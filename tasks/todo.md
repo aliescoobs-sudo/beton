@@ -187,12 +187,12 @@ Plan: [tasks/plan.md](plan.md). Each task lists the spec ACs it closes. Standard
 - [x] Partner sees values read-only; office/plant get 404; changes require step-up and produce audit events
 **Verification:** unit + RLS matrix entry + e2e edit · **Dependencies:** T13, T14 · **Files:** src/modules/platform-security/{domain/parameters.ts,service/parameter-service.ts,ui/parameters/*}, db/migrations/0010_parameters.sql · **Scope:** M
 
-### - [ ] T20: Audit log viewer
+### - [x] T20: Audit log viewer
 **Description:** Screen with filters (date, person, entity, action), paginated; owner/partner see all, office/plant see own actions (RLS from T14); reusable "Historique" tab component for later record pages.
 **Acceptance criteria:**
-- [ ] Office user sees only their own events (RLS-enforced, not UI-filtered)
-- [ ] Viewer shows before/after diff for an update event
-**Verification:** integration + e2e · **Dependencies:** T19 · **Files:** src/modules/platform-security/{service/audit-query.ts,ui/audit/*}, src/app/[locale]/historique/page.tsx · **Scope:** S
+- [x] Office user sees only their own events (RLS-enforced, not UI-filtered)
+- [x] Viewer shows before/after diff for an update event
+**Verification:** integration + e2e · **Dependencies:** T19 · **Files:** src/modules/platform-security/{service/audit-query.ts,ui/audit/*}, src/app/[locale]/(protected)/historique/page.tsx · **Scope:** S
 
 ### - [ ] T21: Security checklist + fake-data banner
 **Description:** `security_checklist_item` seeded with the D37 items (SPEC §8); owner can mark items with evidence (sensitive); the automated items (CI security tests, restore test < 7 days, all users 2FA, no seed accounts) are computed. A "Données fictives uniquement" banner shows until all pass and the owner signs off; `REAL_DATA=true` refuses to boot unless the checklist is complete.

@@ -57,4 +57,22 @@ test('the owner creates, disables, re-enables a user and resets another user’s
   await expect(page.getByTestId('param-auth.step_up_minutes').getByTestId('param-message')).toHaveText(
     'Enregistré.',
   );
+
+  // Audit viewer (T20): the last parameter change shows its before/after diff.
+  await page.goto('/fr/historique?table=parameter&action=update');
+  const latest = page.getByTestId('audit-event').first();
+  await expect(latest.getByTestId('audit-action')).toContainText('update · parameter · auth.step_up_minutes');
+  await expect(latest.getByTestId('diff-value')).toContainText('8');
+  await expect(latest.getByTestId('diff-value')).toContainText('10');
+});
+
+test('a plant user sees only their own actions in the audit viewer (T20)', async ({ page }) => {
+  // The owner reset this user's 2FA above, so logging in again goes through enrolment.
+  await loginAndEnrol(page, 'fr', E2E_PLANT.email);
+  await page.goto('/fr/historique');
+  await expect(page.getByText('Vous voyez vos propres actions.')).toBeVisible();
+  await expect(page.locator('select[name=person]')).toHaveCount(0);
+  const actors = await page.getByTestId('audit-event').locator('span.font-medium').allTextContents();
+  expect(actors.length).toBeGreaterThan(0);
+  for (const name of actors) expect(['Centrale E2E', 'Système', 'Anonyme']).toContain(name);
 });

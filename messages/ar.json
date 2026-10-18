@@ -119,5 +119,32 @@
       "clock.job.due_reminders": "تذكيرات الآجال",
       "clock.job.day_close": "إغلاق اليوم"
     }
+  },
+  "history": {
+    "title": "السجل",
+    "link": "السجل",
+    "from": "من",
+    "to": "إلى",
+    "person": "الشخص",
+    "everyone": "الجميع",
+    "table": "الجدول",
+    "action": "الإجراء",
+    "any": "الكل",
+    "filter": "تصفية",
+    "when": "التاريخ",
+    "who": "من",
+    "what": "ماذا",
+    "changes": "التغييرات",
+    "field": "الحقل",
+    "before": "قبل",
+    "after": "بعد",
+    "empty": "لا توجد أحداث.",
+    "prev": "السابق",
+    "next": "التالي",
+    "pageOf": "الصفحة {page} من {pages}",
+    "ownOnly": "تعرض إجراءاتك فقط.",
+    "system": "النظام",
+    "anonymous": "مجهول",
+    "simulated": "محاكاة: {at}"
   }
 }

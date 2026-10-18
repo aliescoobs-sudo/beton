@@ -119,5 +119,32 @@
       "clock.job.due_reminders": "Rappels d'échéances",
       "clock.job.day_close": "Clôture de la journée"
     }
+  },
+  "history": {
+    "title": "Historique",
+    "link": "Historique",
+    "from": "Du",
+    "to": "Au",
+    "person": "Personne",
+    "everyone": "Tout le monde",
+    "table": "Table",
+    "action": "Action",
+    "any": "Toutes",
+    "filter": "Filtrer",
+    "when": "Date",
+    "who": "Qui",
+    "what": "Quoi",
+    "changes": "Modifications",
+    "field": "Champ",
+    "before": "Avant",
+    "after": "Après",
+    "empty": "Aucun événement.",
+    "prev": "Précédent",
+    "next": "Suivant",
+    "pageOf": "Page {page} sur {pages}",
+    "ownOnly": "Vous voyez vos propres actions.",
+    "system": "Système",
+    "anonymous": "Anonyme",
+    "simulated": "simulé : {at}"
   }
 }
