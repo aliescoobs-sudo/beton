@@ -9,6 +9,9 @@ const valid = {
   DATABASE_URL_SYSTEM: 'postgres://system:pw@localhost:5432/belgobeton',
   AUTH_SECRET: 'a'.repeat(32),
   FIELD_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
+  RECOVERY_CODES_KEY: Buffer.alloc(32, 8).toString('base64'),
+  LOOKUP_HMAC_KEY: Buffer.alloc(32, 9).toString('base64'),
+  APP_BASE_URL: 'http://localhost:3000',
   BACKUP_AGE_RECIPIENT: 'age1qyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqs3290gq',
 };
 

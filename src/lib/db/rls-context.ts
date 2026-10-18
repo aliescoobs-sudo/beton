@@ -1,12 +1,15 @@
 import type pg from 'pg';
 import { z } from 'zod';
 
-/** Roles known to RLS policies (SPEC-platform-security §4); `system` is the scheduled-job actor. */
-export const DB_ROLES = ['owner', 'partner', 'office', 'plant', 'system'] as const;
+/**
+ * Roles known to RLS policies (SPEC-platform-security §4). `system` is the scheduled-job / bootstrap actor;
+ * `anonymous` is only for auditing failed logins and is granted nothing.
+ */
+export const DB_ROLES = ['owner', 'partner', 'office', 'plant', 'system', 'anonymous'] as const;
 
 const contextSchema = z.object({
   userId: z.uuid({ error: 'userId must be a UUID' }),
-  role: z.enum(DB_ROLES, { error: 'role must be one of owner, partner, office, plant, system' }),
+  role: z.enum(DB_ROLES, { error: 'role must be one of owner, partner, office, plant, system, anonymous' }),
   requestId: z.string().min(1).max(100),
   simAt: z.date().optional(),
 });

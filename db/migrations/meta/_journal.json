@@ -29,6 +29,13 @@
       "when": 1792332003000,
       "tag": "0003_audit_chain",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792332004000,
+      "tag": "0004_auth",
+      "breakpoints": true
     }
   ]
 }

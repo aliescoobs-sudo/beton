@@ -85,13 +85,13 @@ Plan: [tasks/plan.md](plan.md). Each task lists the spec ACs it closes. Standard
 - [x] Decision approved by Ali before T9 starts (2026-10-18: GO, option A)
 **Verification:** ADR review · **Dependencies:** T4, T7 · **Files:** docs/adr/0001-auth-library.md (spike code not merged) · **Scope:** S
 
-### - [ ] T9: Owner bootstrap + password login + lockout
+### - [x] T9: Owner bootstrap + password login + lockout
 **Description:** `app_user` (role, locale, status) + auth tables per ADR; `pnpm user:create-owner` CLI (prompts, refuses if an owner exists, audited as `system/bootstrap`); login page (fr/ar) with password; argon2id via `@node-rs/argon2`; local common-password check against the bundled top-10k list (`src/modules/platform-security/data/common-passwords.txt` + `LICENSE-common-passwords.md` keeping the SecLists MIT notice); rate limits (5/15 min per account → 15-min lock; 20/15 min per IP); identical error text for unknown email and wrong password; login/failed-login audit events. Failed logins for an unknown email are recorded with the fixed, documented **anonymous actor** id (`00000000-0000-7000-8000-000000000000`, ✅ CP2); the attempted identifier is stored only as a keyed HMAC, never in plain text; attempted passwords are never stored or logged. After password success the user lands on the 2FA step (T10); no other page is reachable.
 **Acceptance criteria:**
-- [ ] 5 failed logins lock the account for 15 min; error text identical for unknown email / wrong password (AC-SEC-02, password part)
-- [ ] CLI refuses a second owner and passwords < 12 chars or on the common list
-- [ ] Login success/failure produce audit events without the password or email in plaintext; unknown-email failures use the anonymous actor and an HMAC of the identifier
-- [ ] A log-scan test proves attempted passwords and identifiers never appear in logs
+- [x] 5 failed logins lock the account for 15 min; error text identical for unknown email / wrong password (AC-SEC-02, password part)
+- [x] CLI refuses a second owner and passwords < 12 chars or on the common list
+- [x] Login success/failure produce audit events without the password or email in plaintext; unknown-email failures use the anonymous actor and an HMAC of the identifier
+- [x] A log-scan test proves attempted passwords and identifiers never appear in logs
 **Verification:** `pnpm test src/modules/platform-security` + Playwright `e2e/auth-login.spec.ts` · **Dependencies:** T8 · **Files:** src/modules/platform-security/{db/user-schema.ts,service/auth-service.ts,ui/login-form.tsx}, src/app/[locale]/login/page.tsx, scripts/create-owner.ts, src/modules/platform-security/data/{common-passwords.txt,LICENSE-common-passwords.md} · **Scope:** M
 
 ### - [ ] T10: Forced TOTP enrolment + recovery codes

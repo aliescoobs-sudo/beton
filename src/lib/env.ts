@@ -19,6 +19,9 @@ const envSchema = z.object({
   DATABASE_URL_SYSTEM: postgresUrl,
   AUTH_SECRET: z.string().min(32, { error: 'must be at least 32 characters' }),
   FIELD_ENCRYPTION_KEY: base64Key32,
+  RECOVERY_CODES_KEY: base64Key32,
+  LOOKUP_HMAC_KEY: base64Key32,
+  APP_BASE_URL: z.url({ protocol: /^https?$/, error: 'must be the http(s) origin the app is served from' }),
   BACKUP_AGE_RECIPIENT: z.string().startsWith('age1', { error: 'must be an age public key (age1…)' }),
   SIMULATION_ENABLED: flag,
   REAL_DATA: flag,
@@ -34,6 +37,8 @@ export const SECRET_ENV_NAMES = [
   'DATABASE_URL_SYSTEM',
   'AUTH_SECRET',
   'FIELD_ENCRYPTION_KEY',
+  'RECOVERY_CODES_KEY',
+  'LOOKUP_HMAC_KEY',
 ] as const satisfies readonly (keyof Env)[];
 
 /** Every secret value (and each database password on its own) to scrub from logs. */

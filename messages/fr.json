@@ -2,5 +2,16 @@
   "shell": {
     "title": "BELGOBETON",
     "tagline": "Pilote — données fictives uniquement"
+  },
+  "auth": {
+    "login": {
+      "title": "Connexion",
+      "email": "Adresse e-mail",
+      "password": "Mot de passe",
+      "submit": "Se connecter",
+      "invalid": "E-mail ou mot de passe incorrect.",
+      "locked": "Trop de tentatives. Réessayez plus tard.",
+      "error": "Connexion impossible pour le moment. Réessayez."
+    }
   }
 }
