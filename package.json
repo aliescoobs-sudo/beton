@@ -25,7 +25,9 @@
     "audit:verify": "node --import ./scripts/register-ts-paths.mjs scripts/audit-verify.ts",
     "user:create-owner": "node --import ./scripts/register-ts-paths.mjs scripts/create-owner.ts",
     "test:e2e": "playwright test",
-    "crypto:rotate": "node --import ./scripts/register-ts-paths.mjs scripts/crypto-rotate.ts"
+    "crypto:rotate": "node --import ./scripts/register-ts-paths.mjs scripts/crypto-rotate.ts",
+    "backup": "node --import ./scripts/register-ts-paths.mjs scripts/backup.ts",
+    "backup:restore-test": "node --import ./scripts/register-ts-paths.mjs scripts/restore-test.ts"
   },
   "dependencies": {
     "@better-auth/utils": "0.4.2",

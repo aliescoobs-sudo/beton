@@ -54,7 +54,20 @@ To rotate: put a new key first (keep the old one after it), restart, run `corepa
 `corepack pnpm crypto:rotate --check`, then remove the old key. Columns are registered in
 `src/modules/platform-security/domain/encrypted-columns.ts`.
 
-More commands (backups, audit verification, simulation) arrive with their tasks; the full list is in CAPABILITY-MAP.md §4.
+## Backups
+
+Needs `age` (`brew install age`) and the PostgreSQL client tools.
+
+```bash
+corepack pnpm backup                 # backups/<ts>.sql.age (age-encrypted pg_dump) + <ts>.audit-anchor.json
+corepack pnpm backup:restore-test    # restore the latest into a scratch DB: integrity, migrations, audit chain, anchor
+```
+
+The anchor stores the latest audit event id and hash outside the database: a restore whose chain does not match it
+fails, which catches a full rewrite of the audit log. Copy both files off the host. The age private key
+(`BACKUP_AGE_IDENTITY_FILE`) is only needed for restores and never lives on the app host in production.
+
+More commands (simulation) arrive with their tasks; the full list is in CAPABILITY-MAP.md §4.
 
 ## Module boundaries
 

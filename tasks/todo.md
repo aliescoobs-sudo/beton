@@ -172,12 +172,12 @@ Plan: [tasks/plan.md](plan.md). Each task lists the spec ACs it closes. Standard
 - [x] Playwright: no CSP violation in the console on login and home, in fr and ar
 **Verification:** `pnpm test headers && pnpm test:e2e headers` · **Dependencies:** T1 · **Files:** src/proxy.ts, src/lib/security-headers.ts, tests · **Scope:** S
 
-### - [ ] T18: Encrypted backup + restore test
+### - [x] T18: Encrypted backup + restore test
 **Description:** `pnpm backup` = `pg_dump` (as migrator) piped to `age -r $BACKUP_AGE_RECIPIENT` into `backups/<ts>.sql.age` (gitignored). Next to each backup, write `backups/<ts>.audit-anchor.json` with the latest audit event id and hash (✅ CP2: off-database anchor, so a full rewrite of the chain by the owner/superuser is detectable). `pnpm backup:restore-test` decrypts with the key from a path given by env, restores into a scratch DB, checks migration status and row counts, runs `audit:verify`. Fails clearly if `age` isn't installed.
 **Acceptance criteria:**
-- [ ] Backup file is not readable as SQL without the key (AC-SEC-12)
-- [ ] Restore test passes on a fresh backup, including `audit:verify` (AC-SEC-12)
-- [ ] Restore test fails if the restored chain's event at the anchored id has a different hash than the anchor file
+- [x] Backup file is not readable as SQL without the key (AC-SEC-12)
+- [x] Restore test passes on a fresh backup, including `audit:verify` (AC-SEC-12)
+- [x] Restore test fails if the restored chain's event at the anchored id has a different hash than the anchor file
 **Verification:** run both commands locally against the dev DB · **Dependencies:** T7 · **Files:** scripts/backup.ts, scripts/restore-test.ts, README section · **Scope:** S
 
 ### - [ ] T19: Parameters store
