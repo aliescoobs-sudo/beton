@@ -118,8 +118,9 @@ Plan: [tasks/plan.md](plan.md). Each task lists the spec ACs it closes. Standard
 **Verification:** unit + e2e with a test-only sensitive action · **Dependencies:** T11 · **Files:** src/modules/platform-security/{service/step-up.ts,ui/step-up-dialog.tsx}, tests · **Scope:** S
 
 ### Checkpoint CP3 — Identity
-- [ ] Login → enrolment → 2FA → step-up → logout works end-to-end in fr and ar
-- [ ] ADR 0001 accepted; review with Ali before Phase 3
+- [x] Login → enrolment → 2FA → step-up → logout works end-to-end in fr and ar (`e2e/auth-flow.spec.ts`)
+- [x] ADR 0001 accepted
+- [ ] Review with Ali before Phase 3
 
 ---
 

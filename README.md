@@ -19,7 +19,7 @@ corepack pnpm lint         # eslint (incl. module boundaries) + prettier --check
 corepack pnpm typecheck    # tsc --noEmit
 corepack pnpm test         # vitest run (unit + integration; database must be up)
 corepack pnpm build
-corepack pnpm ci:local     # lint + typecheck + test + build (CI is local until a private remote exists)
+corepack pnpm ci:local     # lint + typecheck + test + audit:verify + build + e2e (CI is local until a private remote exists)
 ```
 
 ## Database (local)
@@ -36,6 +36,16 @@ corepack pnpm test:integration             # migrates and uses belgobeton_test
 ```
 
 Roles: `belgobeton_migrator` owns the schema and runs migrations; `belgobeton_app`, `belgobeton_auth` and `belgobeton_system` have no elevated attributes, own nothing and get only explicit grants. Services reach the database only through `withRlsContext()` (`src/lib/db/rls-context.ts`).
+
+## Accounts and browser tests
+
+```bash
+corepack pnpm user:create-owner            # the single owner; 2FA enrolment is forced at first login
+corepack exec playwright install chromium  # once
+corepack pnpm build && corepack pnpm test:e2e   # fr + ar login/enrolment/step-up flow on belgobeton_e2e (~2 min)
+```
+
+Scripts may only drop the throwaway databases `belgobeton_test`, `belgobeton_e2e` and `belgobeton_ddl_scratch`.
 
 More commands (backups, audit verification, simulation) arrive with their tasks; the full list is in CAPABILITY-MAP.md §4.
 

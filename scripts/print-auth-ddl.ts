@@ -6,16 +6,12 @@ import { getMigrations } from 'better-auth/db/migration';
 import pg from 'pg';
 import { loadEnv } from '@/lib/env';
 import { baseAuthOptions } from '@/modules/platform-security/auth/options';
-import { ensureDatabase, superuserUrl } from './db-bootstrap';
+import { DDL_SCRATCH_DATABASE, recreateDatabase } from './db-bootstrap';
 
 if (existsSync('.env.local')) process.loadEnvFile('.env.local');
 const env = loadEnv(process.env);
-const scratch = 'belgobeton_ddl_scratch';
-const admin = new pg.Client({ connectionString: superuserUrl(env, 'postgres') });
-await admin.connect();
-await admin.query(`drop database if exists ${scratch} with (force)`);
-await admin.end();
-await ensureDatabase(env, scratch);
+const scratch = DDL_SCRATCH_DATABASE;
+await recreateDatabase(env, scratch);
 
 const url = new URL(env.DATABASE_URL_MIGRATOR);
 url.pathname = `/${scratch}`;

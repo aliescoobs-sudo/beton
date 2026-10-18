@@ -3,12 +3,12 @@ import { TEST_DATABASE } from '../scripts/db-bootstrap';
 import { loadEnv } from '../src/lib/env';
 
 /** Integration tests run against `belgobeton_test`, with the same roles as dev (see scripts/db-bootstrap.ts). */
-export function testEnv() {
+export function testEnv(database: string = TEST_DATABASE) {
   if (existsSync('.env.local')) process.loadEnvFile('.env.local');
   const env = loadEnv(process.env);
   const toTestDb = (url: string) => {
     const u = new URL(url);
-    u.pathname = `/${TEST_DATABASE}`;
+    u.pathname = `/${database}`;
     return u.toString();
   };
   return {

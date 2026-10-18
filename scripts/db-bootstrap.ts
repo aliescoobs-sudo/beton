@@ -7,6 +7,10 @@ import { z } from 'zod';
 import { type Env, loadEnv } from '../src/lib/env.ts';
 
 export const TEST_DATABASE = 'belgobeton_test';
+export const E2E_DATABASE = 'belgobeton_e2e';
+export const DDL_SCRATCH_DATABASE = 'belgobeton_ddl_scratch';
+/** The only databases scripts may drop: never the dev (or any real) database. */
+const THROWAWAY_DATABASES: readonly string[] = [TEST_DATABASE, E2E_DATABASE, DDL_SCRATCH_DATABASE];
 
 const ROLE_NAMES = {
   migrator: 'belgobeton_migrator',
@@ -92,13 +96,20 @@ export async function ensureDatabase(env: Env, database: string): Promise<void> 
   });
 }
 
-/** Drops and recreates the integration-test database (it holds immutable audit rows). */
-export async function recreateTestDatabase(env: Env): Promise<void> {
+/** Drops and recreates a throwaway database (test/e2e: they hold immutable audit rows). Never the dev database. */
+export async function recreateDatabase(env: Env, database: string): Promise<void> {
+  if (!THROWAWAY_DATABASES.includes(database)) {
+    throw new Error(
+      `Refusing to recreate "${database}": only ${THROWAWAY_DATABASES.join(', ')} may be dropped`,
+    );
+  }
   await withClient(superuserUrl(env, 'postgres'), (client) =>
-    client.query(`DROP DATABASE IF EXISTS ${client.escapeIdentifier(TEST_DATABASE)} WITH (FORCE)`),
+    client.query(`DROP DATABASE IF EXISTS ${client.escapeIdentifier(database)} WITH (FORCE)`),
   );
-  await ensureDatabase(env, TEST_DATABASE);
+  await ensureDatabase(env, database);
 }
+
+export const recreateTestDatabase = (env: Env) => recreateDatabase(env, TEST_DATABASE);
 
 if (import.meta.main) {
   if (existsSync('.env.local')) process.loadEnvFile('.env.local');
