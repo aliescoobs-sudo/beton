@@ -94,12 +94,12 @@ Plan: [tasks/plan.md](plan.md). Each task lists the spec ACs it closes. Standard
 - [x] A log-scan test proves attempted passwords and identifiers never appear in logs
 **Verification:** `pnpm test src/modules/platform-security` + Playwright `e2e/auth-login.spec.ts` · **Dependencies:** T8 · **Files:** src/modules/platform-security/{db/user-schema.ts,service/auth-service.ts,ui/login-form.tsx}, src/app/[locale]/login/page.tsx, scripts/create-owner.ts, src/modules/platform-security/data/{common-passwords.txt,LICENSE-common-passwords.md} · **Scope:** M
 
-### - [ ] T10: Forced TOTP enrolment + recovery codes
+### - [x] T10: Forced TOTP enrolment + recovery codes
 **Description:** After the first password login: QR + manual key enrolment, confirm with a code, show 10 recovery codes once (stored hashed). Later logins require TOTP (±1 step) or a recovery code (single use). Any route other than enrolment/2FA redirects there until done.
 **Acceptance criteria:**
-- [ ] A user without TOTP enrolled cannot reach any page except enrolment (AC-SEC-01)
-- [ ] Correct password + wrong TOTP fails and counts toward lockout (AC-SEC-02)
-- [ ] A recovery code works once, then is refused
+- [x] A user without TOTP enrolled cannot reach any page except enrolment (AC-SEC-01)
+- [x] Correct password + wrong TOTP fails and counts toward lockout (AC-SEC-02)
+- [x] A recovery code works once, then is refused
 **Verification:** unit (TOTP window with test clock) + `e2e/auth-2fa.spec.ts` in fr and ar · **Dependencies:** T9 · **Files:** src/modules/platform-security/{service/two-factor.ts,ui/enrol-totp.tsx,ui/verify-totp.tsx}, src/app/[locale]/(auth)/2fa/*, middleware gate · **Scope:** M
 
 ### - [ ] T11: Session lifetimes, rotation, logout

@@ -12,7 +12,7 @@ describe('module boundaries (CAPABILITY-MAP §1)', () => {
   it('forbids shared lib code from importing route code', async () => {
     const errors = await boundaryErrors(
       'src/lib/boundary-probe.ts',
-      "import Page from '@/app/[locale]/page';\nexport const probe = Page;\n",
+      "import Page from '@/app/[locale]/(protected)/page';\nexport const probe = Page;\n",
     );
     expect(errors).toHaveLength(1);
   });

@@ -14,9 +14,15 @@ import {
   recordLogin,
 } from './login-guard';
 import { baseAuthOptions } from './options';
+import { afterTwoFactor, beforeTwoFactor, TWO_FACTOR_PATHS } from './two-factor-hooks';
 
 /** Auth endpoints reachable over HTTP; everything else Better Auth ships answers 404 (ADR 0001). */
-export const ALLOWED_AUTH_PATHS = new Set(['/sign-in/email', '/sign-out', '/get-session']);
+export const ALLOWED_AUTH_PATHS = new Set<string>([
+  '/sign-in/email',
+  '/sign-out',
+  '/get-session',
+  ...TWO_FACTOR_PATHS,
+]);
 
 /** One message for every lockout, so it never reveals whether an account exists. */
 export const LOCKED_MESSAGE = 'Too many attempts. Try again later.';
@@ -34,6 +40,7 @@ export function createAuth({ authPool, env, log }: CreateAuthDeps) {
     : getLogger();
   const guard: LoginGuardDeps = { pool: authPool, hmacKey: env.LOOKUP_HMAC_KEY, clock: realClock };
   const anonymous = { userId: ANONYMOUS_ACTOR_ID, role: 'anonymous' as const };
+  const twoFactorDeps = { authPool, clock: realClock };
   const signInAttempt = (body: unknown) => ({
     identifier: normalizeIdentifier((body as { email?: unknown } | undefined)?.email),
   });
@@ -74,6 +81,7 @@ export function createAuth({ authPool, env, log }: CreateAuthDeps) {
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
         if (!ALLOWED_AUTH_PATHS.has(ctx.path)) throw new APIError('NOT_FOUND');
+        if (ctx.path.startsWith('/two-factor/')) return beforeTwoFactor(ctx, twoFactorDeps);
 
         if (ctx.path === '/sign-in/email') {
           const { identifier } = signInAttempt(ctx.body);
@@ -90,6 +98,7 @@ export function createAuth({ authPool, env, log }: CreateAuthDeps) {
         }
       }),
       after: createAuthMiddleware(async (ctx) => {
+        if (ctx.path.startsWith('/two-factor/')) return afterTwoFactor(ctx, twoFactorDeps);
         if (ctx.path !== '/sign-in/email') return;
         const { identifier } = signInAttempt(ctx.body);
         const ip = clientIp(ctx.headers);
@@ -107,8 +116,9 @@ export function createAuth({ authPool, env, log }: CreateAuthDeps) {
           return;
         }
 
+        // With 2FA on, the password step only opens the TOTP step; the login is audited after TOTP.
         const session = ctx.context.newSession;
-        if (session) {
+        if (session && session.user.twoFactorEnabled !== true) {
           await auditAuthEvent(
             authPool,
             { userId: session.user.id, role: session.user.role },

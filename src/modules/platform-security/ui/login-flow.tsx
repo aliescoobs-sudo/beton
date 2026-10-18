@@ -1,8 +1,22 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { LoginForm } from './login-form';
+import { TwoFactorStep } from './two-factor-step';
 
-/** Login steps. T9: password only; the TOTP step is added in T10. */
+/** Login: password, then (once enrolled) the second factor. */
 export function LoginFlow({ locale }: { locale: string }) {
-  return <LoginForm locale={locale} />;
+  const router = useRouter();
+  const [step, setStep] = useState<'password' | 'second-factor'>('password');
+  const done = () => {
+    router.replace(`/${locale}`);
+    router.refresh();
+  };
+
+  return step === 'password' ? (
+    <LoginForm locale={locale} onTwoFactor={() => setStep('second-factor')} />
+  ) : (
+    <TwoFactorStep onDone={done} />
+  );
 }

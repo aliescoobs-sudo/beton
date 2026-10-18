@@ -12,6 +12,36 @@
       "invalid": "E-mail ou mot de passe incorrect.",
       "locked": "Trop de tentatives. Réessayez plus tard.",
       "error": "Connexion impossible pour le moment. Réessayez."
+    },
+    "twoFactor": {
+      "title": "Code de vérification",
+      "codeLabel": "Code à 6 chiffres de votre application",
+      "recoveryLabel": "Code de secours",
+      "useRecovery": "Utiliser un code de secours",
+      "useTotp": "Utiliser l'application d'authentification",
+      "submit": "Vérifier",
+      "invalid": "Code incorrect ou déjà utilisé.",
+      "locked": "Trop d'essais. Réessayez dans 15 minutes."
+    },
+    "enrol": {
+      "title": "Activer la double authentification",
+      "intro": "La double authentification est obligatoire pour tous les comptes.",
+      "confirmPassword": "Confirmez votre mot de passe",
+      "start": "Continuer",
+      "keyLabel": "Clé à saisir dans votre application d'authentification",
+      "openApp": "Ouvrir dans l'application d'authentification",
+      "codesTitle": "Codes de secours",
+      "codesIntro": "Notez ces 10 codes et gardez-les en lieu sûr. Ils ne seront plus jamais affichés. Chaque code ne sert qu'une fois.",
+      "codesSaved": "J'ai noté mes codes de secours",
+      "confirmCode": "Saisissez le code affiché par l'application",
+      "finish": "Activer",
+      "invalidPassword": "Mot de passe incorrect.",
+      "invalidCode": "Code incorrect. Attendez le code suivant et réessayez.",
+      "error": "Une erreur est survenue. Réessayez."
+    },
+    "session": {
+      "logout": "Se déconnecter",
+      "signedInAs": "Connecté en tant que {name}"
     }
   }
 }
