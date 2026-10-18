@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { currentAuthState } from '@/modules/platform-security/auth/request-state';
 import { LogoutButton } from '@/modules/platform-security/ui/logout-button';
@@ -16,7 +17,10 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
       <p className="mt-6" data-testid="signed-in-as">
         {t('auth.session.signedInAs', { name })}
       </p>
-      <div className="mt-4">
+      <div className="mt-4 flex items-center gap-4">
+        <Link href={`/${locale}/security`} className="text-sm underline">
+          {t('auth.security.link')}
+        </Link>
         <LogoutButton locale={locale} />
       </div>
     </main>

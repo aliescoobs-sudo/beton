@@ -42,6 +42,25 @@
     "session": {
       "logout": "Se déconnecter",
       "signedInAs": "Connecté en tant que {name}"
+    },
+    "stepUp": {
+      "title": "Confirmez votre identité",
+      "intro": "Cette action est sensible. Saisissez le code de votre application d'authentification.",
+      "code": "Code à 6 chiffres",
+      "confirm": "Confirmer",
+      "cancel": "Annuler",
+      "invalid": "Code incorrect ou déjà utilisé."
+    },
+    "security": {
+      "title": "Sécurité",
+      "recoveryTitle": "Codes de secours",
+      "recoveryIntro": "Générer de nouveaux codes remplace et invalide tous les anciens. Les nouveaux codes ne seront affichés qu'une fois.",
+      "password": "Mot de passe",
+      "regenerate": "Générer de nouveaux codes",
+      "newCodes": "Vos nouveaux codes de secours (notez-les maintenant) :",
+      "invalidPassword": "Mot de passe incorrect.",
+      "error": "Une erreur est survenue. Réessayez.",
+      "link": "Sécurité du compte"
     }
   }
 }

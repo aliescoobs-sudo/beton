@@ -3,6 +3,7 @@ import { APIError, getSessionFromCtx } from 'better-auth/api';
 import { symmetricDecrypt } from 'better-auth/crypto';
 import type pg from 'pg';
 import type { Clock } from '@/modules/clock';
+import { needsStepUp } from '../domain/step-up';
 import { auditAuthEvent } from './audit';
 import type { UserRole } from './user-service';
 
@@ -88,7 +89,17 @@ export async function beforeTwoFactor(ctx: HookCtx, deps: Deps): Promise<void> {
     // Re-enrolment happens only after the owner resets a user's 2FA; new codes only once enrolled.
     if (ctx.path === '/two-factor/enable' && enrolled)
       throw new APIError('FORBIDDEN', { message: 'Already enrolled' });
-    if (ctx.path === '/two-factor/generate-backup-codes' && !enrolled) throw new APIError('FORBIDDEN');
+    if (ctx.path === '/two-factor/generate-backup-codes') {
+      if (!enrolled) throw new APIError('FORBIDDEN');
+      // Sensitive action 'auth.regenerate_recovery_codes': needs a second factor at most 10 minutes old.
+      const at = (session.session as { twoFactorAt?: Date | string | null }).twoFactorAt;
+      if (needsStepUp(at ? new Date(at) : null, deps.clock.now())) {
+        throw new APIError('FORBIDDEN', {
+          code: 'STEP_UP_REQUIRED',
+          message: 'Confirm with your authenticator code',
+        });
+      }
+    }
     if (key)
       flows.set(key, {
         kind: ctx.path === '/two-factor/enable' ? 'enable' : 'regenerate',

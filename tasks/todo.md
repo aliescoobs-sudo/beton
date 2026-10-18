@@ -110,11 +110,11 @@ Plan: [tasks/plan.md](plan.md). Each task lists the spec ACs it closes. Standard
 - [x] After logout, replaying the old cookie is refused
 **Verification:** `pnpm test session` + e2e logout check · **Dependencies:** T10 · **Files:** src/modules/platform-security/service/session.ts, middleware, tests · **Scope:** S
 
-### - [ ] T12: Step-up 2FA guard
+### - [x] T12: Step-up 2FA guard
 **Description:** `requireRecentTwoFactor(10 min)` for actions marked sensitive; UI re-prompt dialog that retries the action after a successful TOTP; registry of sensitive actions (from SPEC §5) in code.
 **Acceptance criteria:**
-- [ ] A sensitive action with `two_factor_at` older than 10 min is not executed and prompts TOTP; after success it runs once (AC-SEC-09)
-- [ ] Non-sensitive actions are unaffected
+- [x] A sensitive action with `two_factor_at` older than 10 min is not executed and prompts TOTP; after success it runs once (AC-SEC-09)
+- [x] Non-sensitive actions are unaffected
 **Verification:** unit + e2e with a test-only sensitive action · **Dependencies:** T11 · **Files:** src/modules/platform-security/{service/step-up.ts,ui/step-up-dialog.tsx}, tests · **Scope:** S
 
 ### Checkpoint CP3 — Identity
