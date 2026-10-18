@@ -58,9 +58,10 @@ function run(child: ReturnType<typeof spawn>, name: string): Promise<void> {
 
 const sha256File = (file: string) => createHash('sha256').update(readFileSync(file)).digest('hex');
 
-/** pg_dump (as the migrator) piped into age; then the audit anchor written next to it. */
+/** pg_dump (as the read-only backup role) piped into age; then the audit anchor written next to it. */
 export async function createBackup(options: {
-  migratorUrl: string;
+  /** belgobeton_backup: read-only, BYPASSRLS, so the dump contains every row. */
+  backupUrl: string;
   recipient: string;
   dir: string;
   ageBin?: string;
@@ -73,10 +74,10 @@ export async function createBackup(options: {
   const stamp = realClock.now().toISOString().replace(/[:.]/g, '-');
   const backupFile = join(options.dir, `${stamp}.sql.age`);
   const anchorFile = join(options.dir, `${stamp}.audit-anchor.json`);
-  const database = new URL(options.migratorUrl).pathname.slice(1);
+  const database = new URL(options.backupUrl).pathname.slice(1);
 
   // Anchor first: every event up to it is in the dump; later ones may be too.
-  const pool = new pg.Pool({ connectionString: options.migratorUrl, max: 1 });
+  const pool = new pg.Pool({ connectionString: options.backupUrl, max: 1 });
   let last: { id: string; hash: string } | undefined;
   let count = 0;
   try {
@@ -90,7 +91,7 @@ export async function createBackup(options: {
     await pool.end();
   }
 
-  const conn = libpq(options.migratorUrl);
+  const conn = libpq(options.backupUrl);
   const dump = spawn('pg_dump', [...conn.args, '--format=plain', '--quote-all-identifiers'], {
     env: conn.env,
   });

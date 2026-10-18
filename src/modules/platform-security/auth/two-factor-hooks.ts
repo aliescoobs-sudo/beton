@@ -3,6 +3,7 @@ import { APIError, getSessionFromCtx } from 'better-auth/api';
 import { symmetricDecrypt } from 'better-auth/crypto';
 import type pg from 'pg';
 import type { Clock } from '@/modules/clock';
+import type { ParameterValues } from '../domain/parameters';
 import { sensitiveActionBlocker } from '../domain/step-up';
 import { auditAuthEvent } from './audit';
 import type { UserRole } from './user-service';
@@ -26,6 +27,7 @@ type Flow =
 interface Deps {
   authPool: pg.Pool;
   clock: Clock;
+  parameters: () => Promise<ParameterValues>;
 }
 
 const TOTP_PERIOD_SECONDS = 30;
@@ -136,6 +138,7 @@ export async function beforeTwoFactor(ctx: HookCtx, deps: Deps): Promise<void> {
     const blocker = sensitiveActionBlocker(
       { reenrolRequired: user.reenrolRequired === true, twoFactorAt: at ? new Date(at) : null },
       deps.clock.now(),
+      (await deps.parameters())['auth.step_up_minutes'] * 60_000,
     );
     if (blocker)
       throw new APIError('FORBIDDEN', { code: blocker, message: 'A fresh second factor is required' });

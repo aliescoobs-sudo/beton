@@ -3,8 +3,10 @@ import type pg from 'pg';
 import type { Clock } from '@/modules/clock';
 import { auditAuthEvent } from './audit';
 
-// SPEC §5 (🟡 A8): Better Auth only knows the sliding idle timeout; the absolute cap is ours (ADR 0001 gap 7).
-export const SESSION_ABSOLUTE_MS = 12 * 60 * 60 * 1000;
+import type { ParameterValues } from '../domain/parameters';
+
+// SPEC §5 (🟡 A8): Better Auth only knows the sliding idle timeout; the absolute cap is ours (ADR 0001 gap 7),
+// parameter `auth.session_absolute_hours` (default 12).
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type HookCtx = any;
@@ -15,12 +17,12 @@ type HookCtx = any;
  */
 export async function enforceAbsoluteLifetime(
   ctx: HookCtx,
-  deps: { authPool: pg.Pool; clock: Clock },
+  deps: { authPool: pg.Pool; clock: Clock; parameters: () => Promise<ParameterValues> },
 ): Promise<void> {
   const session = await getSessionFromCtx(ctx);
   if (!session) return;
   const age = deps.clock.now().getTime() - new Date(session.session.createdAt).getTime();
-  if (age <= SESSION_ABSOLUTE_MS) return;
+  if (age <= (await deps.parameters())['auth.session_absolute_hours'] * 3_600_000) return;
 
   await ctx.context.internalAdapter.deleteSession(session.session.token);
   await auditAuthEvent(

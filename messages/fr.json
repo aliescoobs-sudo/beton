@@ -98,5 +98,26 @@
     },
     "error": "Action refusée.",
     "confirmReset": "Réinitialiser la 2FA de cet utilisateur ? Il devra configurer une nouvelle application à sa prochaine connexion."
+  },
+  "parameters": {
+    "title": "Paramètres",
+    "link": "Paramètres",
+    "readOnly": "Lecture seule : seul le propriétaire peut modifier les paramètres.",
+    "save": "Enregistrer",
+    "saved": "Enregistré.",
+    "invalid": "Valeur refusée (hors des limites autorisées).",
+    "error": "Action refusée.",
+    "bounds": "Limites : {min} – {max}",
+    "keys": {
+      "auth.lockout_account_failures": "Échecs de connexion avant blocage (par compte)",
+      "auth.lockout_ip_failures": "Échecs de connexion avant blocage (par adresse IP)",
+      "auth.lockout_window_minutes": "Durée du blocage et fenêtre de comptage (minutes)",
+      "auth.session_absolute_hours": "Durée maximale d'une session (heures)",
+      "auth.step_up_minutes": "Âge maximal du code 2FA pour une action sensible (minutes)",
+      "clock.job.morning_recompute": "Recalcul du matin",
+      "clock.job.daily_brief": "Brief quotidien",
+      "clock.job.due_reminders": "Rappels d'échéances",
+      "clock.job.day_close": "Clôture de la journée"
+    }
   }
 }

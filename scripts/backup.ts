@@ -8,7 +8,7 @@ import { createBackup } from './backup-lib';
 if (existsSync('.env.local')) process.loadEnvFile('.env.local');
 const env = loadEnv(process.env);
 const { backupFile, anchorFile, anchor } = await createBackup({
-  migratorUrl: env.DATABASE_URL_MIGRATOR,
+  backupUrl: env.DATABASE_URL_BACKUP,
   recipient: env.BACKUP_AGE_RECIPIENT,
   dir: 'backups',
 });

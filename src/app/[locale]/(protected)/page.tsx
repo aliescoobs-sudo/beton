@@ -35,6 +35,11 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
         <Link href={`/${locale}/security`} className="text-sm underline">
           {t('auth.security.link')}
         </Link>
+        {state.kind === 'authenticated' && (state.user.role === 'owner' || state.user.role === 'partner') && (
+          <Link href={`/${locale}/parameters`} className="text-sm underline" data-testid="parameters-link">
+            {t('parameters.link')}
+          </Link>
+        )}
         {state.kind === 'authenticated' && state.user.role === 'owner' && (
           <Link href={`/${locale}/admin/users`} className="text-sm underline" data-testid="admin-link">
             {t('admin.link')}

@@ -2,15 +2,14 @@ import type pg from 'pg';
 import { keyedHash } from '@/lib/crypto/hmac';
 import type { Clock } from '@/modules/clock';
 
-// SPEC-platform-security §5. Become parameters in T19.
-export const ACCOUNT_MAX_FAILURES = 5;
-export const IP_MAX_FAILURES = 20;
-export const LOCKOUT_WINDOW_MS = 15 * 60 * 1000;
+import type { ParameterValues } from '../domain/parameters';
 
 export interface LoginGuardDeps {
   pool: pg.Pool; // belgobeton_auth
   hmacKey: string;
   clock: Clock;
+  /** Current parameters (SPEC §5 defaults: 5 per account, 20 per IP, 15 minutes). */
+  parameters: () => Promise<ParameterValues>;
 }
 
 export type LoginVerdict = 'allowed' | 'account_locked' | 'ip_locked';
@@ -40,7 +39,8 @@ export async function checkLogin(
   ip: string | null,
 ): Promise<LoginVerdict> {
   const { identifierHmac, ipHmac } = hashes(deps, identifier, ip);
-  const since = new Date(deps.clock.now().getTime() - LOCKOUT_WINDOW_MS);
+  const p = await deps.parameters();
+  const since = new Date(deps.clock.now().getTime() - p['auth.lockout_window_minutes'] * 60_000);
   const { rows } = await deps.pool.query<{ account_failures: number; ip_failures: number }>(
     `select
        (select count(*)::int from login_attempt a
@@ -51,8 +51,8 @@ export async function checkLogin(
     [identifierHmac, ipHmac, since],
   );
   const { account_failures, ip_failures } = rows[0]!;
-  if (account_failures >= ACCOUNT_MAX_FAILURES) return 'account_locked';
-  if (ip !== null && ip_failures >= IP_MAX_FAILURES) return 'ip_locked';
+  if (account_failures >= p['auth.lockout_account_failures']) return 'account_locked';
+  if (ip !== null && ip_failures >= p['auth.lockout_ip_failures']) return 'ip_locked';
   return 'allowed';
 }
 

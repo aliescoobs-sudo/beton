@@ -1,4 +1,4 @@
-/** A sensitive action needs a second factor no older than this (SPEC-platform-security §5, 🟡 A8). */
+/** Default maximum age of the second factor for a sensitive action (SPEC §5); parameter `auth.step_up_minutes`. */
 export const STEP_UP_MAX_AGE_MS = 10 * 60 * 1000;
 
 /** Actions that need a fresh second factor. Later modules use these ids with requireStepUp(). */
@@ -27,14 +27,19 @@ export type SensitiveBlocker = 'REENROL_REQUIRED' | 'STEP_UP_REQUIRED';
 export function sensitiveActionBlocker(
   state: { reenrolRequired: boolean; twoFactorAt: Date | null },
   now: Date,
+  maxAgeMs: number = STEP_UP_MAX_AGE_MS,
 ): SensitiveBlocker | null {
   if (state.reenrolRequired) return 'REENROL_REQUIRED';
-  return needsStepUp(state.twoFactorAt, now) ? 'STEP_UP_REQUIRED' : null;
+  return needsStepUp(state.twoFactorAt, now, maxAgeMs) ? 'STEP_UP_REQUIRED' : null;
 }
 
 /** True unless the session's last second factor is between 0 and 10 minutes old. */
-export function needsStepUp(twoFactorAt: Date | null, now: Date): boolean {
+export function needsStepUp(
+  twoFactorAt: Date | null,
+  now: Date,
+  maxAgeMs: number = STEP_UP_MAX_AGE_MS,
+): boolean {
   if (!twoFactorAt) return true;
   const age = now.getTime() - twoFactorAt.getTime();
-  return age < 0 || age > STEP_UP_MAX_AGE_MS;
+  return age < 0 || age > maxAgeMs;
 }

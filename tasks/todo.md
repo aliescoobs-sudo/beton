@@ -180,12 +180,12 @@ Plan: [tasks/plan.md](plan.md). Each task lists the spec ACs it closes. Standard
 - [x] Restore test fails if the restored chain's event at the anchored id has a different hash than the anchor file
 **Verification:** run both commands locally against the dev DB · **Dependencies:** T7 · **Files:** scripts/backup.ts, scripts/restore-test.ts, README section · **Scope:** S
 
-### - [ ] T19: Parameters store
+### - [x] T19: Parameters store
 **Description:** Typed parameter registry in code (key, Zod schema, default, owner-only write): first entries = session/lockout values and clock job times (later modules add their own). Owner edit screen (sensitive → step-up); partner read-only; every change audited.
 **Acceptance criteria:**
-- [ ] Invalid values rejected by schema; defaults used when unset
-- [ ] Partner sees values read-only; office/plant get 404; changes require step-up and produce audit events
-**Verification:** unit + RLS matrix entry + e2e edit · **Dependencies:** T13, T14 · **Files:** src/modules/platform-security/{domain/parameters.ts,service/parameter-service.ts,ui/parameters/*}, db/migrations/0005_parameters.sql · **Scope:** M
+- [x] Invalid values rejected by schema; defaults used when unset
+- [x] Partner sees values read-only; office/plant get 404; changes require step-up and produce audit events
+**Verification:** unit + RLS matrix entry + e2e edit · **Dependencies:** T13, T14 · **Files:** src/modules/platform-security/{domain/parameters.ts,service/parameter-service.ts,ui/parameters/*}, db/migrations/0010_parameters.sql · **Scope:** M
 
 ### - [ ] T20: Audit log viewer
 **Description:** Screen with filters (date, person, entity, action), paginated; owner/partner see all, office/plant see own actions (RLS from T14); reusable "Historique" tab component for later record pages.

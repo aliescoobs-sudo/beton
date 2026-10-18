@@ -17,5 +17,6 @@ export function testEnv(database: string = TEST_DATABASE) {
     DATABASE_URL_MIGRATOR: toTestDb(env.DATABASE_URL_MIGRATOR),
     DATABASE_URL_AUTH: toTestDb(env.DATABASE_URL_AUTH),
     DATABASE_URL_SYSTEM: toTestDb(env.DATABASE_URL_SYSTEM),
+    DATABASE_URL_BACKUP: toTestDb(env.DATABASE_URL_BACKUP),
   };
 }

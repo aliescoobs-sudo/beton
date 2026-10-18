@@ -43,6 +43,28 @@ describe('database roles (SPEC-platform-security §4)', () => {
     expect(rows[0].can).toBe(false);
   });
 
+  it('the backup role bypasses RLS to dump, but cannot write anything', async () => {
+    expect(await roleRow('belgobeton_backup')).toMatchObject({
+      rolsuper: false,
+      rolbypassrls: true,
+      rolcreaterole: false,
+    });
+    const backup = new pg.Client({ connectionString: env.DATABASE_URL_BACKUP });
+    await backup.connect();
+    try {
+      await expect(
+        backup.query(
+          `insert into parameter (key, value, updated_by, updated_at) values ('x.y', '1', gen_random_uuid(), now())`,
+        ),
+      ).rejects.toThrow(/permission denied/);
+      await expect(backup.query('create table backup_should_not_create (id int)')).rejects.toThrow(
+        /permission denied/,
+      );
+    } finally {
+      await backup.end();
+    }
+  });
+
   it('migrator is not a superuser and cannot bypass RLS', async () => {
     expect(await roleRow('belgobeton_migrator')).toMatchObject({ rolsuper: false, rolbypassrls: false });
   });

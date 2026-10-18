@@ -1,5 +1,11 @@
 import { type Clock, realClock } from '@/modules/clock';
-import { type SensitiveAction, sensitiveActionBlocker, type SensitiveBlocker } from '../domain/step-up';
+import type { ParameterValues } from '../domain/parameters';
+import {
+  type SensitiveAction,
+  sensitiveActionBlocker,
+  type SensitiveBlocker,
+  STEP_UP_MAX_AGE_MS,
+} from '../domain/step-up';
 import type { AuthState, SessionUser } from './session-gate';
 
 export const STEP_UP_REQUIRED = 'STEP_UP_REQUIRED' as const;
@@ -11,6 +17,8 @@ export type StepUpResult<T> =
 export interface StepUpDeps {
   getState: () => Promise<AuthState>;
   clock?: Clock;
+  /** Current parameters (`auth.step_up_minutes`); the spec default applies without it. */
+  parameters?: () => Promise<ParameterValues>;
 }
 
 /**
@@ -21,13 +29,14 @@ export interface StepUpDeps {
 export async function withStepUp<T>(
   _action: SensitiveAction,
   fn: (user: SessionUser) => Promise<T>,
-  { getState, clock = realClock }: StepUpDeps,
+  { getState, clock = realClock, parameters }: StepUpDeps,
 ): Promise<StepUpResult<T>> {
   const state = await getState();
   if (state.kind !== 'authenticated') return { ok: false, error: 'UNAUTHENTICATED' };
   const blocker = sensitiveActionBlocker(
     { reenrolRequired: state.user.reenrolRequired, twoFactorAt: state.session.twoFactorAt },
     clock.now(),
+    parameters ? (await parameters())['auth.step_up_minutes'] * 60_000 : STEP_UP_MAX_AGE_MS,
   );
   if (blocker) return { ok: false, error: blocker };
   return { ok: true, value: await fn(state.user) };

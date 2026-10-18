@@ -9,6 +9,7 @@ test('a non-owner gets a 404 on user admin (T13, SPEC §4)', async ({ page }) =>
   await expect(page.getByTestId('admin-link')).toHaveCount(0);
   const response = await page.goto('/fr/admin/users');
   expect(response?.status()).toBe(404);
+  expect((await page.goto('/fr/parameters'))?.status()).toBe(404);
 });
 
 test('the owner creates, disables, re-enables a user and resets another user’s 2FA', async ({ page }) => {
@@ -40,4 +41,20 @@ test('the owner creates, disables, re-enables a user and resets another user’s
   page.once('dialog', (dialog) => void dialog.accept());
   await plant.getByRole('button', { name: 'Réinitialiser la 2FA' }).click();
   await expect(plant.getByTestId('two-factor')).toHaveText('À configurer');
+
+  // Parameters (T19): the owner tightens the step-up window, the change persists, then restores the default.
+  await page.goto('/fr');
+  await page.getByTestId('parameters-link').click();
+  await expect(page).toHaveURL('/fr/parameters');
+  const stepUp = page.getByTestId('param-auth.step_up_minutes');
+  await stepUp.locator('input[name=value]').fill('8');
+  await stepUp.locator('button[type=submit]').click();
+  await expect(stepUp.getByTestId('param-message')).toHaveText('Enregistré.');
+  await page.reload();
+  await expect(page.getByTestId('param-auth.step_up_minutes').locator('input[name=value]')).toHaveValue('8');
+  await page.getByTestId('param-auth.step_up_minutes').locator('input[name=value]').fill('10');
+  await page.getByTestId('param-auth.step_up_minutes').locator('button[type=submit]').click();
+  await expect(page.getByTestId('param-auth.step_up_minutes').getByTestId('param-message')).toHaveText(
+    'Enregistré.',
+  );
 });

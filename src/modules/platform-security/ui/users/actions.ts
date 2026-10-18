@@ -7,6 +7,7 @@ import { getAuth } from '../../auth/instance';
 import { currentAuthState } from '../../auth/request-state';
 import type { SessionUser } from '../../auth/session-gate';
 import { withStepUp } from '../../auth/step-up-guard';
+import { readParameters } from '../../service/parameter-service';
 import {
   createManagedUser,
   resetTwoFactor,
@@ -29,7 +30,10 @@ async function ownerAction(fn: (user: SessionUser) => Promise<void>): Promise<Ad
   const allowed = await authorize('users.manage', { getState: currentAuthState, appPool: getPool('app') });
   if (!allowed.ok) return { ok: false, error: allowed.reason };
   try {
-    const result = await withStepUp('users.manage', fn, { getState: currentAuthState });
+    const result = await withStepUp('users.manage', fn, {
+      getState: currentAuthState,
+      parameters: () => readParameters(getPool('auth')),
+    });
     return result.ok ? { ok: true } : { ok: false, error: result.error };
   } catch (error) {
     // Service refusals (policy, duplicates): their messages carry no secrets.

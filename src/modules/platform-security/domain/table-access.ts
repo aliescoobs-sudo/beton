@@ -35,6 +35,14 @@ export const TABLE_ACCESS = {
       'CP2: its SECURITY DEFINER writers run as the owner and must read the latest hash, so RLS is enabled, not ' +
       'forced; it is the audit log itself, so it is not captured by the audit trigger.',
   },
+  parameter: {
+    kind: 'rls',
+    read: { owner: 'all', partner: 'all', office: 'none', plant: 'none', system: 'all', anonymous: 'none' },
+    force: true,
+    audited: true,
+    exception:
+      'Also readable by belgobeton_auth (login lockout runs before any session); writes: owner only.',
+  },
   user: { kind: 'auth_only', reason: 'Better Auth account table (ADR 0001)' },
   session: { kind: 'auth_only', reason: 'Better Auth sessions (ADR 0001)' },
   account: { kind: 'auth_only', reason: 'Better Auth credentials: password hashes (ADR 0001)' },

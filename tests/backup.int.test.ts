@@ -26,7 +26,7 @@ beforeAll(async () => {
     );
   }
   backup = await createBackup({
-    migratorUrl: env.DATABASE_URL_MIGRATOR,
+    backupUrl: env.DATABASE_URL_BACKUP,
     recipient: env.BACKUP_AGE_RECIPIENT,
     dir,
   });
@@ -104,7 +104,7 @@ describe('restore test', () => {
   it('explains how to install age when it is missing', async () => {
     await expect(
       createBackup({
-        migratorUrl: env.DATABASE_URL_MIGRATOR,
+        backupUrl: env.DATABASE_URL_BACKUP,
         recipient: env.BACKUP_AGE_RECIPIENT,
         dir,
         ageBin: 'age-not-installed',

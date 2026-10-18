@@ -13,6 +13,7 @@ import {
   normalizeIdentifier,
   recordLogin,
 } from './login-guard';
+import { readParameters } from '../service/parameter-service';
 import { baseAuthOptions } from './options';
 import { enforceAbsoluteLifetime } from './session-lifetime';
 import { afterTwoFactor, beforeTwoFactor, TWO_FACTOR_PATHS } from './two-factor-hooks';
@@ -39,9 +40,15 @@ export function createAuth({ authPool, env, log }: CreateAuthDeps) {
   const logger = log
     ? createClockLogger({ clock: realClock, secretValues: secretValuesOf(env), write: log })
     : getLogger();
-  const guard: LoginGuardDeps = { pool: authPool, hmacKey: env.LOOKUP_HMAC_KEY, clock: realClock };
+  const parameters = () => readParameters(authPool);
+  const guard: LoginGuardDeps = {
+    pool: authPool,
+    hmacKey: env.LOOKUP_HMAC_KEY,
+    clock: realClock,
+    parameters,
+  };
   const anonymous = { userId: ANONYMOUS_ACTOR_ID, role: 'anonymous' as const };
-  const twoFactorDeps = { authPool, clock: realClock };
+  const twoFactorDeps = { authPool, clock: realClock, parameters };
   const signInAttempt = (body: unknown) => ({
     identifier: normalizeIdentifier((body as { email?: unknown } | undefined)?.email),
   });

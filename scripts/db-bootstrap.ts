@@ -23,6 +23,7 @@ const ROLE_NAMES = {
   app: 'belgobeton_app',
   auth: 'belgobeton_auth',
   system: 'belgobeton_system',
+  backup: 'belgobeton_backup',
 } as const;
 
 function roleUrls(env: Env) {
@@ -31,6 +32,7 @@ function roleUrls(env: Env) {
     { name: ROLE_NAMES.app, url: env.DATABASE_URL_APP },
     { name: ROLE_NAMES.auth, url: env.DATABASE_URL_AUTH },
     { name: ROLE_NAMES.system, url: env.DATABASE_URL_SYSTEM },
+    { name: ROLE_NAMES.backup, url: env.DATABASE_URL_BACKUP },
   ];
 }
 
@@ -70,11 +72,14 @@ export async function ensureRoles(env: Env): Promise<void> {
 
       const exists = await client.query('select 1 from pg_roles where rolname = $1', [role.name]);
       const verb = exists.rowCount ? 'ALTER' : 'CREATE';
+      // Only the backup role may bypass RLS (pg_dump must see every row); it can read, never write.
+      const rls = role.name === ROLE_NAMES.backup ? 'BYPASSRLS INHERIT' : 'NOBYPASSRLS NOINHERIT';
       await client.query(
         `${verb} ROLE ${client.escapeIdentifier(role.name)} LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE ` +
-          `NOBYPASSRLS NOREPLICATION NOINHERIT PASSWORD ${client.escapeLiteral(password)}`,
+          `${rls} NOREPLICATION PASSWORD ${client.escapeLiteral(password)}`,
       );
     }
+    await client.query(`GRANT pg_read_all_data TO ${client.escapeIdentifier(ROLE_NAMES.backup)}`);
   });
 }
 

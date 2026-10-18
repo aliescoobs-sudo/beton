@@ -7,6 +7,7 @@ const valid = {
   DATABASE_URL_MIGRATOR: 'postgres://migrator:pw@localhost:5432/belgobeton',
   DATABASE_URL_AUTH: 'postgres://auth:pw@localhost:5432/belgobeton',
   DATABASE_URL_SYSTEM: 'postgres://system:pw@localhost:5432/belgobeton',
+  DATABASE_URL_BACKUP: 'postgres://backup:pw@localhost:5432/belgobeton',
   AUTH_SECRET: 'a'.repeat(32),
   FIELD_ENCRYPTION_KEYS: `k1:${Buffer.alloc(32, 7).toString('base64')}`,
   RECOVERY_CODES_KEYS: `r1:${Buffer.alloc(32, 8).toString('base64')}`,
