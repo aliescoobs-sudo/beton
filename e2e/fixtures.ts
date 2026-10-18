@@ -11,6 +11,7 @@ export const E2E_USERS = {
 } as const;
 export const E2E_OWNER = { email: 'e2e-owner@belgobeton.test', name: 'Propriétaire E2E' } as const;
 export const E2E_PLANT = { email: 'e2e-plant@belgobeton.test', name: 'Centrale E2E' } as const;
+export const E2E_CSP = { email: 'e2e-csp@belgobeton.test', name: 'CSP E2E' } as const;
 
 /** TOTP from the key shown on the enrolment page, as an authenticator app would compute it. */
 export async function totpFromDisplayedKey(displayed: string): Promise<string> {

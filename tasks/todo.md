@@ -165,11 +165,11 @@ Plan: [tasks/plan.md](plan.md). Each task lists the spec ACs it closes. Standard
 - [x] Rotation re-encrypts all rows to the new key id; old key can then be removed
 **Verification:** `pnpm test crypto` (unit + integration) · **Dependencies:** T4 · **Files:** src/lib/crypto/field.ts, src/lib/crypto/hmac.ts, scripts/crypto-rotate.ts, tests · **Scope:** S
 
-### - [ ] T17: Security headers + nonce CSP
+### - [x] T17: Security headers + nonce CSP
 **Description:** `src/proxy.ts` sets a per-request nonce CSP (`default-src 'self'`, `script-src 'nonce-…' 'strict-dynamic'`, `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'none'`), `X-Content-Type-Options`, `Referrer-Policy: same-origin`, minimal `Permissions-Policy`, HSTS in non-local envs.
 **Acceptance criteria:**
-- [ ] Every response carries the headers (AC-SEC-13), checked by an integration test over 3 routes
-- [ ] Playwright: no CSP violation in the console on login and home, in fr and ar
+- [x] Every response carries the headers (AC-SEC-13), checked by an integration test over 3 routes
+- [x] Playwright: no CSP violation in the console on login and home, in fr and ar
 **Verification:** `pnpm test headers && pnpm test:e2e headers` · **Dependencies:** T1 · **Files:** src/proxy.ts, src/lib/security-headers.ts, tests · **Scope:** S
 
 ### - [ ] T18: Encrypted backup + restore test

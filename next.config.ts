@@ -6,6 +6,19 @@ const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
+  // Static assets bypass src/proxy.ts; give them the fixed hardening headers too.
+  async headers() {
+    return [
+      {
+        source: '/_next/static/:path*',
+        headers: [
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'Referrer-Policy', value: 'same-origin' },
+          { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+        ],
+      },
+    ];
+  },
 };
 
 export default withNextIntl(nextConfig);
