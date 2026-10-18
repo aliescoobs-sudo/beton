@@ -28,6 +28,7 @@ Daily job catalogue (times are Africa/Casablanca business time, 🟡 A3):
 Event-driven recompute (after any ledger/operations write) runs in addition; the jobs guarantee time-based rules fire even with no writes.
 
 ## 4. Behaviour
+- **Time zone (✅ confirmed by Ali, 2026-10-18):** Morocco has been on GMT (UTC+0) permanently since 20 Sept 2026 (decree 2.26.530), with no Ramadan switch. Business dates use `Africa/Casablanca` from the IANA tz data shipped with Node (2026c already encodes the change); never hard-code an offset. Dates before 20 Sept 2026 keep their historical UTC+1. If the rule changes again, update Node/tz data, not code.
 - `clock.now()` returns real time when mode = `real` or simulation is disabled; otherwise `sim_now`.
 - `clock.advance({ to | byDays })` (owner only, step-up 2FA, audited — the role and step-up checks live in the route/server action in `src/app`, the audit comes from the DB trigger on `sim_clock`; `clock` imports no other module) moves `sim_now` forward **step by step**: for each crossed job time and scripted event (from `simulation`), in chronological order, set `sim_now` to that instant and run it to completion before continuing. Advancing 3 days gives the same state as advancing 1 day three times.
 - Time never moves backwards; going back = `sim:reset`.

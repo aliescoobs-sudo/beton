@@ -225,7 +225,7 @@ Doc-level 🟡 items (D27–D59, R-rules) are cited inline in each module spec. 
 |---|---|---|
 | A1 | Better Auth + TOTP plugin is acceptable as auth library | platform-security |
 | A2 | pnpm as package manager | all |
-| A3 | Time zone Africa/Casablanca for business dates | all |
+| A3 | ✅ 2026-10-18: time zone Africa/Casablanca from IANA tz data; Morocco is on UTC+0 permanently since 20 Sept 2026 (decree 2.26.530, no Ramadan switch) | all |
 | A4 | ✅ 2026-10-18: VAT 20% in the simulation; must be a configurable parameter (`vat_rate_bp`), single rate per line | ledger, rules-engine |
 | A5 | Working days Mon–Sat; holidays configurable | clock, operations |
 | A6 | Coverage bar 90% on domain code | all |
