@@ -183,6 +183,63 @@ describe('password login (T9, AC-SEC-02 password part)', () => {
 describe('createUser (owner bootstrap and user admin)', () => {
   const bootstrap = { userId: BOOTSTRAP_ACTOR_ID, role: 'system' as const };
 
+  it('if writing the credentials fails, the user stays disabled, the failure is audited, and a retry completes it', async () => {
+    const email = `retry-${Date.now()}@belgobeton.test`;
+    const input = {
+      actor: bootstrap,
+      email,
+      name: 'Retry',
+      password,
+      role: 'office' as const,
+      locale: 'fr' as const,
+    };
+    const ctx = await kit.auth.$context;
+    const spy = vi
+      .spyOn(ctx.internalAdapter, 'linkAccount')
+      .mockRejectedValueOnce(new Error('connection lost'));
+    try {
+      await expect(createUser(kit.auth, kit.authPool, input)).rejects.toThrow(/retry/i);
+    } finally {
+      spy.mockRestore();
+    }
+
+    const { rows } = await kit.migrator.query(
+      `select id, status, "provisionedAt" from "user" where email = $1`,
+      [email],
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ status: 'disabled', provisionedAt: null });
+    const [failure] = await kit.auditEvents(`action = 'user_creation_failed' and row_id = $1`, [rows[0].id]);
+    expect(failure).toMatchObject({ actor_user_id: BOOTSTRAP_ACTOR_ID, reason: 'credentials_not_written' });
+    expect(JSON.stringify(failure)).not.toContain('connection lost');
+    expect((await kit.call('/sign-in/email', { email, password })).ok).toBe(false);
+
+    const retried = await createUser(kit.auth, kit.authPool, input);
+    expect(retried.id).toBe(rows[0].id);
+    const { rows: after } = await kit.migrator.query(
+      `select status, "provisionedAt" from "user" where email = $1`,
+      [email],
+    );
+    expect(after[0].status).toBe('active');
+    expect(after[0].provisionedAt).toBeInstanceOf(Date);
+    expect((await kit.call('/sign-in/email', { email, password })).status).toBe(200);
+    expect(await kit.auditEvents(`action = 'user_created' and row_id = $1`, [retried.id])).toHaveLength(1);
+  });
+
+  it('refuses to create a user whose email already belongs to a completed account', async () => {
+    const email = `dup-${Date.now()}@belgobeton.test`;
+    const input = {
+      actor: bootstrap,
+      email,
+      name: 'Dup',
+      password,
+      role: 'office' as const,
+      locale: 'fr' as const,
+    };
+    await createUser(kit.auth, kit.authPool, input);
+    await expect(createUser(kit.auth, kit.authPool, input)).rejects.toThrow(/already exists/);
+  });
+
   it('refuses a second owner', async () => {
     await expect(
       createUser(kit.auth, kit.authPool, {

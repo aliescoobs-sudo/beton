@@ -15,6 +15,7 @@ export const SERVICE_AUDIT_ACTIONS = [
   'permission_denied',
   'export',
   'user_created',
+  'user_creation_failed',
   'two_factor_enrolled',
   'recovery_codes_generated',
   'recovery_code_used',
