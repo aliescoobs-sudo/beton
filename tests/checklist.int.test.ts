@@ -46,9 +46,11 @@ describe('security checklist (T21)', () => {
       deps(),
     );
     expect(await status('csp_active')).toBe('done');
-    const [event] = await kit.auditEvents(`table_name = 'security_checklist_item' and actor_user_id = $1`, [
-      owner.id,
-    ]);
+    // The owner is shared by every suite in the run: look at this item's event only.
+    const [event] = await kit.auditEvents(
+      `table_name = 'security_checklist_item' and actor_user_id = $1 and row_id = 'csp_active'`,
+      [owner.id],
+    );
     expect(event).toMatchObject({ action: 'insert', row_id: 'csp_active' });
   });
 

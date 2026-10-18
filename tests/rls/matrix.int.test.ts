@@ -59,11 +59,12 @@ const FIXTURES: Record<
     visible: `select checked_by::text as owner from security_checklist_item where key = 'test_' || $1`,
   },
   security_check_run: {
+    // Failed runs: they must not count as a recent successful restore test for other suites.
     writers: ['system'],
     pool: 'system',
     seed: (tx, actor) =>
       tx.query(
-        `insert into security_check_run (key, ok, at, detail) values ('restore_test', true, now(), $1)`,
+        `insert into security_check_run (key, ok, at, detail) values ('restore_test', false, now(), $1)`,
         [`${marker}:${actor}`],
       ),
     visible: `select split_part(detail, ':', 2) as owner from security_check_run where detail like $1 || ':%'`,
