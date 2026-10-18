@@ -1,9 +1,8 @@
 import { existsSync } from 'node:fs';
+import { TEST_DATABASE } from '../scripts/db-bootstrap';
 import { loadEnv } from '../src/lib/env';
 
 /** Integration tests run against `belgobeton_test`, with the same roles as dev (see scripts/db-bootstrap.ts). */
-export const TEST_DATABASE = 'belgobeton_test';
-
 export function testEnv() {
   if (existsSync('.env.local')) process.loadEnvFile('.env.local');
   const env = loadEnv(process.env);

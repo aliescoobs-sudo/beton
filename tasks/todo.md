@@ -47,11 +47,11 @@ Plan: [tasks/plan.md](plan.md). Each task lists the spec ACs it closes. Standard
 
 ## Phase 1 — Audit log (security core)
 
-### - [ ] T5: `audit_event` table, immutable
+### - [x] T5: `audit_event` table, immutable
 **Description:** Create `audit_event` (columns per SPEC §3). `REVOKE UPDATE, DELETE, TRUNCATE` from all roles incl. migrator; `BEFORE UPDATE OR DELETE` trigger raising; `INSERT` only via the trigger function / `audit.record()` (SECURITY DEFINER, fixed `search_path`).
 **Acceptance criteria:**
-- [ ] `UPDATE`, `DELETE`, `TRUNCATE` on `audit_event` fail for `app` and `migrator` (AC-SEC-07, audit part)
-- [ ] Direct `INSERT` by `app` is refused; `audit.record()` works
+- [x] `UPDATE`, `DELETE`, `TRUNCATE` on `audit_event` fail for `app` and `migrator` (AC-SEC-07, audit part)
+- [x] Direct `INSERT` by `app` is refused; `audit.record()` works
 **Verification:** `pnpm test db/audit` (integration) · **Dependencies:** T4 · **Files:** db/migrations/0001_audit.sql, src/modules/platform-security/db/audit-schema.ts, tests · **Scope:** S
 
 ### - [ ] T6: Generic audit capture trigger
