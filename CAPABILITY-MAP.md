@@ -13,7 +13,7 @@ Legend (same as DECISIONS.md): ✅ confirmed · 🟡 assumption. `D<n>` = DECISI
 
 | Module id | Responsibility | Depends on | Spec |
 |---|---|---|---|
-| `platform-security` | Auth + 2FA, sessions, RBAC (app + PostgreSQL RLS), immutable audit log, encryption, backups, secrets, parameters | — | [SPEC-platform-security.md](SPEC-platform-security.md) |
+| `platform-security` | Auth + 2FA, sessions, RBAC (app + PostgreSQL RLS), immutable audit log, encryption, backups, secrets, parameters | `clock` | [SPEC-platform-security.md](SPEC-platform-security.md) |
 | `clock` | Single source of "now"; real vs simulated clock; scheduled-job runner driven by the clock | — | [SPEC-clock.md](SPEC-clock.md) |
 | `master-data` | Clients, suppliers, components/units, recettes, concrete types, prices, trucks, zones | `platform-security` | [SPEC-master-data.md](SPEC-master-data.md) |
 | `ledger` | Orders + payment plans, internal invoices, payment instruments lifecycle, purchases, supplier payments, money accounts, reversing entries | `master-data`, `clock` | [SPEC-ledger.md](SPEC-ledger.md) |
@@ -25,9 +25,11 @@ Legend (same as DECISIONS.md): ✅ confirmed · 🟡 assumption. `D<n>` = DECISI
 | `owner-dashboard` | Brain's home, forecast view, black-day report; works with AI off | `rules-engine`, `reconciliation`, `notifications` | [SPEC-owner-dashboard.md](SPEC-owner-dashboard.md) |
 | `ai-layer` | Provider abstraction, pseudonymization, 5 AI roles, confirmation flow, kill switches, budget | `rules-engine`, `reconciliation`, `ledger`, `owner-dashboard` | [SPEC-ai-layer.md](SPEC-ai-layer.md) |
 
-**Build order:** `platform-security`, `clock` → `master-data` → `ledger` → `operations` → `rules-engine`, `reconciliation` → `simulation` → `notifications`, `owner-dashboard` → `ai-layer`
+**Build order:** `clock` (real mode) → `platform-security` → `master-data` → `ledger` → `operations` → `rules-engine`, `reconciliation` → `simulation` → `notifications`, `owner-dashboard` → `ai-layer`
 
-Dependency rule: a module may import only from modules it depends on (directly or transitively). Enforced by lint (`eslint-plugin-boundaries` or equivalent — 🟡 A20, ask first before adding).
+Dependency rule: a module may import only from modules it depends on (directly or transitively). Enforced by lint (`eslint-plugin-boundaries`, ✅ A20 approved 2026-10-18; map mirrored in `module-map.mjs`).
+
+`clock` has no dependencies; `platform-security` depends on it for `clock.now()` (session lifetimes, audit sim time). Owner/step-up checks for `clock.advance` are done in the route layer (`src/app`), and its audit comes from the DB trigger, so `clock` never imports `platform-security` (avoids a cycle; changed 2026-10-18 during T1).
 
 ## 2. Objective (shared)
 
@@ -240,7 +242,7 @@ Doc-level 🟡 items (D27–D59, R-rules) are cited inline in each module spec. 
 | A17 | ✅ 2026-10-18: cheque/LCN clearing delay after deposit = 1 working day in the simulation; must be a configurable parameter (`clearing_delay_days`) | rules-engine |
 | A18 | Loading time per trip 10 min, working day 600 min (parameters) | operations |
 | A19 | Amounts are never sent to AI: replaced by placeholders and re-hydrated by code | ai-layer |
-| A20 | Module-boundary lint plugin | all |
+| A20 | ✅ 2026-10-18: `eslint-plugin-boundaries` | all |
 | A21 | Simulation reset may drop the *simulation* database (fake data) — the only exception to "no hard deletes" | simulation |
 | A22 | Owner Q&A and conversational commands available to owner + partner only in MVP | ai-layer |
 | A23 | ✅ 2026-10-18: AI never writes financial records; AI actions limited to alert actions + drafting (never sending) client messages; assisted entry only prefills forms and a human saves | ai-layer |

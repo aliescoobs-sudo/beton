@@ -163,11 +163,11 @@ Plan: [tasks/plan.md](plan.md). Each task lists the spec ACs it closes. Standard
 **Verification:** `pnpm test crypto` (unit + integration) · **Dependencies:** T4 · **Files:** src/lib/crypto/field.ts, src/lib/crypto/hmac.ts, scripts/crypto-rotate.ts, tests · **Scope:** S
 
 ### - [ ] T17: Security headers + nonce CSP
-**Description:** Middleware sets a per-request nonce CSP (`default-src 'self'`, `script-src 'nonce-…' 'strict-dynamic'`, `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'none'`), `X-Content-Type-Options`, `Referrer-Policy: same-origin`, minimal `Permissions-Policy`, HSTS in non-local envs.
+**Description:** `src/proxy.ts` sets a per-request nonce CSP (`default-src 'self'`, `script-src 'nonce-…' 'strict-dynamic'`, `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'none'`), `X-Content-Type-Options`, `Referrer-Policy: same-origin`, minimal `Permissions-Policy`, HSTS in non-local envs.
 **Acceptance criteria:**
 - [ ] Every response carries the headers (AC-SEC-13), checked by an integration test over 3 routes
 - [ ] Playwright: no CSP violation in the console on login and home, in fr and ar
-**Verification:** `pnpm test headers && pnpm test:e2e headers` · **Dependencies:** T1 · **Files:** src/middleware.ts, src/lib/security-headers.ts, tests · **Scope:** S
+**Verification:** `pnpm test headers && pnpm test:e2e headers` · **Dependencies:** T1 · **Files:** src/proxy.ts, src/lib/security-headers.ts, tests · **Scope:** S
 
 ### - [ ] T18: Encrypted backup + restore test
 **Description:** `pnpm backup` = `pg_dump` (as migrator) piped to `age -r $BACKUP_AGE_RECIPIENT` into `backups/<ts>.sql.age` (gitignored). `pnpm backup:restore-test` decrypts with the key from a path given by env, restores into a scratch DB, checks migration status and row counts, runs `audit:verify`. Fails clearly if `age` isn't installed.
@@ -221,7 +221,7 @@ Plan: [tasks/plan.md](plan.md). Each task lists the spec ACs it closes. Standard
 **Verification:** integration test with pg-boss against the test DB · **Dependencies:** T22 · **Files:** src/modules/clock/{domain/job-catalogue.ts,service/job-runner.ts,db/job-run-schema.ts}, db/migrations/0008_job_runs.sql · **Scope:** M
 
 ### - [ ] T24: `clock.advance` (owner, step-up, audited) + demo control
-**Description:** `advance({ to } | { byDays })`: compute all job instants and registered scripted-event instants (hook interface for the `simulation` module) between now and target; for each in order set `sim_now` and run synchronously to completion; idempotent via T23. Owner-only, sensitive (step-up), audit event with from/to. Minimal "Avancer à" control in the sim badge.
+**Description:** `advance({ to } | { byDays })`: compute all job instants and registered scripted-event instants (hook interface for the `simulation` module) between now and target; for each in order set `sim_now` and run synchronously to completion; idempotent via T23. Owner-only, sensitive (step-up) — checked in the server action in `src/app`, not inside `clock`; audit event with from/to via the `sim_clock` trigger. Minimal "Avancer à" control in the sim badge.
 **Acceptance criteria:**
 - [ ] D1 07:00 → D4 07:00 runs each daily job once per crossed day, chronologically; re-advancing over run instants runs nothing (AC-CLK-03)
 - [ ] Advance 3 days ≡ 3 × 1 day: identical job-run sequence and audit sequence (excluding real timestamps) (AC-CLK-04)

@@ -29,7 +29,7 @@ Event-driven recompute (after any ledger/operations write) runs in addition; the
 
 ## 4. Behaviour
 - `clock.now()` returns real time when mode = `real` or simulation is disabled; otherwise `sim_now`.
-- `clock.advance({ to | byDays })` (owner only, step-up 2FA, audited) moves `sim_now` forward **step by step**: for each crossed job time and scripted event (from `simulation`), in chronological order, set `sim_now` to that instant and run it to completion before continuing. Advancing 3 days gives the same state as advancing 1 day three times.
+- `clock.advance({ to | byDays })` (owner only, step-up 2FA, audited — the role and step-up checks live in the route/server action in `src/app`, the audit comes from the DB trigger on `sim_clock`; `clock` imports no other module) moves `sim_now` forward **step by step**: for each crossed job time and scripted event (from `simulation`), in chronological order, set `sim_now` to that instant and run it to completion before continuing. Advancing 3 days gives the same state as advancing 1 day three times.
 - Time never moves backwards; going back = `sim:reset`.
 - Guards: simulated mode cannot be enabled when `NODE_ENV=production` or `REAL_DATA=true`; the app refuses to boot in that combination. The UI shows a permanent sim-date badge ("SIMULATION — jeu. 26 nov. 2026 07:00") whenever mode = simulated.
 - Audit events record both `at` (real) and `sim_at`.
