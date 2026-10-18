@@ -3,7 +3,7 @@ import { APIError, getSessionFromCtx } from 'better-auth/api';
 import { symmetricDecrypt } from 'better-auth/crypto';
 import type pg from 'pg';
 import type { Clock } from '@/modules/clock';
-import { needsStepUp } from '../domain/step-up';
+import { sensitiveActionBlocker } from '../domain/step-up';
 import { auditAuthEvent } from './audit';
 import type { UserRole } from './user-service';
 
@@ -19,9 +19,9 @@ export const TWO_FACTOR_PATHS = [
 ] as const;
 
 type Flow =
-  | { kind: 'enable'; userId: string }
+  | { kind: 'enable'; userId: string; reenrol: boolean }
   | { kind: 'regenerate'; userId: string }
-  | { kind: 'login' | 'enrol' | 'step_up'; userId: string | null; method: 'totp' | 'recovery' };
+  | { kind: 'login' | 'enrol' | 'reenrol' | 'step_up'; userId: string | null; method: 'totp' | 'recovery' };
 
 interface Deps {
   authPool: pg.Pool;
@@ -34,9 +34,23 @@ const TOTP_PERIOD_SECONDS = 30;
 const flows = new WeakMap<object, Flow>();
 const flowKey = (ctx: HookCtx): object | undefined => ctx.headers ?? ctx.request;
 
+interface SessionUserRow {
+  id: string;
+  twoFactorEnabled?: boolean | null;
+  reenrolRequired?: boolean;
+}
+
 async function roleOf(pool: pg.Pool, userId: string): Promise<UserRole> {
   const { rows } = await pool.query<{ role: UserRole }>('select role from "user" where id = $1', [userId]);
   return rows[0]!.role;
+}
+
+async function twoFactorVerified(pool: pg.Pool, userId: string): Promise<boolean | null> {
+  const { rows } = await pool.query<{ verified: boolean | null }>(
+    'select verified from "twoFactor" where "userId" = $1',
+    [userId],
+  );
+  return rows[0] ? rows[0].verified !== false : null;
 }
 
 /** The user a second factor is being checked for: the session user, or the one behind the pending 2FA cookie. */
@@ -50,6 +64,14 @@ async function twoFactorUserId(
   if (!signed) return null;
   const verification = await ctx.context.internalAdapter.findVerificationValue(signed);
   return verification?.value ?? null;
+}
+
+async function passwordMatches(ctx: HookCtx, userId: string, password: unknown): Promise<boolean> {
+  if (typeof password !== 'string') return false;
+  const accounts: { providerId: string; password?: string | null }[] =
+    await ctx.context.internalAdapter.findAccounts(userId);
+  const hash = accounts.find((a) => a.providerId === 'credential')?.password;
+  return !!hash && (await ctx.context.password.verify({ hash, password }));
 }
 
 /**
@@ -82,37 +104,58 @@ async function claimTotpStep(ctx: HookCtx, deps: Deps, userId: string, code: str
 export async function beforeTwoFactor(ctx: HookCtx, deps: Deps): Promise<void> {
   const key = flowKey(ctx);
   const session = await getSessionFromCtx(ctx);
+  const user = session?.user as SessionUserRow | undefined;
+  const enrolled = user?.twoFactorEnabled === true;
 
-  if (ctx.path === '/two-factor/enable' || ctx.path === '/two-factor/generate-backup-codes') {
-    if (!session) throw new APIError('UNAUTHORIZED');
-    const enrolled = session.user.twoFactorEnabled === true;
-    // Re-enrolment happens only after the owner resets a user's 2FA; new codes only once enrolled.
-    if (ctx.path === '/two-factor/enable' && enrolled)
-      throw new APIError('FORBIDDEN', { message: 'Already enrolled' });
-    if (ctx.path === '/two-factor/generate-backup-codes') {
-      if (!enrolled) throw new APIError('FORBIDDEN');
-      // Sensitive action 'auth.regenerate_recovery_codes': needs a second factor at most 10 minutes old.
-      const at = (session.session as { twoFactorAt?: Date | string | null }).twoFactorAt;
-      if (needsStepUp(at ? new Date(at) : null, deps.clock.now())) {
-        throw new APIError('FORBIDDEN', {
-          code: 'STEP_UP_REQUIRED',
-          message: 'Confirm with your authenticator code',
-        });
+  if (ctx.path === '/two-factor/enable') {
+    if (!session || !user) throw new APIError('UNAUTHORIZED');
+    // Only authenticator apps: the "otp" method would turn 2FA on without one.
+    if (ctx.body?.method !== undefined && ctx.body.method !== 'totp') throw new APIError('BAD_REQUEST');
+    let reenrol = false;
+    if (enrolled) {
+      // Enrolling again is allowed only after a recovery-code login (DECISIONS 72); owner resets come in T13.
+      if (!user.reenrolRequired) throw new APIError('FORBIDDEN', { message: 'Already enrolled' });
+      // Check the password before touching anything, so a wrong one cannot disable the current authenticator.
+      if (!(await passwordMatches(ctx, user.id, ctx.body?.password))) {
+        throw new APIError('BAD_REQUEST', { message: 'Invalid password' });
       }
+      await deps.authPool.query('update "twoFactor" set verified = false where "userId" = $1', [user.id]);
+      // A new secret is a new replay domain: steps used by the old authenticator must not block the new one.
+      await deps.authPool.query('update totp_used_step set last_step = 0 where user_id = $1', [user.id]);
+      reenrol = true;
     }
-    if (key)
-      flows.set(key, {
-        kind: ctx.path === '/two-factor/enable' ? 'enable' : 'regenerate',
-        userId: session.user.id,
-      });
+    if (key) flows.set(key, { kind: 'enable', userId: user.id, reenrol });
+    return;
+  }
+
+  if (ctx.path === '/two-factor/generate-backup-codes') {
+    if (!session || !user) throw new APIError('UNAUTHORIZED');
+    if (!enrolled) throw new APIError('FORBIDDEN');
+    // Sensitive action 'auth.regenerate_recovery_codes'.
+    const at = (session.session as { twoFactorAt?: Date | string | null }).twoFactorAt;
+    const blocker = sensitiveActionBlocker(
+      { reenrolRequired: user.reenrolRequired === true, twoFactorAt: at ? new Date(at) : null },
+      deps.clock.now(),
+    );
+    if (blocker)
+      throw new APIError('FORBIDDEN', { code: blocker, message: 'A fresh second factor is required' });
+    if (key) flows.set(key, { kind: 'regenerate', userId: user.id });
     return;
   }
 
   // verify-totp / verify-backup-code
   if (ctx.body?.trustDevice) throw new APIError('BAD_REQUEST', { message: 'trustDevice is not allowed' });
   const userId = await twoFactorUserId(ctx, session);
-  const kind = !session ? 'login' : session.user.twoFactorEnabled ? 'step_up' : 'enrol';
   const method = ctx.path === '/two-factor/verify-totp' ? 'totp' : 'recovery';
+  let kind: 'login' | 'enrol' | 'reenrol' | 'step_up' = 'login';
+  if (user) {
+    if (!enrolled) kind = 'enrol';
+    else
+      kind =
+        user.reenrolRequired && (await twoFactorVerified(deps.authPool, user.id)) === false
+          ? 'reenrol'
+          : 'step_up';
+  }
   if (method === 'totp' && userId && typeof ctx.body?.code === 'string') {
     await claimTotpStep(ctx, deps, userId, ctx.body.code.trim());
   }
@@ -128,25 +171,47 @@ export async function afterTwoFactor(ctx: HookCtx, deps: Deps): Promise<void> {
   const actor = { userId: flow.userId, role: await roleOf(deps.authPool, flow.userId) };
 
   if (flow.kind === 'enable' || flow.kind === 'regenerate') {
-    await auditAuthEvent(deps.authPool, actor, { action: 'recovery_codes_generated', table: 'twoFactor' });
+    await auditAuthEvent(deps.authPool, actor, {
+      action: 'recovery_codes_generated',
+      table: 'twoFactor',
+      ...(flow.kind === 'enable' && flow.reenrol ? { reason: 're_enrolment' } : {}),
+    });
     return;
   }
 
   const sessionId: string | undefined =
     ctx.context.newSession?.session.id ?? (await getSessionFromCtx(ctx))?.session.id;
+
+  if (flow.method === 'recovery') {
+    // A recovery code proves less than a TOTP: no step-up credit, and a new authenticator is required (DECISIONS 72).
+    await deps.authPool.query('update "user" set "reenrolRequired" = true where id = $1', [flow.userId]);
+    await auditAuthEvent(deps.authPool, actor, { action: 'recovery_code_used', table: 'twoFactor' });
+    if (flow.kind === 'login') {
+      await auditAuthEvent(deps.authPool, actor, {
+        action: 'login',
+        table: 'session',
+        reason: 'recovery_code',
+        ...(sessionId ? { rowId: sessionId } : {}),
+      });
+    }
+    return;
+  }
+
   if (sessionId) {
     await deps.authPool.query('update session set "twoFactorAt" = $1 where id = $2', [
       deps.clock.now(),
       sessionId,
     ]);
   }
-  if (flow.method === 'recovery') {
-    await auditAuthEvent(deps.authPool, actor, { action: 'recovery_code_used', table: 'twoFactor' });
+  if (flow.kind === 'reenrol') {
+    await deps.authPool.query('update "user" set "reenrolRequired" = false where id = $1', [flow.userId]);
   }
-  const action = flow.kind === 'login' ? 'login' : flow.kind === 'enrol' ? 'two_factor_enrolled' : 'step_up';
+  const action =
+    flow.kind === 'login' ? 'login' : flow.kind === 'step_up' ? 'step_up' : 'two_factor_enrolled';
   await auditAuthEvent(deps.authPool, actor, {
     action,
     table: 'session',
     ...(sessionId ? { rowId: sessionId } : {}),
+    ...(flow.kind === 'reenrol' ? { reason: 're_enrolment' } : {}),
   });
 }

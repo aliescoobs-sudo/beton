@@ -43,6 +43,13 @@
       "when": 1792332005000,
       "tag": "0005_user_provisioning",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792332006000,
+      "tag": "0006_reenrol_required",
+      "breakpoints": true
     }
   ]
 }

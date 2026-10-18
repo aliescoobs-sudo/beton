@@ -7,7 +7,7 @@ import { type FormEvent, useState } from 'react';
 type Enrolment = { totpURI: string; backupCodes: string[] };
 
 /** Mandatory 2FA enrolment: confirm password → key + recovery codes (shown once) → confirm a first code. */
-export function EnrolFlow({ locale }: { locale: string }) {
+export function EnrolFlow({ locale, reenrol = false }: { locale: string; reenrol?: boolean }) {
   const t = useTranslations('auth.enrol');
   const router = useRouter();
   const [enrolment, setEnrolment] = useState<Enrolment | null>(null);
@@ -62,7 +62,7 @@ export function EnrolFlow({ locale }: { locale: string }) {
   if (!enrolment) {
     return (
       <form onSubmit={start} className="mt-6 space-y-4">
-        <p>{t('intro')}</p>
+        <p>{reenrol ? t('reenrolIntro') : t('intro')}</p>
         <label className="block">
           <span className="text-sm font-medium">{t('confirmPassword')}</span>
           <input name="password" type="password" autoComplete="current-password" required className={input} />

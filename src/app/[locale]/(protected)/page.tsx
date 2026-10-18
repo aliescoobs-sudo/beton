@@ -9,11 +9,24 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
   const t = await getTranslations();
   const state = await currentAuthState();
   const name = state.kind === 'authenticated' ? state.user.name : '';
+  const reenrol = state.kind === 'authenticated' && state.user.reenrolRequired;
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
       <h1 className="text-2xl font-semibold">{t('shell.title')}</h1>
       <p className="mt-2 text-gray-600">{t('shell.tagline')}</p>
+      {reenrol && (
+        <p
+          role="status"
+          className="mt-6 rounded border border-amber-400 bg-amber-50 p-3 text-sm"
+          data-testid="reenrol-banner"
+        >
+          {t('auth.session.reenrolBanner')}{' '}
+          <Link href={`/${locale}/security`} className="underline">
+            {t('auth.session.reenrolLink')}
+          </Link>
+        </p>
+      )}
       <p className="mt-6" data-testid="signed-in-as">
         {t('auth.session.signedInAs', { name })}
       </p>

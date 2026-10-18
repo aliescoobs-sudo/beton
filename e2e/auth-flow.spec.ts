@@ -17,7 +17,7 @@ async function passwordStep(page: Page, locale: string, email: string) {
 for (const locale of ['fr', 'ar'] as const) {
   const user = E2E_USERS[locale];
 
-  test(`${locale}: login → forced enrolment → logout → TOTP login → step-up → recovery-code login`, async ({
+  test(`${locale}: login → enrolment → logout → TOTP login → step-up → recovery login → re-enrolment`, async ({
     page,
   }) => {
     // Anonymous visitors are sent to login; the page direction follows the locale.
@@ -83,5 +83,20 @@ for (const locale of ['fr', 'ar'] as const) {
     await page.fill('input[name=code]', recoveryCode);
     await page.click('button[type=submit]');
     await expect(page).toHaveURL(`/${locale}`);
+
+    // After a recovery-code login: re-enrol a new authenticator before any sensitive action (DECISIONS 72).
+    await expect(page.getByTestId('reenrol-banner')).toBeVisible();
+    await page.getByTestId('reenrol-banner').locator('a').click();
+    await expect(page).toHaveURL(`/${locale}/security`);
+    await page.fill('input[name=password]', E2E_PASSWORD);
+    await page.click('button[type=submit]');
+    const newKey = (await page.getByTestId('totp-secret').textContent()) ?? '';
+    expect(newKey).not.toBe(key);
+    await expect(page.getByTestId('recovery-codes').locator('li')).toHaveCount(10);
+    await page.check('input[type=checkbox]');
+    await page.fill('input[name=code]', await totpFromDisplayedKey(newKey));
+    await page.click('button[type=submit]');
+    await expect(page).toHaveURL(`/${locale}`);
+    await expect(page.getByTestId('reenrol-banner')).toHaveCount(0);
   });
 }

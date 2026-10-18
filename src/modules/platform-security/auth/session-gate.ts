@@ -9,6 +9,8 @@ export interface SessionUser {
   role: UserRole;
   locale: 'fr' | 'ar';
   twoFactorEnabled: boolean;
+  /** Logged in with a recovery code: must enrol a new authenticator before any sensitive action. */
+  reenrolRequired: boolean;
 }
 
 export interface SessionInfo {
@@ -44,6 +46,7 @@ export async function resolveAuthState(auth: Auth, headers: Headers): Promise<Au
     role: result.user.role as UserRole,
     locale: result.user.locale === 'ar' ? 'ar' : 'fr',
     twoFactorEnabled: result.user.twoFactorEnabled === true,
+    reenrolRequired: result.user.reenrolRequired === true,
   };
   if (!user.twoFactorEnabled) return { kind: 'needs_enrolment', user };
 

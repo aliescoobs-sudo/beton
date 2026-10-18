@@ -40,6 +40,8 @@ export function baseAuthOptions({ authPool, env }: AuthDeps) {
         role: { type: 'string', required: true, input: false },
         locale: { type: 'string', required: true, defaultValue: 'fr', input: false },
         status: { type: 'string', required: true, defaultValue: 'active', input: false },
+        // Set after a recovery-code login until a new authenticator is confirmed (DECISIONS 72).
+        reenrolRequired: { type: 'boolean', required: true, defaultValue: false, input: false },
       },
     },
     session: {

@@ -37,11 +37,15 @@
       "finish": "Activer",
       "invalidPassword": "Mot de passe incorrect.",
       "invalidCode": "Code incorrect. Attendez le code suivant et réessayez.",
-      "error": "Une erreur est survenue. Réessayez."
+      "error": "Une erreur est survenue. Réessayez.",
+      "reenrolTitle": "Configurer un nouvel authentificateur",
+      "reenrolIntro": "Vous vous êtes connecté avec un code de secours. Avant toute action sensible, configurez une nouvelle application d'authentification : l'ancienne et vos anciens codes de secours cesseront de fonctionner."
     },
     "session": {
       "logout": "Se déconnecter",
-      "signedInAs": "Connecté en tant que {name}"
+      "signedInAs": "Connecté en tant que {name}",
+      "reenrolBanner": "Connexion avec un code de secours : configurez un nouvel authentificateur.",
+      "reenrolLink": "Configurer maintenant"
     },
     "stepUp": {
       "title": "Confirmez votre identité",

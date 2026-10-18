@@ -11,6 +11,7 @@ const user = {
   role: 'owner' as const,
   locale: 'fr' as const,
   twoFactorEnabled: true,
+  reenrolRequired: false,
 };
 const authenticated = (twoFactorAt: Date | null): AuthState => ({
   kind: 'authenticated',
@@ -19,6 +20,17 @@ const authenticated = (twoFactorAt: Date | null): AuthState => ({
 });
 
 describe('withStepUp (AC-SEC-09)', () => {
+  it('does not run the action when the user must re-enrol after a recovery-code login', async () => {
+    const fn = vi.fn(async () => 'done');
+    const state = authenticated(new Date('2026-11-23T09:59:00Z'));
+    if (state.kind === 'authenticated') state.user = { ...state.user, reenrolRequired: true };
+    expect(await withStepUp('users.manage', fn, { getState: async () => state, clock })).toEqual({
+      ok: false,
+      error: 'REENROL_REQUIRED',
+    });
+    expect(fn).not.toHaveBeenCalled();
+  });
+
   it('runs the action once when the second factor is fresh', async () => {
     const fn = vi.fn(async () => 'done');
     const result = await withStepUp('users.manage', fn, {

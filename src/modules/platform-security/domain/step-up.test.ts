@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isSensitiveAction, needsStepUp, STEP_UP_MAX_AGE_MS } from './step-up';
+import { isSensitiveAction, needsStepUp, sensitiveActionBlocker, STEP_UP_MAX_AGE_MS } from './step-up';
 
 const now = new Date('2026-11-23T10:00:00Z');
 const ago = (ms: number) => new Date(now.getTime() - ms);
@@ -20,6 +20,19 @@ describe('needsStepUp (SPEC §5, AC-SEC-09)', () => {
 
   it('is needed for a timestamp in the future (clock skew or tampering)', () => {
     expect(needsStepUp(new Date(now.getTime() + 60_000), now)).toBe(true);
+  });
+});
+
+describe('sensitiveActionBlocker', () => {
+  it('requires re-enrolment first after a recovery-code login, even with a fresh second factor', () => {
+    expect(sensitiveActionBlocker({ reenrolRequired: true, twoFactorAt: now }, now)).toBe('REENROL_REQUIRED');
+  });
+
+  it('otherwise requires a fresh second factor', () => {
+    expect(
+      sensitiveActionBlocker({ reenrolRequired: false, twoFactorAt: ago(STEP_UP_MAX_AGE_MS + 1) }, now),
+    ).toBe('STEP_UP_REQUIRED');
+    expect(sensitiveActionBlocker({ reenrolRequired: false, twoFactorAt: ago(1000) }, now)).toBeNull();
   });
 });
 

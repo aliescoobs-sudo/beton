@@ -11,4 +11,4 @@ export {
   type SensitiveAction,
   STEP_UP_MAX_AGE_MS,
 } from './domain/step-up';
-export { STEP_UP_REQUIRED, type StepUpResult, withStepUp } from './auth/step-up-guard';
+export { REENROL_REQUIRED, STEP_UP_REQUIRED, type StepUpResult, withStepUp } from './auth/step-up-guard';

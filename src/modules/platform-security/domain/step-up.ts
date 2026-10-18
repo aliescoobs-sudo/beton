@@ -18,6 +18,20 @@ export function isSensitiveAction(action: string): action is SensitiveAction {
   return (SENSITIVE_ACTIONS as readonly string[]).includes(action);
 }
 
+export type SensitiveBlocker = 'REENROL_REQUIRED' | 'STEP_UP_REQUIRED';
+
+/**
+ * What stops a sensitive action now, if anything. A user who logged in with a recovery code must first enrol a new
+ * authenticator (DECISIONS 72); otherwise the second factor must be a TOTP at most 10 minutes old.
+ */
+export function sensitiveActionBlocker(
+  state: { reenrolRequired: boolean; twoFactorAt: Date | null },
+  now: Date,
+): SensitiveBlocker | null {
+  if (state.reenrolRequired) return 'REENROL_REQUIRED';
+  return needsStepUp(state.twoFactorAt, now) ? 'STEP_UP_REQUIRED' : null;
+}
+
 /** True unless the session's last second factor is between 0 and 10 minutes old. */
 export function needsStepUp(twoFactorAt: Date | null, now: Date): boolean {
   if (!twoFactorAt) return true;
