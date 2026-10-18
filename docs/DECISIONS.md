@@ -72,6 +72,9 @@ Legend: ✅ confirmed by Ali · 🟡 assumption (reasonable default, revisit wit
 65. ✅ (A23) AI never writes financial records; AI actions are limited to alert actions and drafting (never sending) client messages; assisted entry only prefills forms and a human saves.
 66. ✅ VAT rate (`vat_rate_bp`, 20% in the simulation) and cheque/LCN clearing delay (`clearing_delay_days`, 1 working day in the simulation) are configurable parameters, never hard-coded; each document stores the VAT rate in force when created.
 67. ✅ (A27) Per-client selling-price overrides allowed; owner and partner only, with a mandatory reason; audited.
+68. ✅ (ADR 0001, 2026-10-18) Auth library: Better Auth 1.7.7 pinned exactly; every upgrade re-runs the full auth test suite. Gaps closed by tested hooks: 12 h absolute session cap, per-account/IP login lockout, no trust-device bypass, TOTP replay refused, mandatory 2FA enrolment, step-up timestamp.
+69. ✅ Recovery codes stored encrypted with a dedicated key that never lives in the database; single-use; shown only once at generation; regenerating invalidates the old set; every use audited.
+70. ✅ Sessions always run on real time, even in simulation; tests fake the system time.
 
 ## Legal
 30. 🟡 Law 69-21 deadline alerts in MVP; full quarterly report in phase 2.

@@ -1,6 +1,6 @@
 # ADR 0001 — Authentication library
 
-- Status: **Proposed** (awaiting Ali's go/no-go; no login code before approval)
+- Status: **Accepted** by Ali on 2026-10-18 — option A, Better Auth 1.7.7 pinned exactly; recovery codes encrypted with a dedicated key (key never in the database, single-use, shown once, regeneration invalidates the old set, every use audited); AC-SEC-03 tested by faking the system time
 - Date: 2026-10-18
 - Task: T8 (tasks/todo.md), spec: SPEC-platform-security §5, assumption 🟡 A1
 - Evidence: branch `spike/auth-library`, commit `1532047`, `tests/spike-auth.int.test.ts` — 17 checks run against the real PostgreSQL 17 test database on the `belgobeton_auth` role (all green; several record a gap rather than assert a pass)

@@ -59,7 +59,7 @@ Users: owner, partner, 2 office staff, plant operator (✅ D2). Pilot = fake dat
 | DB | PostgreSQL 17 with Row-Level Security | app connects as non-owner role without `BYPASSRLS` |
 | ORM / migrations | Drizzle ORM + drizzle-kit SQL migrations | RLS policies, triggers, grants in hand-written SQL migrations |
 | Jobs | pg-boss (Postgres-backed queue/scheduler) | no Redis; schedules are driven through `clock` |
-| Auth | Better Auth + two-factor (TOTP) plugin | 🟡 A1 — ask-first dependency; fallback = argon2id + otplib hand-rolled |
+| Auth | Better Auth 1.7.7 (pinned exactly) + two-factor (TOTP) plugin, `@node-rs/argon2` | ✅ A1 (ADR 0001, 2026-10-18); every upgrade re-runs the full auth test suite |
 | Validation | Zod at every boundary (forms, server actions, imports, AI output, webhooks) | |
 | i18n | next-intl, locales `fr` + `ar`, RTL for `ar` | ✅ both languages in pilot (2026-10-18); Darija accepted as AI input |
 | UI | Tailwind CSS (logical properties only: `ms-`/`me-`/`ps-`… for RTL), Radix-based components | |
@@ -223,13 +223,13 @@ Doc-level 🟡 items (D27–D59, R-rules) are cited inline in each module spec. 
 
 | Id | Assumption | Used by |
 |---|---|---|
-| A1 | Better Auth + TOTP plugin is acceptable as auth library | platform-security |
+| A1 | ✅ 2026-10-18 (ADR 0001): Better Auth 1.7.7 pinned + TOTP plugin, gaps closed by tested hooks | platform-security |
 | A2 | pnpm as package manager | all |
 | A3 | ✅ 2026-10-18: time zone Africa/Casablanca from IANA tz data; Morocco is on UTC+0 permanently since 20 Sept 2026 (decree 2.26.530, no Ramadan switch) | all |
 | A4 | ✅ 2026-10-18: VAT 20% in the simulation; must be a configurable parameter (`vat_rate_bp`), single rate per line | ledger, rules-engine |
 | A5 | Working days Mon–Sat; holidays configurable | clock, operations |
 | A6 | Coverage bar 90% on domain code | all |
-| A7 | 2FA = TOTP authenticator app + 10 single-use recovery codes; no SMS | platform-security |
+| A7 | ✅ 2026-10-18: 2FA = TOTP authenticator app + 10 single-use recovery codes stored encrypted with a dedicated env key; no SMS | platform-security |
 | A8 | Session: idle timeout 30 min, absolute 12 h; step-up 2FA ≤ 10 min old for sensitive actions | platform-security |
 | A9 | ✅ 2026-10-18: office reads all operational records needed to record payments, but no margins, cash position or forecast (nor costs or risk alerts) | platform-security |
 | A10 | Partner = owner minus user management, parameters, simulation controls, backups | platform-security |

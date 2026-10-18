@@ -14,7 +14,7 @@ Out: SSO, SMS, password-less, multi-tenant, SIEM integration.
 | Table | Key columns | Notes |
 |---|---|---|
 | `app_user` | id, display_name, email (unique), role (`owner`/`partner`/`office`/`plant`), locale (`fr`/`ar`), status (`active`/`disabled`), created_at | No CIN (🟡 D57). Disabled, never deleted |
-| `credential` | user_id, password_hash (argon2id), totp_secret_enc, totp_enabled_at, recovery_codes_hash[] | Owned by auth lib (🟡 A1); secrets encrypted |
+| `credential` | user_id, password_hash (argon2id), totp_secret_enc, totp_enabled_at, recovery_codes_enc | Owned by Better Auth (✅ A1, ADR 0001): tables `user`, `session`, `account`, `verification`, `twoFactor` on the `auth` DB role; secrets encrypted |
 | `session` | id (random 256-bit), user_id, created_at, last_seen_at, two_factor_at, ip_hash, user_agent | httpOnly cookie holds id only |
 | `login_attempt` | email_hash, at, success, ip_hash | rate limiting + lockout |
 | `audit_event` | id (bigserial), at (real), sim_at, actor_user_id, actor_kind (`user`/`system`/`ai_confirmed`), request_id, table_name, row_id, action (`insert`/`update`/`reverse`/`archive`/`login`/`permission_denied`/…), before jsonb, after jsonb, reason, prev_hash, hash | Append-only |
@@ -62,7 +62,7 @@ Migrations run with a separate `migrator` role; jobs run as a `system` actor wit
 
 ## 5. Authentication and sessions
 - Passwords: argon2id, min 12 chars, checked against a local common-password list; no composition rules.
-- 2FA mandatory for all accounts (🟡 D35): TOTP (RFC 6238, 30 s, ±1 step) enrolment forced at first login; 10 single-use recovery codes, shown once, stored hashed (🟡 A7). Only the owner can reset another user's 2FA; the reset is audited and forces re-enrolment.
+- 2FA mandatory for all accounts (🟡 D35): TOTP (RFC 6238, 30 s, ±1 step) enrolment forced at first login; 10 single-use recovery codes (✅ A7, ✅ ADR 0001, 2026-10-18): shown only once, at generation; **stored encrypted with a dedicated key** (`RECOVERY_CODES_KEY`, AES-256-GCM) that lives only in the environment, never in the database; each code works once; regenerating replaces and invalidates the whole previous set; every use and every regeneration is audited. (Hashing is not possible with Better Auth, which compares code lists.) Only the owner can reset another user's 2FA; the reset is audited and forces re-enrolment.
 - Sessions (🟡 A8): idle 30 min, absolute 12 h, cookie `__Host-` prefix, `Secure; HttpOnly; SameSite=Strict`, rotated on login and on 2FA. Logout invalidates server-side.
 - Step-up: actions marked *sensitive* (confirm AI command, reclassify alert, reverse a financial entry, change parameters, move sim clock, user admin) require `two_factor_at` ≤ 10 min, else re-prompt TOTP.
 - Rate limits: 5 failed logins / 15 min per account → 15-min lock; 20 / 15 min per IP; generic error messages (no user enumeration).
@@ -88,7 +88,7 @@ Stored in `security_checklist_item`; the app shows a banner "Données fictives u
 ## 9. Acceptance criteria
 - **AC-SEC-01** A user without TOTP enrolled cannot reach any page other than enrolment after password login.
 - **AC-SEC-02** Login with correct password but wrong TOTP fails; 5 failures lock the account 15 min; error text is identical for unknown email and wrong password.
-- **AC-SEC-03** Session expires after 30 min idle and 12 h absolute (tested with `clock` real-mode fake timers).
+- **AC-SEC-03** Session expires after 30 min idle and 12 h absolute. Sessions always run on real time, also in simulation; tests fake the system time (`Date`), because the auth library reads it directly (✅ 2026-10-18).
 - **AC-SEC-04** For each table × role in §4: allowed reads return rows, denied reads return 0 rows via direct SQL as the app role with that `app.role` set (integration test matrix generated from the permission table).
 - **AC-SEC-05** A plant-role response for an order contains no price, total, payment plan or client contact field; an office-role response for a delivery contains no margin or cost field.
 - **AC-SEC-06** Any `INSERT`/`UPDATE` on a business table without `app.user_id` set fails.
@@ -102,4 +102,4 @@ Stored in `security_checklist_item`; the app shows a banner "Données fictives u
 - **AC-SEC-14** Disabling a user ends their sessions immediately; their history remains intact.
 
 ## 10. Assumptions relied on
-🟡 D33 (RBAC shape), 🟡 D34 (immutable audit, no hard deletes), 🟡 D35 (2FA all), 🟡 D36 (encryption + backups), 🟡 D37 (fake-data pilot + checklist), 🟡 D39 (CNDP), 🟡 D52 (Morocco hosting), 🟡 D57 (no CIN), 🟡 A1, A7, A8, A10, ✅ A9, OQ10.
+🟡 D33 (RBAC shape), 🟡 D34 (immutable audit, no hard deletes), 🟡 D35 (2FA all), 🟡 D36 (encryption + backups), 🟡 D37 (fake-data pilot + checklist), 🟡 D39 (CNDP), 🟡 D52 (Morocco hosting), 🟡 D57 (no CIN), ✅ A1 (ADR 0001), ✅ A7, 🟡 A8, A10, ✅ A9, OQ10.

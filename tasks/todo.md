@@ -78,11 +78,11 @@ Plan: [tasks/plan.md](plan.md). Each task lists the spec ACs it closes. Standard
 
 ## Phase 2 — Identity
 
-### - [ ] T8: Auth library spike + go/no-go (🟡 A1)
+### - [x] T8: Auth library spike + go/no-go (🟡 A1)
 **Description:** Time-boxed spike on a throwaway branch: Better Auth + Drizzle adapter on the `auth` DB role; check argon2id hasher (open question 1), `__Host-` cookie with `Secure; HttpOnly; SameSite=Strict`, idle 30 min + absolute 12 h, rotation on login/2FA, server-side revoke, TOTP + recovery codes, where TOTP secrets are stored and how they're encrypted, hooks for audit events, ability to read time from `clock`. Write `docs/adr/0001-auth-library.md` with the verdict; if no-go, the ADR describes the fallback (argon2id + otplib + own session table).
 **Acceptance criteria:**
 - [x] ADR lists each requirement with pass/fail + evidence (test or doc link) — docs/adr/0001-auth-library.md, spike branch `spike/auth-library` @ 1532047
-- [ ] Decision approved by Ali before T9 starts
+- [x] Decision approved by Ali before T9 starts (2026-10-18: GO, option A)
 **Verification:** ADR review · **Dependencies:** T4, T7 · **Files:** docs/adr/0001-auth-library.md (spike code not merged) · **Scope:** S
 
 ### - [ ] T9: Owner bootstrap + password login + lockout
