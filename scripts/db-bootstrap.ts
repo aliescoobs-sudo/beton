@@ -4,7 +4,7 @@
 import { existsSync } from 'node:fs';
 import pg from 'pg';
 import { z } from 'zod';
-import { type Env, loadEnv } from '../src/lib/env.ts';
+import { type Env, loadBackupUrl, loadEnv } from '../src/lib/env.ts';
 
 export const TEST_DATABASE = 'belgobeton_test';
 export const E2E_DATABASE = 'belgobeton_e2e';
@@ -32,7 +32,7 @@ function roleUrls(env: Env) {
     { name: ROLE_NAMES.app, url: env.DATABASE_URL_APP },
     { name: ROLE_NAMES.auth, url: env.DATABASE_URL_AUTH },
     { name: ROLE_NAMES.system, url: env.DATABASE_URL_SYSTEM },
-    { name: ROLE_NAMES.backup, url: env.DATABASE_URL_BACKUP },
+    { name: ROLE_NAMES.backup, url: loadBackupUrl(process.env) },
   ];
 }
 

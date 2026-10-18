@@ -30,8 +30,6 @@ const envSchema = z.object({
   DATABASE_URL_MIGRATOR: postgresUrl,
   DATABASE_URL_AUTH: postgresUrl,
   DATABASE_URL_SYSTEM: postgresUrl,
-  // Read-only, BYPASSRLS: pg_dump only (pnpm backup). Never used by the app.
-  DATABASE_URL_BACKUP: postgresUrl,
   AUTH_SECRET: z.string().min(32, { error: 'must be at least 32 characters' }),
   // Keyrings: current key first, then retired keys still needed to decrypt (see `pnpm crypto:rotate`).
   FIELD_ENCRYPTION_KEYS: keyring,
@@ -45,13 +43,22 @@ const envSchema = z.object({
 
 export type Env = z.infer<typeof envSchema>;
 
+/**
+ * Backup job only (pnpm backup): the read-only BYPASSRLS role. Deliberately NOT part of the app environment
+ * (DECISIONS open question 8: never in the app runtime); the security checklist checks the app does not have it.
+ */
+export function loadBackupUrl(source: Record<string, string | undefined>): string {
+  const parsed = postgresUrl.safeParse(source.DATABASE_URL_BACKUP);
+  if (!parsed.success) throw new Error('Invalid environment configuration:\n  DATABASE_URL_BACKUP: missing');
+  return parsed.data;
+}
+
 /** Names of variables whose values must never reach logs. */
 export const SECRET_ENV_NAMES = [
   'DATABASE_URL_APP',
   'DATABASE_URL_MIGRATOR',
   'DATABASE_URL_AUTH',
   'DATABASE_URL_SYSTEM',
-  'DATABASE_URL_BACKUP',
   'AUTH_SECRET',
   'FIELD_ENCRYPTION_KEYS',
   'RECOVERY_CODES_KEYS',

@@ -16,6 +16,8 @@ import { can } from '../domain/permissions';
 import { ForbiddenError } from './user-admin';
 
 export interface ChecklistDeps {
+  /** The app runtime environment, to check it holds no backup credentials (default: process.env). */
+  runtimeEnv?: Record<string, string | undefined>;
   /** belgobeton_system: reads the checklist tables under the system actor. */
   systemPool: pg.Pool;
   /** belgobeton_auth: account facts (2FA enrolment, seed accounts). */
@@ -28,7 +30,12 @@ export type Checklist = { items: ChecklistItem[]; complete: boolean };
 const asSystem = <T>(pool: pg.Pool, fn: (tx: pg.PoolClient) => Promise<T>) =>
   withRlsContext(pool, { userId: SYSTEM_ACTOR_ID, role: 'system', requestId: uuidv7(realClock.now()) }, fn);
 
-export async function getChecklist({ systemPool, authPool, clock }: ChecklistDeps): Promise<Checklist> {
+export async function getChecklist({
+  systemPool,
+  authPool,
+  clock,
+  runtimeEnv,
+}: ChecklistDeps): Promise<Checklist> {
   const { manual, lastRestoreTestOk } = await asSystem(systemPool, async (tx) => {
     const marks = await tx.query<{
       key: string;
@@ -57,7 +64,13 @@ export async function getChecklist({ systemPool, authPool, clock }: ChecklistDep
     [BOOTSTRAP_ACTOR_ID],
   );
   return computeChecklist(
-    { manual, lastRestoreTestOk, usersWithout2fa: rows[0]!.without2fa, seedAccounts: rows[0]!.seed },
+    {
+      manual,
+      lastRestoreTestOk,
+      usersWithout2fa: rows[0]!.without2fa,
+      seedAccounts: rows[0]!.seed,
+      appHasBackupCredentials: !!(runtimeEnv ?? process.env).DATABASE_URL_BACKUP,
+    },
     clock.now(),
   );
 }

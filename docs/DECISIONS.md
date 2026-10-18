@@ -105,3 +105,4 @@ Legend: ✅ confirmed by Ali · 🟡 assumption (reasonable default, revisit wit
 8. Moroccan hosting provider. The host must provide a reverse proxy that sets `X-Forwarded-For` (the per-IP login limit depends on it; without it only the per-account limit applies), and the app must trust only that proxy.
 9. Opening balances: meetings with each person responsible for each type of number.
 10. Partner's exact permissions.
+11. Backup operations (CP5, also security checklist items): encrypted backups and their audit anchors are copied off the app host (where, how often, who checks the restore test); the age private key never lives on the app host; the `belgobeton_backup` role credentials (`DATABASE_URL_BACKUP`) exist only in the backup job's environment, never in the app runtime environment (the checklist computes this one).

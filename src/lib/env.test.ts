@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadEnv, SECRET_ENV_NAMES, secretValuesOf } from './env';
+import { loadBackupUrl, loadEnv, SECRET_ENV_NAMES, secretValuesOf } from './env';
 
 const valid = {
   NODE_ENV: 'development',
@@ -7,7 +7,6 @@ const valid = {
   DATABASE_URL_MIGRATOR: 'postgres://migrator:pw@localhost:5432/belgobeton',
   DATABASE_URL_AUTH: 'postgres://auth:pw@localhost:5432/belgobeton',
   DATABASE_URL_SYSTEM: 'postgres://system:pw@localhost:5432/belgobeton',
-  DATABASE_URL_BACKUP: 'postgres://backup:pw@localhost:5432/belgobeton',
   AUTH_SECRET: 'a'.repeat(32),
   FIELD_ENCRYPTION_KEYS: `k1:${Buffer.alloc(32, 7).toString('base64')}`,
   RECOVERY_CODES_KEYS: `r1:${Buffer.alloc(32, 8).toString('base64')}`,
@@ -59,6 +58,23 @@ describe('loadEnv', () => {
   it('parses boolean flags strictly', () => {
     expect(loadEnv({ ...valid, SIMULATION_ENABLED: 'true' }).SIMULATION_ENABLED).toBe(true);
     expect(() => loadEnv({ ...valid, REAL_DATA: 'yes' })).toThrow(/REAL_DATA/);
+  });
+});
+
+describe('backup credentials stay out of the app environment', () => {
+  it('the app environment neither requires nor exposes DATABASE_URL_BACKUP', () => {
+    const env = loadEnv({
+      ...valid,
+      DATABASE_URL_BACKUP: 'postgres://belgobeton_backup:pw@localhost:5432/belgobeton',
+    });
+    expect(env).not.toHaveProperty('DATABASE_URL_BACKUP');
+  });
+
+  it('the backup job reads it on its own', () => {
+    expect(
+      loadBackupUrl({ DATABASE_URL_BACKUP: 'postgres://belgobeton_backup:pw@localhost:5432/x' }),
+    ).toMatch(/^postgres:/);
+    expect(() => loadBackupUrl({})).toThrow(/DATABASE_URL_BACKUP/);
   });
 });
 

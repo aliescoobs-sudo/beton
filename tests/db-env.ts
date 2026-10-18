@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { TEST_DATABASE } from '../scripts/db-bootstrap';
-import { loadEnv } from '../src/lib/env';
+import { loadBackupUrl, loadEnv } from '../src/lib/env';
 
 /** Integration tests run against `belgobeton_test`, with the same roles as dev (see scripts/db-bootstrap.ts). */
 export function testEnv(database: string = TEST_DATABASE) {
@@ -17,6 +17,6 @@ export function testEnv(database: string = TEST_DATABASE) {
     DATABASE_URL_MIGRATOR: toTestDb(env.DATABASE_URL_MIGRATOR),
     DATABASE_URL_AUTH: toTestDb(env.DATABASE_URL_AUTH),
     DATABASE_URL_SYSTEM: toTestDb(env.DATABASE_URL_SYSTEM),
-    DATABASE_URL_BACKUP: toTestDb(env.DATABASE_URL_BACKUP),
+    DATABASE_URL_BACKUP: toTestDb(loadBackupUrl(process.env)),
   };
 }

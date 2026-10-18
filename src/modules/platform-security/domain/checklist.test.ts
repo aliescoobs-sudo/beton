@@ -13,6 +13,7 @@ const facts = (overrides: Partial<ChecklistFacts> = {}): ChecklistFacts => ({
   lastRestoreTestOk: new Date('2026-11-20T10:00:00Z'),
   usersWithout2fa: 0,
   seedAccounts: 0,
+  appHasBackupCredentials: false,
   ...overrides,
 });
 
@@ -29,6 +30,9 @@ describe('security checklist (T21, SPEC §8, D37)', () => {
       'moroccan_hosting',
       'ai_zdr_contract',
       'rbac_second_review',
+      'backups_off_host',
+      'age_key_off_app_host',
+      'backup_credentials_isolated',
       'owner_signoff',
     ]);
   });
@@ -47,6 +51,7 @@ describe('security checklist (T21, SPEC §8, D37)', () => {
     expect(items({ lastRestoreTestOk: null }).restore_test_recent).toBe('open');
     expect(items({ usersWithout2fa: 1 }).all_users_2fa).toBe('open');
     expect(items({ seedAccounts: 2 }).no_seed_accounts).toBe('open');
+    expect(items({ appHasBackupCredentials: true }).backup_credentials_isolated).toBe('open');
   });
 
   it('ignores a manual mark on an automated item', () => {

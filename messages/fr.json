@@ -176,7 +176,10 @@
       "moroccan_hosting": "Hébergement au Maroc en place",
       "ai_zdr_contract": "Contrat IA avec rétention zéro (ZDR)",
       "rbac_second_review": "Revue des droits par une deuxième personne",
-      "owner_signoff": "Signature du propriétaire"
+      "owner_signoff": "Signature du propriétaire",
+      "backups_off_host": "Sauvegardes chiffrées copiées hors du serveur",
+      "age_key_off_app_host": "Clé privée age jamais sur le serveur de l'application",
+      "backup_credentials_isolated": "Identifiants du rôle de sauvegarde absents de l'application"
     }
   }
 }

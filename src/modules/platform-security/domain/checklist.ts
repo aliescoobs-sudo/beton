@@ -14,6 +14,9 @@ export const CHECKLIST = {
   moroccan_hosting: { kind: 'manual' }, // 🟡 D52
   ai_zdr_contract: { kind: 'manual' }, // 🟡 D51
   rbac_second_review: { kind: 'manual' },
+  backups_off_host: { kind: 'manual' }, // encrypted backups and anchors copied off the app host
+  age_key_off_app_host: { kind: 'manual' }, // the age private key never on the app host
+  backup_credentials_isolated: { kind: 'automated' }, // DATABASE_URL_BACKUP absent from the app runtime
   owner_signoff: { kind: 'signoff' },
 } as const;
 
@@ -36,6 +39,8 @@ export interface ChecklistFacts {
   lastRestoreTestOk: Date | null;
   usersWithout2fa: number;
   seedAccounts: number;
+  /** Whether the app runtime environment holds the backup role credentials (it must not). */
+  appHasBackupCredentials: boolean;
 }
 
 export interface ChecklistItem {
@@ -59,6 +64,12 @@ export function computeChecklist(
     },
     all_users_2fa: { done: facts.usersWithout2fa === 0, evidence: `${facts.usersWithout2fa}` },
     no_seed_accounts: { done: facts.seedAccounts === 0, evidence: `${facts.seedAccounts}` },
+    backup_credentials_isolated: {
+      done: !facts.appHasBackupCredentials,
+      evidence: facts.appHasBackupCredentials
+        ? 'DATABASE_URL_BACKUP is set in the app environment'
+        : 'absent',
+    },
   };
 
   const items: ChecklistItem[] = CHECKLIST_KEYS.filter((k) => k !== 'owner_signoff').map((key) => {
