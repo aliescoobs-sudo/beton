@@ -15,6 +15,13 @@
       "when": 1792332001000,
       "tag": "0001_audit",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792332002000,
+      "tag": "0002_audit_capture",
+      "breakpoints": true
     }
   ]
 }

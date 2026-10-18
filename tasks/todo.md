@@ -54,12 +54,12 @@ Plan: [tasks/plan.md](plan.md). Each task lists the spec ACs it closes. Standard
 - [x] Direct `INSERT` by `app` is refused; `audit.record()` works
 **Verification:** `pnpm test db/audit` (integration) · **Dependencies:** T4 · **Files:** db/migrations/0001_audit.sql, src/modules/platform-security/db/audit-schema.ts, tests · **Scope:** S
 
-### - [ ] T6: Generic audit capture trigger
+### - [x] T6: Generic audit capture trigger
 **Description:** `audit.capture()` trigger function (AFTER INSERT OR UPDATE) writes before/after jsonb, actor from `app.user_id`, `actor_kind`, `request_id`, `sim_at`; raises if `app.user_id` is missing. Helper migration macro `audited_table('<name>')` attaches it. Tested on a test-only `audit_probe` table. `auditService.record()` for service-level events (login, permission_denied…).
 **Acceptance criteria:**
-- [ ] Insert/update on `audit_probe` without `app.user_id` fails (AC-SEC-06)
-- [ ] Each insert/update produces exactly one event with actor, real time, before/after (AC-SEC-08, capture part)
-- [ ] Encrypted-column placeholder values are logged as stored (no decryption in trigger)
+- [x] Insert/update on `audit_probe` without `app.user_id` fails (AC-SEC-06)
+- [x] Each insert/update produces exactly one event with actor, real time, before/after (AC-SEC-08, capture part)
+- [x] Encrypted-column placeholder values are logged as stored (no decryption in trigger)
 **Verification:** `pnpm test db/audit` · **Dependencies:** T5 · **Files:** db/migrations/0002_audit_capture.sql, src/modules/platform-security/service/audit-service.ts, tests · **Scope:** S
 
 ### - [ ] T7: Hash chain + `pnpm audit:verify`
