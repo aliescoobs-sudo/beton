@@ -23,7 +23,7 @@ Legend: ✅ confirmed by Ali · 🟡 assumption (reasonable default, revisit wit
 15. ✅ Plant integration is NOT required for MVP; independent double entry is intentional, as a control.
 27. 🟡 Payment methods: cash, cheque, LCN, transfer, advance, installments.
 28. 🟡 Instrument lifecycle: received → deposited → cleared / bounced → 30-day window → regularized / dispute.
-29. 🟡 Rule: post-dated cheques may be presented early (worst case treated as risk).
+29. 🟡 Rule: post-dated cheques may be presented early (worst case treated as risk). Severity of worst-case-only deficits → see 63.
 54. 🟡 Plant data via Excel/CSV import (one row per batch: date, recipe, quantity) with column mapping, or manual daily totals.
 
 ## Intelligence
@@ -37,7 +37,7 @@ Legend: ✅ confirmed by Ali · 🟡 assumption (reasonable default, revisit wit
 58. 🟡 AI roles: assisted entry, daily brief, risk reports, owner Q&A (read-only tools), reconciliation anomaly explanations.
 
 ## Security and privacy
-33. 🟡 RBAC: owner/partner see all; office sees only their transactions (no margins, no global cash); plant sees production and stock only.
+33. 🟡 RBAC: owner/partner see all; office sees only their transactions (no margins, no global cash); plant sees production and stock only. Office scope clarified → see 60.
 34. 🟡 Immutable audit log; no hard deletes; cancellation = reversing entry.
 35. 🟡 2FA for all accounts.
 36. 🟡 Encryption in transit and at rest; daily encrypted backups with regular restore tests.
@@ -58,10 +58,20 @@ Legend: ✅ confirmed by Ali · 🟡 assumption (reasonable default, revisit wit
 43. 🟡 Preliminary stack: TypeScript full-stack (Next.js) + PostgreSQL with Row-Level Security + scheduled jobs + Telegram bot + swappable AI layer. Final choice in spec.
 44. 🟡 Simulation clock in pilot.
 45. 🟡 Trucks in MVP: list + warning when planned loads exceed daily trip capacity.
-48. 🟡 UI languages: Arabic/Darija + French (financial terms in French as used in the office).
+48. ✅ UI languages: French + Arabic both in the pilot, Arabic in RTL; Darija accepted as AI input; financial terms in French as used in the office (confirmed 2026-10-18).
 50. 🟡 AI: Claude Haiku 5.5 (light tasks) + Sonnet 5.5 (analysis); Mistral as comparison; final pick after a ~50-example Darija/French eval.
 53. 🟡 Simulation zones (one way): Tetouan center 20 min, Martil 25, M'diq 30, Fnideq 45, Oued Laou 60; + 30 min unloading.
 32. 🟡 Configurable parameters: 90-min concrete limit, 30-min unloading, capacity per truck (default 8 m³).
+
+## Spec review answers (2026-10-18, see CAPABILITY-MAP.md §10)
+60. ✅ (A9) Office sees all operational records needed to record payments (orders, deliveries, instruments, invoices, purchases), but no margins, cash position or forecast (nor costs or risk alerts).
+61. ✅ (A11) Plant operator creates loads (BL) at dispatch; whoever receives the signed BL (plant operator or office) records its return; double recording is prevented; the audit log shows who.
+62. ✅ (A13) Worst-case forecast = normal forecast with outgoing post-dated instruments counted as liabilities from their issue date (dated max(issue date, today)), consistent with R11.
+63. ✅ (A14) 🔴 risk only for deficits in the normal forecast; 🟠 for worst-case-only deficits.
+64. ✅ (A15) Overdue receivable alert = 🟠; the account colour stays 🔴 when an installment is overdue (R14).
+65. ✅ (A23) AI never writes financial records; AI actions are limited to alert actions and drafting (never sending) client messages; assisted entry only prefills forms and a human saves.
+66. ✅ VAT rate (`vat_rate_bp`, 20% in the simulation) and cheque/LCN clearing delay (`clearing_delay_days`, 1 working day in the simulation) are configurable parameters, never hard-coded; each document stores the VAT rate in force when created.
+67. ✅ (A27) Per-client selling-price overrides allowed; owner and partner only, with a mandatory reason; audited.
 
 ## Legal
 30. 🟡 Law 69-21 deadline alerts in MVP; full quarterly report in phase 2.
@@ -81,7 +91,7 @@ Legend: ✅ confirmed by Ali · 🟡 assumption (reasonable default, revisit wit
 4. CNDP: declaration + authorization for AI transfer; is pseudonymized data exempt? (assume no).
 5. AI provider final choice after eval; contract terms and ZDR.
 6. Real truck capacities, trip durations, zones.
-7. VAT treatment and rates on concrete (not verified; keep configurable).
+7. VAT treatment and rates on concrete (not verified; keep configurable — pilot uses 20% as a parameter, see 66).
 8. Moroccan hosting provider.
 9. Opening balances: meetings with each person responsible for each type of number.
 10. Partner's exact permissions.
