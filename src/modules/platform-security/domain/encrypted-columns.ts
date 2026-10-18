@@ -4,6 +4,13 @@
  */
 export const ENCRYPTED_COLUMNS = [
   { table: 'twoFactor', column: 'backupCodes', idColumn: 'id', keyring: 'RECOVERY_CODES_KEYS', pool: 'auth' },
+  {
+    table: 'two_factor_pending',
+    column: 'backup_codes',
+    idColumn: 'user_id',
+    keyring: 'RECOVERY_CODES_KEYS',
+    pool: 'auth',
+  },
 ] as const;
 
 export type EncryptedColumn = {

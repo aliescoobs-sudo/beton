@@ -64,6 +64,10 @@ export const TABLE_ACCESS = {
   twoFactor: { kind: 'auth_only', reason: 'TOTP secrets and encrypted recovery codes (ADR 0001)' },
   login_attempt: { kind: 'auth_only', reason: 'Login lockout counters, keyed hashes only' },
   totp_used_step: { kind: 'auth_only', reason: 'TOTP replay protection' },
+  two_factor_pending: {
+    kind: 'auth_only',
+    reason: 'Staged re-enrolment (DECISIONS 77): encrypted secret and codes',
+  },
 } as const satisfies Record<string, RlsTable | AuthOnlyTable>;
 
 export type TableName = keyof typeof TABLE_ACCESS;

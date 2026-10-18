@@ -20,7 +20,7 @@ export const TWO_FACTOR_PATHS = [
 ] as const;
 
 type Flow =
-  | { kind: 'enable'; userId: string; reenrol: boolean }
+  | { kind: 'enable'; userId: string; reenrol: boolean; old?: { secret: string; backupCodes: string } }
   | { kind: 'regenerate'; userId: string }
   | { kind: 'login' | 'enrol' | 'reenrol' | 'step_up'; userId: string | null; method: 'totp' | 'recovery' };
 
@@ -47,12 +47,41 @@ async function roleOf(pool: pg.Pool, userId: string): Promise<UserRole> {
   return rows[0]!.role;
 }
 
-async function twoFactorVerified(pool: pg.Pool, userId: string): Promise<boolean | null> {
-  const { rows } = await pool.query<{ verified: boolean | null }>(
-    'select verified from "twoFactor" where "userId" = $1',
+/** The staged re-enrolment of a user, if any (DECISIONS 77). */
+async function pendingOf(
+  pool: pg.Pool,
+  userId: string,
+): Promise<{ secret: string; backupCodes: string } | null> {
+  const { rows } = await pool.query<{ secret: string; backup_codes: string }>(
+    'select secret, backup_codes from two_factor_pending where user_id = $1',
     [userId],
   );
-  return rows[0] ? rows[0].verified !== false : null;
+  return rows[0] ? { secret: rows[0].secret, backupCodes: rows[0].backup_codes } : null;
+}
+
+async function inTransaction(pool: pg.Pool, fn: (client: pg.PoolClient) => Promise<void>): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await fn(client);
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+/** Index of the ±1 time-step whose code equals `code` for this (decrypted) secret, if any. */
+async function matchingStep(secret: string, code: string, now: Date): Promise<number | undefined> {
+  const otp = createOTP(secret);
+  const current = Math.floor(now.getTime() / 1000 / TOTP_PERIOD_SECONDS);
+  let step: number | undefined;
+  for (const candidate of [current - 1, current, current + 1]) {
+    if ((await otp.hotp(candidate)) === code) step = candidate;
+  }
+  return step;
 }
 
 /** The user a second factor is being checked for: the session user, or the one behind the pending 2FA cookie. */
@@ -86,13 +115,8 @@ async function claimTotpStep(ctx: HookCtx, deps: Deps, userId: string, code: str
     [userId],
   );
   if (!rows[0]) return; // not enrolled: the plugin refuses
-  const otp = createOTP(await symmetricDecrypt({ key: ctx.context.secretConfig, data: rows[0].secret }));
-  const current = Math.floor(deps.clock.now().getTime() / 1000 / TOTP_PERIOD_SECONDS);
-
-  let step: number | undefined;
-  for (const candidate of [current - 1, current, current + 1]) {
-    if ((await otp.hotp(candidate)) === code) step = candidate;
-  }
+  const secret = await symmetricDecrypt({ key: ctx.context.secretConfig, data: rows[0].secret });
+  const step = await matchingStep(secret, code, deps.clock.now());
   if (step === undefined) return; // wrong code: the plugin refuses and counts the failure
 
   const { rowCount } = await deps.authPool.query(
@@ -114,6 +138,7 @@ export async function beforeTwoFactor(ctx: HookCtx, deps: Deps): Promise<void> {
     // Only authenticator apps: the "otp" method would turn 2FA on without one.
     if (ctx.body?.method !== undefined && ctx.body.method !== 'totp') throw new APIError('BAD_REQUEST');
     let reenrol = false;
+    let old: { secret: string; backupCodes: string } | undefined;
     if (enrolled) {
       // Enrolling again is allowed only after a recovery-code login (DECISIONS 72); owner resets come in T13.
       if (!user.reenrolRequired) throw new APIError('FORBIDDEN', { message: 'Already enrolled' });
@@ -121,12 +146,17 @@ export async function beforeTwoFactor(ctx: HookCtx, deps: Deps): Promise<void> {
       if (!(await passwordMatches(ctx, user.id, ctx.body?.password))) {
         throw new APIError('BAD_REQUEST', { message: 'Invalid password' });
       }
+      // DECISIONS 77: keep the current authenticator. Snapshot it; the plugin needs an unverified row to issue a new
+      // secret, and the after-hook moves the new one to two_factor_pending and puts this one back.
+      const { rows } = await deps.authPool.query<{ secret: string; backupCodes: string }>(
+        'select secret, "backupCodes" from "twoFactor" where "userId" = $1',
+        [user.id],
+      );
+      old = rows[0];
       await deps.authPool.query('update "twoFactor" set verified = false where "userId" = $1', [user.id]);
-      // A new secret is a new replay domain: steps used by the old authenticator must not block the new one.
-      await deps.authPool.query('update totp_used_step set last_step = 0 where user_id = $1', [user.id]);
       reenrol = true;
     }
-    if (key) flows.set(key, { kind: 'enable', userId: user.id, reenrol });
+    if (key) flows.set(key, { kind: 'enable', userId: user.id, reenrol, ...(old ? { old } : {}) });
     return;
   }
 
@@ -151,13 +181,33 @@ export async function beforeTwoFactor(ctx: HookCtx, deps: Deps): Promise<void> {
   const userId = await twoFactorUserId(ctx, session);
   const method = ctx.path === '/two-factor/verify-totp' ? 'totp' : 'recovery';
   let kind: 'login' | 'enrol' | 'reenrol' | 'step_up' = 'login';
+  let pending: { secret: string; backupCodes: string } | null = null;
   if (user) {
     if (!enrolled) kind = 'enrol';
-    else
-      kind =
-        user.reenrolRequired && (await twoFactorVerified(deps.authPool, user.id)) === false
-          ? 'reenrol'
-          : 'step_up';
+    else {
+      pending = user.reenrolRequired ? await pendingOf(deps.authPool, user.id) : null;
+      kind = pending ? 'reenrol' : 'step_up';
+    }
+  }
+  if (kind === 'reenrol' && pending && user) {
+    // Confirmation of a staged re-enrolment: the code must come from the NEW authenticator. Only then swap secret and
+    // recovery codes in one transaction; a wrong code changes nothing (DECISIONS 77).
+    if (method !== 'totp' || typeof ctx.body?.code !== 'string')
+      throw new APIError('UNAUTHORIZED', { message: 'Invalid code' });
+    const fresh = await symmetricDecrypt({ key: ctx.context.secretConfig, data: pending.secret });
+    if ((await matchingStep(fresh, ctx.body.code.trim(), deps.clock.now())) === undefined) {
+      throw new APIError('UNAUTHORIZED', { message: 'Invalid code' });
+    }
+    const staged = pending;
+    await inTransaction(deps.authPool, async (client) => {
+      await client.query(
+        'update "twoFactor" set secret = $2, "backupCodes" = $3, verified = true, "failedVerificationCount" = 0 where "userId" = $1',
+        [user.id, staged.secret, staged.backupCodes],
+      );
+      await client.query('delete from two_factor_pending where user_id = $1', [user.id]);
+      // A new secret is a new replay domain: steps used by the old authenticator must not block the new one.
+      await client.query('update totp_used_step set last_step = 0 where user_id = $1', [user.id]);
+    });
   }
   if (method === 'totp' && userId && typeof ctx.body?.code === 'string') {
     await claimTotpStep(ctx, deps, userId, ctx.body.code.trim());
@@ -169,6 +219,8 @@ export async function afterTwoFactor(ctx: HookCtx, deps: Deps): Promise<void> {
   const key = flowKey(ctx);
   const flow = key ? flows.get(key) : undefined;
   if (key) flows.delete(key);
+  if (flow?.kind === 'enable' && flow.reenrol && flow.old)
+    await stageReenrolment(deps, flow.userId, flow.old, ctx);
   if (!flow || !flow.userId || ctx.context.returned instanceof APIError) return;
 
   const actor = { userId: flow.userId, role: await roleOf(deps.authPool, flow.userId) };
@@ -216,5 +268,37 @@ export async function afterTwoFactor(ctx: HookCtx, deps: Deps): Promise<void> {
     table: 'session',
     ...(sessionId ? { rowId: sessionId } : {}),
     ...(flow.kind === 'reenrol' ? { reason: 're_enrolment' } : {}),
+  });
+}
+
+/**
+ * After the plugin issued a new secret during a re-enrolment: stage it in two_factor_pending and restore the current
+ * authenticator and recovery codes, in one transaction. If the plugin failed, only the restore happens.
+ */
+async function stageReenrolment(
+  deps: Deps,
+  userId: string,
+  old: { secret: string; backupCodes: string },
+  ctx: HookCtx,
+): Promise<void> {
+  const succeeded = !(ctx.context.returned instanceof APIError);
+  await inTransaction(deps.authPool, async (client) => {
+    if (succeeded) {
+      const { rows } = await client.query<{ secret: string; backupCodes: string }>(
+        'select secret, "backupCodes" from "twoFactor" where "userId" = $1',
+        [userId],
+      );
+      const issued = rows[0]!;
+      await client.query(
+        `insert into two_factor_pending (user_id, secret, backup_codes, created_at) values ($1, $2, $3, $4)
+         on conflict (user_id) do update set secret = excluded.secret, backup_codes = excluded.backup_codes,
+           created_at = excluded.created_at`,
+        [userId, issued.secret, issued.backupCodes, deps.clock.now()],
+      );
+    }
+    await client.query(
+      'update "twoFactor" set secret = $2, "backupCodes" = $3, verified = true where "userId" = $1',
+      [userId, old.secret, old.backupCodes],
+    );
   });
 }

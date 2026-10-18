@@ -76,8 +76,9 @@ describe('after a recovery-code login', () => {
     expect(enable.status).toBe(200);
     const { backupCodes: fresh } = (await enable.json()) as { backupCodes: string[] };
     expect(fresh).toHaveLength(10);
-    const newSecret = await secretOf(user.id);
+    const newSecret = await pendingSecretOf(user.id);
     expect(newSecret).not.toBe(oldSecret);
+    expect(await secretOf(user.id)).toBe(oldSecret); // the old authenticator stays in force until confirmation
 
     const verify = await kit.call(
       '/two-factor/verify-totp',
@@ -128,10 +129,55 @@ describe('after a recovery-code login', () => {
     await kit.call('/two-factor/enable', { password: kit.password }, { cookie: user.cookie });
     const verify = await kit.call(
       '/two-factor/verify-totp',
-      { code: await createOTP(await secretOf(user.id)).totp() },
+      { code: await createOTP(await pendingSecretOf(user.id)).totp() },
       { cookie: user.cookie },
     );
     expect(verify.status).toBe(200);
+  });
+
+  it('abandoning re-enrolment midway leaves the old authenticator and old recovery codes working (DECISIONS 77)', async () => {
+    const user = await recoveryLogin();
+    const enable = await kit.call('/two-factor/enable', { password: kit.password }, { cookie: user.cookie });
+    expect(enable.status).toBe(200);
+    // …the user never confirms the new authenticator.
+    nextStep();
+    await expect(kit.login(user)).resolves.toBeTruthy(); // old TOTP
+    nextStep();
+    const pending = kit.cookieOf(
+      await kit.call('/sign-in/email', { email: user.email, password: kit.password }),
+    );
+    const res = await kit.call(
+      '/two-factor/verify-backup-code',
+      { code: user.backupCodes[1] },
+      { cookie: pending },
+    );
+    expect(res.status).toBe(200); // old recovery code
+  });
+
+  it('a wrong confirmation code swaps nothing; the right one then swaps both at once', async () => {
+    const user = await recoveryLogin();
+    const oldSecret = await secretOf(user.id);
+    await kit.call('/two-factor/enable', { password: kit.password }, { cookie: user.cookie });
+    const wrong = await kit.call(
+      '/two-factor/verify-totp',
+      { code: await createOTP(oldSecret).totp() },
+      { cookie: user.cookie },
+    );
+    expect(wrong.status).toBe(401);
+    expect(await secretOf(user.id)).toBe(oldSecret);
+
+    const newSecret = await pendingSecretOf(user.id);
+    const ok = await kit.call(
+      '/two-factor/verify-totp',
+      { code: await createOTP(newSecret).totp() },
+      { cookie: user.cookie },
+    );
+    expect(ok.status).toBe(200);
+    expect(await secretOf(user.id)).toBe(newSecret);
+    const { rowCount } = await kit.migrator.query(`select 1 from two_factor_pending where user_id = $1`, [
+      user.id,
+    ]);
+    expect(rowCount).toBe(0);
   });
 
   it('a user who logged in with TOTP is never asked to re-enrol', async () => {
@@ -155,6 +201,13 @@ describe('enable accepts only the TOTP method', () => {
     expect((await state(cookie)).kind).toBe('needs_enrolment');
   });
 });
+
+async function pendingSecretOf(userId: string) {
+  const { rows } = await kit.migrator.query(`select secret from two_factor_pending where user_id = $1`, [
+    userId,
+  ]);
+  return symmetricDecrypt({ key: kit.env.AUTH_SECRET, data: rows[0].secret });
+}
 
 async function secretOf(userId: string) {
   const { rows } = await kit.migrator.query(`select secret from "twoFactor" where "userId" = $1`, [userId]);
