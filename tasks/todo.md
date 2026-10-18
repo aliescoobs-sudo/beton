@@ -86,11 +86,12 @@ Plan: [tasks/plan.md](plan.md). Each task lists the spec ACs it closes. Standard
 **Verification:** ADR review · **Dependencies:** T4, T7 · **Files:** docs/adr/0001-auth-library.md (spike code not merged) · **Scope:** S
 
 ### - [ ] T9: Owner bootstrap + password login + lockout
-**Description:** `app_user` (role, locale, status) + auth tables per ADR; `pnpm user:create-owner` CLI (prompts, refuses if an owner exists, audited as `system/bootstrap`); login page (fr/ar) with password; argon2id via `@node-rs/argon2`; local common-password check against the bundled top-10k list (`src/modules/platform-security/data/common-passwords.txt` + `LICENSE-common-passwords.md` keeping the SecLists MIT notice); rate limits (5/15 min per account → 15-min lock; 20/15 min per IP); identical error text for unknown email and wrong password; login/failed-login audit events. After password success the user lands on the 2FA step (T10); no other page is reachable.
+**Description:** `app_user` (role, locale, status) + auth tables per ADR; `pnpm user:create-owner` CLI (prompts, refuses if an owner exists, audited as `system/bootstrap`); login page (fr/ar) with password; argon2id via `@node-rs/argon2`; local common-password check against the bundled top-10k list (`src/modules/platform-security/data/common-passwords.txt` + `LICENSE-common-passwords.md` keeping the SecLists MIT notice); rate limits (5/15 min per account → 15-min lock; 20/15 min per IP); identical error text for unknown email and wrong password; login/failed-login audit events. Failed logins for an unknown email are recorded with the fixed, documented **anonymous actor** id (`00000000-0000-7000-8000-000000000000`, ✅ CP2); the attempted identifier is stored only as a keyed HMAC, never in plain text; attempted passwords are never stored or logged. After password success the user lands on the 2FA step (T10); no other page is reachable.
 **Acceptance criteria:**
 - [ ] 5 failed logins lock the account for 15 min; error text identical for unknown email / wrong password (AC-SEC-02, password part)
 - [ ] CLI refuses a second owner and passwords < 12 chars or on the common list
-- [ ] Login success/failure produce audit events without the password or email in plaintext
+- [ ] Login success/failure produce audit events without the password or email in plaintext; unknown-email failures use the anonymous actor and an HMAC of the identifier
+- [ ] A log-scan test proves attempted passwords and identifiers never appear in logs
 **Verification:** `pnpm test src/modules/platform-security` + Playwright `e2e/auth-login.spec.ts` · **Dependencies:** T8 · **Files:** src/modules/platform-security/{db/user-schema.ts,service/auth-service.ts,ui/login-form.tsx}, src/app/[locale]/login/page.tsx, scripts/create-owner.ts, src/modules/platform-security/data/{common-passwords.txt,LICENSE-common-passwords.md} · **Scope:** M
 
 ### - [ ] T10: Forced TOTP enrolment + recovery codes
@@ -133,7 +134,7 @@ Plan: [tasks/plan.md](plan.md). Each task lists the spec ACs it closes. Standard
 **Verification:** unit + `e2e/user-admin.spec.ts` · **Dependencies:** T12 · **Files:** src/modules/platform-security/{domain/permissions.ts,service/guard.ts,service/user-admin.ts,ui/users/*}, src/app/[locale]/admin/users/* · **Scope:** M
 
 ### - [ ] T14: RLS policies + generated matrix test
-**Description:** `ENABLE` + `FORCE ROW LEVEL SECURITY` and policies for all tables existing so far (`app_user`, `audit_event` — all for owner/partner, own actions for office/plant —, `parameter` placeholder, `scheduled_job_run`, `sim_clock` later). Test generator: for each table × role in the matrix, assert allowed reads return rows and denied reads return 0 rows via direct SQL as `app`. Meta-test: every table in the schema (except the allow-list of auth tables on the `auth` role) has FORCE RLS, the audit trigger, and a matrix entry.
+**Description:** `ENABLE` + `FORCE ROW LEVEL SECURITY` and policies for all tables existing so far (`app_user`, `audit_event` — all for owner/partner, own actions for office/plant —, `parameter` placeholder, `scheduled_job_run`, `sim_clock` later). `audit_event` is the one documented exception to FORCE RLS (✅ CP2): its SECURITY DEFINER write functions run as the owner and must read the latest hash, so RLS is ENABLEd (not forced) with read policies for `app` — owner/partner see all events, office/plant only their own actions. Test generator: for each table × role in the matrix, assert allowed reads return rows and denied reads return 0 rows via direct SQL as `app`. Meta-test: every table in the schema (except the allow-list of auth tables on the `auth` role, and `audit_event` as above) has FORCE RLS, the audit trigger, and a matrix entry.
 **Acceptance criteria:**
 - [ ] Matrix test green for every existing table × 4 roles (AC-SEC-04)
 - [ ] Adding a table without RLS/trigger/matrix entry makes the meta-test fail (checked with a fixture migration)
@@ -170,10 +171,11 @@ Plan: [tasks/plan.md](plan.md). Each task lists the spec ACs it closes. Standard
 **Verification:** `pnpm test headers && pnpm test:e2e headers` · **Dependencies:** T1 · **Files:** src/proxy.ts, src/lib/security-headers.ts, tests · **Scope:** S
 
 ### - [ ] T18: Encrypted backup + restore test
-**Description:** `pnpm backup` = `pg_dump` (as migrator) piped to `age -r $BACKUP_AGE_RECIPIENT` into `backups/<ts>.sql.age` (gitignored). `pnpm backup:restore-test` decrypts with the key from a path given by env, restores into a scratch DB, checks migration status and row counts, runs `audit:verify`. Fails clearly if `age` isn't installed.
+**Description:** `pnpm backup` = `pg_dump` (as migrator) piped to `age -r $BACKUP_AGE_RECIPIENT` into `backups/<ts>.sql.age` (gitignored). Next to each backup, write `backups/<ts>.audit-anchor.json` with the latest audit event id and hash (✅ CP2: off-database anchor, so a full rewrite of the chain by the owner/superuser is detectable). `pnpm backup:restore-test` decrypts with the key from a path given by env, restores into a scratch DB, checks migration status and row counts, runs `audit:verify`. Fails clearly if `age` isn't installed.
 **Acceptance criteria:**
 - [ ] Backup file is not readable as SQL without the key (AC-SEC-12)
 - [ ] Restore test passes on a fresh backup, including `audit:verify` (AC-SEC-12)
+- [ ] Restore test fails if the restored chain's event at the anchored id has a different hash than the anchor file
 **Verification:** run both commands locally against the dev DB · **Dependencies:** T7 · **Files:** scripts/backup.ts, scripts/restore-test.ts, README section · **Scope:** S
 
 ### - [ ] T19: Parameters store

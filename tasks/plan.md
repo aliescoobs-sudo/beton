@@ -88,6 +88,11 @@ Parallelizable after Checkpoint 2: T16, T17, T18 are independent of the auth cha
 | CSP nonces vs Next.js streaming/inline scripts | Med | T17 uses Next's documented nonce pattern via middleware; e2e checks no CSP violations in console |
 | `age` CLI not installed on dev machine / host | Low | T18 checks the binary at start and fails with an install hint; documented in README |
 
+## CP2 decisions (Ali, 2026-10-18)
+- T18: store the latest audit id + hash next to each encrypted backup and check it in the restore test (off-database anchor against a full chain rewrite).
+- T14: `audit_event` is excluded from FORCE RLS (its owner-run write functions read the latest hash); RLS enabled with read policies for the app role.
+- T9: failed logins with an unknown email use a fixed, documented anonymous actor; the attempted identifier is stored only as a keyed hash; attempted passwords are never stored or logged.
+
 ## Resolved questions (Ali, 2026-10-18)
 1. Password hashing: argon2id via `@node-rs/argon2` (spec unchanged).
 2. Bundle a public top-10k common-password list (SecLists, MIT) with its licence notice kept alongside the file.
