@@ -27,7 +27,9 @@ async function freshUser() {
 
 describe('password login (T9, AC-SEC-02 password part)', () => {
   beforeAll(async () => {
-    // An owner exists for the single-owner tests below.
+    // An owner exists for the single-owner tests below (another suite may already have created it).
+    const { rowCount } = await kit.migrator.query(`select 1 from "user" where role = 'owner'`);
+    if (rowCount) return;
     await createUser(kit.auth, kit.authPool, {
       actor: { userId: BOOTSTRAP_ACTOR_ID, role: 'system' },
       email: 'owner@belgobeton.test',

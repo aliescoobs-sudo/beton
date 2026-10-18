@@ -4,6 +4,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { DB_ROLES, withRlsContext } from '../../src/lib/db/rls-context';
 import { RLS_TABLES, TABLE_ACCESS } from '../../src/modules/platform-security/domain/table-access';
 import { testEnv } from '../db-env';
+import { realActor } from '../helpers/actors';
+import { ANONYMOUS_ACTOR_ID, SYSTEM_ACTOR_ID } from '../../src/modules/platform-security/auth/actors';
+import { USER_ROLES } from '../../src/modules/platform-security/domain/permissions';
 
 // AC-SEC-04, generated from the registry: for every RLS table × every role, read exactly what the matrix allows.
 type DbRole = (typeof DB_ROLES)[number];
@@ -15,8 +18,8 @@ const system = new pg.Pool({ connectionString: env.DATABASE_URL_SYSTEM, max: 1 }
 afterAll(() => Promise.all([app.end(), system.end()]));
 
 const marker = `matrix_${randomUUID().replace(/-/g, '')}`;
-// One actor per role.
-const actors = Object.fromEntries(DB_ROLES.map((role) => [role, randomUUID()])) as Record<DbRole, string>;
+// One actor per role: real accounts for user roles, the fixed actors otherwise (the database checks roles, DECISIONS 76).
+const actors = {} as Record<DbRole, string>;
 
 /**
  * Per table: which roles can write seed rows, how to write one for an actor, and a query returning the actor
@@ -68,6 +71,9 @@ const FIXTURES: Record<
 };
 
 beforeAll(async () => {
+  for (const role of USER_ROLES) actors[role] = (await realActor(env.DATABASE_URL_MIGRATOR, role)).id;
+  actors.system = SYSTEM_ACTOR_ID;
+  actors.anonymous = ANONYMOUS_ACTOR_ID;
   for (const table of RLS_TABLES) {
     for (const role of FIXTURES[table].writers) {
       const pool = FIXTURES[table].pool === 'system' ? system : app;
@@ -80,12 +86,12 @@ beforeAll(async () => {
 
 describe.each(RLS_TABLES)('RLS on %s', (table) => {
   const rule = TABLE_ACCESS[table];
-  const seededBy = FIXTURES[table].writers.map((r) => actors[r]);
 
   it.each(DB_ROLES)('role %s sees exactly what the matrix allows', async (role) => {
     const { rows } = await withRlsContext(app, { userId: actors[role], role, requestId: marker }, (tx) =>
       tx.query<{ owner: string }>(FIXTURES[table].visible, [marker]),
     );
+    const seededBy = FIXTURES[table].writers.map((r) => actors[r]);
     const scope = rule.read[role];
     const expected =
       scope === 'all' ? seededBy : scope === 'own' ? seededBy.filter((a) => a === actors[role]) : [];

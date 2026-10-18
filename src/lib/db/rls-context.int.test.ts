@@ -1,17 +1,18 @@
 import pg from 'pg';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { testEnv } from '../../../tests/db-env';
+import { realActor } from '../../../tests/helpers/actors';
 import { withRlsContext } from './rls-context';
 
 // Pool of one connection: every transaction reuses the same session, so a leak would be visible.
 const pool = new pg.Pool({ connectionString: testEnv().DATABASE_URL_APP, max: 1 });
 afterAll(() => pool.end());
 
-const owner = {
-  userId: '0190c2a8-0000-7000-8000-000000000001',
-  role: 'owner',
-  requestId: 'req-1',
-} as const;
+// A real owner: the database checks the request role against the stored role (DECISIONS 76).
+const owner = { userId: '', role: 'owner' as const, requestId: 'req-1' };
+beforeAll(async () => {
+  owner.userId = (await realActor(testEnv().DATABASE_URL_MIGRATOR, 'owner')).id;
+});
 
 async function currentContext(client: pg.PoolClient | pg.Pool) {
   const { rows } = await client.query(

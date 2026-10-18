@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import pg from 'pg';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { realClock } from '../src/modules/clock';
 import { BOOTSTRAP_ACTOR_ID } from '../src/modules/platform-security/auth/actors';
 import type { SessionUser } from '../src/modules/platform-security/auth/session-gate';
@@ -13,6 +13,7 @@ import {
 } from '../src/modules/platform-security/service/checklist';
 import { ForbiddenError } from '../src/modules/platform-security/service/user-admin';
 import { authTestKit } from './auth-helpers';
+import { realSessionUser } from './helpers/actors';
 
 const kit = authTestKit();
 const appPool = new pg.Pool({ connectionString: kit.env.DATABASE_URL_APP, max: 2 });
@@ -22,16 +23,10 @@ afterAll(async () => {
   await kit.close();
 });
 
-const person = (role: SessionUser['role']): SessionUser => ({
-  id: randomUUID(),
-  name: role,
-  email: `${role}@x.test`,
-  role,
-  locale: 'fr',
-  twoFactorEnabled: true,
-  reenrolRequired: false,
+let owner: SessionUser;
+beforeAll(async () => {
+  owner = await realSessionUser(kit.env.DATABASE_URL_MIGRATOR, 'owner');
 });
-const owner = person('owner');
 const deps = () => ({ systemPool, authPool: kit.authPool, clock: realClock });
 const status = async (key: string) => (await getChecklist(deps())).items.find((i) => i.key === key)?.status;
 
@@ -69,7 +64,13 @@ describe('security checklist (T21)', () => {
 
   it.each(['partner', 'office', 'plant'] as const)('refuses %s', async (role) => {
     await expect(
-      markChecklistItem(appPool, person(role), 'cndp_declaration', 'x', deps()),
+      markChecklistItem(
+        appPool,
+        await realSessionUser(kit.env.DATABASE_URL_MIGRATOR, role),
+        'cndp_declaration',
+        'x',
+        deps(),
+      ),
     ).rejects.toBeInstanceOf(ForbiddenError);
   });
 

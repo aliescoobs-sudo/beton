@@ -2,7 +2,9 @@ import { randomUUID } from 'node:crypto';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { withRlsContext } from '../src/lib/db/rls-context';
+import { SYSTEM_ACTOR_ID } from '../src/modules/platform-security/auth/actors';
 import { testEnv } from './db-env';
+import { realActor } from './helpers/actors';
 
 const env = testEnv();
 const app = new pg.Pool({ connectionString: env.DATABASE_URL_APP, max: 2 });
@@ -12,7 +14,11 @@ afterAll(async () => {
   await migrator.end();
 });
 
-const ownerId = '0190c2a8-0000-7000-8000-000000000001';
+// A real owner: the database checks the request role against the stored role (DECISIONS 76).
+let ownerId = '';
+beforeAll(async () => {
+  ownerId = (await realActor(env.DATABASE_URL_MIGRATOR, 'owner')).id;
+});
 
 async function recordAsOwner(requestId: string, action = 'login') {
   return withRlsContext(app, { userId: ownerId, role: 'owner', requestId }, (tx) =>
@@ -95,7 +101,7 @@ describe('audit.record()', () => {
 
   it('marks jobs run by the system role as system actions', async () => {
     const requestId = `record-system-${randomUUID()}`;
-    await withRlsContext(app, { userId: ownerId, role: 'system', requestId }, (tx) =>
+    await withRlsContext(app, { userId: SYSTEM_ACTOR_ID, role: 'system', requestId }, (tx) =>
       tx.query(`select audit.record('login', 'app_user', null, null, null, null)`),
     );
     const [event] = await eventsFor(requestId);

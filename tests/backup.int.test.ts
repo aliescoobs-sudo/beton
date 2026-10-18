@@ -8,6 +8,7 @@ import { createBackup, restoreCheck } from '../scripts/backup-lib';
 import { superuserUrl, TEST_DATABASE } from '../scripts/db-bootstrap';
 import { withRlsContext } from '../src/lib/db/rls-context';
 import { testEnv } from './db-env';
+import { realActor } from './helpers/actors';
 
 // AC-SEC-12 + CP2 audit anchor. Needs `age` and the dev identity file from .env.local.
 const env = testEnv();
@@ -16,7 +17,11 @@ const app = new pg.Pool({ connectionString: env.DATABASE_URL_APP, max: 1 });
 const dir = mkdtempSync(join(tmpdir(), 'belgobeton-backup-'));
 afterAll(() => app.end());
 
-const ownerId = '0190c2a8-0000-7000-8000-000000000001';
+// A real owner: the database checks the request role against the stored role (DECISIONS 76).
+let ownerId = '';
+beforeAll(async () => {
+  ownerId = (await realActor(env.DATABASE_URL_MIGRATOR, 'owner')).id;
+});
 let backup: Awaited<ReturnType<typeof createBackup>>;
 
 beforeAll(async () => {

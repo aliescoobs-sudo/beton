@@ -5,23 +5,20 @@ import { withRlsContext } from '../src/lib/db/rls-context';
 import type { SessionUser } from '../src/modules/platform-security/auth/session-gate';
 import { listAuditEvents } from '../src/modules/platform-security/service/audit-query';
 import { testEnv } from './db-env';
+import { realSessionUser } from './helpers/actors';
 
 const env = testEnv();
 const app = new pg.Pool({ connectionString: env.DATABASE_URL_APP, max: 2 });
 afterAll(() => app.end());
 
-const person = (role: SessionUser['role']): SessionUser => ({
-  id: randomUUID(),
-  name: role,
-  email: `${role}@x.test`,
-  role,
-  locale: 'fr',
-  twoFactorEnabled: true,
-  reenrolRequired: false,
+let owner: SessionUser;
+let office: SessionUser;
+let plant: SessionUser;
+beforeAll(async () => {
+  owner = await realSessionUser(env.DATABASE_URL_MIGRATOR, 'owner');
+  office = await realSessionUser(env.DATABASE_URL_MIGRATOR, 'office');
+  plant = await realSessionUser(env.DATABASE_URL_MIGRATOR, 'plant');
 });
-const owner = person('owner');
-const office = person('office');
-const plant = person('plant');
 const tag = `viewer-${randomUUID()}`;
 
 beforeAll(async () => {
