@@ -23,12 +23,12 @@ Plan: [tasks/plan.md](plan.md). Each task lists the spec ACs it closes. Standard
 - [x] A test logging an object with `password`, `token`, `cookie` fields outputs them as `[REDACTED]`; a log-scan test finds no env secret values in captured logs (AC-SEC-11)
 **Verification:** `pnpm test src/lib/env src/lib/logger` · **Dependencies:** T1 · **Files:** src/lib/env.ts, src/lib/logger.ts, .env.example, tests · **Scope:** S
 
-### - [ ] T3: Clock (real mode) + `Date.now()` ban
+### - [x] T3: Clock (real mode) + `Date.now()` ban
 **Description:** `src/modules/clock` exposes `clock.now()`, `clock.today()` (`BusinessDate` in Africa/Casablanca), and a test clock (`createTestClock`). ESLint `no-restricted-syntax`/`no-restricted-globals` bans `Date.now()`, `new Date()` without args, and `performance.now()` for business time outside `src/modules/clock`.
 **Acceptance criteria:**
-- [ ] `clock.now()` tracks real time in real mode (AC-CLK-01, real part)
-- [ ] `clock.today()` returns the Casablanca date across the UTC midnight boundary (tests at 23:30 UTC and 00:30 UTC)
-- [ ] Lint fails on a fixture file using `Date.now()` outside the clock module (AC-CLK-07)
+- [x] `clock.now()` tracks real time in real mode (AC-CLK-01, real part)
+- [x] `clock.today()` returns the Casablanca date across the local midnight boundary, for both UTC+1 and UTC+0 periods (offsets from IANA tz data, not hard-coded)
+- [x] Lint fails on a fixture file using `Date.now()` outside the clock module (AC-CLK-07)
 **Verification:** `pnpm test src/modules/clock`; `pnpm lint` on a fixture · **Dependencies:** T1 · **Files:** src/modules/clock/{index.ts,domain/business-date.ts,service/clock.ts}, eslint.config.mjs, tests · **Scope:** S
 
 ### - [ ] T4: DB roles, migrations, RLS context helper, test harness

@@ -12,6 +12,28 @@ const config = [
     ignores: ['.next/**', 'node_modules/**', 'next-env.d.ts', 'coverage/**'],
   },
   {
+    // Business time comes only from the clock module (SPEC-clock §4, AC-CLK-07).
+    files: ['src/**/*.{ts,tsx}', 'scripts/**/*.ts'],
+    ignores: ['src/modules/clock/**'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "CallExpression[callee.object.name='Date'][callee.property.name='now']",
+          message: 'Use clock.now() from the clock module instead of Date.now().',
+        },
+        {
+          selector: "NewExpression[callee.name='Date'][arguments.length=0]",
+          message: 'Use clock.now() from the clock module instead of new Date().',
+        },
+        {
+          selector: "CallExpression[callee.object.name='performance'][callee.property.name='now']",
+          message: 'Use clock.now() from the clock module instead of performance.now().',
+        },
+      ],
+    },
+  },
+  {
     files: ['src/**/*.{ts,tsx}'],
     plugins: { boundaries },
     settings: {
