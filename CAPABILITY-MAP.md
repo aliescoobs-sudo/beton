@@ -59,7 +59,7 @@ Users: owner, partner, 2 office staff, plant operator (✅ D2). Pilot = fake dat
 | DB | PostgreSQL 17 with Row-Level Security | app connects as non-owner role without `BYPASSRLS` |
 | ORM / migrations | Drizzle ORM + drizzle-kit SQL migrations | RLS policies, triggers, grants in hand-written SQL migrations |
 | Jobs | pg-boss (Postgres-backed queue/scheduler) | no Redis; schedules are driven through `clock` |
-| Auth | Better Auth 1.7.7 (pinned exactly) + two-factor (TOTP) plugin, `@node-rs/argon2` | ✅ A1 (ADR 0001, 2026-10-18); every upgrade re-runs the full auth test suite |
+| Auth | Better Auth 1.7.7 (pinned exactly) + two-factor (TOTP) plugin, `@node-rs/argon2`, `@better-auth/utils` 0.4.2 (✅ CP3) | ✅ A1 (ADR 0001, 2026-10-18); every upgrade re-runs the full auth test suite |
 | Validation | Zod at every boundary (forms, server actions, imports, AI output, webhooks) | |
 | i18n | next-intl, locales `fr` + `ar`, RTL for `ar` | ✅ both languages in pilot (2026-10-18); Darija accepted as AI input |
 | UI | Tailwind CSS (logical properties only: `ms-`/`me-`/`ps-`… for RTL), Radix-based components | |
@@ -253,6 +253,6 @@ Doc-level 🟡 items (D27–D59, R-rules) are cited inline in each module spec. 
 
 ## 11. Open questions (blocking for production, not for pilot)
 
-Inherited from DECISIONS.md: OQ1 revenue/69-21 obligations, OQ2 e-invoicing date, OQ3 plant export format, OQ4 CNDP AI transfer, OQ5 AI provider + ZDR, OQ6 real truck/zone data, OQ7 VAT, OQ8 Moroccan host, OQ9 opening balances, OQ10 partner permissions.
+Inherited from DECISIONS.md: OQ1 revenue/69-21 obligations, OQ2 e-invoicing date, OQ3 plant export format, OQ4 CNDP AI transfer, OQ5 AI provider + ZDR, OQ6 real truck/zone data, OQ7 VAT, OQ8 Moroccan host (must provide a reverse proxy setting `X-Forwarded-For` for the per-IP login limit), OQ9 opening balances, OQ10 partner permissions.
 
 Resolved on 2026-10-18 (were Q1–Q4): Q1 → A9 ✅ · Q2 → A11 ✅ · Q3 → A27 ✅ · Q4 → A14 ✅.

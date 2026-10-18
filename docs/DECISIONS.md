@@ -75,6 +75,10 @@ Legend: ✅ confirmed by Ali · 🟡 assumption (reasonable default, revisit wit
 68. ✅ (ADR 0001, 2026-10-18) Auth library: Better Auth 1.7.7 pinned exactly; every upgrade re-runs the full auth test suite. Gaps closed by tested hooks: 12 h absolute session cap, per-account/IP login lockout, no trust-device bypass, TOTP replay refused, mandatory 2FA enrolment, step-up timestamp.
 69. ✅ Recovery codes stored encrypted with a dedicated key that never lives in the database; single-use; shown only once at generation; regenerating invalidates the old set; every use audited.
 70. ✅ Sessions always run on real time, even in simulation; tests fake the system time.
+71. ✅ (CP3) `@better-auth/utils@0.4.2` approved as a direct, pinned dependency (OTP helper for TOTP replay protection).
+72. ✅ (CP3) After a recovery-code login, sensitive actions need a real TOTP, and the user must first enrol a new authenticator and receive a new recovery-code set.
+73. ✅ (CP3) Enrolment shows a QR code generated server-side by a pinned, well-maintained library; the TOTP secret is never sent to an external service; key + otpauth link stay as fallback.
+74. ✅ (CP3) User creation is retry-safe: the user stays disabled until its credentials are written; a failure is audited and a retry completes it.
 
 ## Legal
 30. 🟡 Law 69-21 deadline alerts in MVP; full quarterly report in phase 2.
@@ -95,6 +99,6 @@ Legend: ✅ confirmed by Ali · 🟡 assumption (reasonable default, revisit wit
 5. AI provider final choice after eval; contract terms and ZDR.
 6. Real truck capacities, trip durations, zones.
 7. VAT treatment and rates on concrete (not verified; keep configurable — pilot uses 20% as a parameter, see 66).
-8. Moroccan hosting provider.
+8. Moroccan hosting provider. The host must provide a reverse proxy that sets `X-Forwarded-For` (the per-IP login limit depends on it; without it only the per-account limit applies), and the app must trust only that proxy.
 9. Opening balances: meetings with each person responsible for each type of number.
 10. Partner's exact permissions.
