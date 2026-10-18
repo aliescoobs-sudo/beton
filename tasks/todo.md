@@ -31,13 +31,13 @@ Plan: [tasks/plan.md](plan.md). Each task lists the spec ACs it closes. Standard
 - [x] Lint fails on a fixture file using `Date.now()` outside the clock module (AC-CLK-07)
 **Verification:** `pnpm test src/modules/clock`; `pnpm lint` on a fixture · **Dependencies:** T1 · **Files:** src/modules/clock/{index.ts,domain/business-date.ts,service/clock.ts}, eslint.config.mjs, tests · **Scope:** S
 
-### - [ ] T4: DB roles, migrations, RLS context helper, test harness
-**Description:** docker-compose Postgres 17; drizzle-kit config; first SQL migration creating roles `migrator`, `app`, `auth`, `system` with minimal grants (no `BYPASSRLS`, app is not owner). `withRlsContext(ctx, fn)` = transaction + `set_config('app.user_id'|'app.role'|'app.request_id'|'app.sim_at', v, true)`. Integration test harness: a compose test DB, migrations applied once, per-test transaction rollback or schema reset.
+### - [x] T4: DB roles, migrations, RLS context helper, test harness
+**Description:** docker-compose Postgres 17; drizzle-kit config; roles created by an idempotent superuser script `scripts/db-bootstrap.ts` (role DDL needs the superuser, so it can't be a migration run as migrator); roles `belgobeton_migrator`, `_app`, `_auth`, `_system` with no elevated attributes (no `BYPASSRLS`, app is not owner); first SQL migration = schema hardening + `ctx.*()` helpers with minimal grants. `withRlsContext(ctx, fn)` = transaction + `set_config('app.user_id'|'app.role'|'app.request_id'|'app.sim_at', v, true)`. Integration test harness: a compose test DB, migrations applied once, per-test transaction rollback or schema reset.
 **Acceptance criteria:**
-- [ ] Test asserts `app` role: `rolbypassrls = false`, owns no tables, cannot `CREATE` in `public`
-- [ ] Settings set inside `withRlsContext` are invisible to the next transaction on the same pooled connection (leak test with pool size 1)
-- [ ] `pnpm db:migrate` is idempotent on a fresh and an already-migrated DB
-**Verification:** `docker compose up -d db && pnpm db:migrate && pnpm test -- --project integration` · **Dependencies:** T2, T3 · **Files:** docker-compose.yml, drizzle.config.ts, db/migrations/0000_roles.sql, src/lib/db/{pool.ts,rls-context.ts}, tests/setup-db.ts · **Scope:** M
+- [x] Test asserts `app` role: `rolbypassrls = false`, owns no tables, cannot `CREATE` in `public`
+- [x] Settings set inside `withRlsContext` are invisible to the next transaction on the same pooled connection (leak test with pool size 1)
+- [x] `pnpm db:migrate` is idempotent on a fresh and an already-migrated DB
+**Verification:** `pnpm db:up && pnpm db:bootstrap && pnpm db:migrate && pnpm test:integration` · **Dependencies:** T2, T3 · **Files:** docker-compose.yml, drizzle.config.ts, db/migrations/0000_roles.sql, src/lib/db/{pool.ts,rls-context.ts}, tests/setup-db.ts · **Scope:** M
 
 ### Checkpoint CP1 — Foundation
 - [ ] All commands green; both locales render; app role verified non-privileged

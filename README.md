@@ -17,12 +17,27 @@ corepack pnpm install --frozen-lockfile
 corepack pnpm dev          # http://localhost:3000 → /fr or /ar
 corepack pnpm lint         # eslint (incl. module boundaries) + prettier --check
 corepack pnpm typecheck    # tsc --noEmit
-corepack pnpm test         # vitest run
+corepack pnpm test         # vitest run (unit + integration; database must be up)
 corepack pnpm build
 corepack pnpm ci:local     # lint + typecheck + test + build (CI is local until a private remote exists)
 ```
 
-More commands (database, backups, audit verification, simulation) arrive with their tasks; the full list is in CAPABILITY-MAP.md §4.
+## Database (local)
+
+PostgreSQL 17 runs in Docker (Colima on macOS: `brew install colima docker docker-compose`, then `colima start`).
+
+```bash
+cp .env.example .env.local                 # fill in; secrets: openssl rand -base64 32 / -hex 16
+corepack pnpm db:up                        # start postgres:17.11 on 127.0.0.1:5432
+corepack pnpm db:bootstrap                 # superuser, idempotent: roles + belgobeton + belgobeton_test
+corepack pnpm db:migrate                   # apply db/migrations as belgobeton_migrator
+corepack pnpm test:unit                    # no database needed
+corepack pnpm test:integration             # migrates and uses belgobeton_test
+```
+
+Roles: `belgobeton_migrator` owns the schema and runs migrations; `belgobeton_app`, `belgobeton_auth` and `belgobeton_system` have no elevated attributes, own nothing and get only explicit grants. Services reach the database only through `withRlsContext()` (`src/lib/db/rls-context.ts`).
+
+More commands (backups, audit verification, simulation) arrive with their tasks; the full list is in CAPABILITY-MAP.md §4.
 
 ## Module boundaries
 
