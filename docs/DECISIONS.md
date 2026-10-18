@@ -79,6 +79,9 @@ Legend: ✅ confirmed by Ali · 🟡 assumption (reasonable default, revisit wit
 72. ✅ (CP3) After a recovery-code login, sensitive actions need a real TOTP, and the user must first enrol a new authenticator and receive a new recovery-code set.
 73. ✅ (CP3) Enrolment shows a QR code generated server-side by a pinned, well-maintained library; the TOTP secret is never sent to an external service; key + otpauth link stay as fallback.
 74. ✅ (CP3) User creation is retry-safe: the user stays disabled until its credentials are written; a failure is audited and a retry completes it.
+75. ✅ (CP4) Owner break-glass: `user:reset-owner-2fa` CLI, server-only, requires the database superuser password, audited, and every use sends an alert to the owner and the partner.
+76. ✅ (CP4) Defence in depth: the database checks the request role set by the app against the user's stored role (Phase 4).
+77. ✅ (CP4) Interrupted re-enrolment: the old authenticator and old recovery codes stay valid until the new authenticator is confirmed; the swap is atomic at confirmation.
 
 ## Legal
 30. 🟡 Law 69-21 deadline alerts in MVP; full quarterly report in phase 2.
