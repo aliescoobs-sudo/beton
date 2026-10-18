@@ -27,7 +27,8 @@
     "test:e2e": "playwright test",
     "crypto:rotate": "node --import ./scripts/register-ts-paths.mjs scripts/crypto-rotate.ts",
     "backup": "node --import ./scripts/register-ts-paths.mjs scripts/backup.ts",
-    "backup:restore-test": "node --import ./scripts/register-ts-paths.mjs scripts/restore-test.ts"
+    "backup:restore-test": "node --import ./scripts/register-ts-paths.mjs scripts/restore-test.ts",
+    "user:reset-owner-2fa": "node --import ./scripts/register-ts-paths.mjs scripts/reset-owner-2fa.ts"
   },
   "dependencies": {
     "@better-auth/utils": "0.4.2",

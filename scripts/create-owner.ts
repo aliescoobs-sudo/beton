@@ -2,44 +2,17 @@
 // The owner must enrol an authenticator app (2FA) at first login.
 //   corepack pnpm user:create-owner
 import { existsSync } from 'node:fs';
-import { createInterface } from 'node:readline/promises';
 import pg from 'pg';
 import { loadEnv } from '@/lib/env';
 import { BOOTSTRAP_ACTOR_ID, createAuth, createUser } from '@/modules/platform-security';
+import { createPrompt } from './prompt';
 
 if (existsSync('.env.local')) process.loadEnvFile('.env.local');
 const env = loadEnv(process.env);
 
-/** Reads a line without echoing it when stdin is a terminal (piped input is read as-is). */
-async function readSecret(prompt: string): Promise<string> {
-  process.stdout.write(prompt);
-  if (!process.stdin.isTTY) return (await lines.next()).value ?? '';
-  return new Promise((resolve) => {
-    let value = '';
-    process.stdin.setRawMode(true);
-    process.stdin.resume();
-    const onData = (chunk: Buffer) => {
-      for (const char of chunk.toString('utf8')) {
-        if (char === '\r' || char === '\n') {
-          process.stdin.setRawMode(false);
-          process.stdin.off('data', onData);
-          process.stdout.write('\n');
-          return resolve(value);
-        }
-        if (char === '\u0003') process.exit(130); // Ctrl-C
-        value = char === '\u007f' ? value.slice(0, -1) : value + char;
-      }
-    };
-    process.stdin.on('data', onData);
-  });
-}
-
-const rl = createInterface({ input: process.stdin, terminal: false });
-const lines = rl[Symbol.asyncIterator]();
-const ask = async (prompt: string) => {
-  process.stdout.write(prompt);
-  return ((await lines.next()).value ?? '').trim();
-};
+const prompt = createPrompt();
+const ask = prompt.ask;
+const readSecret = prompt.secret;
 
 try {
   const email = await ask('Owner email: ');
@@ -62,7 +35,7 @@ try {
     });
     console.log('Owner created. At first login you will set up an authenticator app (2FA).');
   } finally {
-    rl.close();
+    prompt.close();
     await authPool.end();
   }
 } catch (error) {

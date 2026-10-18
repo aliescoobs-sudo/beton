@@ -47,6 +47,21 @@ async function revokeSessions(authPool: pg.Pool, userId: string): Promise<void> 
   await authPool.query('delete from session where "userId" = $1', [userId]);
 }
 
+/**
+ * Removes a user's authenticator, recovery codes and any staged re-enrolment, and ends their sessions: they enrol
+ * again at next login. Shared by the owner's reset (T13) and the break-glass CLI (DECISIONS 75).
+ */
+export async function clearTwoFactor(authPool: pg.Pool, userId: string): Promise<void> {
+  await authPool.query('delete from two_factor_pending where user_id = $1', [userId]);
+  await authPool.query('delete from "twoFactor" where "userId" = $1', [userId]);
+  await authPool.query(
+    'update "user" set "twoFactorEnabled" = false, "reenrolRequired" = false, "updatedAt" = $2 where id = $1',
+    [userId, realClock.now()],
+  );
+  await authPool.query('update totp_used_step set last_step = 0 where user_id = $1', [userId]);
+  await revokeSessions(authPool, userId);
+}
+
 export async function listUsers(deps: UserAdminDeps, actor: SessionUser): Promise<ManagedUser[]> {
   await assertCanManage(deps, actor);
   const { rows } = await deps.authPool.query<ManagedUser>(
@@ -106,13 +121,7 @@ export async function resetTwoFactor(deps: UserAdminDeps, actor: SessionUser, us
   await assertCanManage(deps, actor);
   if (userId === actor.id) throw new Error('You cannot reset your own 2FA');
 
-  await deps.authPool.query('delete from "twoFactor" where "userId" = $1', [userId]);
-  await deps.authPool.query(
-    'update "user" set "twoFactorEnabled" = false, "reenrolRequired" = false, "updatedAt" = $2 where id = $1',
-    [userId, realClock.now()],
-  );
-  await deps.authPool.query('update totp_used_step set last_step = 0 where user_id = $1', [userId]);
-  await revokeSessions(deps.authPool, userId);
+  await clearTwoFactor(deps.authPool, userId);
   await auditAuthEvent(deps.authPool, actorOf(actor), {
     action: 'two_factor_reset',
     table: 'user',

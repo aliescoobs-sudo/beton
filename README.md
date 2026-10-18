@@ -45,6 +45,10 @@ corepack exec playwright install chromium  # once
 corepack pnpm build && corepack pnpm test:e2e   # fr + ar login/enrolment/step-up flow on belgobeton_e2e (~2 min)
 ```
 
+Owner lost both the authenticator and the recovery codes: on the server, `corepack pnpm user:reset-owner-2fa`
+(asks for the database superuser password; audited; the owner and the partner see a security alert until each
+acknowledges it).
+
 Scripts may only drop the throwaway databases `belgobeton_test`, `belgobeton_e2e` and `belgobeton_ddl_scratch`.
 
 ## Encryption keys

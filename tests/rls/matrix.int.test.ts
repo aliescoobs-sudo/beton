@@ -69,6 +69,26 @@ const FIXTURES: Record<
       ),
     visible: `select split_part(detail, ':', 2) as owner from security_check_run where detail like $1 || ':%'`,
   },
+  security_alert: {
+    writers: ['system'],
+    pool: 'system',
+    seed: (tx, actor) =>
+      tx.query(`insert into security_alert (kind, at, detail) values ('owner_2fa_reset', now(), $1)`, [
+        `${marker}:${actor}`,
+      ]),
+    visible: `select split_part(detail, ':', 2) as owner from security_alert where detail like $1 || ':%'`,
+  },
+  security_alert_ack: {
+    writers: ['owner', 'partner'],
+    seed: (tx, actor) =>
+      tx.query(
+        `insert into security_alert_ack (alert_id, user_id, at)
+         select id, $2, now() from security_alert where detail like $1 || ':%'`,
+        [marker, actor],
+      ),
+    visible: `select k.user_id::text as owner from security_alert_ack k join security_alert a on a.id = k.alert_id
+               where a.detail like $1 || ':%'`,
+  },
 };
 
 beforeAll(async () => {

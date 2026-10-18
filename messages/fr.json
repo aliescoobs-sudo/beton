@@ -67,6 +67,10 @@
       "invalidPassword": "Mot de passe incorrect.",
       "error": "Une erreur est survenue. Réessayez.",
       "link": "Sécurité du compte"
+    },
+    "securityAlert": {
+      "owner_2fa_reset": "Alerte sécurité : la double authentification du propriétaire a été réinitialisée avec l'outil de secours le {at}. Si ce n'était pas prévu, contactez le propriétaire immédiatement.",
+      "ack": "J'ai pris connaissance"
     }
   },
   "admin": {

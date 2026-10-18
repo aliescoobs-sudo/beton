@@ -99,6 +99,13 @@
       "when": 1792332013000,
       "tag": "0013_two_factor_pending",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1792332014000,
+      "tag": "0014_security_alerts",
+      "breakpoints": true
     }
   ]
 }

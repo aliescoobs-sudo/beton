@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { redirect } from 'next/navigation';
 import { currentAuthState } from '@/modules/platform-security/auth/request-state';
+import { SecurityAlertBanner } from '@/modules/platform-security/ui/alerts/security-alert-banner';
 
 /** Every page in this group needs a fully authenticated (password + 2FA) session. */
 export default async function ProtectedLayout({
@@ -14,5 +15,10 @@ export default async function ProtectedLayout({
   const state = await currentAuthState();
   if (state.kind === 'anonymous') redirect(`/${locale}/login`);
   if (state.kind === 'needs_enrolment') redirect(`/${locale}/enrol`);
-  return <>{children}</>;
+  return (
+    <>
+      <SecurityAlertBanner user={state.user} locale={locale} />
+      {children}
+    </>
+  );
 }

@@ -201,16 +201,17 @@ Plan: [tasks/plan.md](plan.md). Each task lists the spec ACs it closes. Standard
 - [x] Boot with `REAL_DATA=true` and an incomplete checklist fails
 **Verification:** integration + e2e · **Dependencies:** T18, T19 · **Files:** src/modules/platform-security/{service/checklist.ts,ui/checklist/*,ui/fake-data-banner.tsx}, db/migrations/0011_security_checklist.sql · **Scope:** M
 
-### - [ ] T21a: CP4 decisions (DECISIONS 75–77)
+### - [x] T21a: CP4 decisions (DECISIONS 75–77)
 **Description:** (1) `user:reset-owner-2fa` CLI: server-only, asks for the database superuser password, resets the owner's 2FA, audited; every use raises an alert to the owner and the partner (in-app inbox once `notifications` exists; until then an audit event plus a persistent banner for both at next login). (2) Database-side check that `app.role` matches the stored role of `app.user_id` (SECURITY DEFINER lookup on the user table; mismatch aborts the transaction). (3) Re-enrolment keeps the old authenticator and recovery codes valid until the new authenticator is confirmed; the swap happens atomically at confirmation.
 **Acceptance criteria:**
-- [ ] CLI refuses without the superuser password; a use is audited and alerts owner + partner
-- [ ] A transaction with a role that does not match the user's stored role fails (system/anonymous actors handled explicitly)
-- [ ] Abandoning re-enrolment midway leaves TOTP login with the old authenticator and the old recovery codes working; confirming swaps both at once
+- [x] CLI refuses without the superuser password; a use is audited and alerts owner + partner
+- [x] A transaction with a role that does not match the user's stored role fails (system/anonymous actors handled explicitly)
+- [x] Abandoning re-enrolment midway leaves TOTP login with the old authenticator and the old recovery codes working; confirming swaps both at once
 **Dependencies:** T19 (banner/parameters), T14 · **Scope:** M
 
 ### Checkpoint CP5 — Data protection
-- [ ] AC-SEC-10, 12, 13 green; parameters, audit viewer and checklist working; review with Ali before Phase 5
+- [x] AC-SEC-10, 12, 13 green; parameters, audit viewer and checklist working; T21a done
+- [ ] Review with Ali before Phase 5
 
 ---
 
