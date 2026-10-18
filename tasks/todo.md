@@ -126,12 +126,12 @@ Plan: [tasks/plan.md](plan.md). Each task lists the spec ACs it closes. Standard
 
 ## Phase 3 — Authorization
 
-### - [ ] T13: Permission matrix, guards, user admin
+### - [x] T13: Permission matrix, guards, user admin
 **Description:** `permissions.ts` encodes SPEC §4. `requirePermission()` for routes/server actions (default deny → 404) and services; `permission_denied` audit events. First consumer: owner-only user admin (create user with role and locale, disable, reset 2FA — all sensitive/step-up). Disabling a user revokes their sessions.
 **Acceptance criteria:**
-- [ ] A route/action without a declared permission fails a meta-test
-- [ ] Non-owner gets 404 on user admin; attempt is audited
-- [ ] Disabling a user ends their sessions immediately; their audit history is intact (AC-SEC-14)
+- [x] A route/action without a declared permission fails a meta-test
+- [x] Non-owner gets 404 on user admin; attempt is audited
+- [x] Disabling a user ends their sessions immediately; their audit history is intact (AC-SEC-14)
 **Verification:** unit + `e2e/user-admin.spec.ts` · **Dependencies:** T12 · **Files:** src/modules/platform-security/{domain/permissions.ts,service/guard.ts,service/user-admin.ts,ui/users/*}, src/app/[locale]/admin/users/* · **Scope:** M
 
 ### - [ ] T14: RLS policies + generated matrix test

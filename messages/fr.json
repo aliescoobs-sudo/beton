@@ -68,5 +68,35 @@
       "error": "Une erreur est survenue. Réessayez.",
       "link": "Sécurité du compte"
     }
+  },
+  "admin": {
+    "title": "Utilisateurs",
+    "link": "Gérer les utilisateurs",
+    "name": "Nom",
+    "email": "E-mail",
+    "role": "Rôle",
+    "locale": "Langue",
+    "status": "Statut",
+    "twoFactor": "2FA",
+    "actions": "Actions",
+    "active": "Actif",
+    "disabled": "Désactivé",
+    "enrolled": "Activée",
+    "notEnrolled": "À configurer",
+    "disable": "Désactiver",
+    "enable": "Réactiver",
+    "reset2fa": "Réinitialiser la 2FA",
+    "createTitle": "Nouvel utilisateur",
+    "password": "Mot de passe initial (12 caractères min.)",
+    "create": "Créer",
+    "created": "Utilisateur créé.",
+    "roles": {
+      "owner": "Propriétaire",
+      "partner": "Associé",
+      "office": "Bureau",
+      "plant": "Centrale"
+    },
+    "error": "Action refusée.",
+    "confirmReset": "Réinitialiser la 2FA de cet utilisateur ? Il devra configurer une nouvelle application à sa prochaine connexion."
   }
 }

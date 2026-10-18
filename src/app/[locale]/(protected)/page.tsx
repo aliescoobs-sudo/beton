@@ -3,6 +3,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { currentAuthState } from '@/modules/platform-security/auth/request-state';
 import { LogoutButton } from '@/modules/platform-security/ui/logout-button';
 
+// @permission authenticated — any user with password + 2FA (guarded by the (protected) layout)
 export default async function HomePage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   setRequestLocale(locale);
@@ -34,6 +35,11 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
         <Link href={`/${locale}/security`} className="text-sm underline">
           {t('auth.security.link')}
         </Link>
+        {state.kind === 'authenticated' && state.user.role === 'owner' && (
+          <Link href={`/${locale}/admin/users`} className="text-sm underline" data-testid="admin-link">
+            {t('admin.link')}
+          </Link>
+        )}
         <LogoutButton locale={locale} />
       </div>
     </main>

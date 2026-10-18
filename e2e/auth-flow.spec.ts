@@ -1,18 +1,11 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import pg from 'pg';
 import { E2E_DATABASE } from '../scripts/db-bootstrap';
 import { testEnv } from '../tests/db-env';
-import { E2E_PASSWORD, E2E_USERS, msUntilNextStep, totpFromDisplayedKey } from './fixtures';
+import { E2E_PASSWORD, E2E_USERS, msUntilNextStep, passwordStep, totpFromDisplayedKey } from './fixtures';
 
 const migrator = new pg.Pool({ connectionString: testEnv(E2E_DATABASE).DATABASE_URL_MIGRATOR, max: 1 });
 test.afterAll(() => migrator.end());
-
-async function passwordStep(page: Page, locale: string, email: string) {
-  await page.goto(`/${locale}/login`);
-  await page.fill('input[name=email]', email);
-  await page.fill('input[name=password]', E2E_PASSWORD);
-  await page.click('button[type=submit]');
-}
 
 for (const locale of ['fr', 'ar'] as const) {
   const user = E2E_USERS[locale];

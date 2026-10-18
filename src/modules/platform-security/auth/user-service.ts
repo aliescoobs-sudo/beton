@@ -4,7 +4,9 @@ import { type AuthActor, auditAuthEvent } from './audit';
 import type { Auth } from './create-auth';
 import { checkPassword } from './password-policy';
 
-export type UserRole = 'owner' | 'partner' | 'office' | 'plant';
+import type { Role } from '../domain/permissions';
+
+export type UserRole = Role;
 
 export interface NewUser {
   actor: AuthActor;

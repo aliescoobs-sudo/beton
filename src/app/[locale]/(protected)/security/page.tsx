@@ -3,6 +3,7 @@ import { currentAuthState } from '@/modules/platform-security/auth/request-state
 import { EnrolFlow } from '@/modules/platform-security/ui/enrol-flow';
 import { RecoveryCodesPanel } from '@/modules/platform-security/ui/recovery-codes-panel';
 
+// @permission authenticated — a user manages only their own second factor
 export default async function SecurityPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   setRequestLocale(locale);

@@ -3,6 +3,7 @@
 import { currentAuthState } from '../auth/request-state';
 import { totpQrDataUrl } from '../domain/totp-qr';
 
+// @permission enrolment — only for the caller's own (re-)enrolment, checked below
 /**
  * QR code for the caller's own enrolment (or re-enrolment after a recovery-code login). Rendered on our server;
  * the secret is never sent to an external service (DECISIONS 73).
