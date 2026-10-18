@@ -1,5 +1,5 @@
 import { betterAuth } from 'better-auth';
-import { APIError, createAuthMiddleware } from 'better-auth/api';
+import { APIError, createAuthMiddleware, getSessionFromCtx } from 'better-auth/api';
 import type pg from 'pg';
 import { type Env, secretValuesOf } from '@/lib/env';
 import { createClockLogger, getLogger, realClock } from '@/modules/clock';
@@ -14,6 +14,7 @@ import {
   recordLogin,
 } from './login-guard';
 import { baseAuthOptions } from './options';
+import { enforceAbsoluteLifetime } from './session-lifetime';
 import { afterTwoFactor, beforeTwoFactor, TWO_FACTOR_PATHS } from './two-factor-hooks';
 
 /** Auth endpoints reachable over HTTP; everything else Better Auth ships answers 404 (ADR 0001). */
@@ -81,6 +82,23 @@ export function createAuth({ authPool, env, log }: CreateAuthDeps) {
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
         if (!ALLOWED_AUTH_PATHS.has(ctx.path)) throw new APIError('NOT_FOUND');
+
+        if (ctx.path === '/sign-out') {
+          const session = await getSessionFromCtx(ctx);
+          if (session) {
+            await auditAuthEvent(
+              authPool,
+              { userId: session.user.id, role: session.user.role },
+              {
+                action: 'logout',
+                table: 'session',
+                rowId: session.session.id,
+              },
+            );
+          }
+          return;
+        }
+        await enforceAbsoluteLifetime(ctx, twoFactorDeps);
         if (ctx.path.startsWith('/two-factor/')) return beforeTwoFactor(ctx, twoFactorDeps);
 
         if (ctx.path === '/sign-in/email') {

@@ -1,3 +1,4 @@
+import { APIError } from 'better-auth/api';
 import type { Auth } from './create-auth';
 import type { UserRole } from './user-service';
 
@@ -24,10 +25,16 @@ export type AuthState =
 
 /**
  * The single answer to "who is this request?". A session whose user has not enrolled 2FA may only enrol
- * (SPEC §5: 2FA is mandatory).
+ * (SPEC §5: 2FA is mandatory). Sessions past the 12 h absolute lifetime are revoked by the auth hooks.
  */
 export async function resolveAuthState(auth: Auth, headers: Headers): Promise<AuthState> {
-  const result = await auth.api.getSession({ headers });
+  let result;
+  try {
+    result = await auth.api.getSession({ headers });
+  } catch (error) {
+    if (error instanceof APIError) return { kind: 'anonymous' }; // e.g. past the 12 h absolute lifetime
+    throw error;
+  }
   if (!result) return { kind: 'anonymous' };
 
   const user: SessionUser = {

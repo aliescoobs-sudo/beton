@@ -1,4 +1,8 @@
+import { createOTP } from '@better-auth/utils/otp';
+import { symmetricDecrypt } from 'better-auth/crypto';
 import pg from 'pg';
+import { BOOTSTRAP_ACTOR_ID } from '../src/modules/platform-security/auth/actors';
+import { createUser, type UserRole } from '../src/modules/platform-security/auth/user-service';
 import { createAuth } from '../src/modules/platform-security/auth/create-auth';
 import { testEnv } from './db-env';
 
@@ -48,7 +52,62 @@ export function authTestKit() {
     return rows;
   }
 
+  const password = 'correct-horse-battery-staple';
+
+  async function newUser(role: UserRole = 'partner') {
+    const email = `user-${Math.random().toString(36).slice(2)}@belgobeton.test`;
+    const { id } = await createUser(auth, authPool, {
+      actor: { userId: BOOTSTRAP_ACTOR_ID, role: 'system' },
+      email,
+      name: 'Test User',
+      password,
+      role,
+      locale: 'fr',
+    });
+    return { email, id };
+  }
+
+  async function totpFor(userId: string) {
+    const { rows } = await migrator.query(`select secret from "twoFactor" where "userId" = $1`, [userId]);
+    return createOTP(await symmetricDecrypt({ key: env.AUTH_SECRET, data: rows[0].secret })).totp();
+  }
+
+  /** Password login + 2FA enrolment. Callers using fake timers should move to the next 30 s step before the next code. */
+  async function enrolledUser(role: UserRole = 'partner') {
+    const user = await newUser(role);
+    const first = cookieOf(await call('/sign-in/email', { email: user.email, password }));
+    const enable = await call('/two-factor/enable', { password }, { cookie: first });
+    const { backupCodes } = (await enable.json()) as { backupCodes: string[] };
+    const verify = await call('/two-factor/verify-totp', { code: await totpFor(user.id) }, { cookie: first });
+    if (verify.status !== 200) throw new Error(`enrolment failed: ${verify.status}`);
+    return { ...user, firstCookie: first, cookie: cookieOf(verify), backupCodes };
+  }
+
+  /** Full login (password + TOTP) of an enrolled user; returns the session cookie. */
+  async function login(user: { email: string; id: string }) {
+    const pending = cookieOf(await call('/sign-in/email', { email: user.email, password }));
+    const res = await call('/two-factor/verify-totp', { code: await totpFor(user.id) }, { cookie: pending });
+    if (res.status !== 200) throw new Error(`login failed: ${res.status}`);
+    return { pending, cookie: cookieOf(res) };
+  }
+
   const close = () => Promise.all([authPool.end(), migrator.end()]);
 
-  return { env, auth, authPool, migrator, logLines, call, getSession, cookieOf, auditEvents, close };
+  return {
+    env,
+    auth,
+    authPool,
+    migrator,
+    logLines,
+    password,
+    call,
+    getSession,
+    cookieOf,
+    auditEvents,
+    newUser,
+    totpFor,
+    enrolledUser,
+    login,
+    close,
+  };
 }

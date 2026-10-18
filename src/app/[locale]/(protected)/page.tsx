@@ -1,5 +1,6 @@
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { currentAuthState } from '@/modules/platform-security/auth/request-state';
+import { LogoutButton } from '@/modules/platform-security/ui/logout-button';
 
 export default async function HomePage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -15,6 +16,9 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
       <p className="mt-6" data-testid="signed-in-as">
         {t('auth.session.signedInAs', { name })}
       </p>
+      <div className="mt-4">
+        <LogoutButton locale={locale} />
+      </div>
     </main>
   );
 }

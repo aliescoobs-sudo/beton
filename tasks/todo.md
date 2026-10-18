@@ -102,12 +102,12 @@ Plan: [tasks/plan.md](plan.md). Each task lists the spec ACs it closes. Standard
 - [x] A recovery code works once, then is refused
 **Verification:** unit (TOTP window with test clock) + `e2e/auth-2fa.spec.ts` in fr and ar · **Dependencies:** T9 · **Files:** src/modules/platform-security/{service/two-factor.ts,ui/enrol-totp.tsx,ui/verify-totp.tsx}, src/app/[locale]/(auth)/2fa/*, middleware gate · **Scope:** M
 
-### - [ ] T11: Session lifetimes, rotation, logout
-**Description:** Idle 30 min, absolute 12 h, both read from `clock`; session id rotated on login and on 2FA; logout deletes the session server-side; `two_factor_at` recorded.
+### - [x] T11: Session lifetimes, rotation, logout
+**Description:** Idle 30 min (Better Auth sliding expiry), absolute 12 h (our before-hook on every auth request, via `clock`); sessions use real time, tests fake `Date` (✅ AC-SEC-03 wording); session id rotated on login and on 2FA; logout deletes the session server-side; `two_factor_at` recorded.
 **Acceptance criteria:**
-- [ ] Session refused after 30 min idle and after 12 h absolute with continuous activity (test clock) (AC-SEC-03)
-- [ ] Session id differs before/after login and after 2FA
-- [ ] After logout, replaying the old cookie is refused
+- [x] Session refused after 30 min idle and after 12 h absolute with continuous activity (test clock) (AC-SEC-03)
+- [x] Session id differs before/after login and after 2FA
+- [x] After logout, replaying the old cookie is refused
 **Verification:** `pnpm test session` + e2e logout check · **Dependencies:** T10 · **Files:** src/modules/platform-security/service/session.ts, middleware, tests · **Scope:** S
 
 ### - [ ] T12: Step-up 2FA guard
