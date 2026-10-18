@@ -47,6 +47,13 @@ corepack pnpm build && corepack pnpm test:e2e   # fr + ar login/enrolment/step-u
 
 Scripts may only drop the throwaway databases `belgobeton_test`, `belgobeton_e2e` and `belgobeton_ddl_scratch`.
 
+## Encryption keys
+
+`FIELD_ENCRYPTION_KEYS` and `RECOVERY_CODES_KEYS` are keyrings: `id:base64key[,retired-id:key…]`, current key first.
+To rotate: put a new key first (keep the old one after it), restart, run `corepack pnpm crypto:rotate`, check with
+`corepack pnpm crypto:rotate --check`, then remove the old key. Columns are registered in
+`src/modules/platform-security/domain/encrypted-columns.ts`.
+
 More commands (backups, audit verification, simulation) arrive with their tasks; the full list is in CAPABILITY-MAP.md §4.
 
 ## Module boundaries

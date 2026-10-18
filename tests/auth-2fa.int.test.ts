@@ -70,7 +70,7 @@ describe('mandatory enrolment (AC-SEC-01)', () => {
     const { rows } = await kit.migrator.query(`select "backupCodes" from "twoFactor" where "userId" = $1`, [
       user.id,
     ]);
-    expect(rows[0].backupCodes).toMatch(/^v1\./);
+    expect(rows[0].backupCodes).toMatch(/^f1\./);
     for (const code of user.backupCodes) expect(rows[0].backupCodes).not.toContain(code);
   });
 

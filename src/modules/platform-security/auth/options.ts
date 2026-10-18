@@ -2,7 +2,7 @@ import { hash as argon2Hash, verify as argon2Verify } from '@node-rs/argon2';
 import type { BetterAuthOptions } from 'better-auth';
 import { twoFactor } from 'better-auth/plugins';
 import type pg from 'pg';
-import { decryptString, encryptString } from '@/lib/crypto/aes-gcm';
+import { parseKeyring } from '@/lib/crypto/keyring';
 import type { Env } from '@/lib/env';
 import { uuidv7 } from '@/lib/uuidv7';
 import { realClock } from '@/modules/clock';
@@ -14,11 +14,12 @@ export const SESSION_COOKIE_NAME = '__Host-bb.session_token';
 export interface AuthDeps {
   /** Pool on the belgobeton_auth role: the only role that can read credential tables. */
   authPool: pg.Pool;
-  env: Pick<Env, 'AUTH_SECRET' | 'APP_BASE_URL' | 'RECOVERY_CODES_KEY' | 'LOOKUP_HMAC_KEY'>;
+  env: Pick<Env, 'AUTH_SECRET' | 'APP_BASE_URL' | 'RECOVERY_CODES_KEYS' | 'LOOKUP_HMAC_KEY'>;
 }
 
 /** Better Auth configuration shared by the app, the CLI and the tests (ADR 0001). Hooks are added in createAuth(). */
 export function baseAuthOptions({ authPool, env }: AuthDeps) {
+  const recoveryKeys = parseKeyring(env.RECOVERY_CODES_KEYS);
   return {
     database: authPool,
     secret: env.AUTH_SECRET,
@@ -68,10 +69,10 @@ export function baseAuthOptions({ authPool, env }: AuthDeps) {
         accountLockout: { enabled: true, maxFailedAttempts: 5, durationSeconds: 15 * 60 },
         backupCodeOptions: {
           amount: 10,
-          // Dedicated key from the environment, never stored in the database (ADR 0001, DECISIONS 69).
+          // Dedicated, rotatable keyring from the environment, never stored in the database (ADR 0001, DECISIONS 69).
           storeBackupCodes: {
-            encrypt: async (codes: string) => encryptString(env.RECOVERY_CODES_KEY, codes),
-            decrypt: async (sealed: string) => decryptString(env.RECOVERY_CODES_KEY, sealed),
+            encrypt: async (codes: string) => recoveryKeys.encrypt(codes),
+            decrypt: async (sealed: string) => recoveryKeys.decrypt(sealed),
           },
         },
       }),

@@ -158,11 +158,11 @@ Plan: [tasks/plan.md](plan.md). Each task lists the spec ACs it closes. Standard
 ## Phase 4 — Data protection and operations
 (T16–T18 can run in parallel with Phase 2–3 after CP2.)
 
-### - [ ] T16: Field encryption + HMAC lookup + key rotation
-**Description:** `src/lib/crypto/field.ts`: AES-256-GCM with random 96-bit IV, key id prefix, keys from env (current + previous); keyed HMAC-SHA256 for searchable lookups; `pnpm crypto:rotate` re-encrypts rows from old to new key id. Apply to TOTP secrets if the auth library doesn't already encrypt them (per ADR).
+### - [x] T16: Field encryption + HMAC lookup + key rotation
+**Description:** (Built as `src/lib/crypto/keyring.ts`, used by `FIELD_ENCRYPTION_KEYS` and `RECOVERY_CODES_KEYS`.) AES-256-GCM with random 96-bit IV, key id prefix, keys from env (current + previous); keyed HMAC-SHA256 for searchable lookups; `pnpm crypto:rotate` re-encrypts rows from old to new key id. Apply to TOTP secrets if the auth library doesn't already encrypt them (per ADR).
 **Acceptance criteria:**
-- [ ] Raw `SELECT` of an encrypted column shows no plaintext; decrypt round-trip works; tampered ciphertext fails authentication (AC-SEC-10)
-- [ ] Rotation re-encrypts all rows to the new key id; old key can then be removed
+- [x] Raw `SELECT` of an encrypted column shows no plaintext; decrypt round-trip works; tampered ciphertext fails authentication (AC-SEC-10)
+- [x] Rotation re-encrypts all rows to the new key id; old key can then be removed
 **Verification:** `pnpm test crypto` (unit + integration) · **Dependencies:** T4 · **Files:** src/lib/crypto/field.ts, src/lib/crypto/hmac.ts, scripts/crypto-rotate.ts, tests · **Scope:** S
 
 ### - [ ] T17: Security headers + nonce CSP

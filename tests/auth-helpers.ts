@@ -1,14 +1,15 @@
 import { createOTP } from '@better-auth/utils/otp';
 import { symmetricDecrypt } from 'better-auth/crypto';
 import pg from 'pg';
+import type { Env } from '../src/lib/env';
 import { BOOTSTRAP_ACTOR_ID } from '../src/modules/platform-security/auth/actors';
 import { createUser, type UserRole } from '../src/modules/platform-security/auth/user-service';
 import { createAuth } from '../src/modules/platform-security/auth/create-auth';
 import { testEnv } from './db-env';
 
 /** Better Auth wired to the test database, plus helpers that talk to it over HTTP like a browser. */
-export function authTestKit() {
-  const env = testEnv();
+export function authTestKit(overrides: Partial<Env> = {}) {
+  const env = { ...testEnv(), ...overrides };
   const authPool = new pg.Pool({ connectionString: env.DATABASE_URL_AUTH, max: 4 });
   const migrator = new pg.Pool({ connectionString: env.DATABASE_URL_MIGRATOR, max: 2 });
   const logLines: string[] = [];

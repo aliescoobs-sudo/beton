@@ -15,16 +15,17 @@
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "ci:local": "eslint . && prettier --check . && tsc --noEmit && vitest run && node scripts/audit-verify.ts && next build && playwright test",
+    "ci:local": "eslint . && prettier --check . && tsc --noEmit && vitest run && node --import ./scripts/register-ts-paths.mjs scripts/audit-verify.ts && next build && playwright test",
     "db:up": "docker compose --env-file .env.local up -d --wait db",
     "db:down": "docker compose --env-file .env.local stop db",
-    "db:bootstrap": "node scripts/db-bootstrap.ts",
-    "db:migrate": "node scripts/db-migrate.ts",
+    "db:bootstrap": "node --import ./scripts/register-ts-paths.mjs scripts/db-bootstrap.ts",
+    "db:migrate": "node --import ./scripts/register-ts-paths.mjs scripts/db-migrate.ts",
     "test:unit": "vitest run --project unit",
     "test:integration": "vitest run --project integration",
-    "audit:verify": "node scripts/audit-verify.ts",
+    "audit:verify": "node --import ./scripts/register-ts-paths.mjs scripts/audit-verify.ts",
     "user:create-owner": "node --import ./scripts/register-ts-paths.mjs scripts/create-owner.ts",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "crypto:rotate": "node --import ./scripts/register-ts-paths.mjs scripts/crypto-rotate.ts"
   },
   "dependencies": {
     "@better-auth/utils": "0.4.2",

@@ -8,8 +8,8 @@ const valid = {
   DATABASE_URL_AUTH: 'postgres://auth:pw@localhost:5432/belgobeton',
   DATABASE_URL_SYSTEM: 'postgres://system:pw@localhost:5432/belgobeton',
   AUTH_SECRET: 'a'.repeat(32),
-  FIELD_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
-  RECOVERY_CODES_KEY: Buffer.alloc(32, 8).toString('base64'),
+  FIELD_ENCRYPTION_KEYS: `k1:${Buffer.alloc(32, 7).toString('base64')}`,
+  RECOVERY_CODES_KEYS: `r1:${Buffer.alloc(32, 8).toString('base64')}`,
   LOOKUP_HMAC_KEY: Buffer.alloc(32, 9).toString('base64'),
   APP_BASE_URL: 'http://localhost:3000',
   BACKUP_AGE_RECIPIENT: 'age1qyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqs3290gq',
@@ -49,10 +49,10 @@ describe('loadEnv', () => {
     expect(message).not.toContain(tooShort);
   });
 
-  it('rejects a field encryption key that is not 32 bytes', () => {
-    expect(() => loadEnv({ ...valid, FIELD_ENCRYPTION_KEY: Buffer.alloc(16).toString('base64') })).toThrow(
-      /FIELD_ENCRYPTION_KEY/,
-    );
+  it('rejects a keyring whose key is not 32 bytes', () => {
+    expect(() =>
+      loadEnv({ ...valid, FIELD_ENCRYPTION_KEYS: `k1:${Buffer.alloc(16).toString('base64')}` }),
+    ).toThrow(/FIELD_ENCRYPTION_KEYS/);
   });
 
   it('parses boolean flags strictly', () => {
@@ -66,6 +66,12 @@ describe('secretValuesOf', () => {
     const env = loadEnv(valid);
     const secrets = secretValuesOf(env);
     for (const name of SECRET_ENV_NAMES) expect(secrets).toContain(env[name]);
+  });
+
+  it('also returns each key of a keyring on its own', () => {
+    const env = loadEnv(valid);
+    expect(secretValuesOf(env)).toContain(Buffer.alloc(32, 7).toString('base64'));
+    expect(secretValuesOf(env)).toContain(Buffer.alloc(32, 8).toString('base64'));
   });
 
   it('also returns database passwords on their own', () => {

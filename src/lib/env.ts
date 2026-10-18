@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { parseKeyring } from './crypto/keyring';
 
 const flag = z
   .enum(['true', 'false'], { error: 'must be "true" or "false"' })
@@ -11,6 +12,18 @@ const base64Key32 = z.string().refine((value) => Buffer.from(value, 'base64').le
   error: 'must be 32 bytes, base64-encoded (openssl rand -base64 32)',
 });
 
+const keyring = z.string().superRefine((value, ctx) => {
+  try {
+    parseKeyring(value);
+  } catch (error) {
+    // parseKeyring's messages never contain key material.
+    ctx.addIssue({
+      code: 'custom',
+      message: `must be <id>:<base64 32-byte key>[,…]: ${(error as Error).message}`,
+    });
+  }
+});
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   DATABASE_URL_APP: postgresUrl,
@@ -18,8 +31,9 @@ const envSchema = z.object({
   DATABASE_URL_AUTH: postgresUrl,
   DATABASE_URL_SYSTEM: postgresUrl,
   AUTH_SECRET: z.string().min(32, { error: 'must be at least 32 characters' }),
-  FIELD_ENCRYPTION_KEY: base64Key32,
-  RECOVERY_CODES_KEY: base64Key32,
+  // Keyrings: current key first, then retired keys still needed to decrypt (see `pnpm crypto:rotate`).
+  FIELD_ENCRYPTION_KEYS: keyring,
+  RECOVERY_CODES_KEYS: keyring,
   LOOKUP_HMAC_KEY: base64Key32,
   APP_BASE_URL: z.url({ protocol: /^https?$/, error: 'must be the http(s) origin the app is served from' }),
   BACKUP_AGE_RECIPIENT: z.string().startsWith('age1', { error: 'must be an age public key (age1…)' }),
@@ -36,8 +50,8 @@ export const SECRET_ENV_NAMES = [
   'DATABASE_URL_AUTH',
   'DATABASE_URL_SYSTEM',
   'AUTH_SECRET',
-  'FIELD_ENCRYPTION_KEY',
-  'RECOVERY_CODES_KEY',
+  'FIELD_ENCRYPTION_KEYS',
+  'RECOVERY_CODES_KEYS',
   'LOOKUP_HMAC_KEY',
 ] as const satisfies readonly (keyof Env)[];
 
@@ -45,6 +59,9 @@ export const SECRET_ENV_NAMES = [
 export function secretValuesOf(env: Env): string[] {
   const values: string[] = SECRET_ENV_NAMES.map((name) => env[name]);
   for (const name of SECRET_ENV_NAMES) {
+    if (name.endsWith('_KEYS')) {
+      for (const entry of env[name].split(',')) values.push(entry.slice(entry.indexOf(':') + 1).trim());
+    }
     if (name.startsWith('DATABASE_URL_')) {
       const password = decodeURIComponent(new URL(env[name]).password);
       if (password) values.push(password);
