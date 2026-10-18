@@ -3,6 +3,7 @@ import { symmetricDecrypt } from 'better-auth/crypto';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BOOTSTRAP_ACTOR_ID } from '../src/modules/platform-security/auth/actors';
 import { resolveAuthState } from '../src/modules/platform-security/auth/session-gate';
+import { totpQrDataUrl } from '../src/modules/platform-security/domain/totp-qr';
 import { createUser } from '../src/modules/platform-security/auth/user-service';
 import { authTestKit } from './auth-helpers';
 
@@ -92,6 +93,18 @@ describe('mandatory enrolment (AC-SEC-01)', () => {
 
   it('enrolling without a session is refused', async () => {
     expect((await kit.call('/two-factor/enable', { password })).status).toBe(401);
+  });
+});
+
+describe('enrolment QR code (DECISIONS 73)', () => {
+  it('renders for the real enrolment URI of that user, and not for another user', async () => {
+    const user = await newUser();
+    const cookie = kit.cookieOf(await kit.call('/sign-in/email', { email: user.email, password }));
+    const { totpURI } = (await (await kit.call('/two-factor/enable', { password }, { cookie })).json()) as {
+      totpURI: string;
+    };
+    expect(totpQrDataUrl(totpURI, user.email)).toMatch(/^data:image\/svg\+xml;base64,/);
+    expect(totpQrDataUrl(totpURI, 'someone-else@belgobeton.test')).toBeNull();
   });
 });
 

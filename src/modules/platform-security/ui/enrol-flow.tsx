@@ -1,8 +1,10 @@
 'use client';
 
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { type FormEvent, useState } from 'react';
+import { totpQrForEnrolment } from './totp-qr-action';
 
 type Enrolment = { totpURI: string; backupCodes: string[] };
 
@@ -11,6 +13,7 @@ export function EnrolFlow({ locale, reenrol = false }: { locale: string; reenrol
   const t = useTranslations('auth.enrol');
   const router = useRouter();
   const [enrolment, setEnrolment] = useState<Enrolment | null>(null);
+  const [qr, setQr] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [problem, setProblem] = useState<'invalidPassword' | 'invalidCode' | 'error' | null>(null);
   const [pending, setPending] = useState(false);
@@ -30,7 +33,9 @@ export function EnrolFlow({ locale, reenrol = false }: { locale: string; reenrol
     try {
       const res = await post('enable', { password: new FormData(event.currentTarget).get('password') });
       if (!res.ok) return setProblem(res.status === 400 || res.status === 401 ? 'invalidPassword' : 'error');
-      setEnrolment((await res.json()) as Enrolment);
+      const data = (await res.json()) as Enrolment;
+      setEnrolment(data);
+      setQr(await totpQrForEnrolment(data.totpURI).catch(() => null)); // the key + link below stay as fallback
     } finally {
       setPending(false);
     }
@@ -78,6 +83,20 @@ export function EnrolFlow({ locale, reenrol = false }: { locale: string; reenrol
   const secret = new URL(enrolment.totpURI).searchParams.get('secret') ?? '';
   return (
     <div className="mt-6 space-y-6">
+      {qr && (
+        <section>
+          <p className="text-sm">{t('qrIntro')}</p>
+          <Image
+            unoptimized
+            src={qr}
+            alt={t('qrAlt')}
+            width={192}
+            height={192}
+            className="mt-2 bg-white p-2"
+            data-testid="totp-qr"
+          />
+        </section>
+      )}
       <section>
         <p className="text-sm font-medium">{t('keyLabel')}</p>
         <p

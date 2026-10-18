@@ -64,6 +64,7 @@ Users: owner, partner, 2 office staff, plant operator (✅ D2). Pilot = fake dat
 | i18n | next-intl, locales `fr` + `ar`, RTL for `ar` | ✅ both languages in pilot (2026-10-18); Darija accepted as AI input |
 | UI | Tailwind CSS (logical properties only: `ms-`/`me-`/`ps-`… for RTL), Radix-based components | |
 | Charts | Lightweight SVG chart lib (chosen at plan time, ask first) | forecast chart |
+| QR codes | `uqr` 0.1.3 (UnJS, MIT, no dependencies), rendered server-side | ✅ CP3 (DECISIONS 73): enrolment QR; secret never sent to an external service |
 | Telegram | grammY, webhook mode | |
 | AI | `ai-layer` provider interface; adapters: Anthropic (Haiku 5.5 / Sonnet 5.5), Mistral, Fake | 🟡 D50 |
 | Tests | Vitest, fast-check (property tests), Playwright, Testcontainers or compose test DB | |

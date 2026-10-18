@@ -34,6 +34,8 @@ for (const locale of ['fr', 'ar'] as const) {
     // Enrolment: confirm password, read key and recovery codes (shown once), confirm a first code.
     await page.fill('input[name=password]', E2E_PASSWORD);
     await page.click('button[type=submit]');
+    await expect(page.getByTestId('totp-qr')).toBeVisible();
+    expect(await page.getByTestId('totp-qr').getAttribute('src')).toMatch(/^data:image\/svg\+xml;base64,/);
     const key = (await page.getByTestId('totp-secret').textContent()) ?? '';
     await expect(page.getByTestId('recovery-codes').locator('li')).toHaveCount(10);
     await page.check('input[type=checkbox]');

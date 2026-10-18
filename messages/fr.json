@@ -39,7 +39,9 @@
       "invalidCode": "Code incorrect. Attendez le code suivant et réessayez.",
       "error": "Une erreur est survenue. Réessayez.",
       "reenrolTitle": "Configurer un nouvel authentificateur",
-      "reenrolIntro": "Vous vous êtes connecté avec un code de secours. Avant toute action sensible, configurez une nouvelle application d'authentification : l'ancienne et vos anciens codes de secours cesseront de fonctionner."
+      "reenrolIntro": "Vous vous êtes connecté avec un code de secours. Avant toute action sensible, configurez une nouvelle application d'authentification : l'ancienne et vos anciens codes de secours cesseront de fonctionner.",
+      "qrIntro": "Scannez ce QR code avec votre application d'authentification, ou saisissez la clé ci-dessous.",
+      "qrAlt": "QR code d'enrôlement"
     },
     "session": {
       "logout": "Se déconnecter",
