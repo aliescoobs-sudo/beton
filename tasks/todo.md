@@ -16,11 +16,11 @@ Plan: [tasks/plan.md](plan.md). Each task lists the spec ACs it closes. Standard
 **Verification:** commands above; manual check of both locales in a browser.
 **Dependencies:** none · **Files:** package.json, tsconfig.json, next.config.ts, eslint.config.mjs, vitest.config.ts, src/app/[locale]/layout.tsx + page.tsx, src/i18n/*, messages/fr.json, messages/ar.json (accepted > 5-file exception: boilerplate) · **Scope:** M
 
-### - [ ] T2: Env validation + redacting logger
+### - [x] T2: Env validation + redacting logger
 **Description:** `src/lib/env.ts` validates all env vars with Zod at boot (DB URLs per role, auth secret, field-encryption key, backup recipient, `SIMULATION_ENABLED`, `REAL_DATA`); `.env.example` lists names only. Structured JSON logger with a redaction list (passwords, tokens, secrets, cookies, emails, phones).
 **Acceptance criteria:**
-- [ ] App/process exits with a clear message when a required var is missing (AC-SEC-11)
-- [ ] A test logging an object with `password`, `token`, `cookie` fields outputs them as `[REDACTED]`; a log-scan test finds no env secret values in captured logs (AC-SEC-11)
+- [x] App/process exits with a clear message when a required var is missing (AC-SEC-11)
+- [x] A test logging an object with `password`, `token`, `cookie` fields outputs them as `[REDACTED]`; a log-scan test finds no env secret values in captured logs (AC-SEC-11)
 **Verification:** `pnpm test src/lib/env src/lib/logger` · **Dependencies:** T1 · **Files:** src/lib/env.ts, src/lib/logger.ts, .env.example, tests · **Scope:** S
 
 ### - [ ] T3: Clock (real mode) + `Date.now()` ban
