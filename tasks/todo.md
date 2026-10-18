@@ -142,15 +142,16 @@ Plan: [tasks/plan.md](plan.md). Each task lists the spec ACs it closes. Standard
 - [x] `app` role cannot read auth/credential tables at all
 **Verification:** `pnpm test -- --project integration rls` · **Dependencies:** T13 · **Files:** db/migrations/0004_rls_platform.sql, tests/rls/matrix.int.test.ts, tests/rls/meta.int.test.ts · **Scope:** M
 
-### - [ ] T15: Role-scoped projection helper (field hiding)
+### - [x] T15: Role-scoped projection helper (field hiding)
 **Description:** `project(role, entity, row)` returns only the fields the role may see (map from `permissions.ts`); `expectNoFields(response, fields)` test helper for API and DOM. Used by later modules to close AC-SEC-05.
 **Acceptance criteria:**
-- [ ] Unit tests on a sample entity: plant projection drops price fields, office projection drops margin fields
-- [ ] Helper documented in the module's `index.ts`
+- [x] Unit tests on a sample entity: plant projection drops price fields, office projection drops margin fields
+- [x] Helper documented in the module's `index.ts`
 **Verification:** `pnpm test projection` · **Dependencies:** T14 · **Files:** src/modules/platform-security/domain/projection.ts, tests/helpers/expect-no-fields.ts · **Scope:** XS
 
 ### Checkpoint CP4 — Authorization
-- [ ] AC-SEC-04 and AC-SEC-14 green; review with Ali before Phase 4
+- [x] AC-SEC-04 and AC-SEC-14 green
+- [ ] Review with Ali before Phase 4
 
 ---
 
