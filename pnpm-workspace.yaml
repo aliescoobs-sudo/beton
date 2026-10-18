@@ -1,0 +1,6 @@
+# Dependency install scripts are blocked by default (supply-chain safety).
+# These packages ship prebuilt native binaries as optional dependencies; their scripts are not needed.
+allowBuilds:
+  '@parcel/watcher': false
+  '@swc/core': false
+  unrs-resolver: false

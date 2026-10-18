@@ -6,13 +6,13 @@ Plan: [tasks/plan.md](plan.md). Each task lists the spec ACs it closes. Standard
 
 ## Phase 0 — Foundation
 
-### - [ ] T1: Project scaffold (fr/ar shell, tooling)
+### - [x] T1: Project scaffold (fr/ar shell, tooling)
 **Description:** Next.js (App Router) + TypeScript strict + pnpm + Tailwind (logical properties) + next-intl with `fr`/`ar` locales and `dir="rtl"` for `ar`; ESLint + Prettier + `eslint-plugin-boundaries` (module dependency rules from CAPABILITY-MAP §1); Vitest; `pg` driver; `.nvmrc` (Node 24); README with the commands from CAPABILITY-MAP §4. CI is local only for now: `pnpm ci:local` runs lint, typecheck, test, build (and later e2e, audit:verify); no GitHub Actions workflow until a private remote exists.
 **Acceptance criteria:**
-- [ ] `/fr` and `/ar` render an empty shell; `<html dir="rtl" lang="ar">` on `/ar`
-- [ ] `pnpm lint`, `pnpm typecheck`, `pnpm test` (1 smoke test), `pnpm build` pass
-- [ ] `.gitignore` covers `.env*`, `backups/`, `node_modules/`, `.next/`
-- [ ] `pnpm ci:local` runs the full local pipeline; a fixture import from a non-dependency module fails `pnpm lint` (boundaries rule)
+- [x] `/fr` and `/ar` render an empty shell; `<html dir="rtl" lang="ar">` on `/ar`
+- [x] `pnpm lint`, `pnpm typecheck`, `pnpm test` (1 smoke test), `pnpm build` pass
+- [x] `.gitignore` covers `.env*`, `backups/`, `node_modules/`, `.next/`
+- [x] `pnpm ci:local` runs the full local pipeline; a fixture import from a non-dependency module fails `pnpm lint` (boundaries rule)
 **Verification:** commands above; manual check of both locales in a browser.
 **Dependencies:** none · **Files:** package.json, tsconfig.json, next.config.ts, eslint.config.mjs, vitest.config.ts, src/app/[locale]/layout.tsx + page.tsx, src/i18n/*, messages/fr.json, messages/ar.json (accepted > 5-file exception: boilerplate) · **Scope:** M
 
