@@ -62,13 +62,13 @@ Plan: [tasks/plan.md](plan.md). Each task lists the spec ACs it closes. Standard
 - [x] Encrypted-column placeholder values are logged as stored (no decryption in trigger)
 **Verification:** `pnpm test db/audit` · **Dependencies:** T5 · **Files:** db/migrations/0002_audit_capture.sql, src/modules/platform-security/service/audit-service.ts, tests · **Scope:** S
 
-### - [ ] T7: Hash chain + `pnpm audit:verify`
+### - [x] T7: Hash chain + `pnpm audit:verify`
 **Description:** In the trigger: `hash = sha256(prev_hash || canonical_json(event))` under `pg_advisory_xact_lock`. Canonical JSON defined once and shared by SQL and the TS verifier. `scripts/audit-verify.ts` recomputes the chain and reports the first broken id.
 **Acceptance criteria:**
-- [ ] 100 parallel inserts produce a valid chain; completes < 2 s locally
-- [ ] Altering one stored event as superuser (test only) makes `audit:verify` fail and name that event (AC-SEC-08)
-- [ ] `pnpm audit:verify` exits 0 on a clean DB
-**Verification:** `pnpm test db/audit && pnpm audit:verify` · **Dependencies:** T6 · **Files:** db/migrations/0003_audit_chain.sql, src/modules/platform-security/domain/canonical-json.ts, scripts/audit-verify.ts, tests · **Scope:** M
+- [x] 100 parallel inserts produce a valid chain; completes < 2 s locally
+- [x] Altering one stored event as superuser (test only) makes `audit:verify` fail and name that event (AC-SEC-08)
+- [x] `pnpm audit:verify` exits 0 on a clean DB
+**Verification:** `pnpm test db/audit && pnpm audit:verify` · **Dependencies:** T6 · **Files:** db/migrations/0003_audit_chain.sql, src/modules/platform-security/domain/audit-canonical.ts, src/modules/platform-security/service/audit-chain.ts, scripts/audit-verify.ts, tests · **Scope:** M
 
 ### Checkpoint CP2 — Audit
 - [ ] AC-SEC-06/07/08 (probe) green; `audit:verify` in the test pipeline

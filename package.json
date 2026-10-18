@@ -15,13 +15,14 @@
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "ci:local": "eslint . && prettier --check . && tsc --noEmit && vitest run && next build",
+    "ci:local": "eslint . && prettier --check . && tsc --noEmit && vitest run && node scripts/audit-verify.ts && next build",
     "db:up": "docker compose --env-file .env.local up -d --wait db",
     "db:down": "docker compose --env-file .env.local stop db",
     "db:bootstrap": "node scripts/db-bootstrap.ts",
     "db:migrate": "node scripts/db-migrate.ts",
     "test:unit": "vitest run --project unit",
-    "test:integration": "vitest run --project integration"
+    "test:integration": "vitest run --project integration",
+    "audit:verify": "node scripts/audit-verify.ts"
   },
   "dependencies": {
     "drizzle-orm": "0.45.3",
