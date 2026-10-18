@@ -134,12 +134,12 @@ Plan: [tasks/plan.md](plan.md). Each task lists the spec ACs it closes. Standard
 - [x] Disabling a user ends their sessions immediately; their audit history is intact (AC-SEC-14)
 **Verification:** unit + `e2e/user-admin.spec.ts` · **Dependencies:** T12 · **Files:** src/modules/platform-security/{domain/permissions.ts,service/guard.ts,service/user-admin.ts,ui/users/*}, src/app/[locale]/admin/users/* · **Scope:** M
 
-### - [ ] T14: RLS policies + generated matrix test
+### - [x] T14: RLS policies + generated matrix test
 **Description:** `ENABLE` + `FORCE ROW LEVEL SECURITY` and policies for all tables existing so far (`app_user`, `audit_event` — all for owner/partner, own actions for office/plant —, `parameter` placeholder, `scheduled_job_run`, `sim_clock` later). `audit_event` is the one documented exception to FORCE RLS (✅ CP2): its SECURITY DEFINER write functions run as the owner and must read the latest hash, so RLS is ENABLEd (not forced) with read policies for `app` — owner/partner see all events, office/plant only their own actions. Test generator: for each table × role in the matrix, assert allowed reads return rows and denied reads return 0 rows via direct SQL as `app`. Meta-test: every table in the schema (except the allow-list of auth tables on the `auth` role, and `audit_event` as above) has FORCE RLS, the audit trigger, and a matrix entry.
 **Acceptance criteria:**
-- [ ] Matrix test green for every existing table × 4 roles (AC-SEC-04)
-- [ ] Adding a table without RLS/trigger/matrix entry makes the meta-test fail (checked with a fixture migration)
-- [ ] `app` role cannot read auth/credential tables at all
+- [x] Matrix test green for every existing table × 4 roles (AC-SEC-04)
+- [x] Adding a table without RLS/trigger/matrix entry makes the meta-test fail (checked with a fixture migration)
+- [x] `app` role cannot read auth/credential tables at all
 **Verification:** `pnpm test -- --project integration rls` · **Dependencies:** T13 · **Files:** db/migrations/0004_rls_platform.sql, tests/rls/matrix.int.test.ts, tests/rls/meta.int.test.ts · **Scope:** M
 
 ### - [ ] T15: Role-scoped projection helper (field hiding)

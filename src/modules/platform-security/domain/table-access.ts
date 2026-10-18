@@ -1,0 +1,56 @@
+import type { DB_ROLES } from '@/lib/db/rls-context';
+
+type DbRole = (typeof DB_ROLES)[number];
+export type ReadScope = 'all' | 'own' | 'none';
+
+interface RlsTable {
+  kind: 'rls';
+  /** Rows each request role may read (SPEC §4). */
+  read: Record<DbRole, ReadScope>;
+  /** FORCE ROW LEVEL SECURITY (also applies to the owner). false only with a documented reason. */
+  force: boolean;
+  /** Captured by audit.capture(). false only with a documented reason. */
+  audited: boolean;
+  exception?: string;
+}
+
+interface AuthOnlyTable {
+  kind: 'auth_only';
+  /** Readable only by belgobeton_auth; belgobeton_app has no privilege at all. */
+  reason: string;
+}
+
+/**
+ * Every table in the public schema, with its access rule. The meta-test (tests/rls/meta.int.test.ts) fails for a
+ * table missing here or not matching its rule; the matrix test reads `read` to check RLS for every role.
+ * Later modules add their business tables as `{ kind: 'rls', force: true, audited: true, read: … }`.
+ */
+export const TABLE_ACCESS = {
+  audit_event: {
+    kind: 'rls',
+    read: { owner: 'all', partner: 'all', office: 'own', plant: 'own', system: 'none', anonymous: 'none' },
+    force: false,
+    audited: false,
+    exception:
+      'CP2: its SECURITY DEFINER writers run as the owner and must read the latest hash, so RLS is enabled, not ' +
+      'forced; it is the audit log itself, so it is not captured by the audit trigger.',
+  },
+  user: { kind: 'auth_only', reason: 'Better Auth account table (ADR 0001)' },
+  session: { kind: 'auth_only', reason: 'Better Auth sessions (ADR 0001)' },
+  account: { kind: 'auth_only', reason: 'Better Auth credentials: password hashes (ADR 0001)' },
+  verification: { kind: 'auth_only', reason: 'Better Auth pending verifications (ADR 0001)' },
+  twoFactor: { kind: 'auth_only', reason: 'TOTP secrets and encrypted recovery codes (ADR 0001)' },
+  login_attempt: { kind: 'auth_only', reason: 'Login lockout counters, keyed hashes only' },
+  totp_used_step: { kind: 'auth_only', reason: 'TOTP replay protection' },
+} as const satisfies Record<string, RlsTable | AuthOnlyTable>;
+
+export type TableName = keyof typeof TABLE_ACCESS;
+
+export const RLS_TABLES = (Object.keys(TABLE_ACCESS) as TableName[]).filter(
+  (
+    t,
+  ): t is Extract<
+    TableName,
+    { [K in TableName]: (typeof TABLE_ACCESS)[K]['kind'] extends 'rls' ? K : never }[TableName]
+  > => TABLE_ACCESS[t].kind === 'rls',
+);

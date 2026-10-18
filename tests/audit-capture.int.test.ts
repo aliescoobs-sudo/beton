@@ -22,6 +22,8 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  // Test-only table: remove it so the table registry meta-test sees only real tables.
+  await migrator.query('drop table if exists public.audit_probe');
   await app.end();
   await migrator.end();
 });
