@@ -47,6 +47,7 @@ for (const locale of ['fr', 'ar'] as const) {
     await page.locator('input[name=email]').fill('someone@belgobeton.test'); // hydrated and interactive
     await page.waitForLoadState('networkidle');
     expect(violations).toEqual([]);
+    await expect(page.getByTestId('fake-data-banner')).toBeVisible(); // T21: on every page until the checklist is done
   });
 }
 
@@ -56,6 +57,7 @@ test('no CSP violation on enrolment (QR code) and on the home page, in fr then a
   await page.waitForLoadState('networkidle');
   await page.goto('/ar');
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+  await expect(page.getByTestId('fake-data-banner')).toBeVisible();
   await page.waitForLoadState('networkidle');
   expect(violations).toEqual([]);
 });

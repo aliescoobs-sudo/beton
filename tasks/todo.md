@@ -194,12 +194,12 @@ Plan: [tasks/plan.md](plan.md). Each task lists the spec ACs it closes. Standard
 - [x] Viewer shows before/after diff for an update event
 **Verification:** integration + e2e · **Dependencies:** T19 · **Files:** src/modules/platform-security/{service/audit-query.ts,ui/audit/*}, src/app/[locale]/(protected)/historique/page.tsx · **Scope:** S
 
-### - [ ] T21: Security checklist + fake-data banner
+### - [x] T21: Security checklist + fake-data banner
 **Description:** `security_checklist_item` seeded with the D37 items (SPEC §8); owner can mark items with evidence (sensitive); the automated items (CI security tests, restore test < 7 days, all users 2FA, no seed accounts) are computed. A "Données fictives uniquement" banner shows until all pass and the owner signs off; `REAL_DATA=true` refuses to boot unless the checklist is complete.
 **Acceptance criteria:**
-- [ ] Banner visible on every page while any item is open
-- [ ] Boot with `REAL_DATA=true` and an incomplete checklist fails
-**Verification:** integration + e2e · **Dependencies:** T18, T19 · **Files:** src/modules/platform-security/{service/checklist.ts,ui/checklist/*,ui/fake-data-banner.tsx}, db/migrations/0006_checklist.sql · **Scope:** M
+- [x] Banner visible on every page while any item is open
+- [x] Boot with `REAL_DATA=true` and an incomplete checklist fails
+**Verification:** integration + e2e · **Dependencies:** T18, T19 · **Files:** src/modules/platform-security/{service/checklist.ts,ui/checklist/*,ui/fake-data-banner.tsx}, db/migrations/0011_security_checklist.sql · **Scope:** M
 
 ### - [ ] T21a: CP4 decisions (DECISIONS 75–77)
 **Description:** (1) `user:reset-owner-2fa` CLI: server-only, asks for the database superuser password, resets the owner's 2FA, audited; every use raises an alert to the owner and the partner (in-app inbox once `notifications` exists; until then an audit event plus a persistent banner for both at next login). (2) Database-side check that `app.role` matches the stored role of `app.user_id` (SECURITY DEFINER lookup on the user table; mismatch aborts the transaction). (3) Re-enrolment keeps the old authenticator and recovery codes valid until the new authenticator is confirmed; the swap happens atomically at confirmation.

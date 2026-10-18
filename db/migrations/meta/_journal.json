@@ -78,6 +78,13 @@
       "when": 1792332010000,
       "tag": "0010_parameters",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1792332011000,
+      "tag": "0011_security_checklist",
+      "breakpoints": true
     }
   ]
 }

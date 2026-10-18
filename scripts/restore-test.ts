@@ -3,7 +3,9 @@
 // Needs BACKUP_AGE_IDENTITY_FILE (path to the age private key) and the local superuser password.
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import pg from 'pg';
 import { loadEnv } from '@/lib/env';
+import { recordRestoreTest } from '@/modules/platform-security/service/checklist';
 import { restoreCheck } from './backup-lib';
 import { superuserUrl } from './db-bootstrap';
 
@@ -39,4 +41,12 @@ const report = await restoreCheck({
 for (const check of report.checks)
   console.log(`${check.ok ? 'OK  ' : 'FAIL'} ${check.name}${check.detail ? ` (${check.detail})` : ''}`);
 console.log(report.ok ? `Restore test passed: ${backupFile}` : `Restore test FAILED: ${backupFile}`);
+// Automated evidence for the security checklist (restore test < 7 days).
+const systemPool = new pg.Pool({ connectionString: env.DATABASE_URL_SYSTEM, max: 1 });
+try {
+  const failed = report.checks.find((c) => !c.ok);
+  await recordRestoreTest(systemPool, { ok: report.ok, detail: failed ? failed.name : backupFile });
+} finally {
+  await systemPool.end();
+}
 if (!report.ok) process.exitCode = 1;

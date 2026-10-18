@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { hasLocale, NextIntlClientProvider } from 'next-intl';
 import { setRequestLocale } from 'next-intl/server';
 import { directionOf, routing } from '@/i18n/routing';
+import { FakeDataBanner } from '@/modules/platform-security/ui/fake-data-banner';
 import '../globals.css';
 
 export function generateStaticParams() {
@@ -23,6 +24,7 @@ export default async function LocaleLayout({
   return (
     <html lang={locale} dir={directionOf(locale)}>
       <body>
+        <FakeDataBanner />
         <NextIntlClientProvider>{children}</NextIntlClientProvider>
       </body>
     </html>

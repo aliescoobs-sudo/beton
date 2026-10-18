@@ -146,5 +146,33 @@
     "system": "Système",
     "anonymous": "Anonyme",
     "simulated": "simulé : {at}"
+  },
+  "checklist": {
+    "title": "Liste de contrôle sécurité",
+    "link": "Liste de contrôle sécurité",
+    "banner": "Données fictives uniquement — pilote. Aucune donnée réelle tant que la liste de contrôle sécurité n'est pas complète.",
+    "intro": "Les données réelles ne peuvent être chargées qu'une fois tous les points validés et la liste signée par le propriétaire.",
+    "done": "Fait",
+    "open": "À faire",
+    "automated": "Calculé automatiquement",
+    "evidence": "Preuve (référence, date, document…)",
+    "mark": "Valider",
+    "signoff": "Signer la liste",
+    "saved": "Enregistré.",
+    "error": "Action refusée.",
+    "complete": "Liste complète : les données réelles sont autorisées.",
+    "items": {
+      "ci_security_tests": "Tests de sécurité CI au vert",
+      "restore_test_recent": "Test de restauration réussi depuis moins de 7 jours",
+      "all_users_2fa": "Tous les utilisateurs actifs ont la 2FA",
+      "no_seed_accounts": "Aucun compte de démonstration actif",
+      "dependency_audit": "Audit des dépendances sans faille grave",
+      "csp_active": "Politique de sécurité du contenu (CSP) vérifiée",
+      "cndp_declaration": "Déclaration CNDP déposée (loi 09-08)",
+      "moroccan_hosting": "Hébergement au Maroc en place",
+      "ai_zdr_contract": "Contrat IA avec rétention zéro (ZDR)",
+      "rbac_second_review": "Revue des droits par une deuxième personne",
+      "owner_signoff": "Signature du propriétaire"
+    }
   }
 }

@@ -10,6 +10,7 @@ export const SENSITIVE_ACTIONS = [
   'clock.advance',
   'users.manage',
   'auth.regenerate_recovery_codes',
+  'checklist.mark',
 ] as const;
 
 export type SensitiveAction = (typeof SENSITIVE_ACTIONS)[number];

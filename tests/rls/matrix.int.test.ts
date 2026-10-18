@@ -11,7 +11,8 @@ type RlsTable = (typeof RLS_TABLES)[number];
 
 const env = testEnv();
 const app = new pg.Pool({ connectionString: env.DATABASE_URL_APP, max: 2 });
-afterAll(() => app.end());
+const system = new pg.Pool({ connectionString: env.DATABASE_URL_SYSTEM, max: 1 });
+afterAll(() => Promise.all([app.end(), system.end()]));
 
 const marker = `matrix_${randomUUID().replace(/-/g, '')}`;
 // One actor per role.
@@ -25,6 +26,8 @@ const FIXTURES: Record<
   RlsTable,
   {
     writers: readonly DbRole[];
+    /** Database role that writes the seed rows (default belgobeton_app). */
+    pool?: 'system';
     seed: (tx: pg.PoolClient, actor: string) => Promise<unknown>;
     visible: string;
   }
@@ -43,12 +46,32 @@ const FIXTURES: Record<
       ]),
     visible: `select updated_by::text as owner from parameter where key = 'test.' || $1`,
   },
+  security_checklist_item: {
+    writers: ['owner'],
+    seed: (tx, actor) =>
+      tx.query(
+        `insert into security_checklist_item (key, status, evidence, checked_by, checked_at) values ($1, 'done', 'x', $2, now())`,
+        [`test_${marker}`, actor],
+      ),
+    visible: `select checked_by::text as owner from security_checklist_item where key = 'test_' || $1`,
+  },
+  security_check_run: {
+    writers: ['system'],
+    pool: 'system',
+    seed: (tx, actor) =>
+      tx.query(
+        `insert into security_check_run (key, ok, at, detail) values ('restore_test', true, now(), $1)`,
+        [`${marker}:${actor}`],
+      ),
+    visible: `select split_part(detail, ':', 2) as owner from security_check_run where detail like $1 || ':%'`,
+  },
 };
 
 beforeAll(async () => {
   for (const table of RLS_TABLES) {
     for (const role of FIXTURES[table].writers) {
-      await withRlsContext(app, { userId: actors[role], role, requestId: marker }, (tx) =>
+      const pool = FIXTURES[table].pool === 'system' ? system : app;
+      await withRlsContext(pool, { userId: actors[role], role, requestId: marker }, (tx) =>
         FIXTURES[table].seed(tx, actors[role]),
       );
     }

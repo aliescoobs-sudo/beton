@@ -79,8 +79,8 @@ export async function createUser(auth: Auth, authPool: pg.Pool, input: NewUser):
       });
     }
     await authPool.query(
-      `update "user" set status = 'active', "provisionedAt" = $2, "updatedAt" = $2 where id = $1`,
-      [userId, realClock.now()],
+      `update "user" set status = 'active', "provisionedAt" = $2, "updatedAt" = $2, "createdBy" = $3 where id = $1`,
+      [userId, realClock.now(), input.actor.userId],
     );
   } catch {
     // The error text may carry driver details; the audit only records that the credentials were not written.

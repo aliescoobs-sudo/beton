@@ -58,6 +58,16 @@ test('the owner creates, disables, re-enables a user and resets another user’s
     'Enregistré.',
   );
 
+  // Security checklist (T21): the owner marks a manual item with evidence; the banner stays (list incomplete).
+  await page.goto('/fr/checklist');
+  const csp = page.getByTestId('check-csp_active');
+  await expect(csp.getByTestId('status')).toHaveText('À faire');
+  await csp.locator('input[name=evidence]').fill('e2e/security-headers.spec.ts');
+  await csp.locator('button[type=submit]').click();
+  await expect(csp.getByTestId('status')).toHaveText('Fait');
+  await expect(page.getByTestId('check-owner_signoff').getByTestId('status')).toHaveText('À faire');
+  await expect(page.getByTestId('fake-data-banner')).toBeVisible();
+
   // Audit viewer (T20): the last parameter change shows its before/after diff.
   await page.goto('/fr/historique?table=parameter&action=update');
   const latest = page.getByTestId('audit-event').first();
