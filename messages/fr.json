@@ -245,6 +245,21 @@
       "invalid": "Valeur refusée (code en majuscules, ex. B25 ; libellé obligatoire).",
       "duplicate": "Ce code existe déjà.",
       "error": "Action refusée."
+    },
+    "recettes": {
+      "title": "Recettes",
+      "link": "Recettes",
+      "readOnly": "Lecture seule : seuls le propriétaire et l'associé publient une nouvelle version.",
+      "none": "Aucune recette publiée.",
+      "version": "Version {version}",
+      "newVersion": "Nouvelle version (copie de la dernière)",
+      "effectiveFrom": "Applicable à partir du",
+      "publish": "Publier la version",
+      "saved": "Version publiée.",
+      "invalid": "Valeur refusée (date réelle, au moins un composant, quantités entières positives).",
+      "notAfterLatest": "La date doit être postérieure à celle de la dernière version.",
+      "inactiveComponent": "Un composant archivé ne peut pas entrer dans une recette.",
+      "error": "Action refusée."
     }
   },
   "history": {

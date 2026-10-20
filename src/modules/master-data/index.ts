@@ -58,3 +58,16 @@ export {
   updateConcreteType,
   type ConcreteTypeError,
 } from './service/concrete-type-service';
+export {
+  parseRecetteInput,
+  resolveRecette,
+  type Recette,
+  type RecetteInput,
+  type RecetteLine,
+} from './domain/recette';
+export {
+  createRecetteVersion,
+  listRecetteVersions,
+  resolveRecetteFor,
+  type RecetteError,
+} from './service/recette-service';

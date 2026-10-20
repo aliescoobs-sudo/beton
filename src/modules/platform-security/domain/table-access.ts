@@ -14,6 +14,8 @@ interface RlsTable {
   exception?: string;
   /** Master data and financial records: belgobeton_app has no DELETE or TRUNCATE privilege (AC-MD-06, R12). */
   noDelete?: boolean;
+  /** Versioned records: belgobeton_app has no UPDATE either (a change is a new row), e.g. recettes (AC-MD-02). */
+  insertOnly?: boolean;
 }
 
 interface AuthOnlyTable {
@@ -121,6 +123,26 @@ export const TABLE_ACCESS = {
     noDelete: true,
     exception:
       'master-data T7: managers write (recettes.write); office and plant read; code immutable (trigger).',
+  },
+  recette: {
+    kind: 'rls',
+    read: { owner: 'all', partner: 'all', office: 'all', plant: 'all', system: 'all', anonymous: 'none' },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'master-data T8: insert-only versions, managers write (recettes.write); every role reads (no price column; ' +
+      'office and plant see quantities, T9 projects the plant view).',
+  },
+  recette_line: {
+    kind: 'rls',
+    read: { owner: 'all', partner: 'all', office: 'all', plant: 'all', system: 'all', anonymous: 'none' },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception: 'master-data T8: insert-only, only in the transaction that creates the recette (trigger).',
   },
   code_sequence: {
     kind: 'rls',

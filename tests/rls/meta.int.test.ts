@@ -47,6 +47,17 @@ describe('every table is registered with its access rule (T14 meta-test)', () =>
     }
   });
 
+  it('flags an insert-only table (recette) whose UPDATE was granted to the app role (AC-MD-02)', async () => {
+    await migrator.query('grant update on recette to belgobeton_app');
+    try {
+      expect(await findTableAccessViolations(migrator)).toContainEqual(
+        expect.objectContaining({ table: 'recette', problem: 'update_granted' }),
+      );
+    } finally {
+      await migrator.query('revoke update on recette from belgobeton_app');
+    }
+  });
+
   it('flags an auth-only table the app role could read', async () => {
     await migrator.query('grant select on login_attempt to belgobeton_app');
     try {

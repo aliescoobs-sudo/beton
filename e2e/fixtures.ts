@@ -28,6 +28,9 @@ export const E2E_MD = {
   typePartnerFr: { email: 'e2e-ty-partner-fr@belgobeton.test', name: 'Associé Types' },
   typePartnerAr: { email: 'e2e-ty-partner-ar@belgobeton.test', name: 'شريك الأنواع' },
   typePlant: { email: 'e2e-ty-plant@belgobeton.test', name: 'Centrale Types' },
+  recettePartnerFr: { email: 'e2e-re-partner-fr@belgobeton.test', name: 'Associé Recettes' },
+  recettePartnerAr: { email: 'e2e-re-partner-ar@belgobeton.test', name: 'شريك الوصفات' },
+  recettePlant: { email: 'e2e-re-plant@belgobeton.test', name: 'Centrale Recettes' },
   clientPlant: { email: 'e2e-cl-plant@belgobeton.test', name: 'Centrale Clients' },
 } as const;
 export const E2E_CSP = { email: 'e2e-csp@belgobeton.test', name: 'CSP E2E' } as const;

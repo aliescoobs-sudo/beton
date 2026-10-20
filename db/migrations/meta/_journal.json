@@ -162,6 +162,13 @@
       "when": 1792591219000,
       "tag": "0022_concrete_type",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1792591220000,
+      "tag": "0023_recette",
+      "breakpoints": true
     }
   ]
 }

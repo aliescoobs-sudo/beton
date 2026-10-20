@@ -34,7 +34,7 @@ Migration `client` (code `CLT-nnn`, kind, ice, phone_enc, contact_name, default_
 ### - [x] T7: Concrete types (S)
 `concrete_type` (code `B20`…, label, status). **AC:** managers W, office R, plant R; archived type not selectable; seed B12, B20, B25, B30 (configurable). **Deps:** T2
 
-### - [ ] T8: Recette versions (M)
+### - [x] T8: Recette versions (M)
 `recette` + `recette_line` (insert-only), `resolveRecette(type, date)` in domain, "new version" form (copy last version, change quantities, pick `effective_from`).
 **AC:** AC-MD-02 (version at D leaves earlier dates on the old version; a stored recette id never changes); no UPDATE/DELETE grant on both tables; managers W; line quantities are integers in base units. **Deps:** T6, T7
 

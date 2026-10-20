@@ -176,6 +176,38 @@ const FIXTURES: Record<
       ),
     visible: `select split_part(label, ':', 2) as owner from concrete_type where label like $1 || ':%'`,
   },
+  recette: {
+    writers: ['owner', 'partner'],
+    seed: async (tx, actor) => {
+      const type = await tx.query<{ id: string }>(
+        `insert into concrete_type (id, code, label) values (gen_random_uuid(), 'R' || upper(substr(md5(random()::text), 1, 8)), $1) returning id`,
+        [`r${marker}:${actor}`],
+      );
+      await tx.query(
+        `insert into recette (id, concrete_type_id, version, effective_from, created_by) values (gen_random_uuid(), $1, 1, '2000-01-01', $2)`,
+        [type.rows[0]?.id, actor],
+      );
+    },
+    visible: `select split_part(t.label, ':', 2) as owner from recette r join concrete_type t on t.id = r.concrete_type_id where t.label like 'r' || $1 || ':%'`,
+  },
+  recette_line: {
+    writers: ['owner', 'partner'],
+    seed: async (tx, actor) => {
+      const type = await tx.query<{ id: string }>(
+        `insert into concrete_type (id, code, label) values (gen_random_uuid(), 'L' || upper(substr(md5(random()::text), 1, 8)), $1) returning id`,
+        [`l${marker}:${actor}`],
+      );
+      const recette = await tx.query<{ id: string }>(
+        `insert into recette (id, concrete_type_id, version, effective_from, created_by) values (gen_random_uuid(), $1, 1, '2000-01-01', $2) returning id`,
+        [type.rows[0]?.id, actor],
+      );
+      await tx.query(
+        `insert into recette_line (id, recette_id, component_id, qty_per_m3) values (gen_random_uuid(), $1, (select id from component order by code limit 1), 1)`,
+        [recette.rows[0]?.id],
+      );
+    },
+    visible: `select split_part(t.label, ':', 2) as owner from recette_line l join recette r on r.id = l.recette_id join concrete_type t on t.id = r.concrete_type_id where t.label like 'l' || $1 || ':%'`,
+  },
   supplier: {
     writers: ['owner', 'partner', 'office'],
     seed: (tx, actor) =>
