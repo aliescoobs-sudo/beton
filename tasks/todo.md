@@ -245,5 +245,5 @@ Plan: [tasks/plan.md](plan.md). Each task lists the spec ACs it closes. Standard
 - [x] All AC-SEC-01…14 green (AC-SEC-05 mechanism only; AC-SEC-07 financial-table part pending ledger) and all AC-CLK-01…07 green
 - [x] `pnpm test -- --coverage` ≥ 90% on `modules/*/domain` (🟡 A6) — 98% (needs `@vitest/coverage-v8`: `pnpm exec vitest run --coverage`)
 - [x] Code review (`/agent-skills:review`) + security-auditor pass on the module
-- [ ] Review fixes done (2026-10-20, one commit per fix; signing the backup anchor deferred: checklist item `backup_anchor_signed`, DECISIONS open question 12)
-- [ ] Review with Ali; then spec → plan for `master-data`
+- [x] Review fixes done (2026-10-20, one commit per fix; signing the backup anchor deferred: checklist item `backup_anchor_signed`, DECISIONS open question 12)
+- [x] Review with Ali; then spec → plan for `master-data`
