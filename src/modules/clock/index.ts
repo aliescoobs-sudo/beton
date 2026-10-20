@@ -26,12 +26,12 @@ export {
 } from './service/job-runner';
 export { installJobQueue, type JobScheduler, startJobScheduler } from './service/job-scheduler';
 export { casablancaInstant, type JobInstant, jobInstantsBetween } from './domain/instants';
+export { advanceClock, type AdvanceDeps, type AdvanceResult, type ScriptedEvent } from './service/advance';
 export {
-  advanceClock,
-  type AdvanceDeps,
-  type AdvanceResult,
+  type AdvanceActionResult,
+  type AdvanceInput,
+  AdvanceRejectedError,
   type AdvanceTarget,
   MAX_ADVANCE_DAYS,
-  type ScriptedEvent,
-} from './service/advance';
-export type { AdvanceActionResult, AdvanceInput } from './domain/advance-input';
+  parseAdvanceInput,
+} from './domain/advance-input';

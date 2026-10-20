@@ -27,7 +27,7 @@ export async function syncSimClockOrExit(): Promise<void> {
 
 /**
  * Node-only, real mode only: schedule the catalogue jobs. `timeOf` supplies the configured job times (read once at
- * boot; a changed parameter applies at the next restart). Simulated mode never schedules: `advance` drives jobs (T24).
+ * boot; a changed parameter applies at the next restart). Simulated mode never schedules: `advance` drives jobs.
  */
 export async function startJobSchedulerOrExit(
   timeOf: (parameterKey: string, defaultTime: string) => Promise<string>,

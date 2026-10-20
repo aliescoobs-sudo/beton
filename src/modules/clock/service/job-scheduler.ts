@@ -47,7 +47,7 @@ export interface JobScheduler {
 
 /**
  * Real mode only: pg-boss cron fires each catalogue job at its Africa/Casablanca time. The handler goes through
- * `runJob`, so a duplicate fire (restart, two instances) is a no-op. In simulated mode `advance` (T24) drives jobs.
+ * `runJob`, so a duplicate fire (restart, two instances) is a no-op. In simulated mode `advance` drives jobs.
  */
 export async function startJobScheduler(
   systemUrl: string,

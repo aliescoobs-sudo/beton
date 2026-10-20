@@ -27,11 +27,18 @@ function localDateTime(instant: Date): { date: string; time: string } {
   return { date: `${parts.year}-${parts.month}-${parts.day}`, time: `${parts.hour}:${parts.minute}` };
 }
 
-/** Casablanca is UTC+1, or UTC+0 during Ramadan; the offset in minutes that makes `date time` a real local time. */
+/** Casablanca is on UTC+0 or UTC+1 depending on the date (tzdata); the offset in minutes that makes `date time` real. */
 const CASABLANCA_OFFSETS_MIN = [60, 0];
 
-/** The instant at which the Casablanca wall clock reads `time` on `date`. */
+/** The instant at which the Casablanca wall clock reads `time` on `date`. Throws on an impossible date or time. */
 export function casablancaInstant(date: BusinessDate, time: string): Date {
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
+    new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) !== date
+  ) {
+    throw new RangeError(`Invalid date "${date}"`);
+  }
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) throw new RangeError(`Invalid time "${time}"`);
   const [year = 0, month = 1, day = 1] = date.split('-').map(Number);
   const [hour = 0, minute = 0] = time.split(':').map(Number);
   const wall = Date.UTC(year, month - 1, day, hour, minute);

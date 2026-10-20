@@ -1,6 +1,7 @@
 import type pg from 'pg';
 import { withRlsContext } from '@/lib/db/rls-context';
 import { uuidv7 } from '@/lib/uuidv7';
+import { AdvanceRejectedError } from '../domain/advance-input';
 import { businessDateOf } from '../domain/business-date';
 import { type Clock, realClock } from './clock';
 
@@ -108,7 +109,7 @@ export async function setSimNow(
         `select sim_now from sim_clock where mode = 'simulated' for update`,
       );
       if (!rows[0]) throw new Error('Simulated clock is not initialised');
-      if (to.getTime() <= rows[0].sim_now.getTime()) throw new Error('sim_now can only move forward');
+      if (to.getTime() <= rows[0].sim_now.getTime()) throw new AdvanceRejectedError('NOT_FORWARD');
       await tx.query(`update sim_clock set sim_now = $1, updated_by = $2, updated_at = $3`, [
         to,
         actor.userId,

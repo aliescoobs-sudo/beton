@@ -26,6 +26,23 @@ export function AdvanceControl({
   const [retry, setRetry] = useState<(() => Promise<AdvanceActionResult>) | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
+  function messageFor(error: Exclude<AdvanceActionResult, { ok: true }>['error']): string {
+    switch (error) {
+      case 'INVALID':
+        return t('invalid');
+      case 'NOT_FORWARD':
+        return t('notForward');
+      case 'TOO_FAR':
+        return t('tooFar');
+      case 'SIMULATION_DISABLED':
+        return t('disabled');
+      case 'SERVER_ERROR':
+        return t('serverError');
+      default:
+        return t('error');
+    }
+  }
+
   async function run(call: () => Promise<AdvanceActionResult>) {
     const result = await call();
     if (result.ok) {
@@ -33,7 +50,7 @@ export function AdvanceControl({
       return router.refresh();
     }
     if (result.error === 'STEP_UP_REQUIRED') return setRetry(() => call);
-    setMessage(result.error === 'INVALID' ? t('invalid') : t('error'));
+    setMessage(messageFor(result.error));
   }
 
   function submit(input: AdvanceInput) {
@@ -75,7 +92,7 @@ export function AdvanceControl({
           onVerified={() => {
             const again = retry;
             setRetry(null);
-            void again().then((r) => (r.ok ? router.refresh() : setMessage(t('error'))));
+            void run(again);
           }}
           onCancel={() => setRetry(null)}
         />

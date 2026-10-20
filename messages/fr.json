@@ -191,7 +191,11 @@
       "go": "Avancer",
       "invalid": "Date invalide.",
       "error": "Action refusée.",
-      "jobFailed": "Tâche en échec : {job}. Le temps s'est arrêté à cet instant."
+      "jobFailed": "Tâche en échec : {job}. Le temps s'est arrêté à cet instant.",
+      "notForward": "La date cible doit être postérieure à la date simulée.",
+      "tooFar": "Avance maximale : 366 jours.",
+      "disabled": "La simulation est désactivée.",
+      "serverError": "Erreur serveur : l'avance a échoué."
     }
   }
 }

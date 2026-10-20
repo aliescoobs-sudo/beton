@@ -14,6 +14,11 @@ describe('casablancaInstant', () => {
     expect(casablancaInstant(day('2026-07-01'), '07:00').toISOString()).toBe('2026-07-01T06:00:00.000Z');
   });
 
+  it('throws on an impossible date or time instead of rolling over', () => {
+    expect(() => casablancaInstant(day('2026-02-31'), '07:00')).toThrow(RangeError);
+    expect(() => casablancaInstant(day('2026-07-01'), '25:00')).toThrow(RangeError);
+  });
+
   it('is UTC+0 during Ramadan', () => {
     expect(casablancaInstant(day('2026-03-02'), '07:00').toISOString()).toBe('2026-03-02T07:00:00.000Z');
   });

@@ -1,11 +1,10 @@
 import type pg from 'pg';
 import { type BusinessDate, businessDateOf } from '../domain/business-date';
+import { AdvanceRejectedError, type AdvanceTarget, MAX_ADVANCE_DAYS } from '../domain/advance-input';
 import { jobInstantsBetween, type ScheduledJobTime } from '../domain/instants';
 import { JOB_CATALOGUE } from '../domain/job-catalogue';
 import { type JobHandler, type JobRegistry, type JobRunOutcome, runJob, unfinishedRuns } from './job-runner';
 import { readSimNow, type SimClockActor, setSimNow } from './sim-clock';
-
-export type AdvanceTarget = { to: Date } | { byDays: number };
 
 /**
  * A scripted event of the `simulation` module: runs at `at`, between the jobs, as part of the advance. It is
@@ -42,7 +41,6 @@ export interface AdvanceResult {
 
 type Step = { at: Date; jobKey: string; businessDate: BusinessDate; run?: JobHandler };
 
-export const MAX_ADVANCE_DAYS = 366;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
@@ -58,9 +56,9 @@ export async function advanceClock(
   const realNow = deps.realNow ?? (() => new Date());
   const from = await readSimNow(deps.appPool, deps.simulationEnabled, actor);
   const to = 'to' in target ? target.to : new Date(from.getTime() + target.byDays * DAY_MS);
-  if (!(to.getTime() > from.getTime())) throw new Error('sim_now can only move forward');
+  if (!(to.getTime() > from.getTime())) throw new AdvanceRejectedError('NOT_FORWARD');
   if (to.getTime() - from.getTime() > MAX_ADVANCE_DAYS * DAY_MS) {
-    throw new Error(`Cannot advance by more than ${MAX_ADVANCE_DAYS} days at once`);
+    throw new AdvanceRejectedError('TOO_FAR');
   }
 
   const times: ScheduledJobTime[] = [];

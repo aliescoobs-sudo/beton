@@ -5,9 +5,8 @@ export async function register() {
   assertEnvOrExit();
   const { assertRealDataOrExit } = await import('./modules/platform-security/boot');
   await assertRealDataOrExit();
-  const { syncSimClockOrExit } = await import('./modules/clock/boot');
+  const { startJobSchedulerOrExit, syncSimClockOrExit } = await import('./modules/clock/boot');
   await syncSimClockOrExit();
-  const { startJobSchedulerOrExit } = await import('./modules/clock/boot');
   const { jobTimeOf } = await import('./app/job-time-of');
   await startJobSchedulerOrExit(jobTimeOf);
 }

@@ -2,6 +2,7 @@ import pg from 'pg';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   advanceClock,
+  AdvanceRejectedError,
   type AdvanceDeps,
   casablancaInstant,
   JOB_CATALOGUE,
@@ -135,10 +136,14 @@ describe('advance (T24)', () => {
     await expect(
       advanceClock(await deps({ simulationEnabled: false }), owner, { byDays: 1 }),
     ).rejects.toBeInstanceOf(SimulationDisabledError);
-    await expect(advanceClock(await deps(), owner, { to: new Date(d1.getTime() - DAY) })).rejects.toThrow(
-      /only move forward/,
+    await expect(
+      advanceClock(await deps(), owner, { to: new Date(d1.getTime() - DAY) }),
+    ).rejects.toMatchObject({
+      reason: 'NOT_FORWARD',
+    });
+    await expect(advanceClock(await deps(), owner, { byDays: 400 })).rejects.toBeInstanceOf(
+      AdvanceRejectedError,
     );
-    await expect(advanceClock(await deps(), owner, { byDays: 400 })).rejects.toThrow(/more than/);
   });
 
   it('runs scripted events between the jobs, in order', async () => {
