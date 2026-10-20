@@ -82,6 +82,7 @@ Legend: ✅ confirmed by Ali · 🟡 assumption (reasonable default, revisit wit
 75. ✅ (CP4) Owner break-glass: `user:reset-owner-2fa` CLI, server-only, requires the database superuser password, audited, and every use sends an alert to the owner and the partner.
 76. ✅ (CP4) Defence in depth: the database checks the request role set by the app against the user's stored role (Phase 4).
 77. ✅ (CP4) Interrupted re-enrolment: the old authenticator and old recovery codes stay valid until the new authenticator is confirmed; the swap is atomic at confirmation.
+78. ⚠️ (CP6, known limitation, simulation only) `clock.advance` moves `sim_now` to a job's instant and then runs the job. A failed job is retried by the next advance, because its run row exists at `sim_now`. If the process dies right after `sim_now` moves and before the run row is written, no row exists, the next advance starts after that instant, and the job is skipped for that day. Accepted for the pilot: the clock is simulation-only and the owner sees the gap in the job-run history. A fix would write the run row (or move the clock) in the same transaction as the start of the job.
 
 ## Legal
 30. 🟡 Law 69-21 deadline alerts in MVP; full quarterly report in phase 2.
