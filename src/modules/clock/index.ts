@@ -3,6 +3,7 @@ export { type Clock, createTestClock, realClock, type TestClock } from './servic
 export { createClockLogger, getLogger } from './service/logger';
 export {
   loadRequestClock,
+  readSimNow,
   type RequestClock,
   SimulationDisabledError,
   setSimNow,
@@ -23,3 +24,13 @@ export {
   stubJobRegistry,
 } from './service/job-runner';
 export { installJobQueue, type JobScheduler, startJobScheduler } from './service/job-scheduler';
+export { casablancaInstant, type JobInstant, jobInstantsBetween } from './domain/instants';
+export {
+  advanceClock,
+  type AdvanceDeps,
+  type AdvanceResult,
+  type AdvanceTarget,
+  MAX_ADVANCE_DAYS,
+  type ScriptedEvent,
+} from './service/advance';
+export { AdvanceControl, type AdvanceActionResult, type AdvanceInput } from './ui/advance-control';

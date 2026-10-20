@@ -233,13 +233,13 @@ Plan: [tasks/plan.md](plan.md). Each task lists the spec ACs it closes. Standard
 - [x] Job writes are audited with `actor_kind = system`
 **Verification:** integration test with pg-boss against the test DB · **Dependencies:** T22 · **Files:** src/modules/clock/{domain/job-catalogue.ts,service/job-runner.ts,db/job-run-schema.ts}, db/migrations/0008_job_runs.sql · **Scope:** M
 
-### - [ ] T24: `clock.advance` (owner, step-up, audited) + demo control
+### - [x] T24: `clock.advance` (owner, step-up, audited) + demo control
 **Description:** `advance({ to } | { byDays })`: compute all job instants and registered scripted-event instants (hook interface for the `simulation` module) between now and target; for each in order set `sim_now` and run synchronously to completion; idempotent via T23. Owner-only, sensitive (step-up) — checked in the server action in `src/app`, not inside `clock`; audit event with from/to via the `sim_clock` trigger. Minimal "Avancer à" control in the sim badge.
 **Acceptance criteria:**
-- [ ] D1 07:00 → D4 07:00 runs each daily job once per crossed day, chronologically; re-advancing over run instants runs nothing (AC-CLK-03)
-- [ ] Advance 3 days ≡ 3 × 1 day: identical job-run sequence and audit sequence (excluding real timestamps) (AC-CLK-04)
-- [ ] Requires owner + TOTP ≤ 10 min; each advance audited with from/to (AC-CLK-06)
-**Verification:** integration (equivalence test) + e2e owner advance with step-up · **Dependencies:** T23, T12 · **Files:** src/modules/clock/{service/advance.ts,domain/instants.ts,ui/advance-control.tsx}, tests · **Scope:** M
+- [x] D1 07:00 → D4 07:00 runs each daily job once per crossed day, chronologically; re-advancing over run instants runs nothing (AC-CLK-03) — re-advance tested after a test-only clock reset (sim_now never moves back)
+- [x] Advance 3 days ≡ 3 × 1 day: identical job-run sequence and audit sequence (excluding real timestamps) (AC-CLK-04)
+- [x] Requires owner + TOTP ≤ 10 min; each advance audited with from/to (AC-CLK-06) — owner + step-up checked in `src/app/advance-action.ts` (`simulation.control` + `withStepUp`); one `sim_clock` audit event per instant crossed
+**Verification:** integration (equivalence test); the e2e owner advance cannot run (e2e serves a production build, which refuses simulation, see T22) — the action is covered by `withStepUp`/`authorize` tests (T12) · **Dependencies:** T23, T12 · **Files:** src/modules/clock/{service/advance.ts,domain/instants.ts,ui/advance-control.tsx}, tests · **Scope:** M
 
 ### Checkpoint CP6 — `platform-security` + `clock` done
 - [ ] All AC-SEC-01…14 green (AC-SEC-05 mechanism only; AC-SEC-07 financial-table part pending ledger) and all AC-CLK-01…07 green

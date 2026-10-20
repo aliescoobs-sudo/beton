@@ -41,6 +41,23 @@ export async function loadRequestClock(
   return rows[0] ? snapshotClock(rows[0].sim_now) : real;
 }
 
+/** Current `sim_now`, read as `actor`. Throws when simulation is disabled (AC-CLK-01) or the clock is not initialised. */
+export async function readSimNow(
+  pool: pg.Pool,
+  simulationEnabled: boolean,
+  actor: SimClockActor,
+): Promise<Date> {
+  if (!simulationEnabled) throw new SimulationDisabledError();
+  const rows = await withRlsContext(
+    pool,
+    { userId: actor.userId, role: actor.role, requestId: uuidv7(new Date()) },
+    async (tx) =>
+      (await tx.query<{ sim_now: Date }>(`select sim_now from sim_clock where mode = 'simulated'`)).rows,
+  );
+  if (!rows[0]) throw new Error('Simulated clock is not initialised');
+  return rows[0].sim_now;
+}
+
 /**
  * Boot: bring the singleton in line with SIMULATION_ENABLED. Enabling creates it (or resumes it, never earlier than
  * its stored instant); disabling flips an existing row back to 'real'. Runs as the system actor, audited.

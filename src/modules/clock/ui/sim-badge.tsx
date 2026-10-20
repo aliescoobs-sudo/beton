@@ -1,5 +1,7 @@
+import type { ReactNode } from 'react';
+
 /** Permanent badge while the clock is simulated (SPEC-clock §4). Presentational: the layout supplies the text. */
-export function SimBadge({ label, at }: { label: string; at: string }) {
+export function SimBadge({ label, at, children }: { label: string; at: string; children?: ReactNode }) {
   return (
     <div
       role="status"
@@ -7,6 +9,7 @@ export function SimBadge({ label, at }: { label: string; at: string }) {
       data-testid="sim-badge"
     >
       {label} — {at}
+      {children}
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { directionOf, routing } from '@/i18n/routing';
 import { formatSimDate, SimBadge } from '@/modules/clock';
 import { FakeDataBanner } from '@/modules/platform-security/ui/fake-data-banner';
+import { AdvanceSlot } from '../advance-slot';
 import { getRequestClock } from '../request-clock';
 import '../globals.css';
 
@@ -28,9 +29,15 @@ export default async function LocaleLayout({
   return (
     <html lang={locale} dir={directionOf(locale)}>
       <body>
-        {clock.simulated && <SimBadge label={t('simulation')} at={formatSimDate(clock.now(), locale)} />}
-        <FakeDataBanner />
-        <NextIntlClientProvider>{children}</NextIntlClientProvider>
+        <NextIntlClientProvider>
+          {clock.simulated && (
+            <SimBadge label={t('simulation')} at={formatSimDate(clock.now(), locale)}>
+              <AdvanceSlot />
+            </SimBadge>
+          )}
+          <FakeDataBanner />
+          {children}
+        </NextIntlClientProvider>
       </body>
     </html>
   );

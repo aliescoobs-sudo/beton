@@ -122,7 +122,8 @@
       "clock__job__daily_brief": "Brief quotidien",
       "clock__job__due_reminders": "Rappels d'échéances",
       "clock__job__day_close": "Clôture de la journée"
-    }
+    },
+    "restartNote": "Les heures des tâches planifiées ne sont prises en compte qu'après un redémarrage du serveur."
   },
   "history": {
     "title": "Historique",
@@ -183,6 +184,14 @@
     }
   },
   "clock": {
-    "simulation": "SIMULATION"
+    "simulation": "SIMULATION",
+    "advance": {
+      "oneDay": "+1 jour",
+      "to": "Avancer à",
+      "go": "Avancer",
+      "invalid": "Date invalide.",
+      "error": "Action refusée.",
+      "jobFailed": "Tâche en échec : {job}. Le temps s'est arrêté à cet instant."
+    }
   }
 }

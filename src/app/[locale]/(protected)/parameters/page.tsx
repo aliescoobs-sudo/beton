@@ -27,6 +27,9 @@ export default async function ParametersPage({ params }: { params: Promise<{ loc
   return (
     <main className="mx-auto max-w-2xl px-4 py-8">
       <h1 className="text-2xl font-semibold">{t('title')}</h1>
+      <p className="mt-2 text-sm text-gray-600" data-testid="restart-note">
+        {t('restartNote')}
+      </p>
       <ParametersForm rows={rows} editable={can(user.role, 'parameters.write')} />
     </main>
   );
