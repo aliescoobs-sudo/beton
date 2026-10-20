@@ -16,7 +16,8 @@ export const CHECKLIST = {
   rbac_second_review: { kind: 'manual' },
   backups_off_host: { kind: 'manual' }, // encrypted backups and anchors copied off the app host
   age_key_off_app_host: { kind: 'manual' }, // the age private key never on the app host
-  backup_credentials_isolated: { kind: 'automated' }, // DATABASE_URL_BACKUP absent from the app runtime
+  backup_credentials_isolated: { kind: 'automated' }, // DATABASE_URL_BACKUP and the superuser password absent from the app runtime
+  backup_anchor_signed: { kind: 'manual' }, // the audit anchor is signed with a key held off the app host (deferred, see DECISIONS)
   owner_signoff: { kind: 'signoff' },
 } as const;
 

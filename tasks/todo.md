@@ -238,11 +238,12 @@ Plan: [tasks/plan.md](plan.md). Each task lists the spec ACs it closes. Standard
 **Acceptance criteria:**
 - [x] D1 07:00 → D4 07:00 runs each daily job once per crossed day, chronologically; re-advancing over run instants runs nothing (AC-CLK-03) — re-advance tested after a test-only clock reset (sim_now never moves back)
 - [x] Advance 3 days ≡ 3 × 1 day: identical job-run sequence and audit sequence (excluding real timestamps) (AC-CLK-04)
-- [x] Requires owner + TOTP ≤ 10 min; each advance audited with from/to (AC-CLK-06) — owner + step-up checked in `src/app/advance-action.ts` (`simulation.control` + `withStepUp`); one `sim_clock` audit event per instant crossed
+- [x] Requires owner + TOTP ≤ 10 min; each advance audited with from/to (AC-CLK-06) — owner + step-up checked in `src/app/advance-action.ts` (`simulation.control` + `withStepUp`); one `clock_advance` audit event with from/to per request (all outcomes), plus one `sim_clock` row per instant crossed; a failed job is retried by the next advance
 **Verification:** integration (equivalence test); the e2e owner advance cannot run (e2e serves a production build, which refuses simulation, see T22) — the action is covered by `withStepUp`/`authorize` tests (T12) · **Dependencies:** T23, T12 · **Files:** src/modules/clock/{service/advance.ts,domain/instants.ts,ui/advance-control.tsx}, tests · **Scope:** M
 
 ### Checkpoint CP6 — `platform-security` + `clock` done
-- [ ] All AC-SEC-01…14 green (AC-SEC-05 mechanism only; AC-SEC-07 financial-table part pending ledger) and all AC-CLK-01…07 green
-- [ ] `pnpm test -- --coverage` ≥ 90% on `modules/*/domain` (🟡 A6)
-- [ ] Code review (`/agent-skills:review`) + security-auditor pass on the module
+- [x] All AC-SEC-01…14 green (AC-SEC-05 mechanism only; AC-SEC-07 financial-table part pending ledger) and all AC-CLK-01…07 green
+- [x] `pnpm test -- --coverage` ≥ 90% on `modules/*/domain` (🟡 A6) — 98% (needs `@vitest/coverage-v8`: `pnpm exec vitest run --coverage`)
+- [x] Code review (`/agent-skills:review`) + security-auditor pass on the module
+- [ ] Review fixes done (2026-10-20, one commit per fix; signing the backup anchor deferred: checklist item `backup_anchor_signed`, DECISIONS open question 12)
 - [ ] Review with Ali; then spec → plan for `master-data`

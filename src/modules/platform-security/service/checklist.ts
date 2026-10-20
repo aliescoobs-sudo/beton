@@ -69,7 +69,10 @@ export async function getChecklist({
       lastRestoreTestOk,
       usersWithout2fa: rows[0]!.without2fa,
       seedAccounts: rows[0]!.seed,
-      appHasBackupCredentials: !!(runtimeEnv ?? process.env).DATABASE_URL_BACKUP,
+      appHasBackupCredentials: !!(
+        (runtimeEnv ?? process.env).DATABASE_URL_BACKUP ||
+        (runtimeEnv ?? process.env).POSTGRES_SUPERUSER_PASSWORD
+      ),
     },
     clock.now(),
   );

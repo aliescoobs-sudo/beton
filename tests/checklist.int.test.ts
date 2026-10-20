@@ -31,6 +31,16 @@ const deps = () => ({ systemPool, authPool: kit.authPool, clock: realClock });
 const status = async (key: string) => (await getChecklist(deps())).items.find((i) => i.key === key)?.status;
 
 describe('security checklist (T21)', () => {
+  it('flags superuser or backup credentials in the app runtime environment, and clears them without', async () => {
+    const withEnv = (runtimeEnv: Record<string, string>) => async () =>
+      (await getChecklist({ ...deps(), runtimeEnv })).items.find(
+        (i) => i.key === 'backup_credentials_isolated',
+      )?.status;
+    expect(await withEnv({})()).toBe('done');
+    expect(await withEnv({ DATABASE_URL_BACKUP: 'postgres://x' })()).toBe('open');
+    expect(await withEnv({ POSTGRES_SUPERUSER_PASSWORD: 'x' })()).toBe('open');
+  });
+
   it('starts incomplete, with the automated items computed from facts', async () => {
     const checklist = await getChecklist(deps());
     expect(checklist.complete).toBe(false);

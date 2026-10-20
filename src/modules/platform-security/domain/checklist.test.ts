@@ -33,6 +33,7 @@ describe('security checklist (T21, SPEC §8, D37)', () => {
       'backups_off_host',
       'age_key_off_app_host',
       'backup_credentials_isolated',
+      'backup_anchor_signed',
       'owner_signoff',
     ]);
   });

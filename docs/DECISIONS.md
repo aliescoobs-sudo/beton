@@ -102,7 +102,8 @@ Legend: ✅ confirmed by Ali · 🟡 assumption (reasonable default, revisit wit
 5. AI provider final choice after eval; contract terms and ZDR.
 6. Real truck capacities, trip durations, zones.
 7. VAT treatment and rates on concrete (not verified; keep configurable — pilot uses 20% as a parameter, see 66).
-8. Moroccan hosting provider. The host must provide a reverse proxy that sets `X-Forwarded-For` (the per-IP login limit depends on it; without it only the per-account limit applies), and the app must trust only that proxy.
+8. Moroccan hosting provider. The host must provide a reverse proxy that appends the client address to `X-Forwarded-For`; set `TRUSTED_PROXY_HOPS` to the number of such proxies. The app then counts only the entry the outermost trusted proxy appended; with `TRUSTED_PROXY_HOPS=0` (default) the header is ignored and only the per-account limit applies.
 9. Opening balances: meetings with each person responsible for each type of number.
 10. Partner's exact permissions.
 11. Backup operations (CP5, also security checklist items): encrypted backups and their audit anchors are copied off the app host (where, how often, who checks the restore test); the age private key never lives on the app host; the `belgobeton_backup` role credentials (`DATABASE_URL_BACKUP`) exist only in the backup job's environment, never in the app runtime environment (the checklist computes this one).
+12. Sign the backup audit anchor (CP6, deferred; also a pre-production checklist item, `backup_anchor_signed`): the anchor holds the SHA-256 of the backup and the last audit hash, unsigned, so anyone who can write both files can swap the backup and recompute the anchor. Sign it (age, minisign or ed25519) with a key held off the app host, or mirror the last hash to an independent store; decide with the hosting provider (8) and the backup operations (11).
