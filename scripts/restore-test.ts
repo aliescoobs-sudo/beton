@@ -10,6 +10,8 @@ import { restoreCheck } from './backup-lib';
 import { superuserUrl } from './db-bootstrap';
 
 if (existsSync('.env.local')) process.loadEnvFile('.env.local');
+// Ops secrets (superuser, backup role, age identity) live in .env.ops, which Next.js never loads.
+if (existsSync('.env.ops')) process.loadEnvFile('.env.ops');
 const env = loadEnv(process.env);
 const identityFile = process.env.BACKUP_AGE_IDENTITY_FILE;
 if (!identityFile || !existsSync(identityFile)) {

@@ -124,6 +124,8 @@ export const recreateTestDatabase = (env: Env) => recreateDatabase(env, TEST_DAT
 
 if (import.meta.main) {
   if (existsSync('.env.local')) process.loadEnvFile('.env.local');
+  // Ops secrets (superuser, backup role, age identity) live in .env.ops, which Next.js never loads.
+  if (existsSync('.env.ops')) process.loadEnvFile('.env.ops');
   const env = loadEnv(process.env);
   const databases = [new URL(env.DATABASE_URL_MIGRATOR).pathname.slice(1), TEST_DATABASE];
   await ensureRoles(env);

@@ -28,6 +28,7 @@ PostgreSQL 17 runs in Docker (Colima on macOS: `brew install colima docker docke
 
 ```bash
 cp .env.example .env.local                 # fill in; secrets: openssl rand -base64 32 / -hex 16
+                                           # the [OPS] variables go in a separate .env.ops (Next.js never loads it)
 corepack pnpm db:up                        # start postgres:17.11 on 127.0.0.1:5432
 corepack pnpm db:bootstrap                 # superuser, idempotent: roles + belgobeton + belgobeton_test
 corepack pnpm db:migrate                   # apply db/migrations as belgobeton_migrator
