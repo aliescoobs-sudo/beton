@@ -50,3 +50,11 @@ export {
   updatePurchaseUnit,
   type ComponentError,
 } from './service/component-service';
+export { parseConcreteTypeInput, type ConcreteType, type ConcreteTypeInput } from './domain/concrete-type';
+export {
+  createConcreteType,
+  listConcreteTypes,
+  listSelectableConcreteTypes,
+  updateConcreteType,
+  type ConcreteTypeError,
+} from './service/concrete-type-service';

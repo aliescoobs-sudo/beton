@@ -167,6 +167,15 @@ const FIXTURES: Record<
       ),
     visible: `select split_part(label, ':', 2) as owner from purchase_unit where label like $1 || ':%'`,
   },
+  concrete_type: {
+    writers: ['owner', 'partner'],
+    seed: (tx, actor) =>
+      tx.query(
+        `insert into concrete_type (id, code, label) values (gen_random_uuid(), 'X' || upper(substr(md5(random()::text), 1, 8)), $1)`,
+        [`${marker}:${actor}`],
+      ),
+    visible: `select split_part(label, ':', 2) as owner from concrete_type where label like $1 || ':%'`,
+  },
   supplier: {
     writers: ['owner', 'partner', 'office'],
     seed: (tx, actor) =>

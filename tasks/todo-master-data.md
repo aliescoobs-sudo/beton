@@ -31,7 +31,7 @@ Migration `client` (code `CLT-nnn`, kind, ice, phone_enc, contact_name, default_
 `component` (name_fr, name_ar, base_unit, low_stock_threshold) and `purchase_unit` (label, factor_to_base int); seed the 6 components. Managers write.
 **AC:** factor must be a positive integer (CHECK); both language names required; AC-SEC-04 matrix. **Deps:** T2, T1
 
-### - [ ] T7: Concrete types (S)
+### - [x] T7: Concrete types (S)
 `concrete_type` (code `B20`…, label, status). **AC:** managers W, office R, plant R; archived type not selectable; seed B12, B20, B25, B30 (configurable). **Deps:** T2
 
 ### - [ ] T8: Recette versions (M)

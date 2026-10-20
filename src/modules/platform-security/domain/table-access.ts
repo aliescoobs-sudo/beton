@@ -113,6 +113,15 @@ export const TABLE_ACCESS = {
     noDelete: true,
     exception: 'master-data T6: managers write (components.write); factor_to_base is immutable (trigger).',
   },
+  concrete_type: {
+    kind: 'rls',
+    read: { owner: 'all', partner: 'all', office: 'all', plant: 'all', system: 'all', anonymous: 'none' },
+    force: true,
+    audited: true,
+    noDelete: true,
+    exception:
+      'master-data T7: managers write (recettes.write); office and plant read; code immutable (trigger).',
+  },
   code_sequence: {
     kind: 'rls',
     read: { owner: 'all', partner: 'all', office: 'all', plant: 'none', system: 'none', anonymous: 'none' },

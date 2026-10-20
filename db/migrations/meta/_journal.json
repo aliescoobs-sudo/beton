@@ -155,6 +155,13 @@
       "when": 1792591218000,
       "tag": "0021_component",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1792591219000,
+      "tag": "0022_concrete_type",
+      "breakpoints": true
     }
   ]
 }

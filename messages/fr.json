@@ -231,6 +231,20 @@
       "invalid": "Valeur refusée (noms fr et ar obligatoires, contenu entier positif).",
       "duplicate": "Ce nom ou cette unité existe déjà.",
       "error": "Action refusée."
+    },
+    "concreteTypes": {
+      "title": "Types de béton",
+      "link": "Types de béton",
+      "readOnly": "Lecture seule : seuls le propriétaire et l'associé modifient les types.",
+      "code": "Code (ex. B25)",
+      "label": "Libellé",
+      "add": "Ajouter le type",
+      "save": "Enregistrer",
+      "archived": "Archivé",
+      "saved": "Enregistré.",
+      "invalid": "Valeur refusée (code en majuscules, ex. B25 ; libellé obligatoire).",
+      "duplicate": "Ce code existe déjà.",
+      "error": "Action refusée."
     }
   },
   "history": {
