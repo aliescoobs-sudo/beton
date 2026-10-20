@@ -79,6 +79,13 @@ export const TABLE_ACCESS = {
       'Singleton, SPEC-clock §3. Every signed-in role reads it (badge, clock.now()); also readable by ' +
       'belgobeton_auth (pre-session pages) and the owner via the ctx.sim_now() definer; updates: owner or system.',
   },
+  scheduled_job_run: {
+    kind: 'rls',
+    read: { owner: 'all', partner: 'all', office: 'none', plant: 'none', system: 'all', anonymous: 'none' },
+    force: true,
+    audited: true,
+    exception: 'SPEC-clock §3 idempotency ledger; written only by the system actor (job runner).',
+  },
   user: { kind: 'auth_only', reason: 'Better Auth account table (ADR 0001)' },
   session: { kind: 'auth_only', reason: 'Better Auth sessions (ADR 0001)' },
   account: { kind: 'auth_only', reason: 'Better Auth credentials: password hashes (ADR 0001)' },

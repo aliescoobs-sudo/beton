@@ -226,11 +226,11 @@ Plan: [tasks/plan.md](plan.md). Each task lists the spec ACs it closes. Standard
 - [x] Audit events carry `sim_at` in sim mode (AC-SEC-08, sim part)
 **Verification:** unit + integration + e2e badge check (e2e only proves the badge is absent in real mode: it serves a production build, which the boot guard refuses with simulation on; the positive case is a unit test) · **Dependencies:** T14, T19 · **Files:** src/modules/clock/{db/sim-clock-schema.ts,service/clock.ts,ui/sim-badge.tsx}, db/migrations/0007_sim_clock.sql, src/lib/env.ts · **Scope:** M
 
-### - [ ] T23: Job runner (pg-boss + idempotent runs)
+### - [x] T23: Job runner (pg-boss + idempotent runs)
 **Description:** Job registry (`job_key`, business time, handler); real mode: pg-boss cron in Africa/Casablanca triggers handlers; `scheduled_job_run (job_key, business_date)` unique → a second run of the same job/day is a no-op. The four catalogue jobs are registered as stubs (logged no-ops) until their modules exist. Jobs run as the `system` actor.
 **Acceptance criteria:**
-- [ ] Running the same job for the same business date twice runs the handler once (AC-CLK-03, idempotency part)
-- [ ] Job writes are audited with `actor_kind = system`
+- [x] Running the same job for the same business date twice runs the handler once (AC-CLK-03, idempotency part)
+- [x] Job writes are audited with `actor_kind = system`
 **Verification:** integration test with pg-boss against the test DB · **Dependencies:** T22 · **Files:** src/modules/clock/{domain/job-catalogue.ts,service/job-runner.ts,db/job-run-schema.ts}, db/migrations/0008_job_runs.sql · **Scope:** M
 
 ### - [ ] T24: `clock.advance` (owner, step-up, audited) + demo control

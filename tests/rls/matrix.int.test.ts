@@ -94,6 +94,17 @@ const FIXTURES: Record<
       ),
     visible: `select updated_by::text as owner from sim_clock where $1::text is not null`,
   },
+  scheduled_job_run: {
+    writers: ['system'],
+    pool: 'system',
+    seed: (tx, actor) =>
+      tx.query(
+        `insert into scheduled_job_run (id, job_key, business_date, status, ran_at, run_by)
+         values (gen_random_uuid(), $1, '2000-01-01', 'succeeded', now(), $2)`,
+        [`matrix-${marker.slice(-12)}`, actor],
+      ),
+    visible: `select run_by::text as owner from scheduled_job_run where job_key = 'matrix-' || right($1, 12)`,
+  },
   security_alert_ack: {
     writers: ['owner', 'partner'],
     seed: (tx, actor) =>

@@ -1,10 +1,10 @@
 import { getPool } from '@/lib/db/pools';
 import { getEnv } from '@/lib/server-env';
+import { SYSTEM_ACTOR_ID } from './domain/system-actor';
 import { realClock } from './service/clock';
+import { stubJobRegistry } from './service/job-runner';
+import { startJobScheduler } from './service/job-scheduler';
 import { syncSimClock } from './service/sim-clock';
-
-/** Same fixed actor id as platform-security's SYSTEM_ACTOR_ID (clock imports no other module). */
-const SYSTEM_ACTOR_ID = '00000000-0000-7000-8000-000000000002';
 
 /**
  * Node-only: make the simulated-clock singleton match SIMULATION_ENABLED (the env guard has already run).
@@ -22,5 +22,25 @@ export async function syncSimClockOrExit(): Promise<void> {
       process.exit(1);
     }
     console.warn(`Could not reset the simulated clock to real mode: ${message}`);
+  }
+}
+
+/**
+ * Node-only, real mode only: schedule the catalogue jobs. `timeOf` supplies the configured job times (read once at
+ * boot; a changed parameter applies at the next restart). Simulated mode never schedules: `advance` drives jobs (T24).
+ */
+export async function startJobSchedulerOrExit(
+  timeOf: (parameterKey: string, defaultTime: string) => Promise<string>,
+): Promise<void> {
+  if (getEnv().SIMULATION_ENABLED || getEnv().JOB_SCHEDULER_DISABLED) return;
+  try {
+    await startJobScheduler(
+      getEnv().DATABASE_URL_SYSTEM,
+      { pool: getPool('system'), clock: realClock, registry: stubJobRegistry() },
+      timeOf,
+    );
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
   }
 }

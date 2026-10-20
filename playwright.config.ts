@@ -25,6 +25,7 @@ export default defineConfig({
       DATABASE_URL_SYSTEM: env.DATABASE_URL_SYSTEM,
       DATABASE_URL_MIGRATOR: env.DATABASE_URL_MIGRATOR,
       APP_BASE_URL: E2E_BASE_URL,
+      JOB_SCHEDULER_DISABLED: 'true',
       NEXT_TELEMETRY_DISABLED: '1',
     },
   },

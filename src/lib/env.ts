@@ -39,6 +39,8 @@ const envObject = z.object({
   BACKUP_AGE_RECIPIENT: z.string().startsWith('age1', { error: 'must be an age public key (age1…)' }),
   SIMULATION_ENABLED: flag,
   REAL_DATA: flag,
+  // Test servers (e2e) that share a database being recreated must not run the pg-boss cron scheduler.
+  JOB_SCHEDULER_DISABLED: flag,
 });
 
 // AC-CLK-02: a simulated clock must never run in production or next to real data.
