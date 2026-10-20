@@ -1,0 +1,51 @@
+import { expect, test } from '@playwright/test';
+import { E2E_MD, loginAndEnrol } from './fixtures';
+
+test('a partner adds, edits and cannot duplicate a zone in French (AC-MD-09 first screen)', async ({
+  page,
+}) => {
+  await loginAndEnrol(page, 'fr', E2E_MD.partnerFr.email);
+  await page.getByTestId('zones-link').click();
+  await expect(page).toHaveURL('/fr/master-data/zones');
+  await expect(page.getByTestId('zone-Martil')).toBeVisible();
+
+  const name = `Zone E2E ${Date.now()}`;
+  const form = page.getByTestId('zone-new');
+  await form.locator('input[name=name]').fill(name);
+  await form.locator('input[name=oneWayMin]').fill('33');
+  await form.locator('button[type=submit]').click();
+  const row = page.getByTestId(`zone-${name}`);
+  await expect(row).toBeVisible();
+
+  await row.locator('input[name=oneWayMin]').fill('34');
+  await row.locator('button[type=submit]').click();
+  await expect(row.getByTestId('zone-message')).toHaveText('Enregistré.');
+  await page.reload();
+  await expect(page.getByTestId(`zone-${name}`).locator('input[name=oneWayMin]')).toHaveValue('34');
+
+  await form.locator('input[name=name]').fill(name.toUpperCase());
+  await form.locator('input[name=oneWayMin]').fill('10');
+  await form.locator('button[type=submit]').click();
+  await expect(form.getByTestId('zone-message')).toHaveText('Une zone porte déjà ce nom.');
+});
+
+test('an office user reads the zones with no edit control', async ({ page }) => {
+  await loginAndEnrol(page, 'fr', E2E_MD.office.email);
+  await page.getByTestId('zones-link').click();
+  await expect(page.getByTestId('zone-name').first()).toBeVisible();
+  await expect(page.locator('input[name=name]')).toHaveCount(0);
+  await expect(page.locator('button[type=submit]')).toHaveCount(0);
+});
+
+test('the zones screen renders right-to-left in Arabic and a partner can edit', async ({ page }) => {
+  await loginAndEnrol(page, 'ar', E2E_MD.partnerAr.email);
+  await page.getByTestId('zones-link').click();
+  await expect(page).toHaveURL('/ar/master-data/zones');
+  await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('مناطق التسليم');
+  await expect(page.getByTestId('zone-new')).toBeVisible();
+  // No horizontal overflow at phone width.
+  await page.setViewportSize({ width: 375, height: 800 });
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+  expect(overflow).toBe(false);
+});

@@ -34,6 +34,19 @@ describe('every table is registered with its access rule (T14 meta-test)', () =>
     }
   });
 
+  it('flags a no-delete table (master data) whose DELETE or TRUNCATE was granted to the app role (AC-MD-06)', async () => {
+    for (const privilege of ['DELETE', 'TRUNCATE']) {
+      await migrator.query(`grant ${privilege} on zone to belgobeton_app`);
+      try {
+        expect(await findTableAccessViolations(migrator)).toContainEqual(
+          expect.objectContaining({ table: 'zone', problem: 'delete_granted' }),
+        );
+      } finally {
+        await migrator.query(`revoke ${privilege} on zone from belgobeton_app`);
+      }
+    }
+  });
+
   it('flags an auth-only table the app role could read', async () => {
     await migrator.query('grant select on login_attempt to belgobeton_app');
     try {

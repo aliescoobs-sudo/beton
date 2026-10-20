@@ -9,7 +9,8 @@ export interface TableAccessViolation {
     | 'rls_disabled'
     | 'rls_not_forced'
     | 'audit_trigger_missing'
-    | 'app_role_has_access';
+    | 'app_role_has_access'
+    | 'delete_granted';
 }
 
 /** Compares the live schema with TABLE_ACCESS (run as the migrator, which can see every table). */
@@ -22,10 +23,12 @@ export async function findTableAccessViolations(
     forced: boolean;
     audited: boolean;
     app_access: boolean;
+    app_delete: boolean;
   }>(`
     select c.relname as name, c.relrowsecurity as rls, c.relforcerowsecurity as forced,
            exists (select 1 from pg_trigger t where t.tgrelid = c.oid and t.tgname = 'audit_capture') as audited,
-           has_table_privilege('belgobeton_app', c.oid, 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE') as app_access
+           has_table_privilege('belgobeton_app', c.oid, 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE') as app_access,
+           has_table_privilege('belgobeton_app', c.oid, 'DELETE, TRUNCATE') as app_delete
       from pg_class c join pg_namespace n on n.oid = c.relnamespace
      where n.nspname = 'public' and c.relkind in ('r', 'p')`);
 
@@ -40,6 +43,9 @@ export async function findTableAccessViolations(
       if (!t.rls) violations.push({ table: t.name, problem: 'rls_disabled' });
       if (rule.force && !t.forced) violations.push({ table: t.name, problem: 'rls_not_forced' });
       if (rule.audited && !t.audited) violations.push({ table: t.name, problem: 'audit_trigger_missing' });
+      if ('noDelete' in rule && rule.noDelete && t.app_delete) {
+        violations.push({ table: t.name, problem: 'delete_granted' });
+      }
     }
   }
   const present = new Set(rows.map((r) => r.name));

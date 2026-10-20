@@ -10,7 +10,7 @@ import { testEnv } from './db-env';
 /** Better Auth wired to the test database, plus helpers that talk to it over HTTP like a browser. */
 export function authTestKit(overrides: Partial<Env> = {}) {
   // One trusted reverse proxy by default: X-Forwarded-For is honoured only for the hop it appends.
-  const env = { ...testEnv(), TRUSTED_PROXY_HOPS: 1, ...overrides };
+  const env = { ...testEnv(), AUTH_SECRETS: undefined, TRUSTED_PROXY_HOPS: 1, ...overrides };
   const authPool = new pg.Pool({ connectionString: env.DATABASE_URL_AUTH, max: 4 });
   const migrator = new pg.Pool({ connectionString: env.DATABASE_URL_MIGRATOR, max: 2 });
   const logLines: string[] = [];

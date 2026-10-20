@@ -11,6 +11,12 @@ export const E2E_USERS = {
 } as const;
 export const E2E_OWNER = { email: 'e2e-owner@belgobeton.test', name: 'Propriétaire E2E' } as const;
 export const E2E_PLANT = { email: 'e2e-plant@belgobeton.test', name: 'Centrale E2E' } as const;
+/** master-data specs: a partner per locale (edit) and an office user (read-only), each enrolled once by its spec. */
+export const E2E_MD = {
+  partnerFr: { email: 'e2e-md-partner-fr@belgobeton.test', name: 'Associé MD' },
+  partnerAr: { email: 'e2e-md-partner-ar@belgobeton.test', name: 'شريك البيانات' },
+  office: { email: 'e2e-md-office@belgobeton.test', name: 'Bureau MD' },
+} as const;
 export const E2E_CSP = { email: 'e2e-csp@belgobeton.test', name: 'CSP E2E' } as const;
 
 /** TOTP from the key shown on the enrolment page, as an authenticator app would compute it. */

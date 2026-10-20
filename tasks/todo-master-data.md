@@ -8,13 +8,13 @@ Branded `Centimes`, `mulDivRound` (round half away from zero, one rounding point
 **AC:** AC-MD-04 domain part: 2.5 t × 1 450,00 MAD/t → 2 500 000 g, cost 3 625,00 MAD; fast-check: integer result, and ±1 centime across equivalent unit expressions.
 **Verify:** `pnpm test src/lib` · **Files:** src/lib/money.ts, src/lib/quantity.ts, tests · **Deps:** none
 
-### - [ ] T2: Zone — the pattern slice (M)
-Migration 0017 `zone` (+ shared `code_sequence` table), FORCE RLS, audit, no DELETE; seed the 5 zones (D53); managers edit, all roles read; list + edit page in fr/ar; `TABLE_ACCESS` entries; generic meta-test "no master-data table has a DELETE grant".
+### - [x] T2: Zone — the pattern slice (M)
+Migration 0017 `zone` (the shared `code_sequence` table moves to T3, its first user), FORCE RLS, audit, no DELETE; seed the 5 zones (D53); managers edit, all roles read; list + edit page in fr/ar; `TABLE_ACCESS` entries; generic meta-test "no master-data table has a DELETE grant".
 **AC:** AC-MD-06 (generic test); AC-MD-09 first screen; AC-SEC-04 for `zone` × 4 roles; office/plant write refused (service + RLS).
 **Verify:** `pnpm test:integration rls`, e2e `master-zone.spec.ts` · **Files:** migration, service/zone-service.ts, ui/zones/*, src/app/[locale]/(protected)/master-data/zones/page.tsx, messages · **Deps:** T1 (not needed), CP6
 
 ### Checkpoint CP-M1 — Pattern
-- [ ] T1–T2 green; pattern reviewed with Ali before it is copied
+- [ ] T1–T2 green (done 2026-10-20); pattern reviewed with Ali before it is copied
 
 ### - [ ] T3: Client create / edit / archive (M)
 Migration `client` (code `CLT-nnn`, kind, ice, phone_enc, contact_name, default_zone_id, payment_terms_days default 60 max 120, notes, status). Create form needs only name + kind. Duplicate guard: a matching ICE **blocks** creation and points to the existing client (add a site instead); owner/partner can override with a mandatory reason, audited (new permission `parties.ice_override`); a similar normalized name only warns. Archive replaces delete and is owner/partner only (new permission `parties.archive`).

@@ -105,6 +105,14 @@ const FIXTURES: Record<
       ),
     visible: `select run_by::text as owner from scheduled_job_run where job_key = 'matrix-' || right($1, 12)`,
   },
+  zone: {
+    writers: ['owner', 'partner'],
+    seed: (tx, actor) =>
+      tx.query(`insert into zone (id, name, one_way_min) values (gen_random_uuid(), $1, 10)`, [
+        `${marker}:${actor}`,
+      ]),
+    visible: `select split_part(name, ':', 2) as owner from zone where name like $1 || ':%'`,
+  },
   security_alert_ack: {
     writers: ['owner', 'partner'],
     seed: (tx, actor) =>

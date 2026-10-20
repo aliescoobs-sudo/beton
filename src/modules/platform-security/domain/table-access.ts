@@ -12,6 +12,8 @@ interface RlsTable {
   /** Captured by audit.capture(). false only with a documented reason. */
   audited: boolean;
   exception?: string;
+  /** Master data and financial records: belgobeton_app has no DELETE or TRUNCATE privilege (AC-MD-06, R12). */
+  noDelete?: boolean;
 }
 
 interface AuthOnlyTable {
@@ -85,6 +87,14 @@ export const TABLE_ACCESS = {
     force: true,
     audited: true,
     exception: 'SPEC-clock §3 idempotency ledger; written only by the system actor (job runner).',
+  },
+  zone: {
+    kind: 'rls',
+    read: { owner: 'all', partner: 'all', office: 'all', plant: 'all', system: 'all', anonymous: 'none' },
+    force: true,
+    audited: true,
+    noDelete: true,
+    exception: 'master-data T2: managers write (zones.write); every signed-in role reads.',
   },
   user: { kind: 'auth_only', reason: 'Better Auth account table (ADR 0001)' },
   session: { kind: 'auth_only', reason: 'Better Auth sessions (ADR 0001)' },

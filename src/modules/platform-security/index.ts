@@ -16,4 +16,9 @@ export { can, type Permission, PERMISSIONS, type Role, rolesWith, USER_ROLES } f
 // Field-level hiding for role-restricted entities: declare with defineVisibility() next to the entity type and pass
 // every outgoing row through project(); assert absence in tests with tests/helpers/expect-no-fields.ts.
 export { defineVisibility, project, projectMany, type Visibility } from './domain/projection';
-export { authorize, type Authorization } from './auth/guards';
+export { auditDenied, authorize, type Authorization } from './auth/guards';
+// Building blocks for other modules' pages, actions and services.
+export { requirePagePermission } from './auth/page-guard';
+export { currentAuthState } from './auth/request-state';
+export type { SessionUser } from './auth/session-gate';
+export { ForbiddenError } from './service/user-admin';

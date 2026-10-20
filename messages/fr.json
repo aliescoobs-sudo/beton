@@ -125,6 +125,22 @@
     },
     "restartNote": "Les heures des tâches planifiées ne sont prises en compte qu'après un redémarrage du serveur."
   },
+  "masterData": {
+    "zones": {
+      "title": "Zones de livraison",
+      "link": "Zones",
+      "readOnly": "Lecture seule : seuls le propriétaire et l'associé modifient les zones.",
+      "name": "Nom de la zone",
+      "oneWayMin": "Trajet aller (minutes)",
+      "minutes": "{count} min",
+      "save": "Enregistrer",
+      "add": "Ajouter la zone",
+      "saved": "Enregistré.",
+      "invalid": "Valeur refusée (nom obligatoire, trajet entre 1 et 480 minutes).",
+      "duplicate": "Une zone porte déjà ce nom.",
+      "error": "Action refusée."
+    }
+  },
   "history": {
     "title": "Historique",
     "link": "Historique",
