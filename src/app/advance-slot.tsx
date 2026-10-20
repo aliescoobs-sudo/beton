@@ -1,4 +1,4 @@
-import { AdvanceControl } from '@/modules/clock';
+import { AdvanceControl } from '@/modules/clock/ui/advance-control';
 import { can } from '@/modules/platform-security/domain/permissions';
 import { currentAuthState } from '@/modules/platform-security/auth/request-state';
 import { StepUpDialog } from '@/modules/platform-security/ui/step-up-dialog';

@@ -3,15 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { type ComponentType, type FormEvent, useState } from 'react';
-
-export type AdvanceInput = { byDays: number } | { toDate: string; toTime: string };
-
-export type AdvanceActionResult =
-  | { ok: true; failedJob?: string }
-  | {
-      ok: false;
-      error: 'UNAUTHENTICATED' | 'FORBIDDEN' | 'STEP_UP_REQUIRED' | 'REENROL_REQUIRED' | 'INVALID';
-    };
+import type { AdvanceActionResult, AdvanceInput } from '../domain/advance-input';
 
 interface StepUpProps {
   onVerified: () => void;

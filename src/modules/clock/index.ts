@@ -33,4 +33,4 @@ export {
   MAX_ADVANCE_DAYS,
   type ScriptedEvent,
 } from './service/advance';
-export { AdvanceControl, type AdvanceActionResult, type AdvanceInput } from './ui/advance-control';
+export type { AdvanceActionResult, AdvanceInput } from './domain/advance-input';
