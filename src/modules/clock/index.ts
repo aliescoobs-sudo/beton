@@ -24,7 +24,12 @@ export {
   unfinishedRuns,
   stubJobRegistry,
 } from './service/job-runner';
-export { installJobQueue, type JobScheduler, startJobScheduler } from './service/job-scheduler';
+export {
+  installJobQueue,
+  type JobScheduler,
+  scheduledHandler,
+  startJobScheduler,
+} from './service/job-scheduler';
 export { casablancaInstant, type JobInstant, jobInstantsBetween } from './domain/instants';
 export { advanceClock, type AdvanceDeps, type AdvanceResult, type ScriptedEvent } from './service/advance';
 export {

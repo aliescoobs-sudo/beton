@@ -2,7 +2,7 @@ import pg from 'pg';
 import { PgBoss } from 'pg-boss';
 import { BUSINESS_TIME_ZONE } from '../domain/business-date';
 import { dailyCron, JOB_CATALOGUE } from '../domain/job-catalogue';
-import { realClock } from './clock';
+import { businessDateOf } from '../domain/business-date';
 import { type JobRunnerDeps, runJob } from './job-runner';
 
 const QUEUE_SCHEMA = 'pgboss';
@@ -41,6 +41,22 @@ export async function installJobQueue(migratorUrl: string): Promise<void> {
   }
 }
 
+/**
+ * The handler of a cron-fired job. The job is booked on the business date of its scheduled firing (`createdOn`), not
+ * of the moment a worker picks it up: a `day-close` handled after midnight still belongs to the day it closes.
+ */
+export function scheduledHandler(
+  deps: JobRunnerDeps,
+  jobKey: string,
+): (jobs: readonly { createdOn: Date }[]) => Promise<void> {
+  return async (jobs) => {
+    for (const { createdOn } of jobs) {
+      const outcome = await runJob(deps, jobKey, businessDateOf(createdOn));
+      if (outcome === 'failed') throw new Error(`Job ${jobKey} failed`);
+    }
+  };
+}
+
 export interface JobScheduler {
   stop(): Promise<void>;
 }
@@ -65,10 +81,7 @@ export async function startJobScheduler(
   for (const job of JOB_CATALOGUE) {
     const time = await timeOf(job.parameterKey, job.defaultTime);
     await boss.schedule(job.key, dailyCron(time), null, { tz: BUSINESS_TIME_ZONE });
-    await boss.work(job.key, async () => {
-      const outcome = await runJob(deps, job.key, realClock.today());
-      if (outcome === 'failed') throw new Error(`Job ${job.key} failed`);
-    });
+    await boss.work(job.key, { includeMetadata: true }, scheduledHandler(deps, job.key));
   }
   return { stop: () => boss.stop({ graceful: true }) };
 }

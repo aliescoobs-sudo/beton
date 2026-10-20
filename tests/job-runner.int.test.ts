@@ -5,6 +5,7 @@ import {
   installJobQueue,
   type JobRegistry,
   runJob,
+  scheduledHandler,
   startJobScheduler,
   SYSTEM_ACTOR_ID,
 } from '../src/modules/clock';
@@ -91,6 +92,29 @@ describe('job runner (T23)', () => {
     expect(await runJob(deps, key, day('2026-03-02'))).toBe('ran');
     const done = await readRuns(key);
     expect(done.rows).toEqual([{ status: 'succeeded', error: null }]);
+  });
+
+  it('books a scheduled job on the business date of its firing, not of the run (late worker)', async () => {
+    const key = job('late');
+    const seen: string[] = [];
+    const deps = {
+      pool: system,
+      // The worker picks the job up after midnight, Casablanca time.
+      clock: createTestClock(new Date('2026-03-03T00:30:00Z')),
+      registry: registryOf(key, async () => void seen.push('ran')),
+    };
+    await scheduledHandler(deps, key)([{ createdOn: new Date('2026-03-02T20:00:05Z') }]);
+    const { rows } = await withRlsContext(
+      system,
+      { userId: SYSTEM_ACTOR_ID, role: 'system', requestId: 't23-late' },
+      (tx) =>
+        tx.query<{ business_date: string }>(
+          `select business_date::text as business_date from scheduled_job_run where job_key = $1`,
+          [key],
+        ),
+    );
+    expect(rows).toEqual([{ business_date: '2026-03-02' }]);
+    expect(seen).toEqual(['ran']);
   });
 
   it('refuses an unknown job', async () => {
