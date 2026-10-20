@@ -1,9 +1,11 @@
 import type { ReactNode } from 'react';
 import { notFound } from 'next/navigation';
 import { hasLocale, NextIntlClientProvider } from 'next-intl';
-import { setRequestLocale } from 'next-intl/server';
+import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { directionOf, routing } from '@/i18n/routing';
+import { formatSimDate, SimBadge } from '@/modules/clock';
 import { FakeDataBanner } from '@/modules/platform-security/ui/fake-data-banner';
+import { getRequestClock } from '../request-clock';
 import '../globals.css';
 
 export function generateStaticParams() {
@@ -20,10 +22,13 @@ export default async function LocaleLayout({
   const { locale } = await params;
   if (!hasLocale(routing.locales, locale)) notFound();
   setRequestLocale(locale);
+  const clock = await getRequestClock();
+  const t = await getTranslations('clock');
 
   return (
     <html lang={locale} dir={directionOf(locale)}>
       <body>
+        {clock.simulated && <SimBadge label={t('simulation')} at={formatSimDate(clock.now(), locale)} />}
         <FakeDataBanner />
         <NextIntlClientProvider>{children}</NextIntlClientProvider>
       </body>

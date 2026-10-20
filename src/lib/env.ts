@@ -24,7 +24,7 @@ const keyring = z.string().superRefine((value, ctx) => {
   }
 });
 
-const envSchema = z.object({
+const envObject = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   DATABASE_URL_APP: postgresUrl,
   DATABASE_URL_MIGRATOR: postgresUrl,
@@ -39,6 +39,17 @@ const envSchema = z.object({
   BACKUP_AGE_RECIPIENT: z.string().startsWith('age1', { error: 'must be an age public key (age1…)' }),
   SIMULATION_ENABLED: flag,
   REAL_DATA: flag,
+});
+
+// AC-CLK-02: a simulated clock must never run in production or next to real data.
+const envSchema = envObject.superRefine((env, ctx) => {
+  if (env.SIMULATION_ENABLED && (env.NODE_ENV === 'production' || env.REAL_DATA)) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['SIMULATION_ENABLED'],
+      message: 'must be "false" when NODE_ENV=production or REAL_DATA=true',
+    });
+  }
 });
 
 export type Env = z.infer<typeof envSchema>;

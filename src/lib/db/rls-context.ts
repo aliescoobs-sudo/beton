@@ -35,6 +35,11 @@ export async function withRlsContext<T>(
               set_config('app.request_id', $3, true), set_config('app.sim_at', $4, true)`,
       [ctx.userId, ctx.role, ctx.requestId, ctx.simAt?.toISOString() ?? ''],
     );
+    // In simulated mode every transaction (including anonymous failed logins) is stamped with the simulated
+    // instant, so audit events never depend on the caller remembering to pass it (AC-SEC-08, sim part).
+    await client.query(
+      `select set_config('app.sim_at', coalesce(nullif(current_setting('app.sim_at', true), ''), ctx.sim_now()::text, ''), true)`,
+    );
     const result = await fn(client);
     await client.query('COMMIT');
     return result;

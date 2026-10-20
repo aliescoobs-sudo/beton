@@ -70,6 +70,15 @@ export const TABLE_ACCESS = {
     force: true,
     audited: true,
   },
+  sim_clock: {
+    kind: 'rls',
+    read: { owner: 'all', partner: 'all', office: 'all', plant: 'all', system: 'all', anonymous: 'none' },
+    force: true,
+    audited: true,
+    exception:
+      'Singleton, SPEC-clock §3. Every signed-in role reads it (badge, clock.now()); also readable by ' +
+      'belgobeton_auth (pre-session pages) and the owner via the ctx.sim_now() definer; updates: owner or system.',
+  },
   user: { kind: 'auth_only', reason: 'Better Auth account table (ADR 0001)' },
   session: { kind: 'auth_only', reason: 'Better Auth sessions (ADR 0001)' },
   account: { kind: 'auth_only', reason: 'Better Auth credentials: password hashes (ADR 0001)' },

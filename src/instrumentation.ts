@@ -5,4 +5,6 @@ export async function register() {
   assertEnvOrExit();
   const { assertRealDataOrExit } = await import('./modules/platform-security/boot');
   await assertRealDataOrExit();
+  const { syncSimClockOrExit } = await import('./modules/clock/boot');
+  await syncSimClockOrExit();
 }

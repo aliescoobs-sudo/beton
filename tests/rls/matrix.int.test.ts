@@ -5,6 +5,7 @@ import { DB_ROLES, withRlsContext } from '../../src/lib/db/rls-context';
 import { RLS_TABLES, TABLE_ACCESS } from '../../src/modules/platform-security/domain/table-access';
 import { testEnv } from '../db-env';
 import { realActor } from '../helpers/actors';
+import { resetSimClock } from '../helpers/reset-sim-clock';
 import { ANONYMOUS_ACTOR_ID, SYSTEM_ACTOR_ID } from '../../src/modules/platform-security/auth/actors';
 import { USER_ROLES } from '../../src/modules/platform-security/domain/permissions';
 
@@ -15,7 +16,10 @@ type RlsTable = (typeof RLS_TABLES)[number];
 const env = testEnv();
 const app = new pg.Pool({ connectionString: env.DATABASE_URL_APP, max: 2 });
 const system = new pg.Pool({ connectionString: env.DATABASE_URL_SYSTEM, max: 1 });
-afterAll(() => Promise.all([app.end(), system.end()]));
+afterAll(async () => {
+  await resetSimClock();
+  await Promise.all([app.end(), system.end()]);
+});
 
 const marker = `matrix_${randomUUID().replace(/-/g, '')}`;
 // One actor per role: real accounts for user roles, the fixed actors otherwise (the database checks roles, DECISIONS 76).
@@ -77,6 +81,18 @@ const FIXTURES: Record<
         `${marker}:${actor}`,
       ]),
     visible: `select split_part(detail, ':', 2) as owner from security_alert where detail like $1 || ':%'`,
+  },
+  sim_clock: {
+    // Singleton: seeded in 'real' mode so other suites never see a simulated instant.
+    writers: ['system'],
+    pool: 'system',
+    seed: (tx, actor) =>
+      tx.query(
+        `insert into sim_clock (mode, sim_now, updated_by, updated_at) values ('real', now(), $1, now())
+         on conflict do nothing`,
+        [actor],
+      ),
+    visible: `select updated_by::text as owner from sim_clock where $1::text is not null`,
   },
   security_alert_ack: {
     writers: ['owner', 'partner'],

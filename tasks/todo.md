@@ -217,14 +217,14 @@ Plan: [tasks/plan.md](plan.md). Each task lists the spec ACs it closes. Standard
 
 ## Phase 5 — Clock simulation
 
-### - [ ] T22: Simulated mode + boot guards + sim badge
+### - [x] T22: Simulated mode + boot guards + sim badge
 **Description:** `sim_clock` singleton (only when `SIMULATION_ENABLED=true`); `clock.now()` reads `sim_now` (cached per request); `app.sim_at` set in every `withRlsContext`; boot refuses `SIMULATION_ENABLED=true` with `NODE_ENV=production` or `REAL_DATA=true`; permanent sim-date badge in the layout; `sim_now` can only move forward (DB check + service).
 **Acceptance criteria:**
-- [ ] With simulation disabled, `advance` is not exposed (route 404, service throws) (AC-CLK-01)
-- [ ] Boot fails for the forbidden env combinations (AC-CLK-02)
-- [ ] Setting `sim_now` backwards fails (AC-CLK-05)
-- [ ] Audit events carry `sim_at` in sim mode (AC-SEC-08, sim part)
-**Verification:** unit + integration + e2e badge check · **Dependencies:** T14, T19 · **Files:** src/modules/clock/{db/sim-clock-schema.ts,service/clock.ts,ui/sim-badge.tsx}, db/migrations/0007_sim_clock.sql, src/lib/env.ts · **Scope:** M
+- [x] With simulation disabled, `advance` is not exposed (route 404, service throws) (AC-CLK-01) — service throws and the table is never read; the route itself arrives in T24 (no route exists to 404 yet)
+- [x] Boot fails for the forbidden env combinations (AC-CLK-02) — env validation in `loadEnv`
+- [x] Setting `sim_now` backwards fails (AC-CLK-05)
+- [x] Audit events carry `sim_at` in sim mode (AC-SEC-08, sim part)
+**Verification:** unit + integration + e2e badge check (e2e only proves the badge is absent in real mode: it serves a production build, which the boot guard refuses with simulation on; the positive case is a unit test) · **Dependencies:** T14, T19 · **Files:** src/modules/clock/{db/sim-clock-schema.ts,service/clock.ts,ui/sim-badge.tsx}, db/migrations/0007_sim_clock.sql, src/lib/env.ts · **Scope:** M
 
 ### - [ ] T23: Job runner (pg-boss + idempotent runs)
 **Description:** Job registry (`job_key`, business time, handler); real mode: pg-boss cron in Africa/Casablanca triggers handlers; `scheduled_job_run (job_key, business_date)` unique → a second run of the same job/day is a no-op. The four catalogue jobs are registered as stubs (logged no-ops) until their modules exist. Jobs run as the `system` actor.

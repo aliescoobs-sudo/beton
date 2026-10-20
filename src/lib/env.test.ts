@@ -99,3 +99,26 @@ describe('secretValuesOf', () => {
     expect(secretValuesOf(env)).toContain('s3cr3t-db-pw');
   });
 });
+
+describe('simulation guard (AC-CLK-02)', () => {
+  it('accepts simulation in development and test', () => {
+    expect(loadEnv({ ...valid, SIMULATION_ENABLED: 'true' }).SIMULATION_ENABLED).toBe(true);
+    expect(loadEnv({ ...valid, NODE_ENV: 'test', SIMULATION_ENABLED: 'true' }).SIMULATION_ENABLED).toBe(true);
+  });
+
+  it('refuses simulation with NODE_ENV=production', () => {
+    expect(() => loadEnv({ ...valid, NODE_ENV: 'production', SIMULATION_ENABLED: 'true' })).toThrow(
+      /SIMULATION_ENABLED/,
+    );
+  });
+
+  it('refuses simulation with REAL_DATA=true', () => {
+    expect(() => loadEnv({ ...valid, REAL_DATA: 'true', SIMULATION_ENABLED: 'true' })).toThrow(
+      /SIMULATION_ENABLED/,
+    );
+  });
+
+  it('still allows production with simulation off', () => {
+    expect(loadEnv({ ...valid, NODE_ENV: 'production' }).SIMULATION_ENABLED).toBe(false);
+  });
+});
