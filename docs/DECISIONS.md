@@ -97,7 +97,7 @@ Legend: ✅ confirmed by Ali · 🟡 assumption (reasonable default, revisit wit
 ## Open questions (verify before production)
 1. Real revenue → which 69-21 and e-invoicing obligations apply (ask the accountant).
 2. E-invoicing status and date for this company.
-3. Real plant software name and export format.
+3. Real plant software name and export format. Partly answered: the software is ARCO GOLD TWO by Arco Electrónica (local partner ARCONOR Maroc). Its data export supports .xls, .pdf, .txt and .dbf for production, consumption and alarm history. Reports can be per formula, client, job, truck, driver and carrier. It logs manual and out-of-spec loads and dosing stops. Still open: a real export sample; the reconciliation spec will be updated once we have one.
 4. CNDP: declaration + authorization for AI transfer; is pseudonymized data exempt? (assume no).
 5. AI provider final choice after eval; contract terms and ZDR.
 6. Real truck capacities, trip durations, zones.
