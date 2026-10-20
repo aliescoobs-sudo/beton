@@ -20,6 +20,9 @@ export const ENCRYPTED_COLUMNS = [
     keyring: 'RECOVERY_CODES_KEYS',
     pool: 'auth',
   },
+  // Personal data of master data. These tables are under FORCE RLS: crypto:rotate reads and re-seals them as the
+  // system actor (pool 'system'), which may update only these columns.
+  { table: 'client', column: 'phone_enc', idColumn: 'id', keyring: 'FIELD_ENCRYPTION_KEYS', pool: 'system' },
 ] as const;
 
 export type EncryptedColumn = {
@@ -27,5 +30,5 @@ export type EncryptedColumn = {
   column: string;
   idColumn: string;
   keyring: 'FIELD_ENCRYPTION_KEYS' | 'RECOVERY_CODES_KEYS' | 'AUTH_SECRETS';
-  pool: 'auth' | 'app';
+  pool: 'auth' | 'app' | 'system';
 };

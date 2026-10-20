@@ -16,6 +16,11 @@ export const E2E_MD = {
   partnerFr: { email: 'e2e-md-partner-fr@belgobeton.test', name: 'Associé MD' },
   partnerAr: { email: 'e2e-md-partner-ar@belgobeton.test', name: 'شريك البيانات' },
   office: { email: 'e2e-md-office@belgobeton.test', name: 'Bureau MD' },
+  // master-client spec (one enrolment each, like the zone spec's users)
+  clientPartnerFr: { email: 'e2e-cl-partner-fr@belgobeton.test', name: 'Associé Clients' },
+  clientPartnerAr: { email: 'e2e-cl-partner-ar@belgobeton.test', name: 'شريك الزبائن' },
+  clientOffice: { email: 'e2e-cl-office@belgobeton.test', name: 'Bureau Clients' },
+  clientPlant: { email: 'e2e-cl-plant@belgobeton.test', name: 'Centrale Clients' },
 } as const;
 export const E2E_CSP = { email: 'e2e-csp@belgobeton.test', name: 'CSP E2E' } as const;
 

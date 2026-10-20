@@ -1,16 +1,10 @@
 import type pg from 'pg';
-import { withRlsContext } from '@/lib/db/rls-context';
 import { err, ok, type Result } from '@/lib/result';
 import { uuidv7 } from '@/lib/uuidv7';
 import { realClock } from '@/modules/clock';
-import {
-  auditDenied,
-  can,
-  ForbiddenError,
-  type Permission,
-  type SessionUser,
-} from '@/modules/platform-security';
+import type { SessionUser } from '@/modules/platform-security';
 import { parseZoneInput, type Zone } from '../domain/zone';
+import { inRequest, isMalformedId, isUniqueViolation, require } from './request';
 
 export type ZoneError = 'INVALID' | 'DUPLICATE_NAME' | 'NOT_FOUND';
 
@@ -21,18 +15,6 @@ interface ZoneRow {
 }
 
 const toZone = (row: ZoneRow): Zone => ({ id: row.id, name: row.name, oneWayMin: row.one_way_min });
-
-const inRequest = <T>(pool: pg.Pool, actor: SessionUser, fn: (tx: pg.PoolClient) => Promise<T>) =>
-  withRlsContext(pool, { userId: actor.id, role: actor.role, requestId: uuidv7(realClock.now()) }, fn);
-
-/** Layer 2 of SPEC-platform-security §4: the service checks the permission again, whatever the route did. */
-async function require(pool: pg.Pool, actor: SessionUser, permission: Permission): Promise<void> {
-  if (can(actor.role, permission)) return;
-  await auditDenied(pool, actor, permission);
-  throw new ForbiddenError();
-}
-
-const isUniqueViolation = (error: unknown) => (error as { code?: string }).code === '23505';
 
 export async function listZones(appPool: pg.Pool, actor: SessionUser): Promise<Zone[]> {
   await require(appPool, actor, 'zones.read');
@@ -84,7 +66,7 @@ export async function updateZone(
   } catch (error) {
     if (isUniqueViolation(error)) return err('DUPLICATE_NAME');
     // A malformed id is a NOT_FOUND to the caller, not a server error.
-    if ((error as { code?: string }).code === '22P02') return err('NOT_FOUND');
+    if (isMalformedId(error)) return err('NOT_FOUND');
     throw error;
   }
 }

@@ -113,6 +113,31 @@ const FIXTURES: Record<
       ]),
     visible: `select split_part(name, ':', 2) as owner from zone where name like $1 || ':%'`,
   },
+  code_sequence: {
+    // One counter per writer role, keyed by the role so the visible query can name its actor. Persistent by design.
+    writers: ['owner', 'partner', 'office'],
+    seed: (tx, actor) => {
+      const role = Object.entries(actors).find(([, id]) => id === actor)![0];
+      return tx.query(
+        `insert into code_sequence (key, last_value) values ($1, 0) on conflict (key) do nothing`,
+        [{ owner: 'MXO', partner: 'MXP', office: 'MXF' }[role as 'owner' | 'partner' | 'office']],
+      );
+    },
+    get visible() {
+      return `select case key when 'MXO' then '${actors.owner}' when 'MXP' then '${actors.partner}'
+                               when 'MXF' then '${actors.office}' end as owner
+                from code_sequence where key like 'MX_' and $1::text is not null`;
+    },
+  },
+  client: {
+    writers: ['owner', 'partner', 'office'],
+    seed: (tx, actor) =>
+      tx.query(
+        `insert into client (id, code, name, kind) values (gen_random_uuid(), public.next_code('CLT', 3), $1, 'person')`,
+        [`${marker}:${actor}`],
+      ),
+    visible: `select split_part(name, ':', 2) as owner from client where name like $1 || ':%'`,
+  },
   security_alert_ack: {
     writers: ['owner', 'partner'],
     seed: (tx, actor) =>

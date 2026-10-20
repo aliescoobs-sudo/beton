@@ -96,6 +96,24 @@ export const TABLE_ACCESS = {
     noDelete: true,
     exception: 'master-data T2: managers write (zones.write); every signed-in role reads.',
   },
+  code_sequence: {
+    kind: 'rls',
+    read: { owner: 'all', partner: 'all', office: 'all', plant: 'none', system: 'none', anonymous: 'none' },
+    force: true,
+    audited: true,
+    noDelete: true,
+    exception: 'master-data T3: CLT-/FRN- counters, bumped by next_code() inside the creating transaction.',
+  },
+  client: {
+    kind: 'rls',
+    read: { owner: 'all', partner: 'all', office: 'all', plant: 'none', system: 'all', anonymous: 'none' },
+    force: true,
+    audited: true,
+    noDelete: true,
+    exception:
+      'master-data T3: owner/partner/office write (archive and ICE override: owner/partner, by trigger); plant ' +
+      'has no access; belgobeton_system reads and may only update phone_enc (key rotation).',
+  },
   user: { kind: 'auth_only', reason: 'Better Auth account table (ADR 0001)' },
   session: { kind: 'auth_only', reason: 'Better Auth sessions (ADR 0001)' },
   account: { kind: 'auth_only', reason: 'Better Auth credentials: password hashes (ADR 0001)' },

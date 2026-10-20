@@ -127,6 +127,13 @@
       "when": 1792332017000,
       "tag": "0017_zone",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1792418417000,
+      "tag": "0018_client",
+      "breakpoints": true
     }
   ]
 }

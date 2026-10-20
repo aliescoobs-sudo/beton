@@ -1,6 +1,27 @@
 import type pg from 'pg';
 import type { Keyring } from '@/lib/crypto/keyring';
+import { withRlsContext } from '@/lib/db/rls-context';
+import { uuidv7 } from '@/lib/uuidv7';
+import { realClock } from '@/modules/clock';
+import { SYSTEM_ACTOR_ID } from '../auth/actors';
 import type { EncryptedColumn } from '../domain/encrypted-columns';
+
+/** What rotation needs from a connection: plain queries, possibly each wrapped in a request context. */
+export type Queryable = Pick<pg.Pool, 'query'>;
+
+/**
+ * Row-level-security tables answer nothing without a request context: run each query as the system actor, whose
+ * writes are audited like any other (the system role may update only the sealed columns).
+ */
+export function asSystemActor(pool: pg.Pool): Queryable {
+  const run = (text: string, values?: unknown[]) =>
+    withRlsContext(
+      pool,
+      { userId: SYSTEM_ACTOR_ID, role: 'system', requestId: uuidv7(realClock.now()) },
+      (tx) => tx.query(text, values),
+    );
+  return { query: run } as unknown as Queryable;
+}
 
 const ident = (name: string) => `"${name.replace(/"/g, '""')}"`;
 
@@ -34,7 +55,7 @@ export interface RotationResult {
 
 /** Rows of `spec` still sealed with a key other than the keyring's current one. */
 export async function countOnOldKeys(
-  pool: pg.Pool,
+  pool: Queryable,
   spec: EncryptedColumn,
   sealer: Keyring | ColumnCipher,
 ): Promise<number> {
@@ -51,7 +72,7 @@ export async function countOnOldKeys(
  * changed meanwhile (compare-and-set), so it is safe to run while the app is up, and safe to run again.
  */
 export async function rotateColumn(
-  pool: pg.Pool,
+  pool: Queryable,
   spec: EncryptedColumn,
   sealer: Keyring | ColumnCipher,
   batchSize = 500,

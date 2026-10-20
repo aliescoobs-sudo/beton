@@ -12,6 +12,7 @@ import { loadEnv } from '@/lib/env';
 import { ENCRYPTED_COLUMNS } from '@/modules/platform-security/domain/encrypted-columns';
 import { authSecretCipher } from '@/modules/platform-security/auth/secret-cipher';
 import {
+  asSystemActor,
   type ColumnCipher,
   countOnOldKeys,
   keyringCipher,
@@ -27,6 +28,13 @@ const checkOnly = process.argv.includes('--check');
 const pools = {
   auth: new pg.Pool({ connectionString: env.DATABASE_URL_AUTH, max: 1 }),
   app: new pg.Pool({ connectionString: env.DATABASE_URL_APP, max: 1 }),
+  system: new pg.Pool({ connectionString: env.DATABASE_URL_SYSTEM, max: 1 }),
+};
+// Tables under row-level security need a request context; the system actor provides it.
+const connections = {
+  auth: pools.auth,
+  app: pools.app,
+  system: asSystemActor(pools.system),
 };
 
 let remaining = 0;
@@ -37,13 +45,13 @@ try {
         ? authSecretCipher(env)
         : keyringCipher(parseKeyring(env[spec.keyring]));
     if (checkOnly) {
-      const n = await countOnOldKeys(pools[spec.pool], spec, keyring);
+      const n = await countOnOldKeys(connections[spec.pool], spec, keyring);
       remaining += n;
       console.log(
         `${spec.table}.${spec.column}: ${n} value(s) on retired keys (current: ${keyring.currentId})`,
       );
     } else {
-      const result = await rotateColumn(pools[spec.pool], spec, keyring);
+      const result = await rotateColumn(connections[spec.pool], spec, keyring);
       remaining += result.remaining;
       console.log(
         `${spec.table}.${spec.column}: ${result.rotated} re-encrypted to ${keyring.currentId}, ${result.remaining} left`,

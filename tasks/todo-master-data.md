@@ -16,7 +16,7 @@ Migration 0017 `zone` (structure only; zones are seeded by T15) (the shared `cod
 ### Checkpoint CP-M1 — Pattern
 - [ ] T1–T2 green (done 2026-10-20); pattern reviewed with Ali before it is copied
 
-### - [ ] T3: Client create / edit / archive (M)
+### - [x] T3: Client create / edit / archive (M)
 Migration `client` (code `CLT-nnn`, kind, ice, phone_enc, contact_name, default_zone_id, payment_terms_days default 60 max 120, notes, status). Create form needs only name + kind. Duplicate guard: a matching ICE **blocks** creation and points to the existing client (add a site instead); owner/partner can override with a mandatory reason, audited (new permission `parties.ice_override`); a similar normalized name only warns. Archive replaces delete and is owner/partner only (new permission `parties.archive`).
 **AC:** AC-MD-01 (name + kind only; code generated; ICE optional; schema/UI/messages contain no CIN); AC-MD-05 data part (archived client excluded from the "selectable" query, still readable); office W (create/edit, not archive), plant no access (404); ICE duplicate blocked for office, override with reason by owner/partner audited; archive refused for office; phone not readable in a raw SELECT.
 **Verify:** unit (normalization, dup guard) + integration + `e2e/master-client.spec.ts` fr/ar · **Deps:** T2
