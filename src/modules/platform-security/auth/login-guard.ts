@@ -1,3 +1,4 @@
+import { isIP } from 'node:net';
 import type pg from 'pg';
 import { keyedHash } from '@/lib/crypto/hmac';
 import type { Clock } from '@/modules/clock';
@@ -20,11 +21,17 @@ export function normalizeIdentifier(raw: unknown): string {
 }
 
 /**
- * Client IP from the reverse proxy's X-Forwarded-For (first hop). Null when unknown: the per-IP limit is then
- * skipped rather than applied to everyone at once; the per-account limit always applies.
+ * Client IP for the per-IP lockout. X-Forwarded-For is attacker-controlled except for what the trusted proxies
+ * append, so with `trustedHops` = 0 the header is ignored, and otherwise only the entry the outermost trusted proxy
+ * appended is used: the `trustedHops`-th from the right. Earlier entries are whatever the client claimed. Null when
+ * unknown or not an IP address: the per-IP limit is then skipped (never applied to everyone at once); the
+ * per-account limit always applies.
  */
-export function clientIp(headers: Headers | undefined): string | null {
-  return headers?.get('x-forwarded-for')?.split(',')[0]?.trim() || null;
+export function clientIp(headers: Headers | undefined, trustedHops: number): string | null {
+  if (trustedHops < 1) return null;
+  const hops = headers?.get('x-forwarded-for')?.split(',') ?? [];
+  const ip = hops[hops.length - trustedHops]?.trim();
+  return ip && isIP(ip) ? ip : null;
 }
 
 const hashes = (deps: LoginGuardDeps, identifier: string, ip: string | null) => ({

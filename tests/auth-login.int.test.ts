@@ -5,7 +5,8 @@ import { createUser } from '../src/modules/platform-security/auth/user-service';
 import { authTestKit } from './auth-helpers';
 
 const kit = authTestKit();
-afterAll(() => kit.close());
+const noProxyKit = authTestKit({ TRUSTED_PROXY_HOPS: 0 });
+afterAll(() => Promise.all([kit.close(), noProxyKit.close()]));
 afterEach(() => vi.useRealTimers());
 
 const password = 'correct-horse-battery-staple';
@@ -113,6 +114,37 @@ describe('password login (T9, AC-SEC-02 password part)', () => {
     const { email } = await freshUser();
     expect((await kit.call('/sign-in/email', { email, password }, { ip })).status).toBe(429);
     expect((await kit.call('/sign-in/email', { email, password }, { ip: '203.0.113.78' })).status).toBe(200);
+  });
+
+  it('counts the IP the trusted proxy appended, so a spoofed first hop does not evade or move the lockout', async () => {
+    const real = '203.0.113.90';
+    for (let i = 0; i < 20; i++) {
+      await kit.call(
+        '/sign-in/email',
+        { email: `spoof${i}-${Date.now()}@belgobeton.test`, password },
+        { ip: `198.51.100.${i + 1}, ${real}` },
+      );
+    }
+    const { email } = await freshUser();
+    expect((await kit.call('/sign-in/email', { email, password }, { ip: `10.9.9.9, ${real}` })).status).toBe(
+      429,
+    );
+    expect((await kit.call('/sign-in/email', { email, password }, { ip: `${real}, 10.9.9.9` })).status).toBe(
+      200,
+    );
+  });
+
+  it('ignores X-Forwarded-For without a trusted proxy: no per-IP lockout', async () => {
+    const ip = '203.0.113.91';
+    for (let i = 0; i < 21; i++) {
+      await noProxyKit.call(
+        '/sign-in/email',
+        { email: `noproxy${i}-${Date.now()}@belgobeton.test`, password },
+        { ip },
+      );
+    }
+    const { email } = await freshUser();
+    expect((await noProxyKit.call('/sign-in/email', { email, password }, { ip })).status).toBe(200);
   });
 
   it('audits a failed login for an unknown email with the anonymous actor and only a keyed hash of the identifier', async () => {

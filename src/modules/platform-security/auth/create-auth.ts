@@ -110,7 +110,7 @@ export function createAuth({ authPool, env, log }: CreateAuthDeps) {
 
         if (ctx.path === '/sign-in/email') {
           const { identifier } = signInAttempt(ctx.body);
-          const ip = clientIp(ctx.headers);
+          const ip = clientIp(ctx.headers, env.TRUSTED_PROXY_HOPS);
           const verdict = await checkLogin(guard, identifier, ip);
           if (verdict !== 'allowed') {
             await auditAuthEvent(authPool, anonymous, {
@@ -126,7 +126,7 @@ export function createAuth({ authPool, env, log }: CreateAuthDeps) {
         if (ctx.path.startsWith('/two-factor/')) return afterTwoFactor(ctx, twoFactorDeps);
         if (ctx.path !== '/sign-in/email') return;
         const { identifier } = signInAttempt(ctx.body);
-        const ip = clientIp(ctx.headers);
+        const ip = clientIp(ctx.headers, env.TRUSTED_PROXY_HOPS);
         const failed = ctx.context.returned instanceof APIError;
         await recordLogin(guard, identifier, ip, !failed);
 

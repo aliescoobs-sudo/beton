@@ -41,6 +41,14 @@ const envObject = z.object({
   REAL_DATA: flag,
   // Test servers (e2e) that share a database being recreated must not run the pg-boss cron scheduler.
   JOB_SCHEDULER_DISABLED: flag,
+  // Reverse proxies in front of the app that each append the address they received the request from to
+  // X-Forwarded-For. 0 (default): the header is ignored, since anyone can set it.
+  TRUSTED_PROXY_HOPS: z.coerce
+    .number({ error: 'must be a whole number of proxies (0 = none)' })
+    .int({ error: 'must be a whole number of proxies (0 = none)' })
+    .min(0)
+    .max(5)
+    .default(0),
 });
 
 // AC-CLK-02: a simulated clock must never run in production or next to real data.

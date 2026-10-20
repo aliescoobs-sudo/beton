@@ -15,6 +15,19 @@ const valid = {
   BACKUP_AGE_RECIPIENT: 'age1qyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqs3290gq',
 };
 
+describe('TRUSTED_PROXY_HOPS', () => {
+  it('defaults to 0 (X-Forwarded-For ignored)', () => {
+    expect(loadEnv(valid).TRUSTED_PROXY_HOPS).toBe(0);
+  });
+
+  it('accepts a small whole number and rejects anything else', () => {
+    expect(loadEnv({ ...valid, TRUSTED_PROXY_HOPS: '1' }).TRUSTED_PROXY_HOPS).toBe(1);
+    for (const bad of ['-1', '1.5', 'x', '9']) {
+      expect(() => loadEnv({ ...valid, TRUSTED_PROXY_HOPS: bad })).toThrow('TRUSTED_PROXY_HOPS');
+    }
+  });
+});
+
 describe('loadEnv', () => {
   it('returns typed values with safe defaults for the flags', () => {
     const env = loadEnv(valid);
