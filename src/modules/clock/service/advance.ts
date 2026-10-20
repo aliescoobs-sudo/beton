@@ -1,16 +1,21 @@
 import type pg from 'pg';
 import { type BusinessDate, businessDateOf } from '../domain/business-date';
-import { type JobInstant, jobInstantsBetween, type ScheduledJobTime } from '../domain/instants';
+import { jobInstantsBetween, type ScheduledJobTime } from '../domain/instants';
 import { JOB_CATALOGUE } from '../domain/job-catalogue';
-import { type JobRegistry, type JobRunOutcome, runJob } from './job-runner';
+import { type JobHandler, type JobRegistry, type JobRunOutcome, runJob, unfinishedRuns } from './job-runner';
 import { readSimNow, type SimClockActor, setSimNow } from './sim-clock';
 
 export type AdvanceTarget = { to: Date } | { byDays: number };
 
-/** A scripted event of the `simulation` module: runs at `at`, between the jobs, as part of the advance. */
+/**
+ * A scripted event of the `simulation` module: runs at `at`, between the jobs, as part of the advance. It is
+ * recorded like a job (`event-<key>` per business date), so it runs once, in the 'system' transaction.
+ */
 export interface ScriptedEvent {
+  /** Unique per event, stable across advances. */
+  key: string;
   at: Date;
-  run: () => Promise<void>;
+  run: JobHandler;
 }
 
 export interface AdvanceDeps {
@@ -35,7 +40,7 @@ export interface AdvanceResult {
   failed: boolean;
 }
 
-type Step = ({ kind: 'job' } & JobInstant) | ({ kind: 'event' } & ScriptedEvent);
+type Step = { at: Date; jobKey: string; businessDate: BusinessDate; run?: JobHandler };
 
 export const MAX_ADVANCE_DAYS = 366;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -62,10 +67,25 @@ export async function advanceClock(
   for (const job of JOB_CATALOGUE) {
     times.push({ jobKey: job.key, time: await deps.timeOf(job.parameterKey, job.defaultTime) });
   }
-  const steps: Step[] = [
-    ...jobInstantsBetween(from, to, times).map((job): Step => ({ ...job, kind: 'job' })),
-    ...((await deps.scriptedEvents?.(from, to)) ?? []).map((event): Step => ({ ...event, kind: 'event' })),
-  ].sort((a, b) => a.at.getTime() - b.at.getTime());
+  // The range starts just before `from`: a step at `from` whose last run failed is offered again (the clock stopped
+  // there); any other step at `from` is not.
+  const lookback = new Date(from.getTime() - 1);
+  const candidates: Step[] = [
+    ...jobInstantsBetween(lookback, to, times),
+    ...((await deps.scriptedEvents?.(lookback, to)) ?? []).map((event): Step => ({
+      at: event.at,
+      jobKey: `event-${event.key}`,
+      businessDate: businessDateOf(event.at),
+      run: event.run,
+    })),
+  ];
+  const retry = await unfinishedRuns(
+    deps.systemPool,
+    candidates.filter((c) => c.at.getTime() === from.getTime()),
+  );
+  const steps = candidates
+    .filter((c) => c.at.getTime() > from.getTime() || retry.has(`${c.jobKey}|${c.businessDate}`))
+    .sort((a, b) => a.at.getTime() - b.at.getTime());
 
   const result: AdvanceResult = { from, to, ran: [], failed: false };
   let current = from;
@@ -74,15 +94,11 @@ export async function advanceClock(
       await setSimNow(deps.appPool, true, actor, step.at, realNow());
       current = step.at;
     }
-    if (step.kind === 'event') {
-      await step.run();
-      continue;
-    }
     const at = step.at;
     const outcome = await runJob(
       {
         pool: deps.systemPool,
-        registry: deps.registry,
+        registry: step.run ? new Map([[step.jobKey, step.run]]) : deps.registry,
         clock: { now: () => new Date(at), today: () => businessDateOf(at), simulated: true },
         realNow,
       },

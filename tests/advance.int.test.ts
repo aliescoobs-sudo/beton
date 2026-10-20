@@ -152,7 +152,7 @@ describe('advance (T24)', () => {
     await advanceClock(
       await deps({
         registry,
-        scriptedEvents: async () => [{ at: eventAt, run: async () => void order.push('event') }],
+        scriptedEvents: async () => [{ key: 'e1', at: eventAt, run: async () => void order.push('event') }],
       }),
       owner,
       { byDays: 1 },
@@ -177,5 +177,43 @@ describe('advance (T24)', () => {
     expect(result.to.getTime()).toBe(
       casablancaInstant(d1.toISOString().slice(0, 10) as BusinessDate, '20:00').getTime(),
     );
+  });
+
+  it('retries a failed job on the next advance, from the instant where it stopped', async () => {
+    const d1 = freshStart();
+    const owner = await startAt(d1);
+    let broken = true;
+    const registry = new Map<string, JobHandler>(
+      JOB_CATALOGUE.map((j) => [
+        j.key,
+        async () => {
+          if (broken && j.key === 'day-close') throw new Error('boom');
+        },
+      ]),
+    );
+    const first = await advanceClock(await deps({ registry }), owner, { byDays: 2 });
+    expect(first.failed).toBe(true);
+
+    broken = false;
+    const second = await advanceClock(await deps({ registry }), owner, { byDays: 1 });
+    expect(second.ran[0]).toMatchObject({ jobKey: 'day-close', outcome: 'ran' });
+    expect(second.failed).toBe(false);
+    // And a third advance does not offer the succeeded instant again.
+    const third = await advanceClock(await deps({ registry }), owner, { byDays: 1 });
+    expect(third.ran.filter((r) => r.outcome === 'skipped')).toEqual([]);
+  });
+
+  it('runs a scripted event once, even if its instant is offered again', async () => {
+    const d1 = freshStart();
+    const owner = await startAt(d1);
+    let calls = 0;
+    const eventAt = new Date(d1.getTime() + 60 * 60_000);
+    const scriptedEvents = async () => [{ key: 'once', at: eventAt, run: async () => void calls++ }];
+    await advanceClock(await deps({ scriptedEvents }), owner, { byDays: 1 });
+    await resetSimClock();
+    await startAt(d1);
+    const again = await advanceClock(await deps({ scriptedEvents }), owner, { byDays: 1 });
+    expect(calls).toBe(1);
+    expect(again.ran.find((r) => r.jobKey === 'event-once')?.outcome).toBe('skipped');
   });
 });

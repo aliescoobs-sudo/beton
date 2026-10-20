@@ -21,6 +21,7 @@ export {
   type JobRunnerDeps,
   type JobRunOutcome,
   runJob,
+  unfinishedRuns,
   stubJobRegistry,
 } from './service/job-runner';
 export { installJobQueue, type JobScheduler, startJobScheduler } from './service/job-scheduler';

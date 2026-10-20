@@ -92,3 +92,25 @@ export async function runJob(
     return 'failed';
   }
 }
+
+/** Which of the given (job, business date) pairs have a run that did not succeed, as `jobKey|businessDate` strings. */
+export async function unfinishedRuns(
+  pool: pg.Pool,
+  runs: readonly { jobKey: string; businessDate: BusinessDate }[],
+): Promise<Set<string>> {
+  if (runs.length === 0) return new Set();
+  const now = new Date();
+  const rows = await withRlsContext(
+    pool,
+    { userId: SYSTEM_ACTOR_ID, role: 'system', requestId: uuidv7(now) },
+    async (tx) =>
+      (
+        await tx.query<{ job_key: string; business_date: string }>(
+          `select job_key, business_date::text as business_date from scheduled_job_run
+            where status <> 'succeeded' and (job_key, business_date) in (select * from unnest($1::text[], $2::date[]))`,
+          [runs.map((r) => r.jobKey), runs.map((r) => r.businessDate)],
+        )
+      ).rows,
+  );
+  return new Set(rows.map((r) => `${r.job_key}|${r.business_date}`));
+}
