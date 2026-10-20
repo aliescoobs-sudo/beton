@@ -2,8 +2,14 @@ import type pg from 'pg';
 import { err, ok, type Result } from '@/lib/result';
 import { uuidv7 } from '@/lib/uuidv7';
 import { realClock } from '@/modules/clock';
-import type { SessionUser } from '@/modules/platform-security';
-import { parseRecetteInput, resolveRecette, type Recette } from '../domain/recette';
+import { projectMany, project, type SessionUser } from '@/modules/platform-security';
+import {
+  parseRecetteInput,
+  recetteVisibility,
+  resolveRecette,
+  type Recette,
+  type RecetteView,
+} from '../domain/recette';
 import { inRequest, isMalformedId, require } from './request';
 
 export type RecetteError = 'INVALID' | 'NOT_FOUND' | 'NOT_AFTER_LATEST' | 'INACTIVE_COMPONENT' | 'CONFLICT';
@@ -33,7 +39,7 @@ const toRecette = (row: RecetteRow): Recette => ({
   lines: row.lines.map((l) => ({ componentId: l.componentId, qtyPerM3: Number(l.qtyPerM3) })),
 });
 
-/** Every version of one concrete type, newest first. */
+/** Every version of one concrete type, newest first, as the actor's role may see it (no cost for office/plant). */
 export async function listRecetteVersions(
   appPool: pg.Pool,
   actor: SessionUser,
@@ -46,7 +52,7 @@ export async function listRecetteVersions(
         concreteTypeId,
       ]),
     );
-    return rows.map(toRecette);
+    return projectMany<RecetteView>(recetteVisibility, actor.role, rows.map(toRecette)) as Recette[];
   } catch (error) {
     if (isMalformedId(error)) return [];
     throw error;
@@ -96,13 +102,14 @@ export async function createRecetteVersion(
           [uuidv7(realClock.now()), id, line.componentId, line.qtyPerM3],
         );
       }
-      return ok({
+      const created: RecetteView = {
         id,
         concreteTypeId,
         version: (rows[0] as { version: number }).version,
         effectiveFrom,
         lines,
-      });
+      };
+      return ok(project(recetteVisibility, actor.role, created) as Recette);
     });
   } catch (error) {
     const code = (error as { code?: string }).code;

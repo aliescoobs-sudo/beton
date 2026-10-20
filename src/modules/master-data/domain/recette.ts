@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { err, ok, type Result } from '@/lib/result';
+import { defineVisibility } from '@/modules/platform-security';
 
 export interface RecetteLine {
   componentId: string;
@@ -63,3 +64,19 @@ export function resolveRecette<T extends { effectiveFrom: string }>(
   }
   return best ? ok(best) : err('NO_RECETTE');
 }
+
+/**
+ * What leaves the service for a recette (SPEC-platform-security §4 layer 4, AC-MD-07/AC-SEC-05). Quantities per m³
+ * are all the plant and the office ever get; the computed cost (filled in by purchase prices, T10) is for owner and
+ * partner only. The allowlist means a field added later stays hidden until someone lists it.
+ */
+export interface RecetteView extends Recette {
+  componentCostPerM3Centimes?: number;
+}
+
+export const recetteVisibility = defineVisibility<RecetteView>({
+  owner: 'all',
+  partner: 'all',
+  office: ['id', 'concreteTypeId', 'version', 'effectiveFrom', 'lines'],
+  plant: ['id', 'concreteTypeId', 'version', 'effectiveFrom', 'lines'],
+});

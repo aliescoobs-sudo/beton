@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { expectNoFields } from '../tests/helpers/expect-no-fields';
 import { E2E_MD, loginAndEnrol } from './fixtures';
 
 test.describe.configure({ mode: 'serial' });
@@ -31,6 +32,13 @@ test('plant reads the recette with no form', async ({ page }) => {
   await page.getByTestId('recettes-link').click();
   await expect(page.getByTestId('recette-B25')).toContainText('350000');
   await expect(page.locator('button[type=submit]')).toHaveCount(0);
+  expectNoFields(await page.content(), [
+    'componentCostPerM3Centimes',
+    'purchase_price',
+    'selling_price',
+    'margin',
+  ]);
+  await expect(page.locator('body')).not.toContainText(/MAD|DH|prix|سعر/i);
 });
 
 test('the recettes screen renders right-to-left in Arabic', async ({ page }) => {

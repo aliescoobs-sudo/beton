@@ -1,6 +1,7 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { parseRecetteInput, resolveRecette } from './recette';
+import { project } from '@/modules/platform-security';
+import { parseRecetteInput, recetteVisibility, resolveRecette } from './recette';
 
 const v = (effectiveFrom: string, id = effectiveFrom) => ({ id, effectiveFrom });
 
@@ -59,5 +60,24 @@ describe('parseRecetteInput', () => {
     ],
   ])('refuses %s', (_name, input) => {
     expect(parseRecetteInput(input)).toEqual({ ok: false, error: 'INVALID' });
+  });
+});
+
+describe('recetteVisibility (AC-MD-07)', () => {
+  const row = {
+    id: 'r1',
+    concreteTypeId: 't1',
+    version: 1,
+    effectiveFrom: '2026-01-01',
+    lines: [{ componentId: 'c1', qtyPerM3: 1 }],
+    componentCostPerM3Centimes: 362_500,
+  };
+  it.each(['plant', 'office'] as const)('%s never sees the component cost', (role) => {
+    const seen = project(recetteVisibility, role, row);
+    expect(seen).not.toHaveProperty('componentCostPerM3Centimes');
+    expect(seen.lines).toEqual(row.lines);
+  });
+  it.each(['owner', 'partner'] as const)('%s sees the component cost', (role) => {
+    expect(project(recetteVisibility, role, row).componentCostPerM3Centimes).toBe(362_500);
   });
 });

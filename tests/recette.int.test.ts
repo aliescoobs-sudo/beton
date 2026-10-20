@@ -15,6 +15,7 @@ import {
 import { ForbiddenError } from '../src/modules/platform-security';
 import type { SessionUser } from '../src/modules/platform-security/auth/session-gate';
 import { testEnv } from './db-env';
+import { expectNoFields } from './helpers/expect-no-fields';
 import { realSessionUser } from './helpers/actors';
 
 const env = testEnv();
@@ -24,6 +25,15 @@ afterAll(() => app.end());
 const users = {} as Record<'owner' | 'partner' | 'office' | 'plant', SessionUser>;
 const inCtx = <T>(user: SessionUser, fn: (tx: pg.PoolClient) => Promise<T>) =>
   withRlsContext(app, { userId: user.id, role: user.role, requestId: 'test' }, fn);
+const FORBIDDEN = [
+  'componentCostPerM3Centimes',
+  'purchase_price',
+  'purchasePrice',
+  'priceHtCentimes',
+  'selling_price',
+  'sellingPrice',
+  'margin',
+];
 let cement: Component;
 let sand: Component;
 
@@ -200,4 +210,35 @@ describe('recette versions (master-data T8, AC-MD-02)', () => {
       }),
     ).rejects.toMatchObject({ code: '23514' });
   });
+});
+
+describe('plant and office recette view (master-data T9, AC-MD-07 recette part)', () => {
+  it.each(['plant', 'office'] as const)(
+    '%s gets quantities per m³ and no cost or price field',
+    async (role) => {
+      const type = await newType();
+      const created = await createRecetteVersion(app, users.owner, type.id, {
+        effectiveFrom: '2026-01-01',
+        lines: lines(350_000),
+      });
+      if (!created.ok) throw new Error(created.error);
+      const seen = await listRecetteVersions(app, users[role], type.id);
+      expect(seen[0]?.lines).toContainEqual({ componentId: cement.id, qtyPerM3: 350_000 });
+      expect(Object.keys(seen[0] ?? {}).sort()).toEqual([
+        'concreteTypeId',
+        'effectiveFrom',
+        'id',
+        'lines',
+        'version',
+      ]);
+      const resolved = await resolveRecetteFor(app, users[role], type.id, '2026-02-01');
+      expectNoFields([seen, resolved], FORBIDDEN);
+      // The response of the publishing action carries no data at all; the service result is projected too.
+      const published = await createRecetteVersion(app, users.owner, type.id, {
+        effectiveFrom: '2027-01-01',
+        lines: lines(1),
+      });
+      expectNoFields({ ok: published.ok }, FORBIDDEN);
+    },
+  );
 });
