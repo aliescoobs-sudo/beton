@@ -4,6 +4,9 @@
 import { existsSync } from 'node:fs';
 import { loadBackupUrl, loadEnv } from '@/lib/env';
 import { createBackup } from './backup-lib';
+import { handleHelp } from './cli-help';
+
+handleHelp(import.meta.url);
 
 if (existsSync('.env.local')) process.loadEnvFile('.env.local');
 // Ops secrets (superuser, backup role, age identity) live in .env.ops, which Next.js never loads.

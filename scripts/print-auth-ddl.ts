@@ -7,6 +7,9 @@ import pg from 'pg';
 import { loadEnv } from '@/lib/env';
 import { baseAuthOptions } from '@/modules/platform-security/auth/options';
 import { DDL_SCRATCH_DATABASE, recreateDatabase } from './db-bootstrap';
+import { handleHelp } from './cli-help';
+
+handleHelp(import.meta.url);
 
 if (existsSync('.env.local')) process.loadEnvFile('.env.local');
 const env = loadEnv(process.env);

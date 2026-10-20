@@ -1,7 +1,8 @@
 'use server';
 
 import { getPool } from '@/lib/db/pools';
-import { authorize, currentAuthState, ForbiddenError } from '@/modules/platform-security';
+import { authorize, ForbiddenError } from '@/modules/platform-security';
+import { currentAuthState } from '@/modules/platform-security/next';
 import { createZone, updateZone, type ZoneError } from '../../service/zone-service';
 
 export type ZoneActionResult =

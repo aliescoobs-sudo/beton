@@ -17,8 +17,6 @@ export { can, type Permission, PERMISSIONS, type Role, rolesWith, USER_ROLES } f
 // every outgoing row through project(); assert absence in tests with tests/helpers/expect-no-fields.ts.
 export { defineVisibility, project, projectMany, type Visibility } from './domain/projection';
 export { auditDenied, authorize, type Authorization } from './auth/guards';
-// Building blocks for other modules' pages, actions and services.
-export { requirePagePermission } from './auth/page-guard';
-export { currentAuthState } from './auth/request-state';
+// Building blocks for other modules' services. Pages and actions also need ./next (Next.js-only, not loadable by CLIs).
 export type { SessionUser } from './auth/session-gate';
 export { ForbiddenError } from './service/user-admin';

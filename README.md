@@ -30,11 +30,15 @@ PostgreSQL 17 runs in Docker (Colima on macOS: `brew install colima docker docke
 cp .env.example .env.local                 # fill in; secrets: openssl rand -base64 32 / -hex 16
                                            # the [OPS] variables go in a separate .env.ops (Next.js never loads it)
 corepack pnpm db:up                        # start postgres:17.11 on 127.0.0.1:5432
+corepack pnpm db:ps                        # container status (a bare `docker compose` cannot see .env.ops:
+                                           # always use the db:* scripts, or `docker compose --env-file .env.ops …`)
 corepack pnpm db:bootstrap                 # superuser, idempotent: roles + belgobeton + belgobeton_test
 corepack pnpm db:migrate                   # apply db/migrations as belgobeton_migrator
 corepack pnpm test:unit                    # no database needed
 corepack pnpm test:integration             # migrates and uses belgobeton_test
 ```
+
+Every script in `scripts/` answers `--help` (its header comment); `scripts/cli-smoke.test.ts` runs them all, plus `docker compose config`, in `pnpm test`.
 
 Roles: `belgobeton_migrator` owns the schema and runs migrations; `belgobeton_app`, `belgobeton_auth` and `belgobeton_system` have no elevated attributes, own nothing and get only explicit grants. Services reach the database only through `withRlsContext()` (`src/lib/db/rls-context.ts`).
 

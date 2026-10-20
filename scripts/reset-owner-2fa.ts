@@ -6,6 +6,9 @@ import pg from 'pg';
 import { loadEnv } from '@/lib/env';
 import { resetOwnerTwoFactor } from '@/modules/platform-security/service/break-glass';
 import { createPrompt } from './prompt';
+import { handleHelp } from './cli-help';
+
+handleHelp(import.meta.url);
 
 if (existsSync('.env.local')) process.loadEnvFile('.env.local');
 const env = loadEnv(process.env);

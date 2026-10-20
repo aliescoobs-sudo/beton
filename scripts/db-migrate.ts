@@ -5,6 +5,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import pg from 'pg';
 import { installJobQueue } from '../src/modules/clock/service/job-scheduler.ts';
+import { handleHelp } from './cli-help';
 
 export const MIGRATIONS_FOLDER = 'db/migrations';
 
@@ -20,6 +21,7 @@ export async function runMigrations(migratorUrl: string): Promise<void> {
 }
 
 if (import.meta.main) {
+  handleHelp(import.meta.url);
   if (existsSync('.env.local')) process.loadEnvFile('.env.local');
   const { loadEnv } = await import('../src/lib/env.ts');
   await runMigrations(loadEnv(process.env).DATABASE_URL_MIGRATOR);

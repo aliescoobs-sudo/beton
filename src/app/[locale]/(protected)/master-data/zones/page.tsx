@@ -2,7 +2,8 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { getPool } from '@/lib/db/pools';
 import { listZones } from '@/modules/master-data';
 import { ZonesManager } from '@/modules/master-data/ui/zones/zones-manager';
-import { can, requirePagePermission } from '@/modules/platform-security';
+import { can } from '@/modules/platform-security';
+import { requirePagePermission } from '@/modules/platform-security/next';
 
 export default async function ZonesPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;

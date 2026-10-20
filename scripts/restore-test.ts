@@ -8,6 +8,9 @@ import { loadEnv } from '@/lib/env';
 import { recordRestoreTest } from '@/modules/platform-security/service/checklist';
 import { restoreCheck } from './backup-lib';
 import { superuserUrl } from './db-bootstrap';
+import { handleHelp } from './cli-help';
+
+handleHelp(import.meta.url);
 
 if (existsSync('.env.local')) process.loadEnvFile('.env.local');
 // Ops secrets (superuser, backup role, age identity) live in .env.ops, which Next.js never loads.

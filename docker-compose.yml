@@ -1,11 +1,12 @@
-# Local development database. Superuser password comes from .env.local:
-#   corepack pnpm db:up
+# Local development database. The superuser password lives in .env.ops (never .env.local: Next.js loads that one),
+# so every compose command needs it passed explicitly. Use the package scripts:
+#   corepack pnpm db:up | db:ps | db:down      (or: docker compose --env-file .env.ops <command>)
 services:
   db:
     image: postgres:17.11-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?set POSTGRES_SUPERUSER_PASSWORD in .env.local}
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?set POSTGRES_SUPERUSER_PASSWORD in .env.ops and pass --env-file .env.ops (or use corepack pnpm db:up)}
       POSTGRES_DB: postgres
       POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
     ports:

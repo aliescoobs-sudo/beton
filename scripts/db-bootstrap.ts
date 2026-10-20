@@ -5,6 +5,7 @@ import { existsSync } from 'node:fs';
 import pg from 'pg';
 import { z } from 'zod';
 import { type Env, loadBackupUrl, loadEnv } from '../src/lib/env.ts';
+import { handleHelp } from './cli-help';
 
 export const TEST_DATABASE = 'belgobeton_test';
 export const E2E_DATABASE = 'belgobeton_e2e';
@@ -123,6 +124,7 @@ export async function recreateDatabase(env: Env, database: string): Promise<void
 export const recreateTestDatabase = (env: Env) => recreateDatabase(env, TEST_DATABASE);
 
 if (import.meta.main) {
+  handleHelp(import.meta.url);
   if (existsSync('.env.local')) process.loadEnvFile('.env.local');
   // Ops secrets (superuser, backup role, age identity) live in .env.ops, which Next.js never loads.
   if (existsSync('.env.ops')) process.loadEnvFile('.env.ops');

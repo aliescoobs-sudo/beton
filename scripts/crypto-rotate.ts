@@ -17,6 +17,9 @@ import {
   keyringCipher,
   rotateColumn,
 } from '@/modules/platform-security/service/key-rotation';
+import { handleHelp } from './cli-help';
+
+handleHelp(import.meta.url);
 
 if (existsSync('.env.local')) process.loadEnvFile('.env.local');
 const env = loadEnv(process.env);

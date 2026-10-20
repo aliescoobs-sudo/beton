@@ -17,6 +17,7 @@
     "test": "vitest run",
     "ci:local": "eslint . && prettier --check . && tsc --noEmit && vitest run && node --import ./scripts/register-ts-paths.mjs scripts/audit-verify.ts && next build && playwright test",
     "db:up": "docker compose --env-file .env.ops up -d --wait db",
+    "db:ps": "docker compose --env-file .env.ops ps",
     "db:down": "docker compose --env-file .env.ops stop db",
     "db:bootstrap": "node --import ./scripts/register-ts-paths.mjs scripts/db-bootstrap.ts",
     "db:migrate": "node --import ./scripts/register-ts-paths.mjs scripts/db-migrate.ts",
