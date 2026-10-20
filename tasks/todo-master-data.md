@@ -67,7 +67,7 @@ Fake-data seed (the 5 zones of D53 with the fixed ids `019c0000-0000-7000-8000-0
 **AC:** idempotent; refuses outside simulation; every row audited as `system/seed`. **Deps:** T3–T13
 
 ### - [ ] T16: Bilingual screenshot check (S)
-Playwright over every master-data screen in fr and ar: no horizontal overflow, `dir="rtl"` on ar, no missing i18n key (key-parity test between `fr.json` and `ar.json`), no CSP violations.
+Playwright over every master-data screen in fr and ar: no horizontal overflow, `dir="rtl"` on ar, no missing i18n key (key-parity test between `fr.json` and `ar.json`), no CSP violations. Explicitly includes, in ar (RTL) as well as fr: the client sites panel (T4: site list, add/edit form with the sealed address, long labels and addresses) and the suppliers screens (T5: list, create/edit form, archive control, FRN-nn codes, category enum labels); check mirrored layout, logical-property alignment, and that Latin codes/ICE/phone numbers stay LTR inside RTL text.
 **AC:** AC-MD-09. **Deps:** T15
 
 ### - [ ] T17: Closure (S)
