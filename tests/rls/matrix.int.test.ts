@@ -148,6 +148,25 @@ const FIXTURES: Record<
       ),
     visible: `select split_part(label, ':', 3) as owner from client_site where label like 'site:' || $1 || ':%'`,
   },
+  component: {
+    writers: ['owner', 'partner'],
+    seed: (tx, actor) =>
+      tx.query(
+        `insert into component (id, code, name_fr, name_ar, base_unit) values (gen_random_uuid(), public.next_code('CMP', 2), $1, 'x', 'g')`,
+        [`${marker}:${actor}`],
+      ),
+    visible: `select split_part(name_fr, ':', 2) as owner from component where name_fr like $1 || ':%'`,
+  },
+  purchase_unit: {
+    writers: ['owner', 'partner'],
+    seed: (tx, actor) =>
+      tx.query(
+        `insert into purchase_unit (id, component_id, label, factor_to_base)
+         values (gen_random_uuid(), (select id from component order by code limit 1), $1, 1)`,
+        [`${marker}:${actor}`],
+      ),
+    visible: `select split_part(label, ':', 2) as owner from purchase_unit where label like $1 || ':%'`,
+  },
   supplier: {
     writers: ['owner', 'partner', 'office'],
     seed: (tx, actor) =>

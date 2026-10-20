@@ -23,6 +23,9 @@ export const PERMISSIONS = {
   // Archiving replaces deleting; a second client on an existing ICE needs a recorded reason
   'parties.archive': MANAGERS,
   'parties.ice_override': MANAGERS,
+  // Components and their purchase units (no price on either: plant reads names for the recette)
+  'components.read': ALL,
+  'components.write': MANAGERS,
   // Concrete types, recettes (office: no cost; plant: quantities only)
   'recettes.read': ALL,
   'recettes.write': MANAGERS,

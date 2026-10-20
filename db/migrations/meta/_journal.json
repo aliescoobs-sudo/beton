@@ -148,6 +148,13 @@
       "when": 1792591217000,
       "tag": "0020_supplier",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1792591218000,
+      "tag": "0021_component",
+      "breakpoints": true
     }
   ]
 }

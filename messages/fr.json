@@ -207,6 +207,30 @@
         "fuel": "Carburant",
         "other": "Autre"
       }
+    },
+    "components": {
+      "title": "Composants",
+      "link": "Composants",
+      "readOnly": "Lecture seule : seuls le propriétaire et l'associé modifient les composants.",
+      "nameFr": "Nom (français)",
+      "nameAr": "Nom (arabe)",
+      "baseUnit": "Unité de base",
+      "baseUnitValue": "Unité de base : {unit}",
+      "thresholdValue": "Seuil bas : {count}",
+      "threshold": "Seuil bas ({unit})",
+      "thresholdShort": "Seuil bas (unité de base)",
+      "unitLabel": "Unité d'achat",
+      "factor": "Contenu ({unit})",
+      "addUnit": "Ajouter l'unité",
+      "add": "Ajouter le composant",
+      "save": "Enregistrer",
+      "archive": "Archiver",
+      "restore": "Réactiver",
+      "archivedBadge": "Archivé",
+      "saved": "Enregistré.",
+      "invalid": "Valeur refusée (noms fr et ar obligatoires, contenu entier positif).",
+      "duplicate": "Ce nom ou cette unité existe déjà.",
+      "error": "Action refusée."
     }
   },
   "history": {

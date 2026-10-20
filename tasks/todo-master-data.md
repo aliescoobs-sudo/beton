@@ -27,7 +27,7 @@ Migration `client` (code `CLT-nnn`, kind, ice, phone_enc, contact_name, default_
 ### - [x] T5: Supplier (S)
 `supplier` (`FRN-nn`, category enum, ice, phone_enc, terms, status), same pattern as clients. **AC:** office W (not archive); archive owner/partner only, audited; code immutable (trigger test); matrix. **Deps:** T3
 
-### - [ ] T6: Components and purchase units (M)
+### - [x] T6: Components and purchase units (M)
 `component` (name_fr, name_ar, base_unit, low_stock_threshold) and `purchase_unit` (label, factor_to_base int); seed the 6 components. Managers write.
 **AC:** factor must be a positive integer (CHECK); both language names required; AC-SEC-04 matrix. **Deps:** T2, T1
 

@@ -31,3 +31,22 @@ export {
   updateSupplier,
   type SupplierError,
 } from './service/supplier-service';
+export {
+  BASE_UNITS,
+  parseComponentInput,
+  parsePurchaseUnitInput,
+  type BaseUnit,
+  type Component,
+  type ComponentInput,
+  type PurchaseUnit,
+  type PurchaseUnitInput,
+} from './domain/component';
+export {
+  createComponent,
+  createPurchaseUnit,
+  listComponents,
+  listPurchaseUnits,
+  updateComponent,
+  updatePurchaseUnit,
+  type ComponentError,
+} from './service/component-service';
