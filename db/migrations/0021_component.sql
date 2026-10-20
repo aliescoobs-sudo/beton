@@ -1,6 +1,7 @@
 -- master-data T6 (SPEC-master-data §2): raw-material components and the units they are bought in. Same pattern as
 -- zone: FORCE RLS, audit, UPDATE but no DELETE grant (AC-MD-06), managers write, every role reads (the plant reads
 -- component names on the recette; neither table holds a price).
+-- Structure only (decision 79): the pilot components come from the pilot seed (belgobeton_system, audited).
 -- Immutable once created: component.code and base_unit (thresholds and factors are expressed in it), and
 -- purchase_unit.factor_to_base / component_id (prices will point at the unit; a different factor is a new unit).
 CREATE TABLE public.component (
@@ -51,37 +52,6 @@ END $$;
 CREATE TRIGGER purchase_unit_guard BEFORE UPDATE ON public.purchase_unit
   FOR EACH ROW EXECUTE FUNCTION public.purchase_unit_guard();
 --> statement-breakpoint
--- The six pilot components are reference data (not fake data), seeded before RLS and audit attach so the migration
--- needs no actor. code_sequence is FORCE-RLS (only request roles write it), so the migration uses fixed codes and
--- moves the 'CMP' counter past them as table owner with its audit trigger off for that one insert (bookkeeping).
-INSERT INTO public.component (id, code, name_fr, name_ar, base_unit) VALUES
-  (gen_random_uuid(), 'CMP-01', 'Ciment', 'إسمنت', 'g'),
-  (gen_random_uuid(), 'CMP-02', 'Sable', 'رمل', 'g'),
-  (gen_random_uuid(), 'CMP-03', 'Gravette 8/15', 'حصى 8/15', 'g'),
-  (gen_random_uuid(), 'CMP-04', 'Gravette 15/25', 'حصى 15/25', 'g'),
-  (gen_random_uuid(), 'CMP-05', 'Eau', 'ماء', 'L'),
-  (gen_random_uuid(), 'CMP-06', 'Adjuvant', 'مادة مضافة', 'mL');
---> statement-breakpoint
-ALTER TABLE public.code_sequence NO FORCE ROW LEVEL SECURITY;
---> statement-breakpoint
-ALTER TABLE public.code_sequence DISABLE TRIGGER USER;
---> statement-breakpoint
-INSERT INTO public.code_sequence (key, last_value) VALUES ('CMP', 6);
---> statement-breakpoint
-ALTER TABLE public.code_sequence ENABLE TRIGGER USER;
---> statement-breakpoint
-ALTER TABLE public.code_sequence FORCE ROW LEVEL SECURITY;
---> statement-breakpoint
-INSERT INTO public.purchase_unit (id, component_id, label, factor_to_base)
-SELECT gen_random_uuid(), c.id, v.label, v.factor
-FROM (VALUES
-  ('Ciment', 't', 1000000), ('Ciment', 'sac 50 kg', 50000),
-  ('Sable', 't', 1000000), ('Gravette 8/15', 't', 1000000), ('Gravette 15/25', 't', 1000000),
-  ('Eau', 'm³', 1000), ('Adjuvant', 'L', 1000)
-) AS v (name_fr, label, factor)
-JOIN public.component c ON lower(c.name_fr) = lower(v.name_fr)
-ON CONFLICT DO NOTHING;
---> statement-breakpoint
 DO $$
 DECLARE
   t text;
@@ -103,6 +73,23 @@ BEGIN
       t || '_update', t);
   END LOOP;
 END $$;
+--> statement-breakpoint
+-- The pilot seed runs as belgobeton_system: it may insert components and units, and use the CMP- counter.
+-- Request roles never reach these policies (they are TO belgobeton_system only).
+GRANT INSERT ON public.component, public.purchase_unit TO belgobeton_system;
+--> statement-breakpoint
+CREATE POLICY component_insert_system ON public.component FOR INSERT TO belgobeton_system
+  WITH CHECK (ctx.role() = 'system' AND status = 'active');
+--> statement-breakpoint
+CREATE POLICY purchase_unit_insert_system ON public.purchase_unit FOR INSERT TO belgobeton_system
+  WITH CHECK (ctx.role() = 'system' AND status = 'active');
+--> statement-breakpoint
+GRANT SELECT, INSERT, UPDATE ON public.code_sequence TO belgobeton_system;
+--> statement-breakpoint
+GRANT EXECUTE ON FUNCTION public.next_code(text, integer) TO belgobeton_system;
+--> statement-breakpoint
+CREATE POLICY code_sequence_system ON public.code_sequence FOR ALL TO belgobeton_system
+  USING (ctx.role() = 'system') WITH CHECK (ctx.role() = 'system');
 --> statement-breakpoint
 SELECT audit.attach('public.component');
 --> statement-breakpoint

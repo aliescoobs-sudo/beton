@@ -33,7 +33,8 @@ corepack pnpm db:up                        # start postgres:17.11 on 127.0.0.1:5
 corepack pnpm db:ps                        # container status (a bare `docker compose` cannot see .env.ops:
                                            # always use the db:* scripts, or `docker compose --env-file .env.ops …`)
 corepack pnpm db:bootstrap                 # superuser, idempotent: roles + belgobeton + belgobeton_test
-corepack pnpm db:migrate                   # apply db/migrations as belgobeton_migrator
+corepack pnpm db:migrate                   # apply db/migrations as belgobeton_migrator (structure only)
+corepack pnpm db:seed                      # pilot master data as the system actor (needs SIMULATION_ENABLED=true)
 corepack pnpm test:unit                    # no database needed
 corepack pnpm test:integration             # migrates and uses belgobeton_test
 ```

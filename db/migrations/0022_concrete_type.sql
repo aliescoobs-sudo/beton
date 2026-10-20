@@ -1,6 +1,7 @@
 -- master-data T7 (SPEC-master-data §2): concrete types (B20, B25...). Same pattern as component: FORCE RLS, audit,
 -- no DELETE (archive instead; an archived type stays readable but is not selectable), managers write, office and
 -- plant read. The code is typed by a manager (it is the product's name) and never changes.
+-- Structure only (decision 79): B12/B20/B25/B30 come from the pilot seed.
 CREATE TABLE public.concrete_type (
   id     uuid PRIMARY KEY,
   code   text NOT NULL UNIQUE CHECK (code ~ '^[A-Z][A-Z0-9]{1,9}$'),
@@ -18,13 +19,6 @@ END $$;
 --> statement-breakpoint
 CREATE TRIGGER concrete_type_guard BEFORE UPDATE ON public.concrete_type
   FOR EACH ROW EXECUTE FUNCTION public.concrete_type_guard();
---> statement-breakpoint
--- Pilot types (configurable afterwards), seeded before RLS and audit attach so the migration needs no actor.
-INSERT INTO public.concrete_type (id, code, label) VALUES
-  (gen_random_uuid(), 'B12', 'Béton B12'),
-  (gen_random_uuid(), 'B20', 'Béton B20'),
-  (gen_random_uuid(), 'B25', 'Béton B25'),
-  (gen_random_uuid(), 'B30', 'Béton B30');
 --> statement-breakpoint
 ALTER TABLE public.concrete_type ENABLE ROW LEVEL SECURITY;
 --> statement-breakpoint
@@ -44,5 +38,10 @@ CREATE POLICY concrete_type_insert ON public.concrete_type FOR INSERT TO belgobe
 --> statement-breakpoint
 CREATE POLICY concrete_type_update ON public.concrete_type FOR UPDATE TO belgobeton_app
   USING (ctx.role() IN ('owner', 'partner')) WITH CHECK (ctx.role() IN ('owner', 'partner'));
+--> statement-breakpoint
+GRANT INSERT ON public.concrete_type TO belgobeton_system;
+--> statement-breakpoint
+CREATE POLICY concrete_type_insert_system ON public.concrete_type FOR INSERT TO belgobeton_system
+  WITH CHECK (ctx.role() = 'system' AND status = 'active');
 --> statement-breakpoint
 SELECT audit.attach('public.concrete_type');

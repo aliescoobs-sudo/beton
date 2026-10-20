@@ -150,7 +150,9 @@ export const TABLE_ACCESS = {
     force: true,
     audited: true,
     noDelete: true,
-    exception: 'master-data T3: CLT-/FRN- counters, bumped by next_code() inside the creating transaction.',
+    exception:
+      'master-data T3: CLT-/FRN- counters, bumped by next_code() inside the creating transaction; the pilot seed ' +
+      '(belgobeton_system pool, role system) bumps CMP-, via a policy for belgobeton_system only.',
   },
   client: {
     kind: 'rls',

@@ -71,3 +71,4 @@ export {
   resolveRecetteFor,
   type RecetteError,
 } from './service/recette-service';
+export { assertSeedAllowed, seedPilotMasterData, type SeedGuardEnv } from './service/pilot-seed';

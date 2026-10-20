@@ -28,11 +28,11 @@ Migration `client` (code `CLT-nnn`, kind, ice, phone_enc, contact_name, default_
 `supplier` (`FRN-nn`, category enum, ice, phone_enc, terms, status), same pattern as clients. **AC:** office W (not archive); archive owner/partner only, audited; code immutable (trigger test); matrix. **Deps:** T3
 
 ### - [x] T6: Components and purchase units (M)
-`component` (name_fr, name_ar, base_unit, low_stock_threshold) and `purchase_unit` (label, factor_to_base int); seed the 6 components. Managers write.
+`component` (name_fr, name_ar, base_unit, low_stock_threshold) and `purchase_unit` (label, factor_to_base int). Structure only (decision 79, which overrides the earlier "seed the 6 components"): the 6 components and their units are inserted by the pilot seed (`pnpm db:seed`, `seedPilotMasterData`). Managers write.
 **AC:** factor must be a positive integer (CHECK); both language names required; AC-SEC-04 matrix. **Deps:** T2, T1
 
 ### - [x] T7: Concrete types (S)
-`concrete_type` (code `B20`…, label, status). **AC:** managers W, office R, plant R; archived type not selectable; seed B12, B20, B25, B30 (configurable). **Deps:** T2
+`concrete_type` (code `B20`…, label, status). **AC:** managers W, office R, plant R; archived type not selectable; B12, B20, B25, B30 come from the pilot seed, not the migration (decision 79; configurable afterwards). **Deps:** T2
 
 ### - [x] T8: Recette versions (M)
 `recette` + `recette_line` (insert-only), `resolveRecette(type, date)` in domain, "new version" form (copy last version, change quantities, pick `effective_from`).
@@ -63,7 +63,7 @@ Domain `isTruckAvailable(truck, date, log)`; service `unavailableDates(truckId, 
 **AC:** AC-MD-08 (breakdown for [D4, D6) → unavailable D4, D5, available D6). **Deps:** T13
 
 ### - [ ] T15: Pilot master-data seed (S)
-Fake-data seed (the 5 zones of D53 with the fixed ids `019c0000-0000-7000-8000-00000000000{1..5}` — Tétouan centre 20, Martil 25, M'diq 30, Fnideq 45, Oued Laou 60 min, `ON CONFLICT DO NOTHING` since the dev database already holds them from the first 0017 —, clients, suppliers, 6 components, B20/B25/B30 recettes, price lists, 4 trucks, zones) behind `SIMULATION_ENABLED`; refuses with `REAL_DATA=true`. Full fixture is completed by `simulation`; this is the minimum so screens are not empty.
+Fake-data seed (the 5 zones of D53 with the fixed ids `019c0000-0000-7000-8000-00000000000{1..5}` — Tétouan centre 20, Martil 25, M'diq 30, Fnideq 45, Oued Laou 60 min, `ON CONFLICT DO NOTHING` since the dev database already holds them from the first 0017 —, clients, suppliers, 6 components, B20/B25/B30 recettes, price lists, 4 trucks, zones) behind `SIMULATION_ENABLED`; refuses with `REAL_DATA=true`. Full fixture is completed by `simulation`; this is the minimum so screens are not empty. *Started with T6/T7: `src/modules/master-data/service/pilot-seed.ts` + `scripts/seed-pilot.ts` already seed components, purchase units and concrete types (system actor, request id `seed`, guards for SIMULATION_ENABLED / REAL_DATA / production, idempotent, audited); T15 adds the rest (zones, clients, suppliers, recettes, prices, trucks). The test and e2e setups run it after migrating.*
 **AC:** idempotent; refuses outside simulation; every row audited as `system/seed`. **Deps:** T3–T13
 
 ### - [ ] T16: Bilingual screenshot check (S)

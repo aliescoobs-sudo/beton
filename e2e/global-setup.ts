@@ -1,6 +1,7 @@
 import pg from 'pg';
 import { E2E_DATABASE, ensureRoles, recreateDatabase } from '../scripts/db-bootstrap';
 import { runMigrations } from '../scripts/db-migrate';
+import { seedPilotMasterData } from '../src/modules/master-data';
 import { createAuth } from '../src/modules/platform-security/auth/create-auth';
 import { BOOTSTRAP_ACTOR_ID } from '../src/modules/platform-security/auth/actors';
 import { createUser } from '../src/modules/platform-security/auth/user-service';
@@ -13,6 +14,12 @@ export default async function globalSetup() {
   await ensureRoles(env);
   await recreateDatabase(env, E2E_DATABASE);
   await runMigrations(env.DATABASE_URL_MIGRATOR);
+  const system = new pg.Pool({ connectionString: env.DATABASE_URL_SYSTEM, max: 1 });
+  try {
+    await seedPilotMasterData(system, { SIMULATION_ENABLED: true, REAL_DATA: false, NODE_ENV: 'test' });
+  } finally {
+    await system.end();
+  }
 
   const authPool = new pg.Pool({ connectionString: env.DATABASE_URL_AUTH, max: 2 });
   try {

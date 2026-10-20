@@ -1,4 +1,4 @@
-export { ANONYMOUS_ACTOR_ID, BOOTSTRAP_ACTOR_ID } from './auth/actors';
+export { ANONYMOUS_ACTOR_ID, BOOTSTRAP_ACTOR_ID, SYSTEM_ACTOR_ID } from './auth/actors';
 export { type Auth, createAuth } from './auth/create-auth';
 export { getAuth } from './auth/instance';
 export { checkPassword } from './auth/password-policy';

@@ -20,6 +20,7 @@
     "db:ps": "docker compose --env-file .env.ops ps",
     "db:down": "docker compose --env-file .env.ops stop db",
     "db:bootstrap": "node --import ./scripts/register-ts-paths.mjs scripts/db-bootstrap.ts",
+    "db:seed": "node --import ./scripts/register-ts-paths.mjs scripts/seed-pilot.ts",
     "db:migrate": "node --import ./scripts/register-ts-paths.mjs scripts/db-migrate.ts",
     "test:unit": "vitest run --project unit",
     "test:integration": "vitest run --project integration",
