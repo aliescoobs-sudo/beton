@@ -70,3 +70,8 @@ export function parseParameter<K extends ParameterKey>(
   const parsed = (PARAMETERS[key].schema as z.ZodType).safeParse(value);
   return parsed.success ? { ok: true, value: parsed.data as ParameterValues[K] } : { ok: false };
 }
+
+/** next-intl treats dots in message keys as nesting, so labels are stored under the key with `.` → `__`. */
+export function parameterLabelKey(key: string): string {
+  return key.replaceAll('.', '__');
+}

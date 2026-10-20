@@ -113,15 +113,15 @@
     "error": "Action refusée.",
     "bounds": "Limites : {min} – {max}",
     "keys": {
-      "auth.lockout_account_failures": "Échecs de connexion avant blocage (par compte)",
-      "auth.lockout_ip_failures": "Échecs de connexion avant blocage (par adresse IP)",
-      "auth.lockout_window_minutes": "Durée du blocage et fenêtre de comptage (minutes)",
-      "auth.session_absolute_hours": "Durée maximale d'une session (heures)",
-      "auth.step_up_minutes": "Âge maximal du code 2FA pour une action sensible (minutes)",
-      "clock.job.morning_recompute": "Recalcul du matin",
-      "clock.job.daily_brief": "Brief quotidien",
-      "clock.job.due_reminders": "Rappels d'échéances",
-      "clock.job.day_close": "Clôture de la journée"
+      "auth__lockout_account_failures": "Échecs de connexion avant blocage (par compte)",
+      "auth__lockout_ip_failures": "Échecs de connexion avant blocage (par adresse IP)",
+      "auth__lockout_window_minutes": "Durée du blocage et fenêtre de comptage (minutes)",
+      "auth__session_absolute_hours": "Durée maximale d'une session (heures)",
+      "auth__step_up_minutes": "Âge maximal du code 2FA pour une action sensible (minutes)",
+      "clock__job__morning_recompute": "Recalcul du matin",
+      "clock__job__daily_brief": "Brief quotidien",
+      "clock__job__due_reminders": "Rappels d'échéances",
+      "clock__job__day_close": "Clôture de la journée"
     }
   },
   "history": {

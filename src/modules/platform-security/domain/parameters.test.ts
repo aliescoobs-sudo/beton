@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { defaultParameters, PARAMETERS, parseParameter } from './parameters';
+import ar from '../../../../messages/ar.json';
+import fr from '../../../../messages/fr.json';
+import { defaultParameters, PARAMETERS, parameterLabelKey, parseParameter } from './parameters';
 
 describe('parameter registry (T19)', () => {
   it('has the spec defaults', () => {
@@ -44,5 +46,19 @@ describe('parameter registry (T19)', () => {
       const weaker = key === 'auth.lockout_window_minutes' ? value - 1 : value + 1;
       expect(parseParameter(key as never, weaker).ok, key).toBe(false);
     }
+  });
+});
+
+describe('parameter labels', () => {
+  it.each([
+    ['fr', fr],
+    ['ar', ar],
+  ])('every parameter has a flat, dot-free label key in %s', (_l, messages) => {
+    const labels = messages.parameters.keys as Record<string, string>;
+    for (const key of Object.keys(PARAMETERS)) {
+      expect(parameterLabelKey(key)).not.toContain('.');
+      expect(labels[parameterLabelKey(key)], key).toBeTruthy();
+    }
+    expect(Object.keys(labels).filter((k) => k.includes('.'))).toEqual([]);
   });
 });

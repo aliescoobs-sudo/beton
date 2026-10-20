@@ -113,15 +113,15 @@
     "error": "تم رفض الإجراء.",
     "bounds": "الحدود: {min} – {max}",
     "keys": {
-      "auth.lockout_account_failures": "محاولات الدخول الفاشلة قبل الحظر (لكل حساب)",
-      "auth.lockout_ip_failures": "محاولات الدخول الفاشلة قبل الحظر (لكل عنوان IP)",
-      "auth.lockout_window_minutes": "مدة الحظر ونافذة العد (دقائق)",
-      "auth.session_absolute_hours": "المدة القصوى للجلسة (ساعات)",
-      "auth.step_up_minutes": "العمر الأقصى لرمز المصادقة الثنائية للإجراءات الحساسة (دقائق)",
-      "clock.job.morning_recompute": "إعادة الحساب الصباحية",
-      "clock.job.daily_brief": "الملخص اليومي",
-      "clock.job.due_reminders": "تذكيرات الآجال",
-      "clock.job.day_close": "إغلاق اليوم"
+      "auth__lockout_account_failures": "محاولات الدخول الفاشلة قبل الحظر (لكل حساب)",
+      "auth__lockout_ip_failures": "محاولات الدخول الفاشلة قبل الحظر (لكل عنوان IP)",
+      "auth__lockout_window_minutes": "مدة الحظر ونافذة العد (دقائق)",
+      "auth__session_absolute_hours": "المدة القصوى للجلسة (ساعات)",
+      "auth__step_up_minutes": "العمر الأقصى لرمز المصادقة الثنائية للإجراءات الحساسة (دقائق)",
+      "clock__job__morning_recompute": "إعادة الحساب الصباحية",
+      "clock__job__daily_brief": "الملخص اليومي",
+      "clock__job__due_reminders": "تذكيرات الآجال",
+      "clock__job__day_close": "إغلاق اليوم"
     }
   },
   "history": {

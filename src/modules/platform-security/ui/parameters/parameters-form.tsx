@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { type FormEvent, useState } from 'react';
+import { parameterLabelKey } from '../../domain/parameters';
 import { StepUpDialog } from '../step-up-dialog';
 import { type ParameterActionResult, setParameterAction } from './actions';
 
@@ -50,7 +51,7 @@ export function ParametersForm({ rows, editable }: { rows: ParameterRow[]; edita
           data-testid={`param-${row.key}`}
         >
           <label className="block">
-            <span className="text-sm font-medium">{t(`keys.${row.key}` as never)}</span>
+            <span className="text-sm font-medium">{t(`keys.${parameterLabelKey(row.key)}` as never)}</span>
             {editable ? (
               <input
                 name="value"
