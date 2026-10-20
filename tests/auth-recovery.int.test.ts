@@ -1,5 +1,5 @@
 import { createOTP } from '@better-auth/utils/otp';
-import { symmetricDecrypt } from 'better-auth/crypto';
+import { authSecretCipher } from '../src/modules/platform-security/auth/secret-cipher';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolveAuthState } from '../src/modules/platform-security/auth/session-gate';
 import { authTestKit } from './auth-helpers';
@@ -206,10 +206,10 @@ async function pendingSecretOf(userId: string) {
   const { rows } = await kit.migrator.query(`select secret from two_factor_pending where user_id = $1`, [
     userId,
   ]);
-  return symmetricDecrypt({ key: kit.env.AUTH_SECRET, data: rows[0].secret });
+  return authSecretCipher(kit.env).decrypt(rows[0].secret);
 }
 
 async function secretOf(userId: string) {
   const { rows } = await kit.migrator.query(`select secret from "twoFactor" where "userId" = $1`, [userId]);
-  return symmetricDecrypt({ key: kit.env.AUTH_SECRET, data: rows[0].secret });
+  return authSecretCipher(kit.env).decrypt(rows[0].secret);
 }

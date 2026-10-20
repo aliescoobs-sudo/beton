@@ -1,6 +1,8 @@
 // Re-encrypts every registered encrypted column to the current key of its keyring.
 //   corepack pnpm crypto:rotate            rotate
 //   corepack pnpm crypto:rotate --check    only report rows still on retired keys (exit 1 if any)
+// TOTP seeds rotate with AUTH_SECRETS (`<version>:<secret>,…`, new version first); keep AUTH_SECRET unchanged until
+// every value has moved off bare (pre-versioning) values.
 // Procedure: put the new key first in the keyring env var (keep the old one after it), restart, rotate,
 // run --check, then remove the old key.
 import { existsSync } from 'node:fs';
@@ -8,7 +10,13 @@ import pg from 'pg';
 import { parseKeyring } from '@/lib/crypto/keyring';
 import { loadEnv } from '@/lib/env';
 import { ENCRYPTED_COLUMNS } from '@/modules/platform-security/domain/encrypted-columns';
-import { countOnOldKeys, rotateColumn } from '@/modules/platform-security/service/key-rotation';
+import { authSecretCipher } from '@/modules/platform-security/auth/secret-cipher';
+import {
+  type ColumnCipher,
+  countOnOldKeys,
+  keyringCipher,
+  rotateColumn,
+} from '@/modules/platform-security/service/key-rotation';
 
 if (existsSync('.env.local')) process.loadEnvFile('.env.local');
 const env = loadEnv(process.env);
@@ -21,7 +29,10 @@ const pools = {
 let remaining = 0;
 try {
   for (const spec of ENCRYPTED_COLUMNS) {
-    const keyring = parseKeyring(env[spec.keyring]);
+    const keyring: ColumnCipher =
+      spec.keyring === 'AUTH_SECRETS'
+        ? authSecretCipher(env)
+        : keyringCipher(parseKeyring(env[spec.keyring]));
     if (checkOnly) {
       const n = await countOnOldKeys(pools[spec.pool], spec, keyring);
       remaining += n;

@@ -3,7 +3,7 @@ import type { BetterAuthOptions } from 'better-auth';
 import { twoFactor } from 'better-auth/plugins';
 import type pg from 'pg';
 import { parseKeyring } from '@/lib/crypto/keyring';
-import type { Env } from '@/lib/env';
+import { type Env, parseAuthSecrets } from '@/lib/env';
 import { uuidv7 } from '@/lib/uuidv7';
 import { realClock } from '@/modules/clock';
 import { PASSWORD_MAX, PASSWORD_MIN } from './password-policy';
@@ -14,7 +14,7 @@ export const SESSION_COOKIE_NAME = '__Host-bb.session_token';
 export interface AuthDeps {
   /** Pool on the belgobeton_auth role: the only role that can read credential tables. */
   authPool: pg.Pool;
-  env: Pick<Env, 'AUTH_SECRET' | 'APP_BASE_URL' | 'RECOVERY_CODES_KEYS' | 'LOOKUP_HMAC_KEY'>;
+  env: Pick<Env, 'AUTH_SECRET' | 'AUTH_SECRETS' | 'APP_BASE_URL' | 'RECOVERY_CODES_KEYS' | 'LOOKUP_HMAC_KEY'>;
 }
 
 /** Better Auth configuration shared by the app, the CLI and the tests (ADR 0001). Hooks are added in createAuth(). */
@@ -22,7 +22,9 @@ export function baseAuthOptions({ authPool, env }: AuthDeps) {
   const recoveryKeys = parseKeyring(env.RECOVERY_CODES_KEYS);
   return {
     database: authPool,
+    // Versioned secrets seal the TOTP secrets (rotated by `pnpm crypto:rotate`); `secret` decrypts older bare values.
     secret: env.AUTH_SECRET,
+    secrets: parseAuthSecrets(env),
     baseURL: env.APP_BASE_URL,
     trustedOrigins: [env.APP_BASE_URL],
     telemetry: { enabled: false },

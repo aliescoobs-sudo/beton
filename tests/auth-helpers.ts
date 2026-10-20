@@ -1,9 +1,9 @@
 import { createOTP } from '@better-auth/utils/otp';
-import { symmetricDecrypt } from 'better-auth/crypto';
 import pg from 'pg';
 import type { Env } from '../src/lib/env';
 import { BOOTSTRAP_ACTOR_ID } from '../src/modules/platform-security/auth/actors';
 import { createUser, type UserRole } from '../src/modules/platform-security/auth/user-service';
+import { authSecretCipher } from '../src/modules/platform-security/auth/secret-cipher';
 import { createAuth } from '../src/modules/platform-security/auth/create-auth';
 import { testEnv } from './db-env';
 
@@ -71,7 +71,7 @@ export function authTestKit(overrides: Partial<Env> = {}) {
 
   async function totpFor(userId: string) {
     const { rows } = await migrator.query(`select secret from "twoFactor" where "userId" = $1`, [userId]);
-    return createOTP(await symmetricDecrypt({ key: env.AUTH_SECRET, data: rows[0].secret })).totp();
+    return createOTP(await authSecretCipher(env).decrypt(rows[0].secret)).totp();
   }
 
   /** Password login + 2FA enrolment. Callers using fake timers should move to the next 30 s step before the next code. */

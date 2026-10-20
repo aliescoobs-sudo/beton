@@ -1,11 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import pg from 'pg';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { symmetricEncrypt } from 'better-auth/crypto';
 import { parseKeyring } from '../src/lib/crypto/keyring';
 import {
   ENCRYPTED_COLUMNS,
   type EncryptedColumn,
 } from '../src/modules/platform-security/domain/encrypted-columns';
+import { authSecretCipher } from '../src/modules/platform-security/auth/secret-cipher';
 import { countOnOldKeys, rotateColumn } from '../src/modules/platform-security/service/key-rotation';
 import { authTestKit } from './auth-helpers';
 
@@ -85,5 +87,80 @@ describe('key rotation (T16, AC-SEC-10)', () => {
       await pool.query('drop table if exists public.rotation_probe');
       await pool.end();
     }
+  });
+
+  describe('TOTP secrets', () => {
+    const registered = ENCRYPTED_COLUMNS.filter((c) => c.keyring === 'AUTH_SECRETS').map(
+      (c) => `${c.table}.${c.column}`,
+    );
+
+    it('are registered for rotation (enrolled and pending seeds)', () => {
+      expect(registered).toEqual(['twoFactor.secret', 'two_factor_pending.secret']);
+    });
+
+    it('are sealed with the versioned Better Auth secret at enrolment', async () => {
+      const user = await kit.enrolledUser();
+      const { rows } = await kit.migrator.query(`select secret from "twoFactor" where "userId" = $1`, [
+        user.id,
+      ]);
+      expect(rows[0].secret.startsWith('$ba$1$')).toBe(true);
+    });
+
+    it('move to a new version (and from bare pre-versioning values); the old version can then go', async () => {
+      // A scratch table: rotating "twoFactor" itself would re-seal every user other suites are logging in with.
+      const pool = new pg.Pool({ connectionString: kit.env.DATABASE_URL_MIGRATOR, max: 1 });
+      const spec: EncryptedColumn = {
+        table: 'totp_rotation_probe',
+        column: 'secret',
+        idColumn: 'id',
+        keyring: 'AUTH_SECRETS',
+        pool: 'auth',
+      };
+      const v1 = authSecretCipher(kit.env);
+      const next = `2:${randomUUID()}${randomUUID()}`;
+      const rotating = authSecretCipher({
+        AUTH_SECRET: kit.env.AUTH_SECRET,
+        AUTH_SECRETS: `${next},1:${kit.env.AUTH_SECRET}`,
+      });
+      try {
+        await pool.query('create table public.totp_rotation_probe (id int primary key, secret text)');
+        const bare = await symmetricEncrypt({ key: kit.env.AUTH_SECRET, data: 'SEED-B' });
+        await pool.query('insert into totp_rotation_probe values (1, $1), (2, $2), (3, null)', [
+          await v1.encrypt('SEED-A'),
+          bare,
+        ]);
+        expect(await countOnOldKeys(pool, spec, rotating)).toBe(2);
+        expect((await rotateColumn(pool, spec, rotating)).remaining).toBe(0);
+        expect((await rotateColumn(pool, spec, rotating)).rotated).toBe(0);
+
+        const { rows } = await pool.query(
+          'select id, secret from totp_rotation_probe where id < 3 order by id',
+        );
+        expect(rows.every((r) => r.secret.startsWith('$ba$2$'))).toBe(true);
+        const alone = authSecretCipher({ AUTH_SECRET: kit.env.AUTH_SECRET, AUTH_SECRETS: next });
+        expect(await alone.decrypt(rows[0].secret)).toBe('SEED-A');
+        expect(await alone.decrypt(rows[1].secret)).toBe('SEED-B');
+      } finally {
+        await pool.query('drop table if exists public.totp_rotation_probe');
+        await pool.end();
+      }
+    });
+
+    it('still verify at login when the secrets list gains a newer version in front', async () => {
+      const user = await kit.enrolledUser();
+      const next = `2:${randomUUID()}${randomUUID()}`;
+      const rotatedKit = authTestKit({ AUTH_SECRETS: `${next},1:${kit.env.AUTH_SECRET}` });
+      try {
+        vi.setSystemTime(Date.now() + 30_000);
+        const pending = rotatedKit.cookieOf(
+          await rotatedKit.call('/sign-in/email', { email: user.email, password: kit.password }),
+        );
+        const code = await kit.totpFor(user.id);
+        const res = await rotatedKit.call('/two-factor/verify-totp', { code }, { cookie: pending });
+        expect(res.status).toBe(200);
+      } finally {
+        await rotatedKit.close();
+      }
+    });
   });
 });

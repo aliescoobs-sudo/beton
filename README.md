@@ -55,7 +55,7 @@ Scripts may only drop the throwaway databases `belgobeton_test`, `belgobeton_e2e
 ## Encryption keys
 
 `FIELD_ENCRYPTION_KEYS` and `RECOVERY_CODES_KEYS` are keyrings: `id:base64key[,retired-id:key…]`, current key first.
-To rotate: put a new key first (keep the old one after it), restart, run `corepack pnpm crypto:rotate`, check with
+TOTP seeds rotate the same way with `AUTH_SECRETS` (`<version>:<secret>,…`, new version first; keep `AUTH_SECRET` unchanged). To rotate: put a new key first (keep the old one after it), restart, run `corepack pnpm crypto:rotate`, check with
 `corepack pnpm crypto:rotate --check`, then remove the old key. Columns are registered in
 `src/modules/platform-security/domain/encrypted-columns.ts`.
 

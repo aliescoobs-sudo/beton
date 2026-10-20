@@ -1,9 +1,18 @@
 /**
- * Every column sealed with a keyring (f1.<keyId>.…). `pnpm crypto:rotate` re-encrypts them to the current key;
+ * Every column sealed with a keyring (f1.<keyId>.…) or, for TOTP seeds, with Better Auth's versioned secrets ($ba$<version>$…). `pnpm crypto:rotate` re-encrypts them to the current key;
  * a column missing here would keep an old key in use forever. Later modules register their columns here.
  */
 export const ENCRYPTED_COLUMNS = [
   { table: 'twoFactor', column: 'backupCodes', idColumn: 'id', keyring: 'RECOVERY_CODES_KEYS', pool: 'auth' },
+  // TOTP seeds: sealed by Better Auth with the versioned AUTH_SECRETS (not a keyring).
+  { table: 'twoFactor', column: 'secret', idColumn: 'id', keyring: 'AUTH_SECRETS', pool: 'auth' },
+  {
+    table: 'two_factor_pending',
+    column: 'secret',
+    idColumn: 'user_id',
+    keyring: 'AUTH_SECRETS',
+    pool: 'auth',
+  },
   {
     table: 'two_factor_pending',
     column: 'backup_codes',
@@ -17,6 +26,6 @@ export type EncryptedColumn = {
   table: string;
   column: string;
   idColumn: string;
-  keyring: 'FIELD_ENCRYPTION_KEYS' | 'RECOVERY_CODES_KEYS';
+  keyring: 'FIELD_ENCRYPTION_KEYS' | 'RECOVERY_CODES_KEYS' | 'AUTH_SECRETS';
   pool: 'auth' | 'app';
 };

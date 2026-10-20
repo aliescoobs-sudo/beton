@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadBackupUrl, loadEnv, SECRET_ENV_NAMES, secretValuesOf } from './env';
+import { loadBackupUrl, loadEnv, parseAuthSecrets, SECRET_ENV_NAMES, secretValuesOf } from './env';
 
 const valid = {
   NODE_ENV: 'development',
@@ -14,6 +14,39 @@ const valid = {
   APP_BASE_URL: 'http://localhost:3000',
   BACKUP_AGE_RECIPIENT: 'age1qyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqszqgpqyqs3290gq',
 };
+
+describe('AUTH_SECRETS', () => {
+  it('is optional: version 1 is AUTH_SECRET', () => {
+    expect(parseAuthSecrets(valid)).toEqual([{ version: 1, value: valid.AUTH_SECRET }]);
+  });
+
+  it('parses versioned secrets, current first', () => {
+    const b = 'b'.repeat(32);
+    expect(parseAuthSecrets({ ...valid, AUTH_SECRETS: `2:${b},1:${valid.AUTH_SECRET}` })).toEqual([
+      { version: 2, value: b },
+      { version: 1, value: valid.AUTH_SECRET },
+    ]);
+  });
+
+  it.each(['x', '1:short', `1:${'a'.repeat(32)},1:${'b'.repeat(32)}`, `-1:${'a'.repeat(32)}`])(
+    'rejects %s without echoing secrets',
+    (bad) => {
+      let message = '';
+      try {
+        loadEnv({ ...valid, AUTH_SECRETS: bad });
+      } catch (error) {
+        message = String(error);
+      }
+      expect(message).toContain('AUTH_SECRETS');
+      expect(message).not.toContain('a'.repeat(32));
+    },
+  );
+
+  it('scrubs every version from logs', () => {
+    const b = 'b'.repeat(32);
+    expect(secretValuesOf(loadEnv({ ...valid, AUTH_SECRETS: `2:${b},1:${valid.AUTH_SECRET}` }))).toContain(b);
+  });
+});
 
 describe('TRUSTED_PROXY_HOPS', () => {
   it('defaults to 0 (X-Forwarded-For ignored)', () => {

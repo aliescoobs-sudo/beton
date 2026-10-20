@@ -4,6 +4,27 @@ import type { EncryptedColumn } from '../domain/encrypted-columns';
 
 const ident = (name: string) => `"${name.replace(/"/g, '""')}"`;
 
+/** How a column's values are sealed and which of them are already on the current key. */
+export interface ColumnCipher {
+  currentId: string;
+  /** SQL LIKE pattern matching values sealed with the current key. */
+  currentPattern: string;
+  encrypt(plaintext: string): string | Promise<string>;
+  decrypt(sealed: string): string | Promise<string>;
+}
+
+export function keyringCipher(keyring: Keyring): ColumnCipher {
+  return {
+    currentId: keyring.currentId,
+    currentPattern: `f1.${keyring.currentId}.%`,
+    encrypt: keyring.encrypt,
+    decrypt: keyring.decrypt,
+  };
+}
+
+const asCipher = (sealer: Keyring | ColumnCipher): ColumnCipher =>
+  'currentPattern' in sealer ? sealer : keyringCipher(sealer);
+
 export interface RotationResult {
   table: string;
   column: string;
@@ -15,11 +36,12 @@ export interface RotationResult {
 export async function countOnOldKeys(
   pool: pg.Pool,
   spec: EncryptedColumn,
-  keyring: Keyring,
+  sealer: Keyring | ColumnCipher,
 ): Promise<number> {
+  const cipher = asCipher(sealer);
   const { rows } = await pool.query<{ n: number }>(
     `select count(*)::int as n from ${ident(spec.table)} where ${ident(spec.column)} is not null and ${ident(spec.column)} not like $1`,
-    [`f1.${keyring.currentId}.%`],
+    [cipher.currentPattern],
   );
   return rows[0]!.n;
 }
@@ -31,19 +53,20 @@ export async function countOnOldKeys(
 export async function rotateColumn(
   pool: pg.Pool,
   spec: EncryptedColumn,
-  keyring: Keyring,
+  sealer: Keyring | ColumnCipher,
   batchSize = 500,
 ): Promise<RotationResult> {
+  const cipher = asCipher(sealer);
   let rotated = 0;
   for (;;) {
     const { rows } = await pool.query<{ id: string; value: string }>(
       `select ${ident(spec.idColumn)}::text as id, ${ident(spec.column)} as value from ${ident(spec.table)}
         where ${ident(spec.column)} is not null and ${ident(spec.column)} not like $1 limit $2`,
-      [`f1.${keyring.currentId}.%`, batchSize],
+      [cipher.currentPattern, batchSize],
     );
     if (rows.length === 0) break;
     for (const row of rows) {
-      const resealed = keyring.encrypt(keyring.decrypt(row.value));
+      const resealed = await cipher.encrypt(await cipher.decrypt(row.value));
       const { rowCount } = await pool.query(
         `update ${ident(spec.table)} set ${ident(spec.column)} = $1 where ${ident(spec.idColumn)}::text = $2 and ${ident(spec.column)} = $3`,
         [resealed, row.id, row.value],
@@ -55,6 +78,6 @@ export async function rotateColumn(
     table: spec.table,
     column: spec.column,
     rotated,
-    remaining: await countOnOldKeys(pool, spec, keyring),
+    remaining: await countOnOldKeys(pool, spec, cipher),
   };
 }

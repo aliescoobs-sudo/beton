@@ -1,5 +1,5 @@
 import { createOTP } from '@better-auth/utils/otp';
-import { symmetricDecrypt } from 'better-auth/crypto';
+import { authSecretCipher } from '../src/modules/platform-security/auth/secret-cipher';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BOOTSTRAP_ACTOR_ID } from '../src/modules/platform-security/auth/actors';
 import { resolveAuthState } from '../src/modules/platform-security/auth/session-gate';
@@ -31,7 +31,7 @@ async function newUser() {
 
 async function rawSecret(userId: string) {
   const { rows } = await kit.migrator.query(`select secret from "twoFactor" where "userId" = $1`, [userId]);
-  return symmetricDecrypt({ key: kit.env.AUTH_SECRET, data: rows[0].secret });
+  return authSecretCipher(kit.env).decrypt(rows[0].secret);
 }
 const totpFor = async (userId: string) => createOTP(await rawSecret(userId)).totp();
 const state = (cookie: string) => resolveAuthState(kit.auth, new Headers({ cookie }));

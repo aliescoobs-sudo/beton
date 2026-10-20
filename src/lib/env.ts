@@ -1,6 +1,32 @@
 import { z } from 'zod';
 import { parseKeyring } from './crypto/keyring';
 
+export interface AuthSecret {
+  version: number;
+  value: string;
+}
+
+/** Secrets Better Auth seals with, current first. Messages never contain secret material. */
+export function parseAuthSecrets(env: {
+  AUTH_SECRET: string;
+  AUTH_SECRETS?: string | undefined;
+}): AuthSecret[] {
+  if (!env.AUTH_SECRETS) return [{ version: 1, value: env.AUTH_SECRET }];
+  const seen = new Set<number>();
+  return env.AUTH_SECRETS.split(',').map((entry) => {
+    const separator = entry.indexOf(':');
+    const version = Number(entry.slice(0, separator));
+    const value = entry.slice(separator + 1).trim();
+    if (separator < 1 || !Number.isInteger(version) || version < 0) {
+      throw new Error('AUTH_SECRETS entries must look like <version>:<secret>, the version a whole number');
+    }
+    if (value.length < 32) throw new Error(`AUTH_SECRETS version ${version} must be at least 32 characters`);
+    if (seen.has(version)) throw new Error(`AUTH_SECRETS lists version ${version} twice`);
+    seen.add(version);
+    return { version, value };
+  });
+}
+
 const flag = z
   .enum(['true', 'false'], { error: 'must be "true" or "false"' })
   .default('false')
@@ -31,6 +57,20 @@ const envObject = z.object({
   DATABASE_URL_AUTH: postgresUrl,
   DATABASE_URL_SYSTEM: postgresUrl,
   AUTH_SECRET: z.string().min(32, { error: 'must be at least 32 characters' }),
+  // Versioned secrets for Better Auth (current first): `<version>:<secret>[,…]`. They seal the TOTP secrets, which
+  // `pnpm crypto:rotate` moves to the current version. Unset: version 1 is AUTH_SECRET. AUTH_SECRET stays as the
+  // fallback for values written before versioning.
+  AUTH_SECRETS: z
+    .string()
+    .optional()
+    .superRefine((value, ctx) => {
+      if (value === undefined || value === '') return;
+      try {
+        parseAuthSecrets({ AUTH_SECRET: 'x'.repeat(32), AUTH_SECRETS: value });
+      } catch (error) {
+        ctx.addIssue({ code: 'custom', message: (error as Error).message });
+      }
+    }),
   // Keyrings: current key first, then retired keys still needed to decrypt (see `pnpm crypto:rotate`).
   FIELD_ENCRYPTION_KEYS: keyring,
   RECOVERY_CODES_KEYS: keyring,
@@ -98,6 +138,7 @@ export function secretValuesOf(env: Env): string[] {
       if (password) values.push(password);
     }
   }
+  if (env.AUTH_SECRETS) values.push(...parseAuthSecrets(env).map((secret) => secret.value));
   return values;
 }
 
