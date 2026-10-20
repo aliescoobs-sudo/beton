@@ -138,6 +138,16 @@ const FIXTURES: Record<
       ),
     visible: `select split_part(name, ':', 2) as owner from client where name like $1 || ':%'`,
   },
+  client_site: {
+    writers: ['owner', 'partner', 'office'],
+    seed: (tx, actor) =>
+      tx.query(
+        `insert into client_site (id, client_id, label)
+         select gen_random_uuid(), id, $2 from client where name like $1 || ':%' limit 1`,
+        [marker, `site:${marker}:${actor}`],
+      ),
+    visible: `select split_part(label, ':', 3) as owner from client_site where label like 'site:' || $1 || ':%'`,
+  },
   security_alert_ack: {
     writers: ['owner', 'partner'],
     seed: (tx, actor) =>

@@ -41,7 +41,20 @@ test('a partner creates a client from a name alone, is blocked on a duplicate IC
   await form.locator('button[type=submit]').click();
   await expect(form.getByTestId('client-message')).toHaveText('Enregistré.');
 
+  // A site is added to the first client from its page.
+  await page.goto('/fr/master-data/clients');
+  await page.getByTestId(`client-${name}`).getByRole('link', { name }).click();
+  const site = page.getByTestId('site-new');
+  await site.locator('input[name=label]').fill('Chantier Martil');
+  await site.locator('input[name=address]').fill('12 rue Hassan II');
+  await site.locator('button[type=submit]').click();
+  await expect(site.getByTestId('site-message')).toHaveText('Enregistré.');
+  await expect(page.getByTestId('site-Chantier Martil').locator('input[name=address]')).toHaveValue(
+    '12 rue Hassan II',
+  );
+
   // Archive the second one: it stays listed, flagged.
+  await page.goto('/fr/master-data/clients');
   await page.getByTestId(`client-${second}`).getByRole('link', { name: second }).click();
   await expect(page.getByTestId('client-override-reason')).toContainText('Filiale du même groupe');
   await page.getByTestId('client-archive').click();

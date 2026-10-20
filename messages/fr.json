@@ -169,6 +169,18 @@
       "archive": "Archiver le client",
       "archivedBadge": "Archivé",
       "archivedNotice": "Client archivé : il n'est plus proposé pour les nouvelles commandes, son historique reste consultable."
+    },
+    "sites": {
+      "title": "Chantiers",
+      "label": "Nom du chantier",
+      "address": "Adresse",
+      "zone": "Zone",
+      "save": "Enregistrer",
+      "add": "Ajouter le chantier",
+      "saved": "Enregistré.",
+      "duplicate": "Ce client a déjà un chantier de ce nom.",
+      "invalid": "Valeur refusée (nom obligatoire).",
+      "error": "Action refusée."
     }
   },
   "history": {

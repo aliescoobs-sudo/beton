@@ -21,7 +21,7 @@ Migration `client` (code `CLT-nnn`, kind, ice, phone_enc, contact_name, default_
 **AC:** AC-MD-01 (name + kind only; code generated; ICE optional; schema/UI/messages contain no CIN); AC-MD-05 data part (archived client excluded from the "selectable" query, still readable); office W (create/edit, not archive), plant no access (404); ICE duplicate blocked for office, override with reason by owner/partner audited; archive refused for office; phone not readable in a raw SELECT.
 **Verify:** unit (normalization, dup guard) + integration + `e2e/master-client.spec.ts` fr/ar · **Deps:** T2
 
-### - [ ] T4: Client sites (S)
+### - [x] T4: Client sites (S)
 `client_site` (label, address_enc, zone_id) inside the client page. **AC:** office W; address encrypted and registered in `ENCRYPTED_COLUMNS` (rotation test covers it); RLS matrix. **Deps:** T3
 
 ### - [ ] T5: Supplier (S)

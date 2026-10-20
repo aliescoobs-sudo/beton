@@ -2,8 +2,9 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { getPool } from '@/lib/db/pools';
-import { getClient, listZones } from '@/modules/master-data';
+import { getClient, listSites, listZones } from '@/modules/master-data';
 import { ClientDetail } from '@/modules/master-data/ui/clients/client-detail';
+import { SitesPanel } from '@/modules/master-data/ui/sites/sites-panel';
 import { can } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/next';
 
@@ -11,9 +12,10 @@ export default async function ClientPage({ params }: { params: Promise<{ locale:
   const { locale, id } = await params;
   setRequestLocale(locale);
   const user = await requirePagePermission(locale, 'parties.read');
-  const [client, zones] = await Promise.all([
+  const [client, zones, sites] = await Promise.all([
     getClient(getPool('app'), user, id),
     listZones(getPool('app'), user),
+    listSites(getPool('app'), user, id),
   ]);
   if (!client) notFound();
   const t = await getTranslations('masterData.clients');
@@ -46,6 +48,16 @@ export default async function ClientPage({ params }: { params: Promise<{ locale:
         zones={zones.map(({ id: zoneId, name }) => ({ id: zoneId, name }))}
         canOverride={can(user.role, 'parties.ice_override')}
         canArchive={can(user.role, 'parties.archive')}
+      />
+      <SitesPanel
+        clientId={client.id}
+        sites={sites.map((s) => ({
+          id: s.id,
+          label: s.label,
+          address: s.address ?? '',
+          zoneId: s.zoneId ?? '',
+        }))}
+        zones={zones.map(({ id: zoneId, name }) => ({ id: zoneId, name }))}
       />
     </main>
   );
