@@ -3,7 +3,7 @@
 Plan: [tasks/plan-master-data.md](plan-master-data.md). Standard verification for every task: `pnpm lint && pnpm typecheck && pnpm test` (+ `pnpm test:integration` when it touches the DB, `pnpm build` when it adds a route). One commit per task. Checkpoint review with Ali after T2 (CP-M1) before T3.
 
 
-### - [ ] T1: Money and quantity primitives (XS/S)
+### - [x] T1: Money and quantity primitives (XS/S)
 Branded `Centimes`, `mulDivRound` (round half away from zero, one rounding point), `BaseQty`; unit conversion `toBase(qty, factor)`.
 **AC:** AC-MD-04 domain part: 2.5 t × 1 450,00 MAD/t → 2 500 000 g, cost 3 625,00 MAD; fast-check: integer result, and ±1 centime across equivalent unit expressions.
 **Verify:** `pnpm test src/lib` · **Files:** src/lib/money.ts, src/lib/quantity.ts, tests · **Deps:** none
