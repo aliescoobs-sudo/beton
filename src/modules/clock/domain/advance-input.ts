@@ -26,13 +26,16 @@ export const MAX_ADVANCE_DAYS = 366;
 
 /** The advance was refused before any job ran: the target is not later than `sim_now`, or too far away. */
 export class AdvanceRejectedError extends Error {
-  constructor(readonly reason: 'NOT_FORWARD' | 'TOO_FAR') {
+  readonly reason: 'NOT_FORWARD' | 'TOO_FAR';
+
+  constructor(reason: 'NOT_FORWARD' | 'TOO_FAR') {
     super(
       reason === 'NOT_FORWARD'
         ? 'sim_now can only move forward'
         : `Cannot advance by more than ${MAX_ADVANCE_DAYS} days at once`,
     );
     this.name = 'AdvanceRejectedError';
+    this.reason = reason;
   }
 }
 
