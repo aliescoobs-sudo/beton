@@ -10,7 +10,6 @@ export {
   syncSimClock,
   type SimClockActor,
 } from './service/sim-clock';
-export { SimBadge } from './ui/sim-badge';
 export { formatSimDate } from './ui/format-sim-date';
 export { dailyCron, JOB_CATALOGUE, type JobKey } from './domain/job-catalogue';
 export { SYSTEM_ACTOR_ID } from './domain/system-actor';
