@@ -17,6 +17,8 @@ Standard verification for every task: `pnpm lint && pnpm typecheck && pnpm test`
 9. **Phone and address** are encrypted with `FIELD_ENCRYPTION_KEYS` and registered in `ENCRYPTED_COLUMNS` so `crypto:rotate` covers them; ICE is plaintext (a business identifier, searchable for the duplicate guard).
 10. **UI**: one shared list + form kit (Task 2), Radix, logical Tailwind properties only, all strings in `messages/{fr,ar}.json` under `masterData.*`, nav entries filtered by permission, 404 for roles without read permission (as in user admin).
 
+11. **Migrations create structure only; fake data comes only from the pilot seed (T15)** (Ali, CP-M1, DECISIONS 79). Reference values that are still assumptions (zones, 🟡 D53) are seeded there too, with fixed ids and `ON CONFLICT DO NOTHING`.
+
 ## Dependency graph
 ```
 T1 money/quantity lib ──────────────────────────────┐

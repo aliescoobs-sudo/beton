@@ -1,13 +1,15 @@
 import { expect, test } from '@playwright/test';
 import { E2E_MD, loginAndEnrol } from './fixtures';
 
+// Serial: the office test reads the zone the partner test creates (migrations seed no zone).
+test.describe.configure({ mode: 'serial' });
+
 test('a partner adds, edits and cannot duplicate a zone in French (AC-MD-09 first screen)', async ({
   page,
 }) => {
   await loginAndEnrol(page, 'fr', E2E_MD.partnerFr.email);
   await page.getByTestId('zones-link').click();
   await expect(page).toHaveURL('/fr/master-data/zones');
-  await expect(page.getByTestId('zone-Martil')).toBeVisible();
 
   const name = `Zone E2E ${Date.now()}`;
   const form = page.getByTestId('zone-new');

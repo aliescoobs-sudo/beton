@@ -1,7 +1,7 @@
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { withRlsContext } from '../src/lib/db/rls-context';
-import { createZone, listZones, updateZone } from '../src/modules/master-data';
+import { createZone, listZones, updateZone, type Zone } from '../src/modules/master-data';
 import { ForbiddenError } from '../src/modules/platform-security';
 import type { SessionUser } from '../src/modules/platform-security/auth/session-gate';
 import { testEnv } from './db-env';
@@ -12,13 +12,18 @@ const app = new pg.Pool({ connectionString: env.DATABASE_URL_APP, max: 2 });
 afterAll(() => app.end());
 
 const users = {} as Record<'owner' | 'partner' | 'office' | 'plant', SessionUser>;
+const unique = () => `Zone ${Math.random().toString(36).slice(2, 10)}`;
+
+// Migrations create structure only; each test run starts with no zone.
+let existing: Zone;
 beforeAll(async () => {
   for (const role of ['owner', 'partner', 'office', 'plant'] as const) {
     users[role] = await realSessionUser(env.DATABASE_URL_MIGRATOR, role);
   }
+  const created = await createZone(app, users.owner, { name: unique(), oneWayMin: 20 });
+  if (!created.ok) throw new Error(created.error);
+  existing = created.value;
 });
-
-const unique = () => `Zone ${Math.random().toString(36).slice(2, 10)}`;
 
 async function auditEvents(actor: SessionUser, rowId: string) {
   const { rows } = await withRlsContext(
@@ -34,15 +39,8 @@ async function auditEvents(actor: SessionUser, rowId: string) {
 }
 
 describe('zones (master-data T2)', () => {
-  it('seeds the five pilot zones (🟡 D53)', async () => {
-    const names = (await listZones(app, users.office)).map((z) => z.name);
-    expect(names).toEqual(
-      expect.arrayContaining(['Tétouan centre', 'Martil', "M'diq", 'Fnideq', 'Oued Laou']),
-    );
-  });
-
   it.each(['owner', 'partner', 'office', 'plant'] as const)('%s can read the zones', async (role) => {
-    expect((await listZones(app, users[role])).length).toBeGreaterThanOrEqual(5);
+    expect(await listZones(app, users[role])).toContainEqual(existing);
   });
 
   it.each(['owner', 'partner'] as const)('%s creates and updates a zone; both are audited', async (role) => {
@@ -82,7 +80,7 @@ describe('zones (master-data T2)', () => {
       write('insert into zone (id, name, one_way_min) values (gen_random_uuid(), $1, 5)', [unique()]),
     ).rejects.toMatchObject({ code: '42501' });
     // An UPDATE that RLS hides from the role changes no row instead of raising.
-    const { rowCount } = await write(`update zone set one_way_min = 1 where name = 'Martil'`);
+    const { rowCount } = await write(`update zone set one_way_min = 1 where id = $1`, [existing.id]);
     expect(rowCount).toBe(0);
   });
 
