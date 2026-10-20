@@ -148,6 +148,15 @@ const FIXTURES: Record<
       ),
     visible: `select split_part(label, ':', 3) as owner from client_site where label like 'site:' || $1 || ':%'`,
   },
+  supplier: {
+    writers: ['owner', 'partner', 'office'],
+    seed: (tx, actor) =>
+      tx.query(
+        `insert into supplier (id, code, name, category) values (gen_random_uuid(), public.next_code('FRN', 2), $1, 'other')`,
+        [`${marker}:${actor}`],
+      ),
+    visible: `select split_part(name, ':', 2) as owner from supplier where name like $1 || ':%'`,
+  },
   security_alert_ack: {
     writers: ['owner', 'partner'],
     seed: (tx, actor) =>

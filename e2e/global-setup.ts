@@ -47,6 +47,8 @@ export default async function globalSetup() {
       [E2E_MD.clientPartnerAr, 'partner', 'ar'],
       [E2E_MD.clientOffice, 'office', 'fr'],
       [E2E_MD.clientPlant, 'plant', 'fr'],
+      [E2E_MD.supplierOffice, 'office', 'fr'],
+      [E2E_MD.supplierPartner, 'partner', 'fr'],
     ] as const) {
       await createUser(auth, authPool, {
         actor: bootstrap,

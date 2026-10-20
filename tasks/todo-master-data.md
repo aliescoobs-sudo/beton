@@ -24,7 +24,7 @@ Migration `client` (code `CLT-nnn`, kind, ice, phone_enc, contact_name, default_
 ### - [x] T4: Client sites (S)
 `client_site` (label, address_enc, zone_id) inside the client page. **AC:** office W; address encrypted and registered in `ENCRYPTED_COLUMNS` (rotation test covers it); RLS matrix. **Deps:** T3
 
-### - [ ] T5: Supplier (S)
+### - [x] T5: Supplier (S)
 `supplier` (`FRN-nn`, category enum, ice, phone_enc, terms, status), same pattern as clients. **AC:** office W (not archive); archive owner/partner only, audited; code immutable (trigger test); matrix. **Deps:** T3
 
 ### - [ ] T6: Components and purchase units (M)

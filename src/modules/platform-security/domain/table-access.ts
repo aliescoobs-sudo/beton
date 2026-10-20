@@ -124,6 +124,16 @@ export const TABLE_ACCESS = {
       'master-data T4: owner/partner/office write; plant has no access; belgobeton_system reads and may only ' +
       'update address_enc (key rotation).',
   },
+  supplier: {
+    kind: 'rls',
+    read: { owner: 'all', partner: 'all', office: 'all', plant: 'none', system: 'all', anonymous: 'none' },
+    force: true,
+    audited: true,
+    noDelete: true,
+    exception:
+      'master-data T5: owner/partner/office write (archive: owner/partner, by trigger); plant has no access; ' +
+      'belgobeton_system reads and may only update phone_enc (key rotation).',
+  },
   user: { kind: 'auth_only', reason: 'Better Auth account table (ADR 0001)' },
   session: { kind: 'auth_only', reason: 'Better Auth sessions (ADR 0001)' },
   account: { kind: 'auth_only', reason: 'Better Auth credentials: password hashes (ADR 0001)' },

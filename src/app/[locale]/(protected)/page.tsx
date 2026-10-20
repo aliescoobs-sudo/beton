@@ -50,6 +50,15 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
             {t('masterData.clients.link')}
           </Link>
         )}
+        {state.kind === 'authenticated' && state.user.role !== 'plant' && (
+          <Link
+            href={`/${locale}/master-data/suppliers`}
+            className="text-sm underline"
+            data-testid="suppliers-link"
+          >
+            {t('masterData.suppliers.link')}
+          </Link>
+        )}
         {state.kind === 'authenticated' && (state.user.role === 'owner' || state.user.role === 'partner') && (
           <Link href={`/${locale}/parameters`} className="text-sm underline" data-testid="parameters-link">
             {t('parameters.link')}

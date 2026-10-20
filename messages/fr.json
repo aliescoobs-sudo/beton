@@ -181,6 +181,32 @@
       "duplicate": "Ce client a déjà un chantier de ce nom.",
       "invalid": "Valeur refusée (nom obligatoire).",
       "error": "Action refusée."
+    },
+    "suppliers": {
+      "title": "Fournisseurs",
+      "link": "Fournisseurs",
+      "new": "Nouveau fournisseur",
+      "add": "Ajouter le fournisseur",
+      "save": "Enregistrer",
+      "name": "Nom",
+      "category": "Catégorie",
+      "ice": "ICE (15 chiffres)",
+      "phone": "Téléphone",
+      "paymentTerms": "Délai de paiement (jours)",
+      "archive": "Archiver",
+      "archivedBadge": "Archivé",
+      "saved": "Enregistré.",
+      "duplicateIce": "Un fournisseur porte déjà cet ICE.",
+      "invalid": "Valeur refusée (nom obligatoire, ICE de 15 chiffres).",
+      "error": "Action refusée.",
+      "categories": {
+        "cement": "Ciment",
+        "aggregates": "Granulats",
+        "admixture": "Adjuvants",
+        "transport": "Transport",
+        "fuel": "Carburant",
+        "other": "Autre"
+      }
     }
   },
   "history": {

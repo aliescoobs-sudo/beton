@@ -18,3 +18,16 @@ export {
 export { fieldCipherFrom, type FieldCipher } from './service/field-cipher';
 export { parseSiteInput, type ClientSite, type SiteInput } from './domain/site';
 export { createSite, listSites, updateSite, type SiteError } from './service/site-service';
+export {
+  parseSupplierInput,
+  SUPPLIER_CATEGORIES,
+  type Supplier,
+  type SupplierInput,
+} from './domain/supplier';
+export {
+  archiveSupplier,
+  createSupplier,
+  listSuppliers,
+  updateSupplier,
+  type SupplierError,
+} from './service/supplier-service';

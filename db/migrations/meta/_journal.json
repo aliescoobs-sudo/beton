@@ -141,6 +141,13 @@
       "when": 1792504817000,
       "tag": "0019_client_site",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1792591217000,
+      "tag": "0020_supplier",
+      "breakpoints": true
     }
   ]
 }
