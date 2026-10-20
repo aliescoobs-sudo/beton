@@ -57,7 +57,7 @@ Users: owner, partner, 2 office staff, plant operator (✅ D2). Pilot = fake dat
 | Runtime | Node.js 24 LTS | pinned in `.nvmrc` + `engines` |
 | Web | Next.js (App Router, current stable at setup, pinned exact) | Server Components + Server Actions; PWA manifest + service worker (🟡 D41) |
 | DB | PostgreSQL 17 with Row-Level Security | app connects as non-owner role without `BYPASSRLS` |
-| ORM / migrations | Drizzle ORM + drizzle-kit SQL migrations | RLS policies, triggers, grants in hand-written SQL migrations |
+| Database access / migrations | `pg` + hand-written SQL migrations; Drizzle only as the migration runner | ✅ DECISIONS 43: SQL-first, no Drizzle table schemas |
 | Jobs | pg-boss (Postgres-backed queue/scheduler) | no Redis; schedules are driven through `clock` |
 | Auth | Better Auth 1.7.7 (pinned exactly) + two-factor (TOTP) plugin, `@node-rs/argon2`, `@better-auth/utils` 0.4.2 (✅ CP3) | ✅ A1 (ADR 0001, 2026-10-18); every upgrade re-runs the full auth test suite |
 | Validation | Zod at every boundary (forms, server actions, imports, AI output, webhooks) | |
@@ -80,7 +80,7 @@ cp .env.example .env.local            # fill secrets locally; never commit
 docker compose up -d db               # PostgreSQL 17 on :5432
 
 # database
-pnpm db:migrate                       # drizzle-kit migrate + SQL (RLS, triggers, grants)
+pnpm db:migrate                       # apply db/migrations (SQL: tables, RLS, triggers, grants)
 pnpm db:seed:sim                      # load simulation dataset (refuses unless SIMULATION_ENABLED=true)
 pnpm sim:reset                        # drop + recreate sim database, re-seed (pilot only)
 
@@ -116,12 +116,12 @@ src/
   modules/<module-id>/
     domain/                    pure functions + types, NO I/O (rules engine logic lives here)
     service/                   use-cases; the only place that opens DB transactions
-    db/                        Drizzle schema + repositories for this module
+    db/                        typed SQL queries (repositories) for this module; schema lives in db/migrations
     ui/                        module components
     index.ts                   public surface (other modules import only from here)
   lib/                         money.ts, quantity.ts, ids.ts, result.ts (shared, dependency-free)
 db/
-  migrations/                  drizzle-kit output + hand-written SQL (rls_*.sql, audit_*.sql, grants.sql)
+  migrations/                  hand-written SQL migrations (tables, RLS, audit triggers, grants)
 messages/fr.json, messages/ar.json
 fixtures/simulation/           seed dataset + black-day script (fake data only)
 e2e/                           Playwright specs

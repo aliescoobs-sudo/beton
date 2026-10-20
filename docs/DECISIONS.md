@@ -55,7 +55,7 @@ Legend: ✅ confirmed by Ali · 🟡 assumption (reasonable default, revisit wit
 40. 🟡 Telegram alert with no sensitive data; details and replies inside the app behind 2FA; in-app push too.
 41. 🟡 Responsive web app (PWA); no native app in MVP.
 42. 🟡 Pilot hosting: any managed cloud (fake data).
-43. 🟡 Preliminary stack: TypeScript full-stack (Next.js) + PostgreSQL with Row-Level Security + scheduled jobs + Telegram bot + swappable AI layer. Final choice in spec.
+43. ✅ (2026-10-20) Stack: TypeScript full-stack (Next.js) + PostgreSQL with Row-Level Security + scheduled jobs + Telegram bot + swappable AI layer (see CAPABILITY-MAP §3). Database access is SQL-first for all business tables: hand-written SQL migrations (tables, RLS, grants, triggers, checks) and typed `pg` queries with Zod row parsing. Drizzle is kept only as the migration runner (`drizzle-orm` migrator in `scripts/db-migrate.ts`); there are no Drizzle table schemas.
 44. 🟡 Simulation clock in pilot.
 45. 🟡 Trucks in MVP: list + warning when planned loads exceed daily trip capacity.
 48. ✅ UI languages: French + Arabic both in the pilot, Arabic in RTL; Darija accepted as AI input; financial terms in French as used in the office (confirmed 2026-10-18).
