@@ -6,6 +6,8 @@ const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
+  // Stop `next dev` from injecting its agent-rules block into CLAUDE.md/AGENTS.md.
+  agentRules: false,
   // Static assets bypass src/proxy.ts; give them the fixed hardening headers too.
   async headers() {
     return [
