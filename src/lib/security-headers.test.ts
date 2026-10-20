@@ -20,6 +20,13 @@ describe('contentSecurityPolicy (AC-SEC-13)', () => {
     expect(d['form-action']).toEqual(["'self'"]);
     expect(d['img-src']).toContain('data:'); // enrolment QR code is a data: URL
     expect(d['upgrade-insecure-requests']).toEqual([]);
+    // Production styles: this request's nonce only, never 'unsafe-inline'.
+    expect(d['style-src']).toEqual(["'self'", "'nonce-abc123'"]);
+  });
+
+  it('relaxes style-src only in development, for the Next.js dev overlay (no nonce, which would void unsafe-inline)', () => {
+    const d = directives(contentSecurityPolicy({ nonce: 'n', dev: true, https: false }));
+    expect(d['style-src']).toEqual(["'self'", "'unsafe-inline'"]);
   });
 
   it('adds eval only in development (React debugging) and no upgrade on plain http', () => {

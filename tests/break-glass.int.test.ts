@@ -44,6 +44,13 @@ beforeAll(async () => {
   partner = await realSessionUser(kit.env.DATABASE_URL_MIGRATOR, 'partner');
   office = await realSessionUser(kit.env.DATABASE_URL_MIGRATOR, 'office');
   vi.useRealTimers();
+  // Other suites leave alerts behind (the RLS matrix seeds one) and file order varies: start from a clean slate for
+  // the two roles this suite checks, so the only pending alert is the one the reset below raises.
+  for (const user of [partner, { ...partner, id: owner.id, role: 'owner' as const, email: owner.email }]) {
+    for (const stale of await pendingSecurityAlerts(appPool, user)) {
+      await acknowledgeSecurityAlert(appPool, user, stale.id);
+    }
+  }
 });
 
 describe('user:reset-owner-2fa (break glass)', () => {

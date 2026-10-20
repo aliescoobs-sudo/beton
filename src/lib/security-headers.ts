@@ -13,7 +13,9 @@ export function contentSecurityPolicy(options: CspOptions): string {
     "default-src 'self'",
     // React needs eval only in development, for its debugging tools.
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${dev ? " 'unsafe-eval'" : ''}`,
-    `style-src 'self' 'nonce-${nonce}'`,
+    // The Next.js dev overlay and indicator apply inline styles that no nonce can cover; without this they render as
+    // an empty grey box. A nonce would make browsers ignore 'unsafe-inline', so development gets one or the other.
+    dev ? "style-src 'self' 'unsafe-inline'" : `style-src 'self' 'nonce-${nonce}'`,
     "img-src 'self' data: blob:",
     "font-src 'self'",
     "connect-src 'self'",
