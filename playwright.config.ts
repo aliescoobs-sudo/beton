@@ -15,7 +15,7 @@ export default defineConfig({
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
     // Production build (pnpm build runs first in test:e2e), on the e2e database.
-    command: `node node_modules/next/dist/bin/next start -p ${E2E_PORT}`,
+    command: `node node_modules/next/dist/bin/next start -H 127.0.0.1 -p ${E2E_PORT}`,
     // Wait on the port only: pages query the e2e database, which globalSetup may still be creating.
     port: E2E_PORT,
     reuseExistingServer: false,
