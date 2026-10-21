@@ -164,7 +164,8 @@ export const TABLE_ACCESS = {
     insertOnly: true,
     exception:
       'master-data T11: insert-only versions; list prices (client_id null) written by managers ' +
-      '(selling_prices.write); office reads, plant has no access (AC-MD-07). Per-client overrides: T12.',
+      '(selling_prices.write); per-client overrides (client_id set) by managers only, with a reason ' +
+      '(client_price_override.write, CHECK + policy: AC-MD-10); office reads, plant has no access (AC-MD-07).',
   },
   code_sequence: {
     kind: 'rls',

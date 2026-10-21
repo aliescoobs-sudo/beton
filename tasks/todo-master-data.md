@@ -50,7 +50,7 @@ Read path for plant: quantities per m³ with no price column; `project()` entry 
 `selling_price` insert-only with `client_id` nullable; domain `resolveSellingPrice(type, client, date)` returns `Result` (error `NO_PRICE`, never 0); list-price form for managers; office R.
 **AC:** AC-MD-03 (override beats list; none → error); versioning by `effective_from`. **Deps:** T7, T3
 
-### - [ ] T12: Per-client price override with reason (S)
+### - [x] T12: Per-client price override with reason (S)
 Override form (managers only) with required reason; DB CHECK + RLS WITH CHECK + service permission `client_price_override.write`; audited like any price version.
 **AC:** AC-MD-10: office and plant refused by service and by direct SQL under RLS; owner/partner without reason refused (service and CHECK); with a reason saved and one audit event with reason in `after`; override shown on the client page. **Deps:** T11, T3
 

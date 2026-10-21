@@ -39,6 +39,9 @@ export const E2E_MD = {
   sellPartnerAr: { email: 'e2e-sp-partner-ar@belgobeton.test', name: 'شريك المبيعات' },
   sellOffice: { email: 'e2e-sp-office@belgobeton.test', name: 'Bureau Ventes' },
   sellPlant: { email: 'e2e-sp-plant@belgobeton.test', name: 'Centrale Ventes' },
+  ovPartnerFr: { email: 'e2e-ov-partner-fr@belgobeton.test', name: 'Associé Remises' },
+  ovPartnerAr: { email: 'e2e-ov-partner-ar@belgobeton.test', name: 'شريك الخصومات' },
+  ovOffice: { email: 'e2e-ov-office@belgobeton.test', name: 'Bureau Remises' },
   clientPlant: { email: 'e2e-cl-plant@belgobeton.test', name: 'Centrale Clients' },
 } as const;
 export const E2E_CSP = { email: 'e2e-csp@belgobeton.test', name: 'CSP E2E' } as const;

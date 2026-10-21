@@ -2,8 +2,15 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { getPool } from '@/lib/db/pools';
-import { getClient, listSites, listZones } from '@/modules/master-data';
+import {
+  getClient,
+  listSellingPrices,
+  listSelectableConcreteTypes,
+  listSites,
+  listZones,
+} from '@/modules/master-data';
 import { ClientDetail } from '@/modules/master-data/ui/clients/client-detail';
+import { OverridesPanel } from '@/modules/master-data/ui/selling-prices/overrides-panel';
 import { SitesPanel } from '@/modules/master-data/ui/sites/sites-panel';
 import { can } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/next';
@@ -12,12 +19,15 @@ export default async function ClientPage({ params }: { params: Promise<{ locale:
   const { locale, id } = await params;
   setRequestLocale(locale);
   const user = await requirePagePermission(locale, 'parties.read');
-  const [client, zones, sites] = await Promise.all([
+  const [client, zones, sites, types, prices] = await Promise.all([
     getClient(getPool('app'), user, id),
     listZones(getPool('app'), user),
     listSites(getPool('app'), user, id),
+    listSelectableConcreteTypes(getPool('app'), user),
+    listSellingPrices(getPool('app'), user, { clientId: id }),
   ]);
   if (!client) notFound();
+  const typeCode = new Map(types.map((type) => [type.id, type.code]));
   const t = await getTranslations('masterData.clients');
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
@@ -58,6 +68,18 @@ export default async function ClientPage({ params }: { params: Promise<{ locale:
           zoneId: s.zoneId ?? '',
         }))}
         zones={zones.map(({ id: zoneId, name }) => ({ id: zoneId, name }))}
+      />
+      <OverridesPanel
+        clientId={client.id}
+        overrides={prices.map((p) => ({
+          id: p.id,
+          typeCode: typeCode.get(p.concreteTypeId) ?? '—',
+          priceHtPerM3Centimes: p.priceHtPerM3Centimes,
+          effectiveFrom: p.effectiveFrom,
+          reason: p.reason ?? '',
+        }))}
+        types={types}
+        editable={can(user.role, 'client_price_override.write') && client.status === 'active'}
       />
     </main>
   );

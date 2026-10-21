@@ -29,6 +29,22 @@ export function parseListPriceInput(input: unknown): Result<ListPriceInput, 'INV
   return parsed.success ? ok(parsed.data) : err('INVALID');
 }
 
+const overrideInputSchema = listPriceInputSchema.extend({
+  clientId: z.uuid(),
+  // Mandatory: a concession below the list price must say why (AC-MD-10).
+  reason: z
+    .string()
+    .transform((value) => value.trim().replace(/\s+/g, ' '))
+    .pipe(z.string().min(1).max(500)),
+});
+
+export type OverrideInput = z.infer<typeof overrideInputSchema>;
+
+export function parseOverrideInput(input: unknown): Result<OverrideInput, 'INVALID'> {
+  const parsed = overrideInputSchema.safeParse(input);
+  return parsed.success ? ok(parsed.data) : err('INVALID');
+}
+
 /** The version of one scope (list or one client) in force on `date`: latest effective_from not after it. */
 function inForce(
   versions: readonly SellingPrice[],

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { parseListPriceInput, resolveSellingPrice, type SellingPrice } from './selling-price';
+import {
+  parseListPriceInput,
+  parseOverrideInput,
+  resolveSellingPrice,
+  type SellingPrice,
+} from './selling-price';
 
 const price = (
   id: string,
@@ -71,5 +76,28 @@ describe('parseListPriceInput', () => {
     ['no type', { ...valid, concreteTypeId: 'x' }],
   ])('refuses %s', (_name, input) => {
     expect(parseListPriceInput(input)).toEqual({ ok: false, error: 'INVALID' });
+  });
+});
+
+describe('parseOverrideInput (AC-MD-10)', () => {
+  const valid = {
+    concreteTypeId: '019c0000-0000-7000-8000-000000000001',
+    clientId: '019c0000-0000-7000-8000-000000000002',
+    priceHtPerM3Centimes: 85_000,
+    effectiveFrom: '2026-01-01',
+    reason: '  Gros  chantier  ',
+  };
+  it('keeps a trimmed, single-spaced reason', () => {
+    expect(parseOverrideInput(valid)).toMatchObject({ ok: true, value: { reason: 'Gros chantier' } });
+  });
+  it.each([
+    ['no reason', { ...valid, reason: undefined }],
+    ['an empty reason', { ...valid, reason: '' }],
+    ['a blank reason', { ...valid, reason: '   ' }],
+    ['a reason over 500 characters', { ...valid, reason: 'x'.repeat(501) }],
+    ['no client', { ...valid, clientId: undefined }],
+    ['a fractional price', { ...valid, priceHtPerM3Centimes: 1.5 }],
+  ])('refuses %s', (_name, input) => {
+    expect(parseOverrideInput(input)).toEqual({ ok: false, error: 'INVALID' });
   });
 });

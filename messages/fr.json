@@ -297,6 +297,22 @@
       "notAfterLatest": "La date doit être postérieure à celle du dernier prix.",
       "inactive": "Un type de béton archivé ne peut pas recevoir de prix.",
       "error": "Action refusée."
+    },
+    "overrides": {
+      "title": "Prix spécifiques du client",
+      "none": "Aucun prix spécifique : le prix de liste s'applique.",
+      "reasonShown": "motif : {reason}",
+      "newOverride": "Nouveau prix spécifique",
+      "type": "Type de béton",
+      "price": "Prix HT par m³ (MAD)",
+      "effectiveFrom": "Applicable à partir du",
+      "reason": "Motif (obligatoire)",
+      "publish": "Publier le prix spécifique",
+      "saved": "Prix spécifique publié.",
+      "invalid": "Valeur refusée (motif obligatoire, prix en MAD avec au plus 2 décimales, date réelle).",
+      "notAfterLatest": "La date doit être postérieure à celle du dernier prix de ce client pour ce type.",
+      "inactive": "Un client ou un type de béton archivé ne peut pas recevoir de prix.",
+      "error": "Action refusée."
     }
   },
   "history": {

@@ -89,11 +89,14 @@ export {
 } from './service/purchase-price-service';
 export {
   parseListPriceInput,
+  parseOverrideInput,
   resolveSellingPrice,
   type ListPriceInput,
+  type OverrideInput,
   type SellingPrice,
 } from './domain/selling-price';
 export {
+  createClientOverride,
   createListPrice,
   listSellingPrices,
   resolveSellingPriceFor,
