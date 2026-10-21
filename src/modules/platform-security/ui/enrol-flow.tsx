@@ -35,7 +35,7 @@ export function EnrolFlow({ locale, reenrol = false }: { locale: string; reenrol
       if (!res.ok) return setProblem(res.status === 400 || res.status === 401 ? 'invalidPassword' : 'error');
       const data = (await res.json()) as Enrolment;
       setEnrolment(data);
-      setQr(await totpQrForEnrolment(data.totpURI).catch(() => null)); // the key + link below stay as fallback
+      setQr(await totpQrForEnrolment().catch(() => null)); // the key + link below stay as fallback
     } finally {
       setPending(false);
     }

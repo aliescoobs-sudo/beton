@@ -8,6 +8,8 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   // Stop `next dev` from injecting its agent-rules block into CLAUDE.md/AGENTS.md.
   agentRules: false,
+  // `next dev` prints every Server Function call with its arguments; never let that reach a terminal or a log file.
+  logging: { serverFunctions: false },
   // Static assets bypass src/proxy.ts; give them the fixed hardening headers too.
   async headers() {
     return [
