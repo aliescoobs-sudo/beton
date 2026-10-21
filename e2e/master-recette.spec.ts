@@ -15,10 +15,17 @@ test('a partner publishes a recette version for B25 in French', async ({ page })
   await expect(page).toHaveURL('/fr/master-data/recettes');
   const form = page.getByTestId('recette-new-B25');
   await form.locator('input[name=effectiveFrom]').fill(date);
-  await form.locator('input[type=number]').first().fill('350000');
+  await form.locator('input[name^=qty-]').first().fill('350');
   await form.locator('button[type=submit]').click();
   await expect(page.getByTestId('recette-B25')).toContainText(date);
-  await expect(page.getByTestId('recette-B25')).toContainText('350000');
+  await expect(page.getByTestId('recette-B25')).toContainText('350 kg');
+  // Typing grams where kilograms are expected (350 g instead of 350 kg) is flagged, not published.
+  await form.locator('input[name^=qty-]').first().fill('0,35');
+  await form.locator('input[name=effectiveFrom]').fill(date.replace(/^2200/, '2201'));
+  await form.locator('button[type=submit]').click();
+  await expect(form.getByTestId('recette-message')).toContainText('facteur 10');
+  await expect(form.locator('button[type=submit]')).toHaveText('Publier quand même');
+  await form.locator('input[name^=qty-]').first().fill('350');
   // Same date again: refused, nothing duplicated.
   await form.locator('input[name=effectiveFrom]').fill(date);
   await form.locator('button[type=submit]').click();
@@ -30,7 +37,7 @@ test('a partner publishes a recette version for B25 in French', async ({ page })
 test('plant reads the recette with no form', async ({ page }) => {
   await loginAndEnrol(page, 'fr', E2E_MD.recettePlant.email);
   await page.getByTestId('recettes-link').click();
-  await expect(page.getByTestId('recette-B25')).toContainText('350000');
+  await expect(page.getByTestId('recette-B25')).toContainText('350 kg');
   await expect(page.locator('button[type=submit]')).toHaveCount(0);
   expectNoFields(await page.content(), [
     'componentCostPerM3Centimes',

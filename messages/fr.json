@@ -256,10 +256,14 @@
       "effectiveFrom": "Applicable à partir du",
       "publish": "Publier la version",
       "saved": "Version publiée.",
-      "invalid": "Valeur refusée (date réelle, au moins un composant, quantités entières positives).",
+      "invalid": "Valeur refusée (date réelle, au moins un composant, quantités positives (3 décimales au plus)).",
       "notAfterLatest": "La date doit être postérieure à celle de la dernière version.",
       "inactiveComponent": "Un composant archivé ne peut pas entrer dans une recette.",
-      "error": "Action refusée."
+      "error": "Action refusée.",
+      "invalidQuantity": "Quantité invalide pour {name} (nombre positif, 3 décimales au plus, unité affichée).",
+      "magnitudeWarning": "Écart d'un facteur 10 ou plus avec la version précédente : {names}. Vérifiez l'unité, puis cliquez à nouveau pour publier.",
+      "publishAnyway": "Publier quand même",
+      "unitOf": "Unité de {name}"
     },
     "purchasePrices": {
       "title": "Prix d'achat",
