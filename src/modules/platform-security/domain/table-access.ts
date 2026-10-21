@@ -144,6 +144,17 @@ export const TABLE_ACCESS = {
     insertOnly: true,
     exception: 'master-data T8: insert-only, only in the transaction that creates the recette (trigger).',
   },
+  purchase_price: {
+    kind: 'rls',
+    read: { owner: 'all', partner: 'all', office: 'all', plant: 'none', system: 'none', anonymous: 'none' },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'master-data T10: insert-only versions, managers write (purchase_prices.write); office reads, plant has no ' +
+      'access (AC-MD-07); the cost per m³ is computed, never stored.',
+  },
   code_sequence: {
     kind: 'rls',
     read: { owner: 'all', partner: 'all', office: 'all', plant: 'none', system: 'none', anonymous: 'none' },

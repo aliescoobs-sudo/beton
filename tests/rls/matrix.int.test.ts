@@ -208,6 +208,29 @@ const FIXTURES: Record<
     },
     visible: `select split_part(t.label, ':', 2) as owner from recette_line l join recette r on r.id = l.recette_id join concrete_type t on t.id = r.concrete_type_id where t.label like 'l' || $1 || ':%'`,
   },
+  purchase_price: {
+    writers: ['owner', 'partner'],
+    seed: async (tx, actor) => {
+      const supplier = await tx.query<{ id: string }>(
+        `insert into supplier (id, code, name, category) values (gen_random_uuid(), public.next_code('FRN', 2), $1, 'other') returning id`,
+        [`pp${marker}:${actor}`],
+      );
+      const component = await tx.query<{ id: string }>(
+        `insert into component (id, code, name_fr, name_ar, base_unit) values (gen_random_uuid(), public.next_code('CMP', 2), $1, 'x', 'g') returning id`,
+        [`pp${marker}:${actor}`],
+      );
+      const unit = await tx.query<{ id: string }>(
+        `insert into purchase_unit (id, component_id, label, factor_to_base) values (gen_random_uuid(), $1, 'kg', 1000) returning id`,
+        [component.rows[0]?.id],
+      );
+      await tx.query(
+        `insert into purchase_price (id, component_id, supplier_id, purchase_unit_id, price_ht_centimes, effective_from, created_by)
+         values (gen_random_uuid(), $1, $2, $3, 100, '2000-01-01', $4)`,
+        [component.rows[0]?.id, supplier.rows[0]?.id, unit.rows[0]?.id, actor],
+      );
+    },
+    visible: `select split_part(s.name, ':', 2) as owner from purchase_price p join supplier s on s.id = p.supplier_id where s.name like 'pp' || $1 || ':%'`,
+  },
   supplier: {
     writers: ['owner', 'partner', 'office'],
     seed: (tx, actor) =>

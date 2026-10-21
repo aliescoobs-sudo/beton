@@ -169,6 +169,13 @@
       "when": 1792591220000,
       "tag": "0023_recette",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1792591221000,
+      "tag": "0024_purchase_price",
+      "breakpoints": true
     }
   ]
 }

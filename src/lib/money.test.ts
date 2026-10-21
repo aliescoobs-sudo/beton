@@ -1,6 +1,6 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { centimes, mulDivRound } from './money';
+import { centimes, formatCentimes, mulDivRound, parseCentimes } from './money';
 
 describe('centimes', () => {
   it('accepts safe integers and refuses fractions, NaN and unsafe values', () => {
@@ -48,6 +48,32 @@ describe('mulDivRound', () => {
           expect((diff < 0n ? -diff : diff) <= BigInt(den)).toBe(true);
         },
       ),
+    );
+  });
+});
+
+describe('parseCentimes / formatCentimes', () => {
+  it.each([
+    ['1450', 145_000],
+    ['1 450,5', 145_050],
+    ['1450.00', 145_000],
+    ['0,01', 1],
+  ])('parses %s', (text, expected) => expect(parseCentimes(text)).toBe(expected));
+
+  it.each(['', '-5', '1,234', '1e3', 'abc', '1.2.3'])('refuses %j', (text) =>
+    expect(parseCentimes(text)).toBeNull(),
+  );
+
+  it('formats with a decimal comma and grouped thousands', () => {
+    expect(formatCentimes(362_500)).toBe('3\u202f625,00');
+    expect(formatCentimes(5)).toBe('0,05');
+  });
+
+  it('round-trips any whole amount of centimes', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 0, max: 9_999_999_999 }), (n) => {
+        expect(parseCentimes(formatCentimes(n))).toBe(n);
+      }),
     );
   });
 });

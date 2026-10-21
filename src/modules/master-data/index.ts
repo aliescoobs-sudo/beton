@@ -72,3 +72,18 @@ export {
   type RecetteError,
 } from './service/recette-service';
 export { assertSeedAllowed, seedPilotMasterData, type SeedGuardEnv } from './service/pilot-seed';
+export {
+  componentCostPerM3,
+  parsePurchasePriceInput,
+  resolvePurchasePrice,
+  type PricePoint,
+  type PurchasePrice,
+  type PurchasePriceInput,
+} from './domain/purchase-price';
+export {
+  componentCostPerM3For,
+  createPurchasePrice,
+  listPurchasePrices,
+  proposePriceFromLastPurchase,
+  type PurchasePriceError,
+} from './service/purchase-price-service';

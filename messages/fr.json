@@ -260,6 +260,28 @@
       "notAfterLatest": "La date doit être postérieure à celle de la dernière version.",
       "inactiveComponent": "Un composant archivé ne peut pas entrer dans une recette.",
       "error": "Action refusée."
+    },
+    "purchasePrices": {
+      "title": "Prix d'achat",
+      "link": "Prix d'achat",
+      "readOnly": "Lecture seule : seuls le propriétaire et l'associé publient un prix.",
+      "none": "Aucun prix publié.",
+      "newPrice": "Nouveau prix",
+      "supplier": "Fournisseur",
+      "unit": "Unité d'achat",
+      "price": "Prix HT (MAD)",
+      "effectiveFrom": "Applicable à partir du",
+      "publish": "Publier le prix",
+      "propose": "Proposer depuis le dernier achat",
+      "noLast": "Aucun prix précédent à proposer.",
+      "saved": "Prix publié.",
+      "invalid": "Valeur refusée (prix en MAD avec au plus 2 décimales, unité du composant, date réelle).",
+      "notAfterLatest": "La date doit être postérieure à celle du dernier prix.",
+      "inactive": "Un composant, fournisseur ou unité archivé ne peut pas recevoir de prix.",
+      "error": "Action refusée.",
+      "costTitle": "Coût des composants par m³",
+      "costAt": "Au",
+      "costMissing": "prix ou recette manquant"
     }
   },
   "history": {

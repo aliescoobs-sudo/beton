@@ -42,7 +42,7 @@ Migration `client` (code `CLT-nnn`, kind, ice, phone_enc, contact_name, default_
 Read path for plant: quantities per m³ with no price column; `project()` entry for `recette`.
 **AC:** AC-MD-07 (recette part): `expectNoFields` on the page and on the action response for plant and office; plant cannot read `purchase_price` or `selling_price` (RLS matrix). *Done in T9: recette projection (`recetteVisibility`, cost field owner/partner only), page + service checks. The `purchase_price`/`selling_price` matrix rows land with their tables in T10/T11 (plant none, office per spec).* **Deps:** T8
 
-### - [ ] T10: Purchase prices + component cost per m³ (M)
+### - [x] T10: Purchase prices + component cost per m³ (M)
 `purchase_price` (insert-only, versioned, supplier, unit); domain `componentCostPerM3(type, date)` = Σ qty × price / factor via `mulDivRound` (computed, never stored); "propose new version from last purchase" is a stub returning the last price (the purchases themselves come with ledger).
 **AC:** AC-MD-04 (full: example and property test through the service); AC-MD-07 office cannot write; plant sees nothing. **Deps:** T1, T6, T8
 
