@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { err, ok, type Result } from '@/lib/result';
 import { defineVisibility } from '@/modules/platform-security';
+import { dateField } from './date-field';
 
 export interface RecetteLine {
   componentId: string;
@@ -16,17 +17,6 @@ export interface Recette {
   effectiveFrom: string;
   lines: RecetteLine[];
 }
-
-const isRealDate = (value: string) => {
-  const [y, m, d] = value.split('-').map(Number) as [number, number, number];
-  const date = new Date(Date.UTC(y, m - 1, d));
-  return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
-};
-
-const dateField = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/)
-  .refine(isRealDate);
 
 const recetteInputSchema = z.object({
   effectiveFrom: dateField,

@@ -176,6 +176,13 @@
       "when": 1792591221000,
       "tag": "0024_purchase_price",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1792591222000,
+      "tag": "0025_selling_price",
+      "breakpoints": true
     }
   ]
 }

@@ -63,6 +63,13 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           {t('masterData.purchasePrices.link')}
         </Link>
         <Link
+          href={`/${locale}/master-data/selling-prices`}
+          className="text-sm underline"
+          data-testid="selling-prices-link"
+        >
+          {t('masterData.sellingPrices.link')}
+        </Link>
+        <Link
           href={`/${locale}/master-data/components`}
           className="text-sm underline"
           data-testid="components-link"

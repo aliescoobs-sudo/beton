@@ -231,6 +231,21 @@ const FIXTURES: Record<
     },
     visible: `select split_part(s.name, ':', 2) as owner from purchase_price p join supplier s on s.id = p.supplier_id where s.name like 'pp' || $1 || ':%'`,
   },
+  selling_price: {
+    writers: ['owner', 'partner'],
+    seed: async (tx, actor) => {
+      const type = await tx.query<{ id: string }>(
+        `insert into concrete_type (id, code, label) values (gen_random_uuid(), 'S' || upper(substr(md5(random()::text), 1, 8)), $1) returning id`,
+        [`s${marker}:${actor}`],
+      );
+      await tx.query(
+        `insert into selling_price (id, concrete_type_id, client_id, price_ht_per_m3_centimes, effective_from, created_by)
+         values (gen_random_uuid(), $1, null, 100, '2000-01-01', $2)`,
+        [type.rows[0]?.id, actor],
+      );
+    },
+    visible: `select split_part(t.label, ':', 2) as owner from selling_price p join concrete_type t on t.id = p.concrete_type_id where t.label like 's' || $1 || ':%'`,
+  },
   supplier: {
     writers: ['owner', 'partner', 'office'],
     seed: (tx, actor) =>

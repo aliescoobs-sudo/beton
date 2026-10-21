@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { centimes, type Centimes } from '@/lib/money';
 import { baseQty, costOf } from '@/lib/quantity';
 import { err, ok, type Result } from '@/lib/result';
+import { dateField } from './date-field';
 import type { RecetteLine } from './recette';
 
 export interface PurchasePrice {
@@ -20,22 +21,13 @@ export type PricePoint = Pick<PurchasePrice, 'componentId' | 'priceHtCentimes' |
   factorToBase: number;
 };
 
-const isRealDate = (value: string) => {
-  const [y, m, d] = value.split('-').map(Number) as [number, number, number];
-  const date = new Date(Date.UTC(y, m - 1, d));
-  return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
-};
-
 const purchasePriceInputSchema = z.object({
   componentId: z.uuid(),
   supplierId: z.uuid(),
   purchaseUnitId: z.uuid(),
   // Integer centimes: the form converts MAD with parseCentimes, never with a float.
   priceHtCentimes: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),
-  effectiveFrom: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .refine(isRealDate),
+  effectiveFrom: dateField,
 });
 
 export type PurchasePriceInput = z.infer<typeof purchasePriceInputSchema>;

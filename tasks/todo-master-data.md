@@ -46,7 +46,7 @@ Read path for plant: quantities per m³ with no price column; `project()` entry 
 `purchase_price` (insert-only, versioned, supplier, unit); domain `componentCostPerM3(type, date)` = Σ qty × price / factor via `mulDivRound` (computed, never stored); "propose new version from last purchase" is a stub returning the last price (the purchases themselves come with ledger).
 **AC:** AC-MD-04 (full: example and property test through the service); AC-MD-07 office cannot write; plant sees nothing. **Deps:** T1, T6, T8
 
-### - [ ] T11: Selling prices (list) + `resolveSellingPrice` (M)
+### - [x] T11: Selling prices (list) + `resolveSellingPrice` (M)
 `selling_price` insert-only with `client_id` nullable; domain `resolveSellingPrice(type, client, date)` returns `Result` (error `NO_PRICE`, never 0); list-price form for managers; office R.
 **AC:** AC-MD-03 (override beats list; none → error); versioning by `effective_from`. **Deps:** T7, T3
 

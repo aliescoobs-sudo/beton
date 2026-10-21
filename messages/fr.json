@@ -282,6 +282,21 @@
       "costTitle": "Coût des composants par m³",
       "costAt": "Au",
       "costMissing": "prix ou recette manquant"
+    },
+    "sellingPrices": {
+      "title": "Prix de vente (liste)",
+      "link": "Prix de vente",
+      "readOnly": "Lecture seule : seuls le propriétaire et l'associé publient un prix.",
+      "none": "Aucun prix de liste publié.",
+      "newPrice": "Nouveau prix de liste",
+      "price": "Prix HT par m³ (MAD)",
+      "effectiveFrom": "Applicable à partir du",
+      "publish": "Publier le prix",
+      "saved": "Prix publié.",
+      "invalid": "Valeur refusée (prix en MAD avec au plus 2 décimales, date réelle).",
+      "notAfterLatest": "La date doit être postérieure à celle du dernier prix.",
+      "inactive": "Un type de béton archivé ne peut pas recevoir de prix.",
+      "error": "Action refusée."
     }
   },
   "history": {

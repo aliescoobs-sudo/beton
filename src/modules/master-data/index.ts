@@ -87,3 +87,15 @@ export {
   proposePriceFromLastPurchase,
   type PurchasePriceError,
 } from './service/purchase-price-service';
+export {
+  parseListPriceInput,
+  resolveSellingPrice,
+  type ListPriceInput,
+  type SellingPrice,
+} from './domain/selling-price';
+export {
+  createListPrice,
+  listSellingPrices,
+  resolveSellingPriceFor,
+  type SellingPriceError,
+} from './service/selling-price-service';

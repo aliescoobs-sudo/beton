@@ -155,6 +155,17 @@ export const TABLE_ACCESS = {
       'master-data T10: insert-only versions, managers write (purchase_prices.write); office reads, plant has no ' +
       'access (AC-MD-07); the cost per m³ is computed, never stored.',
   },
+  selling_price: {
+    kind: 'rls',
+    read: { owner: 'all', partner: 'all', office: 'all', plant: 'none', system: 'none', anonymous: 'none' },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'master-data T11: insert-only versions; list prices (client_id null) written by managers ' +
+      '(selling_prices.write); office reads, plant has no access (AC-MD-07). Per-client overrides: T12.',
+  },
   code_sequence: {
     kind: 'rls',
     read: { owner: 'all', partner: 'all', office: 'all', plant: 'none', system: 'none', anonymous: 'none' },
