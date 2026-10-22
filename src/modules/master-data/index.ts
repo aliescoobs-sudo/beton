@@ -117,6 +117,8 @@ export {
   listTruckStatusLog,
   listTrucks,
   logTruckStatus,
+  unavailableDates,
   updateTruck,
   type TruckError,
 } from './service/truck-service';
+export { datesInRange, isTruckAvailable } from './domain/truck-availability';

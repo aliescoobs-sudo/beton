@@ -6,6 +6,7 @@ import {
   listTruckStatusLog,
   listTrucks,
   logTruckStatus,
+  unavailableDates,
   updateTruck,
 } from '../src/modules/master-data';
 import { ForbiddenError } from '../src/modules/platform-security';
@@ -252,5 +253,70 @@ describe('truck status log (master-data T13)', () => {
         error: 'INVALID',
       });
     }
+  });
+});
+
+describe('truck availability (master-data T14, AC-MD-08)', () => {
+  it('a breakdown for [D4, D6) makes D4 and D5 unavailable and D6 available, through the service', async () => {
+    const truck = await newTruck();
+    await logTruckStatus(app, users.plant, {
+      truckId: truck.id,
+      status: 'breakdown',
+      fromDate: '2026-11-04',
+      toDate: '2026-11-06',
+      reason: 'Panne',
+    });
+    for (const role of ['owner', 'partner', 'office', 'plant'] as const) {
+      expect(
+        await unavailableDates(app, users[role], truck.id, { from: '2026-11-03', to: '2026-11-08' }),
+      ).toEqual({
+        ok: true,
+        value: ['2026-11-04', '2026-11-05'],
+      });
+    }
+  });
+
+  it('a correcting entry and archiving are taken into account', async () => {
+    const truck = await newTruck();
+    const base = { truckId: truck.id, toDate: null, reason: 'x' };
+    await logTruckStatus(app, users.plant, { ...base, status: 'roadblock', fromDate: '2026-11-04' });
+    await logTruckStatus(app, users.plant, { ...base, status: 'available', fromDate: '2026-11-06' });
+    expect(
+      await unavailableDates(app, users.office, truck.id, { from: '2026-11-04', to: '2026-11-08' }),
+    ).toEqual({
+      ok: true,
+      value: ['2026-11-04', '2026-11-05'],
+    });
+    await updateTruck(app, users.owner, truck.id, { plate: truck.plate, capacityL: 8000 }, 'archived');
+    expect(
+      await unavailableDates(app, users.office, truck.id, { from: '2026-11-04', to: '2026-11-06' }),
+    ).toEqual({
+      ok: true,
+      value: ['2026-11-04', '2026-11-05'],
+    });
+  });
+
+  it('refuses an empty, reversed, impossible or over-long range, and an unknown truck', async () => {
+    const truck = await newTruck();
+    for (const range of [
+      { from: '2026-11-04', to: '2026-11-04' },
+      { from: '2026-11-05', to: '2026-11-04' },
+      { from: '2026-02-30', to: '2026-03-04' },
+      { from: '2026-01-01', to: '2027-02-01' },
+    ]) {
+      expect(await unavailableDates(app, users.owner, truck.id, range)).toEqual({
+        ok: false,
+        error: 'INVALID',
+      });
+    }
+    const range = { from: '2026-11-04', to: '2026-11-05' };
+    expect(await unavailableDates(app, users.owner, '00000000-0000-7000-8000-000000000000', range)).toEqual({
+      ok: false,
+      error: 'NOT_FOUND',
+    });
+    expect(await unavailableDates(app, users.owner, 'nope', range)).toEqual({
+      ok: false,
+      error: 'NOT_FOUND',
+    });
   });
 });

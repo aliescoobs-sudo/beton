@@ -11,6 +11,8 @@ import {
   type TruckLogStatus,
   type TruckStatusEntry,
 } from '../domain/truck';
+import { dateField } from '../domain/date-field';
+import { datesInRange, isTruckAvailable } from '../domain/truck-availability';
 import { inRequest, isMalformedId, isUniqueViolation, require } from './request';
 
 export type TruckError = 'INVALID' | 'DUPLICATE' | 'NOT_FOUND';
@@ -158,4 +160,36 @@ export async function listTruckStatusLog(
     if (isMalformedId(error)) return [];
     throw error;
   }
+}
+
+const MAX_RANGE_DAYS = 366;
+
+/**
+ * The days of [from, to) on which the truck cannot be planned (breakdown, roadblock, archived), for the future
+ * capacity check. Every signed-in role may ask.
+ */
+export async function unavailableDates(
+  appPool: pg.Pool,
+  actor: SessionUser,
+  truckId: string,
+  range: { from: string; to: string },
+): Promise<Result<string[], 'INVALID' | 'NOT_FOUND'>> {
+  await require(appPool, actor, 'trucks.read');
+  const from = dateField.safeParse(range.from);
+  const to = dateField.safeParse(range.to);
+  if (!from.success || !to.success || to.data <= from.data) return err('INVALID');
+  const days = datesInRange(from.data, to.data);
+  if (days.length > MAX_RANGE_DAYS) return err('INVALID');
+  let truck: Truck | undefined;
+  try {
+    const { rows } = await inRequest(appPool, actor, (tx) =>
+      tx.query<TruckRow>(`select ${COLUMNS} from truck where id = $1`, [truckId]),
+    );
+    truck = rows[0] ? toTruck(rows[0]) : undefined;
+  } catch (error) {
+    if (!isMalformedId(error)) throw error;
+  }
+  if (!truck) return err('NOT_FOUND');
+  const log = await listTruckStatusLog(appPool, actor, truckId);
+  return ok(days.filter((day) => !isTruckAvailable(truck, day, log)));
 }

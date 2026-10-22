@@ -58,7 +58,7 @@ Override form (managers only) with required reason; DB CHECK + RLS WITH CHECK + 
 `truck` (code `T1`…, plate, capacity_l default 8000) and `truck_status_log` (from, to, reason, logged_by); plant logs breakdown/roadblock, managers edit trucks.
 **AC:** plant writes status only (cannot edit plate/capacity: service + column grants); log is insert-only; matrix. **Deps:** T2
 
-### - [ ] T14: Truck availability query (S)
+### - [x] T14: Truck availability query (S)
 Domain `isTruckAvailable(truck, date, log)`; service `unavailableDates(truckId, range)` for the future capacity check.
 **AC:** AC-MD-08 (breakdown for [D4, D6) → unavailable D4, D5, available D6). **Deps:** T13
 
