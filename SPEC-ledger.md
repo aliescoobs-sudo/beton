@@ -81,5 +81,11 @@ Owner/partner W everything; office W on orders, instruments, invoices, purchases
 - **AC-LED-12** An office user changing the unit price of an order is refused; owner/partner without a reason is refused.
 - **AC-LED-13** Changing parameter `vat_rate_bp` to 1400 affects only orders created afterwards; no literal VAT rate appears in domain code (grep check).
 
+- **AC-LED-14** A post-dated cheque can be deposited (incoming) or cleared (outgoing) before its `written_date`: the event is accepted and flagged `early`; on or after the written date it is not flagged.
+- **AC-LED-15** An invoice's issuance deadline is the last day of the delivery month (R24); the derived legal-deadline read model lists receivable and payable due dates and issuance deadlines.
+- **AC-LED-16** A purchase's due date defaults to supplier invoice date + 60 days and > 120 days is rejected (R24); a supplier payment is an outgoing instrument allocated to the purchase's plan items.
+- **AC-LED-17** Reversal window: an office user can reverse an entry within `reversal_window_days` (2); an older entry is refused to office and accepted for owner/partner with a reason.
+- **AC-LED-18** An archived client or supplier cannot be selected on a new order or purchase; existing documents still show it (completes AC-MD-05).
+
 ## 6. Assumptions relied on
 ✅ D4, D5, D9, D14; 🟡 D27 (methods), 🟡 D28 (lifecycle), 🟡 D29 (early presentation), 🟡 D31 (internal invoices), 🟡 D34 (reversals), ✅ A4 (VAT 20% in simulation, configurable), ✅ A9, ✅ A27, 🟡 A26, OQ7 (VAT), OQ9 (opening balances).
