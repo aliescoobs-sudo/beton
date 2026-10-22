@@ -15,6 +15,7 @@
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "ci:local": "eslint . && prettier --check . && tsc --noEmit && vitest run && node --import ./scripts/register-ts-paths.mjs scripts/audit-verify.ts && next build && playwright test",
     "db:up": "docker compose --env-file .env.ops up -d --wait db",
     "db:ps": "docker compose --env-file .env.ops ps",

@@ -7,6 +7,14 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
+    // T17: the master-data domain (money, prices, recettes, trucks) stays covered by unit and integration tests together.
+    // Run with `pnpm test:coverage`.
+    coverage: {
+      provider: 'v8',
+      include: ['src/modules/master-data/domain/**'],
+      exclude: ['**/*.test.ts'],
+      thresholds: { statements: 90, branches: 90, functions: 90, lines: 90 },
+    },
     projects: [
       {
         extends: true,

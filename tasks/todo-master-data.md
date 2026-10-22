@@ -14,7 +14,7 @@ Migration 0017 `zone` (structure only; zones are seeded by T15) (the shared `cod
 **Verify:** `pnpm test:integration rls`, e2e `master-zone.spec.ts` · **Files:** migration, service/zone-service.ts, ui/zones/*, src/app/[locale]/(protected)/master-data/zones/page.tsx, messages · **Deps:** T1 (not needed), CP6
 
 ### Checkpoint CP-M1 — Pattern
-- [ ] T1–T2 green (done 2026-10-20); pattern reviewed with Ali before it is copied
+- [x] T1–T2 green (done 2026-10-20); pattern reviewed with Ali before it is copied
 
 ### - [x] T3: Client create / edit / archive (M)
 Migration `client` (code `CLT-nnn`, kind, ice, phone_enc, contact_name, default_zone_id, payment_terms_days default 60 max 120, notes, status). Create form needs only name + kind. Duplicate guard: a matching ICE **blocks** creation and points to the existing client (add a site instead); owner/partner can override with a mandatory reason, audited (new permission `parties.ice_override`); a similar normalized name only warns. Archive replaces delete and is owner/partner only (new permission `parties.archive`).
@@ -70,7 +70,7 @@ Fake-data seed (the 5 zones of D53 with the fixed ids `019c0000-0000-7000-8000-0
 Playwright over every master-data screen in fr and ar: no horizontal overflow, `dir="rtl"` on ar, no missing i18n key (key-parity test between `fr.json` and `ar.json`), no CSP violations. Explicitly includes, in ar (RTL) as well as fr: the client sites panel (T4: site list, add/edit form with the sealed address, long labels and addresses) and the suppliers screens (T5: list, create/edit form, archive control, FRN-nn codes, category enum labels); check mirrored layout, logical-property alignment, and that Latin codes/ICE/phone numbers stay LTR inside RTL text.
 **AC:** AC-MD-09. **Deps:** T15
 
-### - [ ] T17: Closure (S)
+### - [x] T17: Closure (S)
 Fill the AC table, check `TABLE_ACCESS` covers every new table, AC-SEC-05 master-data part (plant sees no price; office sees no cost fields), coverage ≥ 90% on `master-data/domain`, DECISIONS/README update.
 **AC:** all AC-MD-01…10 mapped to a passing test. **Deps:** T16
 

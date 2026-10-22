@@ -39,6 +39,7 @@ corepack pnpm db:migrate                   # apply db/migrations as belgobeton_m
 corepack pnpm db:seed                      # pilot master data through belgobeton_seed, audited as system (simulation only)
 corepack pnpm test:unit                    # no database needed
 corepack pnpm test:integration             # migrates and uses belgobeton_test
+corepack pnpm test:coverage                # unit + integration; master-data/domain must stay >= 90%
 ```
 
 Every script in `scripts/` answers `--help` (its header comment); `scripts/cli-smoke.test.ts` runs them all, plus `docker compose config`, in `pnpm test`.
