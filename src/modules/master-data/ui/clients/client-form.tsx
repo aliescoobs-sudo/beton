@@ -179,7 +179,7 @@ export function ClientForm({
           {existing && (
             <span data-testid="client-existing">
               {' '}
-              <span dir="ltr">{existing.code}</span> — {existing.name}
+              <span dir="ltr">{existing.code}</span> — <bdi>{existing.name}</bdi>
             </span>
           )}
         </p>

@@ -177,7 +177,9 @@ export function SuppliersManager({
                 )}
               </form>
             ) : (
-              <p className="font-medium">{s.name}</p>
+              <p className="font-medium">
+                <bdi>{s.name}</bdi>
+              </p>
             )}
           </li>
         ))}

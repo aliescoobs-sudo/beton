@@ -98,7 +98,7 @@ export function ConcreteTypesManager({ types, editable }: { types: ConcreteTypeR
                 <span dir="ltr" className="font-medium">
                   {type.code}
                 </span>
-                <span data-testid="type-label">{type.label}</span>
+                <bdi data-testid="type-label">{type.label}</bdi>
                 {type.status === 'archived' && <span className="text-gray-600">{t('archived')}</span>}
               </p>
             )}

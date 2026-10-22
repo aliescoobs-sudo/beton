@@ -74,6 +74,8 @@ export default async function globalSetup() {
       [E2E_MD.componentPartnerFr, 'partner', 'fr'],
       [E2E_MD.componentPartnerAr, 'partner', 'ar'],
       [E2E_MD.componentPlant, 'plant', 'fr'],
+      [E2E_MD.screensPartnerFr, 'partner', 'fr'],
+      [E2E_MD.screensPartnerAr, 'partner', 'ar'],
       [E2E_MD.truckPartnerFr, 'partner', 'fr'],
       [E2E_MD.truckPartnerAr, 'partner', 'ar'],
       [E2E_MD.truckPlant, 'plant', 'fr'],

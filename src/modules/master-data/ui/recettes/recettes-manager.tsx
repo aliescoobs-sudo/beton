@@ -112,7 +112,7 @@ export function RecettesManager({
             data-testid={`recette-${type.code}`}
           >
             <h2 className="font-medium">
-              <span dir="ltr">{type.code}</span> · {type.label}
+              <span dir="ltr">{type.code}</span> · <bdi>{type.label}</bdi>
             </h2>
             {type.versions.length === 0 && <p className="mt-2 text-sm text-gray-600">{t('none')}</p>}
             <ul className="mt-2 space-y-2">

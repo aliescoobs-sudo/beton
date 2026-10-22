@@ -107,7 +107,7 @@ export function PurchasePricesManager({
           <ul className="mt-2 space-y-1 text-sm">
             {costs.map((c) => (
               <li key={c.code} data-testid={`cost-${c.code}`}>
-                <span dir="ltr">{c.code}</span> · {c.label} :{' '}
+                <span dir="ltr">{c.code}</span> · <bdi>{c.label}</bdi> :{' '}
                 {c.costCentimes === null ? (
                   t('costMissing')
                 ) : (

@@ -50,7 +50,7 @@ export function ClientsManager({
               {client.code}
             </span>
             <Link href={`/${locale}/master-data/clients/${client.id}`} className="font-medium underline">
-              {client.name}
+              <bdi>{client.name}</bdi>
             </Link>
             <span className="text-sm text-gray-600">
               {client.kind === 'company' ? t('kindCompany') : t('kindPerson')}

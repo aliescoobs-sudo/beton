@@ -81,7 +81,7 @@ export function OverridesPanel({
               <select name="concreteTypeId" required className={INPUT}>
                 {types.map((type) => (
                   <option key={type.id} value={type.id}>
-                    {type.code} · {type.label}
+                    <bdi dir="ltr">{type.code}</bdi> · <bdi>{type.label}</bdi>
                   </option>
                 ))}
               </select>

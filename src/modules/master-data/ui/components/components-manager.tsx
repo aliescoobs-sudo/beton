@@ -97,7 +97,7 @@ export function ComponentsManager({
             <ul className="mt-2 space-y-1 text-sm">
               {c.units.map((u) => (
                 <li key={u.id} className="flex flex-wrap items-center gap-3" data-testid={`unit-${u.label}`}>
-                  <span>{u.label}</span>
+                  <bdi>{u.label}</bdi>
                   <span dir="ltr">
                     = {u.factorToBase} {c.baseUnit}
                   </span>

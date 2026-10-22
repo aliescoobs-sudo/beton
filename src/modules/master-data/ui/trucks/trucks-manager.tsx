@@ -156,7 +156,7 @@ export function TrucksManager({
                   <bdi dir="ltr">
                     {entry.fromDate} → {entry.toDate ?? '…'}
                   </bdi>{' '}
-                  — {entry.reason}
+                  — <bdi>{entry.reason}</bdi>
                 </li>
               ))}
             </ul>

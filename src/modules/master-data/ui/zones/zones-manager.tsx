@@ -88,9 +88,9 @@ export function ZonesManager({ zones, editable }: { zones: ZoneRow[]; editable: 
               </form>
             ) : (
               <p className="flex flex-wrap gap-x-6">
-                <span className="font-medium" data-testid="zone-name">
+                <bdi className="font-medium" data-testid="zone-name">
                   {zone.name}
-                </span>
+                </bdi>
                 <span dir="ltr" data-testid="zone-minutes">
                   {t('minutes', { count: zone.oneWayMin })}
                 </span>

@@ -46,6 +46,8 @@ export const E2E_MD = {
   truckPartnerAr: { email: 'e2e-tr-partner-ar@belgobeton.test', name: 'شريك الشاحنات' },
   truckPlant: { email: 'e2e-tr-plant@belgobeton.test', name: 'Centrale Camions' },
   truckOffice: { email: 'e2e-tr-office@belgobeton.test', name: 'Bureau Camions' },
+  screensPartnerFr: { email: 'e2e-sc-partner-fr@belgobeton.test', name: 'Associé Écrans' },
+  screensPartnerAr: { email: 'e2e-sc-partner-ar@belgobeton.test', name: 'شريك الشاشات' },
   clientPlant: { email: 'e2e-cl-plant@belgobeton.test', name: 'Centrale Clients' },
 } as const;
 export const E2E_CSP = { email: 'e2e-csp@belgobeton.test', name: 'CSP E2E' } as const;
