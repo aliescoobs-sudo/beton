@@ -34,7 +34,7 @@ export function StepUpDialog({ onVerified, onCancel }: { onVerified: () => void;
       aria-labelledby="step-up-title"
       className="fixed inset-0 flex items-center justify-center bg-black/40 p-4"
     >
-      <form onSubmit={submit} className="w-full max-w-sm space-y-4 rounded bg-white p-6">
+      <form onSubmit={submit} className="w-full max-w-sm space-y-4 rounded bg-white p-6 text-gray-900">
         <h2 id="step-up-title" className="text-lg font-medium">
           {t('title')}
         </h2>
