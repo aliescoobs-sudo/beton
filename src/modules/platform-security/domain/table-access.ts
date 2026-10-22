@@ -167,6 +167,27 @@ export const TABLE_ACCESS = {
       '(selling_prices.write); per-client overrides (client_id set) by managers only, with a reason ' +
       '(client_price_override.write, CHECK + policy: AC-MD-10); office reads, plant has no access (AC-MD-07).',
   },
+  truck: {
+    kind: 'rls',
+    read: { owner: 'all', partner: 'all', office: 'all', plant: 'all', system: 'all', anonymous: 'none' },
+    force: true,
+    audited: true,
+    noDelete: true,
+    exception:
+      'master-data T13: managers write (trucks.write); plate, capacity and status are the only updatable columns ' +
+      '(column grant), the plant cannot edit a truck; code immutable (trigger).',
+  },
+  truck_status_log: {
+    kind: 'rls',
+    read: { owner: 'all', partner: 'all', office: 'all', plant: 'all', system: 'all', anonymous: 'none' },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'master-data T13: insert-only log, written by plant, owner and partner (trucks.status.write, policy WITH CHECK; office cannot); a ' +
+      'correction is a new entry. Every signed-in role reads.',
+  },
   code_sequence: {
     kind: 'rls',
     read: { owner: 'all', partner: 'all', office: 'all', plant: 'none', system: 'none', anonymous: 'none' },

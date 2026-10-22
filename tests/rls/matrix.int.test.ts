@@ -37,6 +37,8 @@ const FIXTURES: Record<
     pool?: 'system';
     seed: (tx: pg.PoolClient, actor: string) => Promise<unknown>;
     visible: string;
+    /** `visible` also takes $2: every actor id as text[] (for tables with no column roomy enough for an actor id). */
+    withActors?: true;
   }
 > = {
   audit_event: {
@@ -246,6 +248,31 @@ const FIXTURES: Record<
     },
     visible: `select split_part(t.label, ':', 2) as owner from selling_price p join concrete_type t on t.id = p.concrete_type_id where t.label like 's' || $1 || ':%'`,
   },
+  truck: {
+    writers: ['owner', 'partner'],
+    seed: (tx, actor) =>
+      tx.query(
+        `insert into truck (id, code, plate)
+         values (gen_random_uuid(), 'T' || (100 + floor(random() * 899))::int, 'M' || substr(md5($1), 1, 6) || substr(replace($2::text, '-', ''), 21, 12))`,
+        [marker, actor],
+      ),
+    // The plate is 19 characters at most: a marker hash and the last 12 hex digits of the actor id.
+    visible: `select a as owner from truck t join unnest($2::text[]) a
+               on substr(t.plate, 8) = substr(replace(a, '-', ''), 21, 12)
+              where left(t.plate, 7) = 'M' || substr(md5($1), 1, 6)`,
+    withActors: true,
+  },
+  truck_status_log: {
+    // Plant, owner and partner write the log; the trucks it points at were seeded by the truck fixture just above.
+    writers: ['owner', 'partner', 'plant'],
+    seed: (tx, actor) =>
+      tx.query(
+        `insert into truck_status_log (id, truck_id, status, from_date, reason, logged_by)
+         values (gen_random_uuid(), (select id from truck where left(plate, 7) = 'M' || substr(md5($1), 1, 6) limit 1), 'breakdown', '2000-01-01', $1, $2)`,
+        [marker, actor],
+      ),
+    visible: `select logged_by::text as owner from truck_status_log where reason = $1`,
+  },
   supplier: {
     writers: ['owner', 'partner', 'office'],
     seed: (tx, actor) =>
@@ -282,12 +309,15 @@ beforeAll(async () => {
   }
 });
 
+const visibleArgs = (table: RlsTable) =>
+  FIXTURES[table].withActors ? [marker, Object.values(actors)] : [marker];
+
 describe.each(RLS_TABLES)('RLS on %s', (table) => {
   const rule = TABLE_ACCESS[table];
 
   it.each(DB_ROLES)('role %s sees exactly what the matrix allows', async (role) => {
     const { rows } = await withRlsContext(app, { userId: actors[role], role, requestId: marker }, (tx) =>
-      tx.query<{ owner: string }>(FIXTURES[table].visible, [marker]),
+      tx.query<{ owner: string }>(FIXTURES[table].visible, visibleArgs(table)),
     );
     const seededBy = FIXTURES[table].writers.map((r) => actors[r]);
     const scope = rule.read[role];
@@ -297,7 +327,7 @@ describe.each(RLS_TABLES)('RLS on %s', (table) => {
   });
 
   it('nothing is visible outside a request context', async () => {
-    const { rows } = await app.query(FIXTURES[table].visible, [marker]);
+    const { rows } = await app.query(FIXTURES[table].visible, visibleArgs(table));
     expect(rows).toEqual([]);
   });
 });

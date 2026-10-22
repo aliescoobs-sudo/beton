@@ -317,6 +317,31 @@
       "notAfterLatest": "La date doit être postérieure à celle du dernier prix de ce client pour ce type.",
       "inactive": "Un client ou un type de béton archivé ne peut pas recevoir de prix.",
       "error": "Action refusée."
+    },
+    "trucks": {
+      "title": "Camions",
+      "link": "Camions",
+      "readOnly": "Lecture seule : le propriétaire et l'associé modifient les camions ; la centrale, le propriétaire et l'associé signalent les pannes.",
+      "code": "Code (ex. T5)",
+      "plate": "Immatriculation",
+      "capacity": "Capacité (L)",
+      "add": "Ajouter le camion",
+      "save": "Enregistrer",
+      "archived": "Archivé",
+      "saved": "Enregistré.",
+      "invalid": "Valeur refusée (code T1…T999, immatriculation, capacité 1 000 à 30 000 L ; la date de fin suit la date de début ; motif obligatoire).",
+      "duplicate": "Ce code ou cette immatriculation existe déjà.",
+      "error": "Action refusée.",
+      "logStatus": "Signaler",
+      "fromDate": "À partir du",
+      "toDate": "Retour le (vide = jusqu'à nouvel ordre)",
+      "reason": "Motif",
+      "log": "Enregistrer le signalement",
+      "status": {
+        "available": "Disponible",
+        "breakdown": "Panne",
+        "roadblock": "Route coupée"
+      }
     }
   },
   "history": {

@@ -54,7 +54,7 @@ Read path for plant: quantities per m³ with no price column; `project()` entry 
 Override form (managers only) with required reason; DB CHECK + RLS WITH CHECK + service permission `client_price_override.write`; audited like any price version.
 **AC:** AC-MD-10: office and plant refused by service and by direct SQL under RLS; owner/partner without reason refused (service and CHECK); with a reason saved and one audit event with reason in `after`; override shown on the client page. **Deps:** T11, T3
 
-### - [ ] T13: Trucks and status log (M)
+### - [x] T13: Trucks and status log (M)
 `truck` (code `T1`…, plate, capacity_l default 8000) and `truck_status_log` (from, to, reason, logged_by); plant logs breakdown/roadblock, managers edit trucks.
 **AC:** plant writes status only (cannot edit plate/capacity: service + column grants); log is insert-only; matrix. **Deps:** T2
 

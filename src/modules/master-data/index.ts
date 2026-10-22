@@ -102,3 +102,21 @@ export {
   resolveSellingPriceFor,
   type SellingPriceError,
 } from './service/selling-price-service';
+export {
+  DEFAULT_TRUCK_CAPACITY_L,
+  parseTruckInput,
+  parseTruckStatusInput,
+  TRUCK_STATUSES,
+  type Truck,
+  type TruckInput,
+  type TruckLogStatus,
+  type TruckStatusEntry,
+} from './domain/truck';
+export {
+  createTruck,
+  listTruckStatusLog,
+  listTrucks,
+  logTruckStatus,
+  updateTruck,
+  type TruckError,
+} from './service/truck-service';
