@@ -28,7 +28,7 @@ export function ClientsManager({
   const t = useTranslations('masterData.clients');
   return (
     <div className="mt-6 space-y-6">
-      <section className="rounded border border-dashed border-gray-300 p-3">
+      <section className="rounded-lg border border-dashed border-line-strong bg-canvas/60 p-3">
         <h2 className="mb-2 font-medium">{t('new')}</h2>
         <ClientForm
           initial={EMPTY_CLIENT}
@@ -43,7 +43,7 @@ export function ClientsManager({
         {clients.map((client) => (
           <li
             key={client.id}
-            className="flex flex-wrap items-center gap-x-6 rounded border border-gray-200 p-3"
+            className="flex flex-wrap items-center gap-x-6 card p-3"
             data-testid={`client-${client.name}`}
           >
             <span dir="ltr" className="font-mono text-sm">
@@ -52,11 +52,11 @@ export function ClientsManager({
             <Link href={`/${locale}/master-data/clients/${client.id}`} className="font-medium underline">
               <bdi>{client.name}</bdi>
             </Link>
-            <span className="text-sm text-gray-600">
+            <span className="text-sm text-muted">
               {client.kind === 'company' ? t('kindCompany') : t('kindPerson')}
             </span>
             {client.status === 'archived' && (
-              <span className="text-sm text-gray-600" data-testid="client-archived">
+              <span className="text-sm text-muted" data-testid="client-archived">
                 {t('archivedBadge')}
               </span>
             )}

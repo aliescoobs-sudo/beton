@@ -15,16 +15,19 @@ export async function SecurityAlertBanner({ user, locale }: { user: SessionUser;
     timeZone: 'Africa/Casablanca',
   });
   return (
-    <div className="space-y-2 bg-red-50 px-4 py-3" data-testid="security-alerts">
+    <div
+      className="mb-6 space-y-2 rounded-md border border-status-late/40 bg-status-late/10 px-4 py-3"
+      data-testid="security-alerts"
+    >
       {alerts.map((alert) => (
         <form
           key={alert.id}
           action={acknowledgeSecurityAlertAction.bind(null, alert.id)}
           role="alert"
-          className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-2 text-sm text-red-900"
+          className="flex flex-wrap items-center justify-between gap-2 text-sm text-ink"
         >
           <span>{t(alert.kind, { at: format.format(alert.at) })}</span>
-          <button type="submit" className="rounded border border-red-300 px-3 py-1">
+          <button type="submit" className="btn btn-danger btn-sm">
             {t('ack')}
           </button>
         </form>

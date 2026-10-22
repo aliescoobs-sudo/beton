@@ -38,38 +38,27 @@ export function LoginForm({ locale, onTwoFactor }: { locale: string; onTwoFactor
   }
 
   return (
-    <form onSubmit={submit} className="mt-6 space-y-4" noValidate>
+    <form onSubmit={submit} className="space-y-4" noValidate>
       <label className="block">
-        <span className="text-sm font-medium">{t('email')}</span>
-        <input
-          name="email"
-          type="email"
-          autoComplete="username"
-          required
-          dir="ltr"
-          className="mt-1 block w-full rounded border border-gray-300 px-3 py-2"
-        />
+        <span className="field-label">{t('email')}</span>
+        <input name="email" type="email" autoComplete="username" required dir="ltr" className="input mt-1" />
       </label>
       <label className="block">
-        <span className="text-sm font-medium">{t('password')}</span>
+        <span className="field-label">{t('password')}</span>
         <input
           name="password"
           type="password"
           autoComplete="current-password"
           required
-          className="mt-1 block w-full rounded border border-gray-300 px-3 py-2"
+          className="input mt-1"
         />
       </label>
       {problem && (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="text-sm text-status-late">
           {t(problem)}
         </p>
       )}
-      <button
-        type="submit"
-        disabled={pending}
-        className="w-full rounded bg-gray-900 px-4 py-2 font-medium text-white disabled:opacity-50"
-      >
+      <button type="submit" disabled={pending} className="btn btn-primary w-full">
         {t('submit')}
       </button>
     </form>

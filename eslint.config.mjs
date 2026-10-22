@@ -40,6 +40,7 @@ const config = [
       'boundaries/elements': [
         ...moduleIds.map((id) => ({ type: id, pattern: `src/modules/${id}` })),
         { type: 'lib', pattern: 'src/lib' },
+        { type: 'ui', pattern: 'src/ui' },
         { type: 'i18n', pattern: 'src/i18n' },
         { type: 'app', pattern: 'src/app' },
       ],
@@ -55,15 +56,22 @@ const config = [
               from: { element: { types: { anyOf: ['lib', 'i18n'] } } },
               allow: { to: { element: { types: { anyOf: ['lib', 'i18n'] } } } },
             },
+            // ui is the shared design-system leaf (components + tokens): lib and itself only.
+            {
+              from: { element: { type: 'ui' } },
+              allow: { to: { element: { types: { anyOf: ['ui', 'lib'] } } } },
+            },
             // Each module may import itself, lib, i18n and the modules it depends on (transitively).
             ...moduleIds.map((id) => ({
               from: { element: { type: id } },
-              allow: { to: { element: { types: { anyOf: [id, ...allowedModules(id), 'lib', 'i18n'] } } } },
+              allow: {
+                to: { element: { types: { anyOf: [id, ...allowedModules(id), 'lib', 'i18n', 'ui'] } } },
+              },
             })),
             // Routes sit on top and may use everything.
             {
               from: { element: { types: { anyOf: ['app'] } } },
-              allow: { to: { element: { types: { anyOf: [...moduleIds, 'lib', 'i18n', 'app'] } } } },
+              allow: { to: { element: { types: { anyOf: [...moduleIds, 'lib', 'i18n', 'ui', 'app'] } } } },
             },
           ],
         },

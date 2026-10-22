@@ -1,0 +1,5 @@
+IBM Plex Sans and IBM Plex Sans Arabic
+Copyright © 2017 IBM Corp. with Reserved Font Name "Plex".
+Licensed under the SIL Open Font License, Version 1.1: https://openfontlicense.org
+Files fetched from Google Fonts (v23 / v15) and committed here so builds need no network and the app makes no
+external request at runtime (loaded through next/font/local).

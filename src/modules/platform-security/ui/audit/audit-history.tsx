@@ -19,7 +19,7 @@ export function AuditHistory({
   locale: string;
 }) {
   const t = useTranslations('history');
-  if (rows.length === 0) return <p className="mt-4 text-sm text-gray-600">{t('empty')}</p>;
+  if (rows.length === 0) return <p className="mt-4 text-sm text-muted">{t('empty')}</p>;
   const format = new Intl.DateTimeFormat(locale === 'ar' ? 'ar-MA' : 'fr-MA', {
     dateStyle: 'short',
     timeStyle: 'medium',
@@ -37,18 +37,18 @@ export function AuditHistory({
       {rows.map((row) => {
         const changes = auditDiff(row.before, row.after);
         return (
-          <li key={row.id} className="rounded border border-gray-200 p-3 text-sm" data-testid="audit-event">
+          <li key={row.id} className="card p-3 text-sm" data-testid="audit-event">
             <div className="flex flex-wrap gap-x-4 gap-y-1">
               <span>{format.format(row.at)}</span>
               {row.simAt && (
-                <span className="text-amber-700">{t('simulated', { at: format.format(row.simAt) })}</span>
+                <span className="text-muted">{t('simulated', { at: format.format(row.simAt) })}</span>
               )}
               <span className="font-medium">{who(row)}</span>
               <span className="font-mono" dir="ltr" data-testid="audit-action">
                 {row.action} · {row.table}
                 {row.rowId ? ` · ${row.rowId}` : ''}
               </span>
-              {row.reason && <span className="text-gray-600">{row.reason}</span>}
+              {row.reason && <span className="text-muted">{row.reason}</span>}
             </div>
             {row.action === 'update' && changes.length > 0 && (
               <table className="mt-2 w-full text-xs" data-testid="audit-diff">
@@ -63,8 +63,8 @@ export function AuditHistory({
                   {changes.map((c) => (
                     <tr key={c.field} data-testid={`diff-${c.field}`}>
                       <td className="font-mono">{c.field}</td>
-                      <td className="font-mono text-red-700">{show(c.before)}</td>
-                      <td className="font-mono text-green-700">{show(c.after)}</td>
+                      <td className="font-mono text-status-late">{show(c.before)}</td>
+                      <td className="font-mono text-status-paid">{show(c.after)}</td>
                     </tr>
                   ))}
                 </tbody>

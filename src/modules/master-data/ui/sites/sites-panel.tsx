@@ -12,7 +12,7 @@ export interface SiteRow {
   zoneId: string;
 }
 
-const input = 'mt-1 block w-full rounded border border-gray-300 px-3 py-1';
+const input = 'input mt-1';
 
 /** Delivery sites of one client: add and edit inline (office, owner, partner; the server checks again). */
 export function SitesPanel({
@@ -60,15 +60,15 @@ export function SitesPanel({
   const fields = (site?: SiteRow) => (
     <>
       <label className="block">
-        <span className="text-sm font-medium">{t('label')}</span>
+        <span className="field-label">{t('label')}</span>
         <input name="label" defaultValue={site?.label} maxLength={120} required className={input} />
       </label>
       <label className="block">
-        <span className="text-sm font-medium">{t('address')}</span>
+        <span className="field-label">{t('address')}</span>
         <input name="address" defaultValue={site?.address} maxLength={500} className={input} />
       </label>
       <label className="block">
-        <span className="text-sm font-medium">{t('zone')}</span>
+        <span className="field-label">{t('zone')}</span>
         <select name="zoneId" defaultValue={site?.zoneId ?? ''} className={input}>
           <option value="">—</option>
           {zones.map((zone) => (
@@ -86,13 +86,13 @@ export function SitesPanel({
       <h2 className="text-lg font-semibold">{t('title')}</h2>
       <ul className="mt-3 space-y-3">
         {sites.map((site) => (
-          <li key={site.id} className="rounded border border-gray-200 p-3" data-testid={`site-${site.label}`}>
+          <li key={site.id} className="card p-3" data-testid={`site-${site.label}`}>
             <form
               onSubmit={(e) => void submit(site.id, e, (value) => updateSiteAction(site.id, value))}
               className="grid gap-3 sm:grid-cols-3"
             >
               {fields(site)}
-              <button type="submit" className="w-fit rounded bg-gray-900 px-3 py-1 text-sm text-white">
+              <button type="submit" className="btn btn-primary btn-sm w-fit">
                 {t('save')}
               </button>
               {message?.id === site.id && (
@@ -106,11 +106,11 @@ export function SitesPanel({
       </ul>
       <form
         onSubmit={(e) => void submit('new', e, (value) => createSiteAction(clientId, value))}
-        className="mt-3 grid gap-3 rounded border border-dashed border-gray-300 p-3 sm:grid-cols-3"
+        className="mt-3 grid gap-3 rounded-lg border border-dashed border-line-strong bg-canvas/60 p-3 sm:grid-cols-3"
         data-testid="site-new"
       >
         {fields()}
-        <button type="submit" className="w-fit rounded bg-gray-900 px-3 py-1 text-sm text-white">
+        <button type="submit" className="btn btn-primary btn-sm w-fit">
           {t('add')}
         </button>
         {message?.id === 'new' && (

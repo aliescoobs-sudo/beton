@@ -13,6 +13,7 @@ import {
 import { PurchasePricesManager } from '@/modules/master-data/ui/purchase-prices/purchase-prices-manager';
 import { can } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/next';
+import { PageHeader } from '@/ui';
 
 export default async function PurchasePricesPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -43,8 +44,8 @@ export default async function PurchasePricesPage({ params }: { params: Promise<{
 
   const t = await getTranslations('masterData.purchasePrices');
   return (
-    <main className="mx-auto max-w-4xl px-4 py-8">
-      <h1 className="text-2xl font-semibold">{t('title')}</h1>
+    <div>
+      <PageHeader title={t('title')} />
       <PurchasePricesManager
         components={components
           .filter((c) => c.status === 'active')
@@ -71,6 +72,6 @@ export default async function PurchasePricesPage({ params }: { params: Promise<{
         businessDate={businessDate}
         editable={can(user.role, 'purchase_prices.write')}
       />
-    </main>
+    </div>
   );
 }

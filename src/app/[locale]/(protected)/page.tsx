@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { currentAuthState } from '@/modules/platform-security/auth/request-state';
-import { LogoutButton } from '@/modules/platform-security/ui/logout-button';
+import { buttonClass, EmptyState, PageHeader } from '@/ui';
 
 // @permission authenticated — any user with password + 2FA (guarded by the (protected) layout)
 export default async function HomePage({ params }: { params: Promise<{ locale: string }> }) {
@@ -13,107 +13,48 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
   const reenrol = state.kind === 'authenticated' && state.user.reenrolRequired;
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-8">
-      <h1 className="text-2xl font-semibold">{t('shell.title')}</h1>
-      <p className="mt-2 text-gray-600">{t('shell.tagline')}</p>
+    <div>
+      <PageHeader
+        title={t('shell.nav.dashboard')}
+        description={<span data-testid="signed-in-as">{t('auth.session.signedInAs', { name })}</span>}
+      />
       {reenrol && (
         <p
           role="status"
-          className="mt-6 rounded border border-amber-400 bg-amber-50 p-3 text-sm"
+          className="mb-6 rounded-md border border-status-due/60 bg-status-due/10 p-3 text-sm"
           data-testid="reenrol-banner"
         >
           {t('auth.session.reenrolBanner')}{' '}
-          <Link href={`/${locale}/security`} className="underline">
+          <Link href={`/${locale}/security`} className="font-medium underline">
             {t('auth.session.reenrolLink')}
           </Link>
         </p>
       )}
-      <p className="mt-6" data-testid="signed-in-as">
-        {t('auth.session.signedInAs', { name })}
-      </p>
-      <div className="mt-4 flex items-center gap-4">
-        <Link href={`/${locale}/security`} className="text-sm underline">
-          {t('auth.security.link')}
-        </Link>
-        <Link href={`/${locale}/historique`} className="text-sm underline" data-testid="history-link">
-          {t('history.link')}
-        </Link>
-        <Link href={`/${locale}/master-data/zones`} className="text-sm underline" data-testid="zones-link">
-          {t('masterData.zones.link')}
-        </Link>
-        <Link href={`/${locale}/master-data/trucks`} className="text-sm underline" data-testid="trucks-link">
-          {t('masterData.trucks.link')}
-        </Link>
-        <Link
-          href={`/${locale}/master-data/concrete-types`}
-          className="text-sm underline"
-          data-testid="concrete-types-link"
-        >
-          {t('masterData.concreteTypes.link')}
-        </Link>
-        <Link
-          href={`/${locale}/master-data/recettes`}
-          className="text-sm underline"
-          data-testid="recettes-link"
-        >
-          {t('masterData.recettes.link')}
-        </Link>
-        <Link
-          href={`/${locale}/master-data/purchase-prices`}
-          className="text-sm underline"
-          data-testid="purchase-prices-link"
-        >
-          {t('masterData.purchasePrices.link')}
-        </Link>
-        <Link
-          href={`/${locale}/master-data/selling-prices`}
-          className="text-sm underline"
-          data-testid="selling-prices-link"
-        >
-          {t('masterData.sellingPrices.link')}
-        </Link>
-        <Link
-          href={`/${locale}/master-data/components`}
-          className="text-sm underline"
-          data-testid="components-link"
-        >
-          {t('masterData.components.link')}
-        </Link>
-        {state.kind === 'authenticated' && state.user.role !== 'plant' && (
-          <Link
-            href={`/${locale}/master-data/clients`}
-            className="text-sm underline"
-            data-testid="clients-link"
+      <EmptyState
+        data-testid="dashboard-empty"
+        icon={
+          <svg
+            viewBox="0 0 24 24"
+            width="36"
+            height="36"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
           >
-            {t('masterData.clients.link')}
+            <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
+          </svg>
+        }
+        title={t('shell.dashboard.emptyTitle')}
+        description={t('shell.dashboard.emptyText')}
+        action={
+          <Link href={`/${locale}/master-data/clients`} className={buttonClass('secondary')}>
+            {t('shell.dashboard.action')}
           </Link>
-        )}
-        {state.kind === 'authenticated' && state.user.role !== 'plant' && (
-          <Link
-            href={`/${locale}/master-data/suppliers`}
-            className="text-sm underline"
-            data-testid="suppliers-link"
-          >
-            {t('masterData.suppliers.link')}
-          </Link>
-        )}
-        {state.kind === 'authenticated' && (state.user.role === 'owner' || state.user.role === 'partner') && (
-          <Link href={`/${locale}/parameters`} className="text-sm underline" data-testid="parameters-link">
-            {t('parameters.link')}
-          </Link>
-        )}
-        {state.kind === 'authenticated' && state.user.role === 'owner' && (
-          <Link href={`/${locale}/checklist`} className="text-sm underline" data-testid="checklist-link">
-            {t('checklist.link')}
-          </Link>
-        )}
-        {state.kind === 'authenticated' && state.user.role === 'owner' && (
-          <Link href={`/${locale}/admin/users`} className="text-sm underline" data-testid="admin-link">
-            {t('admin.link')}
-          </Link>
-        )}
-        <LogoutButton locale={locale} />
-      </div>
-    </main>
+        }
+      />
+    </div>
   );
 }

@@ -65,28 +65,25 @@ export function AdvanceControl({
   }
 
   return (
-    <div className="flex flex-wrap items-center justify-center gap-2 text-sm" data-testid="advance-control">
-      <button type="button" onClick={() => submit({ byDays: 1 })} className="rounded bg-white/20 px-2 py-0.5">
+    <div className="space-y-3 text-sm" data-testid="advance-control">
+      <button type="button" onClick={() => submit({ byDays: 1 })} className="btn btn-secondary btn-sm w-full">
         {t('oneDay')}
       </button>
-      <form onSubmit={advanceTo} className="flex items-center gap-1">
-        <label className="flex items-center gap-1">
-          <span>{t('to')}</span>
-          <input name="date" type="date" required dir="ltr" className="rounded px-1 text-gray-900" />
+      <form onSubmit={advanceTo} className="space-y-2">
+        <label className="block">
+          <span className="field-label">{t('to')}</span>
+          <input name="date" type="date" required dir="ltr" className="input" />
         </label>
-        <input
-          name="time"
-          type="time"
-          required
-          defaultValue="07:00"
-          dir="ltr"
-          className="rounded px-1 text-gray-900"
-        />
-        <button type="submit" className="rounded bg-white/20 px-2 py-0.5">
+        <input name="time" type="time" required defaultValue="07:00" dir="ltr" className="input" />
+        <button type="submit" className="btn btn-primary btn-sm w-full">
           {t('go')}
         </button>
       </form>
-      {message && <span role="alert">{message}</span>}
+      {message && (
+        <p role="alert" className="field-error">
+          {message}
+        </p>
+      )}
       {retry && (
         <StepUp
           onVerified={() => {

@@ -32,7 +32,7 @@ export interface RecetteTypeView {
   }[];
 }
 
-const INPUT = 'mt-1 block rounded border border-gray-300 px-3 py-1';
+const INPUT = 'input mt-1';
 
 /**
  * Per concrete type: the published versions (read-only, quantities per m³ in base units) and, for owner and
@@ -101,20 +101,16 @@ export function RecettesManager({
 
   return (
     <div className="mt-6 space-y-6">
-      {!editable && <p className="text-sm text-gray-600">{t('readOnly')}</p>}
+      {!editable && <p className="text-sm text-muted">{t('readOnly')}</p>}
       {types.map((type) => {
         const latest = type.versions[0];
         const quantity = new Map(latest?.lines.map((l) => [l.componentId, l.qtyPerM3]));
         return (
-          <section
-            key={type.id}
-            className="rounded border border-gray-200 p-3"
-            data-testid={`recette-${type.code}`}
-          >
+          <section key={type.id} className="card p-3" data-testid={`recette-${type.code}`}>
             <h2 className="font-medium">
               <span dir="ltr">{type.code}</span> · <bdi>{type.label}</bdi>
             </h2>
-            {type.versions.length === 0 && <p className="mt-2 text-sm text-gray-600">{t('none')}</p>}
+            {type.versions.length === 0 && <p className="mt-2 text-sm text-muted">{t('none')}</p>}
             <ul className="mt-2 space-y-2">
               {type.versions.map((v) => (
                 <li key={v.id} className="text-sm" data-testid={`recette-${type.code}-v${v.version}`}>
@@ -195,7 +191,7 @@ export function RecettesManager({
                     );
                   })}
                 </div>
-                <button type="submit" className="rounded bg-gray-900 px-3 py-1 text-sm text-white">
+                <button type="submit" className="btn btn-primary btn-sm">
                   {confirm === type.id ? t('publishAnyway') : t('publish')}
                 </button>
                 {message?.id === type.id && (

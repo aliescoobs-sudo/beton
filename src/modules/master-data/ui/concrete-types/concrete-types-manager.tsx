@@ -12,8 +12,8 @@ export interface ConcreteTypeRow {
   status: 'active' | 'archived';
 }
 
-const INPUT = 'mt-1 block rounded border border-gray-300 px-3 py-1';
-const BUTTON = 'rounded bg-gray-900 px-3 py-1 text-sm text-white';
+const INPUT = 'input mt-1';
+const BUTTON = 'btn btn-primary btn-sm';
 
 /** Everyone signed in reads the types; owner and partner edit (the server checks again on every write). */
 export function ConcreteTypesManager({ types, editable }: { types: ConcreteTypeRow[]; editable: boolean }) {
@@ -54,10 +54,10 @@ export function ConcreteTypesManager({ types, editable }: { types: ConcreteTypeR
 
   return (
     <div className="mt-6 space-y-4">
-      {!editable && <p className="text-sm text-gray-600">{t('readOnly')}</p>}
+      {!editable && <p className="text-sm text-muted">{t('readOnly')}</p>}
       <ul className="space-y-3">
         {types.map((type) => (
-          <li key={type.id} className="rounded border border-gray-200 p-3" data-testid={`type-${type.code}`}>
+          <li key={type.id} className="card p-3" data-testid={`type-${type.code}`}>
             {editable ? (
               <form
                 onSubmit={(e) =>
@@ -75,7 +75,7 @@ export function ConcreteTypesManager({ types, editable }: { types: ConcreteTypeR
                   {type.code}
                 </span>
                 <label className="block">
-                  <span className="text-sm font-medium">{t('label')}</span>
+                  <span className="field-label">{t('label')}</span>
                   <input
                     name="label"
                     defaultValue={type.label}
@@ -99,7 +99,7 @@ export function ConcreteTypesManager({ types, editable }: { types: ConcreteTypeR
                   {type.code}
                 </span>
                 <bdi data-testid="type-label">{type.label}</bdi>
-                {type.status === 'archived' && <span className="text-gray-600">{t('archived')}</span>}
+                {type.status === 'archived' && <span className="text-muted">{t('archived')}</span>}
               </p>
             )}
           </li>
@@ -115,15 +115,15 @@ export function ConcreteTypesManager({ types, editable }: { types: ConcreteTypeR
               }),
             )
           }
-          className="flex flex-wrap items-end gap-3 rounded border border-dashed border-gray-300 p-3"
+          className="flex flex-wrap items-end gap-3 rounded-lg border border-dashed border-line-strong bg-canvas/60 p-3"
           data-testid="type-new"
         >
           <label className="block">
-            <span className="text-sm font-medium">{t('code')}</span>
+            <span className="field-label">{t('code')}</span>
             <input name="code" maxLength={10} required dir="ltr" className={`${INPUT} w-32`} />
           </label>
           <label className="block">
-            <span className="text-sm font-medium">{t('label')}</span>
+            <span className="field-label">{t('label')}</span>
             <input name="label" maxLength={80} required className={`${INPUT} w-56`} />
           </label>
           <button type="submit" className={BUTTON}>

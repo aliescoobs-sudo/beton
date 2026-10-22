@@ -25,8 +25,8 @@ const litres = (data: FormData) => {
   return parsed.ok ? parsed.value : Number.NaN;
 };
 
-const INPUT = 'mt-1 block rounded border border-gray-300 px-3 py-1';
-const BUTTON = 'rounded bg-gray-900 px-3 py-1 text-sm text-white';
+const INPUT = 'input mt-1';
+const BUTTON = 'btn btn-primary btn-sm';
 
 /**
  * Everyone signed in reads trucks and their log; owner and partner edit trucks; the plant logs a breakdown or a
@@ -80,14 +80,10 @@ export function TrucksManager({
 
   return (
     <div className="mt-6 space-y-4">
-      {!canEdit && !canLog && <p className="text-sm text-gray-600">{t('readOnly')}</p>}
+      {!canEdit && !canLog && <p className="text-sm text-muted">{t('readOnly')}</p>}
       <ul className="space-y-3">
         {trucks.map((truck) => (
-          <li
-            key={truck.id}
-            className="rounded border border-gray-200 p-3"
-            data-testid={`truck-${truck.code}`}
-          >
+          <li key={truck.id} className="card p-3" data-testid={`truck-${truck.code}`}>
             {canEdit ? (
               <form
                 onSubmit={(e) =>
@@ -105,7 +101,7 @@ export function TrucksManager({
                   {truck.code}
                 </span>
                 <label className="block">
-                  <span className="text-sm font-medium">{t('plate')}</span>
+                  <span className="field-label">{t('plate')}</span>
                   <input
                     name="plate"
                     defaultValue={truck.plate}
@@ -116,7 +112,7 @@ export function TrucksManager({
                   />
                 </label>
                 <label className="block">
-                  <span className="text-sm font-medium">{t('capacity')}</span>
+                  <span className="field-label">{t('capacity')}</span>
                   <input
                     name="capacityM3"
                     inputMode="decimal"
@@ -146,7 +142,7 @@ export function TrucksManager({
                 <span>
                   <bdi dir="ltr">{formatCapacityM3(truck.capacityL)}</bdi> m³
                 </span>
-                {truck.status === 'archived' && <span className="text-gray-600">{t('archived')}</span>}
+                {truck.status === 'archived' && <span className="text-muted">{t('archived')}</span>}
               </p>
             )}
             <ul className="mt-2 space-y-1 text-sm" data-testid={`truck-log-${truck.code}`}>
@@ -173,11 +169,11 @@ export function TrucksManager({
                     }),
                   )
                 }
-                className="mt-3 flex flex-wrap items-end gap-3 rounded border border-dashed border-gray-300 p-3"
+                className="mt-3 flex flex-wrap items-end gap-3 rounded-lg border border-dashed border-line-strong bg-canvas/60 p-3"
                 data-testid={`truck-log-form-${truck.code}`}
               >
                 <label className="block">
-                  <span className="text-sm font-medium">{t('logStatus')}</span>
+                  <span className="field-label">{t('logStatus')}</span>
                   <select name="status" className={INPUT} defaultValue="breakdown">
                     <option value="breakdown">{t('status.breakdown')}</option>
                     <option value="roadblock">{t('status.roadblock')}</option>
@@ -185,15 +181,15 @@ export function TrucksManager({
                   </select>
                 </label>
                 <label className="block">
-                  <span className="text-sm font-medium">{t('fromDate')}</span>
+                  <span className="field-label">{t('fromDate')}</span>
                   <input name="fromDate" type="date" required dir="ltr" className={INPUT} />
                 </label>
                 <label className="block">
-                  <span className="text-sm font-medium">{t('toDate')}</span>
+                  <span className="field-label">{t('toDate')}</span>
                   <input name="toDate" type="date" dir="ltr" className={INPUT} />
                 </label>
                 <label className="block">
-                  <span className="text-sm font-medium">{t('reason')}</span>
+                  <span className="field-label">{t('reason')}</span>
                   <input name="reason" maxLength={500} required className={`${INPUT} w-56`} />
                 </label>
                 <button type="submit" className={BUTTON}>
@@ -216,19 +212,19 @@ export function TrucksManager({
               }),
             )
           }
-          className="flex flex-wrap items-end gap-3 rounded border border-dashed border-gray-300 p-3"
+          className="flex flex-wrap items-end gap-3 rounded-lg border border-dashed border-line-strong bg-canvas/60 p-3"
           data-testid="truck-new"
         >
           <label className="block">
-            <span className="text-sm font-medium">{t('code')}</span>
+            <span className="field-label">{t('code')}</span>
             <input name="code" maxLength={4} required dir="ltr" className={`${INPUT} w-24`} />
           </label>
           <label className="block">
-            <span className="text-sm font-medium">{t('plate')}</span>
+            <span className="field-label">{t('plate')}</span>
             <input name="plate" maxLength={20} required dir="ltr" className={`${INPUT} w-40`} />
           </label>
           <label className="block">
-            <span className="text-sm font-medium">{t('capacity')}</span>
+            <span className="field-label">{t('capacity')}</span>
             <input
               name="capacityM3"
               inputMode="decimal"

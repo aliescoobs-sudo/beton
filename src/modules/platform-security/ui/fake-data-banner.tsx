@@ -29,7 +29,7 @@ export async function FakeDataBanner() {
   return (
     <div
       role="status"
-      className="bg-amber-100 px-4 py-2 text-center text-sm text-amber-900"
+      className="border-b border-accent/40 bg-accent/15 px-4 py-1 text-center text-xs font-medium text-ink"
       data-testid="fake-data-banner"
     >
       {t('banner')}

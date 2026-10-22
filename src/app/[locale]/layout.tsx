@@ -3,11 +3,9 @@ import { notFound } from 'next/navigation';
 import { hasLocale, NextIntlClientProvider } from 'next-intl';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { directionOf, routing } from '@/i18n/routing';
-import { formatSimDate } from '@/modules/clock';
-import { SimBadge } from '@/modules/clock/ui/sim-badge';
 import { FakeDataBanner } from '@/modules/platform-security/ui/fake-data-banner';
-import { AdvanceSlot } from '../advance-slot';
-import { getRequestClock } from '../request-clock';
+import { ToastProvider } from '@/ui';
+import { plexArabic, plexSans } from '../fonts';
 import '../globals.css';
 
 export function generateStaticParams() {
@@ -24,20 +22,14 @@ export default async function LocaleLayout({
   const { locale } = await params;
   if (!hasLocale(routing.locales, locale)) notFound();
   setRequestLocale(locale);
-  const clock = await getRequestClock();
-  const t = await getTranslations('clock');
+  const t = await getTranslations('shell');
 
   return (
-    <html lang={locale} dir={directionOf(locale)}>
+    <html lang={locale} dir={directionOf(locale)} className={`${plexSans.variable} ${plexArabic.variable}`}>
       <body>
         <NextIntlClientProvider>
-          {clock.simulated && (
-            <SimBadge label={t('simulation')} at={formatSimDate(clock.now(), locale)}>
-              <AdvanceSlot />
-            </SimBadge>
-          )}
           <FakeDataBanner />
-          {children}
+          <ToastProvider dismissLabel={t('dismiss')}>{children}</ToastProvider>
         </NextIntlClientProvider>
       </body>
     </html>

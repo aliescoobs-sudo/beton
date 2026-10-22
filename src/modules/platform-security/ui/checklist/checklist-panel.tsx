@@ -6,6 +6,7 @@ import { type FormEvent, useState } from 'react';
 import type { ChecklistItem } from '../../domain/checklist';
 import { StepUpDialog } from '../step-up-dialog';
 import { type ChecklistActionResult, markChecklistItemAction } from './actions';
+import { StatusPill } from '@/ui';
 
 /** Owner view of the pre-real-data checklist: automated items are shown, manual ones marked with evidence. */
 export function ChecklistPanel({ items, complete }: { items: ChecklistItem[]; complete: boolean }) {
@@ -35,29 +36,21 @@ export function ChecklistPanel({ items, complete }: { items: ChecklistItem[]; co
       <p className="text-sm">{complete ? t('complete') : t('intro')}</p>
       <ul className="space-y-3">
         {items.map((item) => (
-          <li key={item.key} className="rounded border border-gray-200 p-3" data-testid={`check-${item.key}`}>
+          <li key={item.key} className="card p-3" data-testid={`check-${item.key}`}>
             <div className="flex items-center justify-between gap-2">
               <span className="font-medium">{t(`items.${item.key}` as never)}</span>
-              <span
-                data-testid="status"
-                className={item.status === 'done' ? 'text-green-700' : 'text-amber-700'}
-              >
+              <StatusPill data-testid="status" status={item.status === 'done' ? 'paid' : 'neutral'}>
                 {item.status === 'done' ? t('done') : t('open')}
-              </span>
+              </StatusPill>
             </div>
-            {item.kind === 'automated' && <p className="text-xs text-gray-500">{t('automated')}</p>}
+            {item.kind === 'automated' && <p className="text-xs text-muted">{t('automated')}</p>}
             {item.evidence && item.kind !== 'automated' && (
-              <p className="mt-1 text-sm text-gray-700">{item.evidence}</p>
+              <p className="mt-1 text-sm text-ink">{item.evidence}</p>
             )}
             {item.kind !== 'automated' && item.status === 'open' && (
               <form onSubmit={(e) => mark(item.key, e)} className="mt-2 flex gap-2">
-                <input
-                  name="evidence"
-                  required
-                  placeholder={t('evidence')}
-                  className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm"
-                />
-                <button type="submit" className="rounded bg-gray-900 px-3 py-1 text-sm text-white">
+                <input name="evidence" required placeholder={t('evidence')} className="input flex-1" />
+                <button type="submit" className="btn btn-primary btn-sm">
                   {item.kind === 'signoff' ? t('signoff') : t('mark')}
                 </button>
               </form>

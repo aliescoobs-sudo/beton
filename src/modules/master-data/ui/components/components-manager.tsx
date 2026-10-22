@@ -22,8 +22,8 @@ export interface ComponentView {
   units: { id: string; label: string; factorToBase: number; status: 'active' | 'archived' }[];
 }
 
-const INPUT = 'mt-1 block rounded border border-gray-300 px-3 py-1';
-const BUTTON = 'rounded bg-gray-900 px-3 py-1 text-sm text-white';
+const INPUT = 'input mt-1';
+const BUTTON = 'btn btn-primary btn-sm';
 
 /** Everyone signed in reads components; owner and partner edit (the server checks again on every write). */
 export function ComponentsManager({
@@ -77,12 +77,12 @@ export function ComponentsManager({
 
   return (
     <div className="mt-6 space-y-4">
-      {!editable && <p className="text-sm text-gray-600">{t('readOnly')}</p>}
+      {!editable && <p className="text-sm text-muted">{t('readOnly')}</p>}
       <ul className="space-y-3">
         {components.map((c) => (
-          <li key={c.id} className="rounded border border-gray-200 p-3" data-testid={`component-${c.code}`}>
+          <li key={c.id} className="card p-3" data-testid={`component-${c.code}`}>
             <p className="flex flex-wrap items-baseline gap-x-4">
-              <span dir="ltr" className="text-sm text-gray-600">
+              <span dir="ltr" className="text-sm text-muted">
                 {c.code}
               </span>
               <span className="font-medium" data-testid="component-name">
@@ -92,7 +92,7 @@ export function ComponentsManager({
                 {t('baseUnitValue', { unit: c.baseUnit })} ·{' '}
                 {t('thresholdValue', { count: c.lowStockThreshold })}
               </span>
-              {c.status === 'archived' && <span className="text-sm text-gray-600">{t('archivedBadge')}</span>}
+              {c.status === 'archived' && <span className="text-sm text-muted">{t('archivedBadge')}</span>}
             </p>
             <ul className="mt-2 space-y-1 text-sm">
               {c.units.map((u) => (
@@ -101,7 +101,7 @@ export function ComponentsManager({
                   <span dir="ltr">
                     = {u.factorToBase} {c.baseUnit}
                   </span>
-                  {u.status === 'archived' && <span className="text-gray-600">{t('archivedBadge')}</span>}
+                  {u.status === 'archived' && <span className="text-muted">{t('archivedBadge')}</span>}
                   {editable && (
                     <button
                       type="button"
@@ -136,7 +136,7 @@ export function ComponentsManager({
                 >
                   <input type="hidden" name="baseUnit" value={c.baseUnit} />
                   <label className="block">
-                    <span className="text-sm font-medium">{t('nameFr')}</span>
+                    <span className="field-label">{t('nameFr')}</span>
                     <input
                       name="nameFr"
                       defaultValue={c.nameFr}
@@ -146,7 +146,7 @@ export function ComponentsManager({
                     />
                   </label>
                   <label className="block">
-                    <span className="text-sm font-medium">{t('nameAr')}</span>
+                    <span className="field-label">{t('nameAr')}</span>
                     <input
                       name="nameAr"
                       defaultValue={c.nameAr}
@@ -157,7 +157,7 @@ export function ComponentsManager({
                     />
                   </label>
                   <label className="block">
-                    <span className="text-sm font-medium">{t('threshold', { unit: c.baseUnit })}</span>
+                    <span className="field-label">{t('threshold', { unit: c.baseUnit })}</span>
                     <input
                       name="lowStockThreshold"
                       type="number"
@@ -189,11 +189,11 @@ export function ComponentsManager({
                   data-testid={`unit-new-${c.code}`}
                 >
                   <label className="block">
-                    <span className="text-sm font-medium">{t('unitLabel')}</span>
+                    <span className="field-label">{t('unitLabel')}</span>
                     <input name="label" maxLength={80} required className={`${INPUT} w-40`} />
                   </label>
                   <label className="block">
-                    <span className="text-sm font-medium">{t('factor', { unit: c.baseUnit })}</span>
+                    <span className="field-label">{t('factor', { unit: c.baseUnit })}</span>
                     <input
                       name="factorToBase"
                       type="number"
@@ -217,19 +217,19 @@ export function ComponentsManager({
       {editable && (
         <form
           onSubmit={(e) => void submit('new', e, (d) => createComponentAction(fields(d)))}
-          className="flex flex-wrap items-end gap-3 rounded border border-dashed border-gray-300 p-3"
+          className="flex flex-wrap items-end gap-3 rounded-lg border border-dashed border-line-strong bg-canvas/60 p-3"
           data-testid="component-new"
         >
           <label className="block">
-            <span className="text-sm font-medium">{t('nameFr')}</span>
+            <span className="field-label">{t('nameFr')}</span>
             <input name="nameFr" maxLength={80} required className={`${INPUT} w-48`} />
           </label>
           <label className="block">
-            <span className="text-sm font-medium">{t('nameAr')}</span>
+            <span className="field-label">{t('nameAr')}</span>
             <input name="nameAr" maxLength={80} required dir="rtl" className={`${INPUT} w-48`} />
           </label>
           <label className="block">
-            <span className="text-sm font-medium">{t('baseUnit')}</span>
+            <span className="field-label">{t('baseUnit')}</span>
             <select name="baseUnit" defaultValue="g" dir="ltr" className={INPUT}>
               <option value="g">g</option>
               <option value="mL">mL</option>
@@ -237,7 +237,7 @@ export function ComponentsManager({
             </select>
           </label>
           <label className="block">
-            <span className="text-sm font-medium">{t('thresholdShort')}</span>
+            <span className="field-label">{t('thresholdShort')}</span>
             <input name="lowStockThreshold" type="number" min={0} dir="ltr" className={`${INPUT} w-36`} />
           </label>
           <button type="submit" className={BUTTON}>

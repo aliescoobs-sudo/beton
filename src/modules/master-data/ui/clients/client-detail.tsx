@@ -35,7 +35,7 @@ export function ClientDetail({
   return (
     <div className="mt-6 space-y-4">
       {archived && (
-        <p role="status" className="text-sm text-gray-600" data-testid="client-archived">
+        <p role="status" className="text-sm text-muted" data-testid="client-archived">
           {t('archivedNotice')}
         </p>
       )}
@@ -53,7 +53,7 @@ export function ClientDetail({
         <button
           type="button"
           onClick={() => void archive()}
-          className="rounded border border-red-700 px-3 py-1 text-sm text-red-700"
+          className="btn btn-danger btn-sm"
           data-testid="client-archive"
         >
           {t('archive')}

@@ -2,10 +2,12 @@
 
 import { useTranslations } from 'next-intl';
 import { type FormEvent, useState } from 'react';
+import { Button, Dialog, Field, Input, useToast } from '@/ui';
 
 /** Asks for a fresh TOTP before a sensitive action; the caller retries the action once on success. */
 export function StepUpDialog({ onVerified, onCancel }: { onVerified: () => void; onCancel: () => void }) {
   const t = useTranslations('auth.stepUp');
+  const toast = useToast();
   const [invalid, setInvalid] = useState(false);
   const [pending, setPending] = useState(false);
 
@@ -20,7 +22,10 @@ export function StepUpDialog({ onVerified, onCancel }: { onVerified: () => void;
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ code }),
       });
-      if (res.ok) return onVerified();
+      if (res.ok) {
+        toast.show(t('verified'));
+        return onVerified();
+      }
       setInvalid(true);
     } finally {
       setPending(false);
@@ -28,47 +33,34 @@ export function StepUpDialog({ onVerified, onCancel }: { onVerified: () => void;
   }
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="step-up-title"
-      className="fixed inset-0 flex items-center justify-center bg-black/40 p-4"
-    >
-      <form onSubmit={submit} className="w-full max-w-sm space-y-4 rounded bg-white p-6 text-gray-900">
-        <h2 id="step-up-title" className="text-lg font-medium">
-          {t('title')}
-        </h2>
-        <p className="text-sm">{t('intro')}</p>
-        <label className="block">
-          <span className="text-sm font-medium">{t('code')}</span>
-          <input
+    <Dialog title={t('title')} onClose={onCancel}>
+      <form onSubmit={submit} className="space-y-4">
+        <p className="text-sm text-muted">{t('intro')}</p>
+        <Field label={t('code')}>
+          <Input
             name="code"
             inputMode="numeric"
             autoComplete="one-time-code"
             required
             autoFocus
             dir="ltr"
-            className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 font-mono tracking-widest"
+            className="num font-mono tracking-widest"
           />
-        </label>
+        </Field>
         {invalid && (
-          <p role="alert" className="text-sm text-red-700">
+          <p role="alert" className="field-error">
             {t('invalid')}
           </p>
         )}
         <div className="flex gap-2">
-          <button
-            type="submit"
-            disabled={pending}
-            className="flex-1 rounded bg-gray-900 px-4 py-2 font-medium text-white disabled:opacity-50"
-          >
+          <Button type="submit" disabled={pending} className="flex-1">
             {t('confirm')}
-          </button>
-          <button type="button" onClick={onCancel} className="rounded border border-gray-300 px-4 py-2">
+          </Button>
+          <Button variant="secondary" onClick={onCancel}>
             {t('cancel')}
-          </button>
+          </Button>
         </div>
       </form>
-    </div>
+    </Dialog>
   );
 }

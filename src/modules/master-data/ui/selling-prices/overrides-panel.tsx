@@ -14,7 +14,7 @@ export interface OverrideView {
   reason: string;
 }
 
-const INPUT = 'mt-1 block rounded border border-gray-300 px-3 py-1';
+const INPUT = 'input mt-1';
 
 /** The price overrides of one client (read-only for office) and, for owner and partner, the form with its mandatory reason. */
 export function OverridesPanel({
@@ -60,9 +60,9 @@ export function OverridesPanel({
   }
 
   return (
-    <section className="mt-8 rounded border border-gray-200 p-3" data-testid="overrides">
+    <section className="mt-8 card p-3" data-testid="overrides">
       <h2 className="font-medium">{t('title')}</h2>
-      {overrides.length === 0 && <p className="mt-2 text-sm text-gray-600">{t('none')}</p>}
+      {overrides.length === 0 && <p className="mt-2 text-sm text-muted">{t('none')}</p>}
       <ul className="mt-2 space-y-1 text-sm">
         {overrides.map((o) => (
           <li key={o.id} data-testid="override-row">
@@ -99,7 +99,7 @@ export function OverridesPanel({
             <span className="text-sm">{t('reason')}</span>
             <textarea name="reason" required maxLength={500} rows={2} className={`${INPUT} w-full`} />
           </label>
-          <button type="submit" className="rounded bg-gray-900 px-3 py-1 text-sm text-white">
+          <button type="submit" className="btn btn-primary btn-sm">
             {t('publish')}
           </button>
           {message && (

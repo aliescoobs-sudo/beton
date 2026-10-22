@@ -57,19 +57,19 @@ export function EnrolFlow({ locale, reenrol = false }: { locale: string; reenrol
   }
 
   const error = problem && (
-    <p role="alert" className="text-sm text-red-700">
+    <p role="alert" className="text-sm text-status-late">
       {t(problem)}
     </p>
   );
-  const input = 'mt-1 block w-full rounded border border-gray-300 px-3 py-2';
-  const button = 'w-full rounded bg-gray-900 px-4 py-2 font-medium text-white disabled:opacity-50';
+  const input = 'input mt-1';
+  const button = 'btn btn-primary w-full';
 
   if (!enrolment) {
     return (
-      <form onSubmit={start} className="mt-6 space-y-4">
+      <form onSubmit={start} className="space-y-4">
         <p>{reenrol ? t('reenrolIntro') : t('intro')}</p>
         <label className="block">
-          <span className="text-sm font-medium">{t('confirmPassword')}</span>
+          <span className="field-label">{t('confirmPassword')}</span>
           <input name="password" type="password" autoComplete="current-password" required className={input} />
         </label>
         {error}
@@ -82,7 +82,7 @@ export function EnrolFlow({ locale, reenrol = false }: { locale: string; reenrol
 
   const secret = new URL(enrolment.totpURI).searchParams.get('secret') ?? '';
   return (
-    <div className="mt-6 space-y-6">
+    <div className="space-y-6">
       {qr && (
         <section>
           <p className="text-sm">{t('qrIntro')}</p>
@@ -101,7 +101,7 @@ export function EnrolFlow({ locale, reenrol = false }: { locale: string; reenrol
         <p className="text-sm font-medium">{t('keyLabel')}</p>
         <p
           dir="ltr"
-          className="mt-1 break-all rounded bg-gray-100 p-3 font-mono text-lg tracking-wider"
+          className="mt-1 break-all rounded bg-canvas p-3 font-mono text-lg tracking-wider"
           data-testid="totp-secret"
         >
           {secret.match(/.{1,4}/g)?.join(' ')}
@@ -126,7 +126,7 @@ export function EnrolFlow({ locale, reenrol = false }: { locale: string; reenrol
       {saved && (
         <form onSubmit={finish} className="space-y-4">
           <label className="block">
-            <span className="text-sm font-medium">{t('confirmCode')}</span>
+            <span className="field-label">{t('confirmCode')}</span>
             <input
               name="code"
               inputMode="numeric"

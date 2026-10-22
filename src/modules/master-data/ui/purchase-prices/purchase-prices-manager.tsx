@@ -28,7 +28,7 @@ export interface CostView {
   costCentimes: number | null;
 }
 
-const INPUT = 'mt-1 block rounded border border-gray-300 px-3 py-1';
+const INPUT = 'input mt-1';
 
 /**
  * Per component: the price versions (insert-only) and, for owner and partner, a "new price" form. Managers also see
@@ -97,11 +97,11 @@ export function PurchasePricesManager({
 
   return (
     <div className="mt-6 space-y-6">
-      {!editable && <p className="text-sm text-gray-600">{t('readOnly')}</p>}
+      {!editable && <p className="text-sm text-muted">{t('readOnly')}</p>}
       {costs && (
-        <section className="rounded border border-gray-200 p-3" data-testid="cost-per-m3">
+        <section className="card p-3" data-testid="cost-per-m3">
           <h2 className="font-medium">{t('costTitle')}</h2>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-muted">
             {t('costAt')} <span dir="ltr">{businessDate}</span>
           </p>
           <ul className="mt-2 space-y-1 text-sm">
@@ -121,15 +121,11 @@ export function PurchasePricesManager({
       {components.map((c) => {
         const seed = proposed[c.id];
         return (
-          <section
-            key={c.id}
-            className="rounded border border-gray-200 p-3"
-            data-testid={`price-${c.nameFr}`}
-          >
+          <section key={c.id} className="card p-3" data-testid={`price-${c.nameFr}`}>
             <h2 className="font-medium" dir="auto">
               {name(c)}
             </h2>
-            {c.history.length === 0 && <p className="mt-2 text-sm text-gray-600">{t('none')}</p>}
+            {c.history.length === 0 && <p className="mt-2 text-sm text-muted">{t('none')}</p>}
             <ul className="mt-2 space-y-1 text-sm">
               {c.history.map((h) => (
                 <li key={h.id}>
@@ -191,14 +187,10 @@ export function PurchasePricesManager({
                   </label>
                 </div>
                 <div className="flex gap-3">
-                  <button type="submit" className="rounded bg-gray-900 px-3 py-1 text-sm text-white">
+                  <button type="submit" className="btn btn-primary btn-sm">
                     {t('publish')}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => void propose(c)}
-                    className="rounded border border-gray-300 px-3 py-1 text-sm"
-                  >
+                  <button type="button" onClick={() => void propose(c)} className="btn btn-secondary btn-sm">
                     {t('propose')}
                   </button>
                 </div>

@@ -4,6 +4,7 @@ import { listZones } from '@/modules/master-data';
 import { ZonesManager } from '@/modules/master-data/ui/zones/zones-manager';
 import { can } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/next';
+import { PageHeader } from '@/ui';
 
 export default async function ZonesPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -12,9 +13,9 @@ export default async function ZonesPage({ params }: { params: Promise<{ locale: 
   const zones = await listZones(getPool('app'), user);
   const t = await getTranslations('masterData.zones');
   return (
-    <main className="mx-auto max-w-3xl px-4 py-8">
-      <h1 className="text-2xl font-semibold">{t('title')}</h1>
+    <div>
+      <PageHeader title={t('title')} />
       <ZonesManager zones={zones} editable={can(user.role, 'zones.write')} />
-    </main>
+    </div>
   );
 }

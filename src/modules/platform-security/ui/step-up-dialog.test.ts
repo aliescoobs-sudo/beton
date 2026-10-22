@@ -44,8 +44,8 @@ describe('StepUpDialog', () => {
       expect(html).not.toContain('auth.stepUp');
     });
 
-    it(`sets its own text colour in ${locale} (the sim badge hosting it is text-white)`, () => {
-      expect(render(locale)).toMatch(/<form[^>]*class="[^"]*\btext-gray-900\b/);
+    it(`sets its own text colour in ${locale} (it is rendered inside the simulation pill's popover)`, () => {
+      expect(render(locale)).toMatch(/role="dialog"[^>]*class="[^"]*\btext-ink\b/);
     });
   }
 });

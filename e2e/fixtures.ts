@@ -70,6 +70,12 @@ export async function passwordStep(page: Page, locale: string, email: string) {
   await page.click('button[type=submit]');
 }
 
+/** Opens the user menu in the top bar and signs out. */
+export async function logout(page: Page) {
+  await page.getByTestId('user-menu').click();
+  await page.getByTestId('logout').click();
+}
+
 /** Password login of a not-yet-enrolled user, then enrolment in the browser. Returns the displayed key. */
 export async function loginAndEnrol(page: Page, locale: string, email: string): Promise<string> {
   await passwordStep(page, locale, email);

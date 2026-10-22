@@ -39,8 +39,8 @@ export function UsersAdmin({ users, selfId }: { users: ManagedUser[]; selfId: st
     void run(() => createUserAction(data), t('created')).then(() => form.reset());
   }
 
-  const cell = 'border-b border-gray-200 px-2 py-2 text-start';
-  const input = 'mt-1 block w-full rounded border border-gray-300 px-3 py-2';
+  const cell = 'border-b border-line px-2 py-2 text-start';
+  const input = 'input mt-1';
 
   return (
     <div className="mt-6 space-y-8">
@@ -137,7 +137,7 @@ export function UsersAdmin({ users, selfId }: { users: ManagedUser[]; selfId: st
           <span className="text-sm">{t('password')}</span>
           <input name="password" type="password" autoComplete="new-password" required className={input} />
         </label>
-        <button type="submit" className="rounded bg-gray-900 px-4 py-2 font-medium text-white">
+        <button type="submit" className="btn btn-primary">
           {t('create')}
         </button>
       </form>

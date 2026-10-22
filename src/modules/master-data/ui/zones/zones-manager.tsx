@@ -45,27 +45,27 @@ export function ZonesManager({ zones, editable }: { zones: ZoneRow[]; editable: 
 
   return (
     <div className="mt-6 space-y-4">
-      {!editable && <p className="text-sm text-gray-600">{t('readOnly')}</p>}
+      {!editable && <p className="text-sm text-muted">{t('readOnly')}</p>}
       <ul className="space-y-3">
         {zones.map((zone) => (
-          <li key={zone.id} className="rounded border border-gray-200 p-3" data-testid={`zone-${zone.name}`}>
+          <li key={zone.id} className="card p-3" data-testid={`zone-${zone.name}`}>
             {editable ? (
               <form
                 onSubmit={(e) => void submit(zone.id, e, (input) => updateZoneAction(zone.id, input))}
                 className="flex flex-wrap items-end gap-3"
               >
                 <label className="block">
-                  <span className="text-sm font-medium">{t('name')}</span>
+                  <span className="field-label">{t('name')}</span>
                   <input
                     name="name"
                     defaultValue={zone.name}
                     maxLength={80}
                     required
-                    className="mt-1 block w-56 rounded border border-gray-300 px-3 py-1"
+                    className="input mt-1 w-56"
                   />
                 </label>
                 <label className="block">
-                  <span className="text-sm font-medium">{t('oneWayMin')}</span>
+                  <span className="field-label">{t('oneWayMin')}</span>
                   <input
                     name="oneWayMin"
                     type="number"
@@ -74,10 +74,10 @@ export function ZonesManager({ zones, editable }: { zones: ZoneRow[]; editable: 
                     defaultValue={zone.oneWayMin}
                     required
                     dir="ltr"
-                    className="mt-1 block w-28 rounded border border-gray-300 px-3 py-1"
+                    className="input mt-1 w-28"
                   />
                 </label>
-                <button type="submit" className="rounded bg-gray-900 px-3 py-1 text-sm text-white">
+                <button type="submit" className="btn btn-primary btn-sm">
                   {t('save')}
                 </button>
                 {message?.id === zone.id && (
@@ -102,20 +102,15 @@ export function ZonesManager({ zones, editable }: { zones: ZoneRow[]; editable: 
       {editable && (
         <form
           onSubmit={(e) => void submit('new', e, createZoneAction)}
-          className="flex flex-wrap items-end gap-3 rounded border border-dashed border-gray-300 p-3"
+          className="flex flex-wrap items-end gap-3 rounded-lg border border-dashed border-line-strong bg-canvas/60 p-3"
           data-testid="zone-new"
         >
           <label className="block">
-            <span className="text-sm font-medium">{t('name')}</span>
-            <input
-              name="name"
-              maxLength={80}
-              required
-              className="mt-1 block w-56 rounded border border-gray-300 px-3 py-1"
-            />
+            <span className="field-label">{t('name')}</span>
+            <input name="name" maxLength={80} required className="input mt-1 w-56" />
           </label>
           <label className="block">
-            <span className="text-sm font-medium">{t('oneWayMin')}</span>
+            <span className="field-label">{t('oneWayMin')}</span>
             <input
               name="oneWayMin"
               type="number"
@@ -123,10 +118,10 @@ export function ZonesManager({ zones, editable }: { zones: ZoneRow[]; editable: 
               max={480}
               required
               dir="ltr"
-              className="mt-1 block w-28 rounded border border-gray-300 px-3 py-1"
+              className="input mt-1 w-28"
             />
           </label>
-          <button type="submit" className="rounded bg-gray-900 px-3 py-1 text-sm text-white">
+          <button type="submit" className="btn btn-primary btn-sm">
             {t('add')}
           </button>
           {message?.id === 'new' && (

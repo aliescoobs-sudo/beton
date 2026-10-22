@@ -14,6 +14,7 @@ import { OverridesPanel } from '@/modules/master-data/ui/selling-prices/override
 import { SitesPanel } from '@/modules/master-data/ui/sites/sites-panel';
 import { can } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/next';
+import { PageHeader } from '@/ui';
 
 export default async function ClientPage({ params }: { params: Promise<{ locale: string; id: string }> }) {
   const { locale, id } = await params;
@@ -30,15 +31,25 @@ export default async function ClientPage({ params }: { params: Promise<{ locale:
   const typeCode = new Map(types.map((type) => [type.id, type.code]));
   const t = await getTranslations('masterData.clients');
   return (
-    <main className="mx-auto max-w-3xl px-4 py-8">
-      <Link href={`/${locale}/master-data/clients`} className="text-sm underline">
+    <div>
+      <Link
+        href={`/${locale}/master-data/clients`}
+        className="mb-2 inline-block text-sm text-muted underline"
+      >
         {t('back')}
       </Link>
-      <h1 className="mt-2 text-2xl font-semibold">
-        <span dir="ltr">{client.code}</span> — {client.name}
-      </h1>
+      <PageHeader
+        title={
+          <>
+            <bdi dir="ltr" className="num">
+              {client.code}
+            </bdi>{' '}
+            — <bdi>{client.name}</bdi>
+          </>
+        }
+      />
       {client.iceOverrideReason && (
-        <p className="mt-2 text-sm text-gray-600" data-testid="client-override-reason">
+        <p className="mt-2 text-sm text-muted" data-testid="client-override-reason">
           {t('overrideNote', { reason: client.iceOverrideReason })}
         </p>
       )}
@@ -81,6 +92,6 @@ export default async function ClientPage({ params }: { params: Promise<{ locale:
         types={types}
         editable={can(user.role, 'client_price_override.write') && client.status === 'active'}
       />
-    </main>
+    </div>
   );
 }

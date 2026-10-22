@@ -4,6 +4,7 @@ import { listSellingPrices, listSelectableConcreteTypes } from '@/modules/master
 import { SellingPricesManager } from '@/modules/master-data/ui/selling-prices/selling-prices-manager';
 import { can } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/next';
+import { PageHeader } from '@/ui';
 
 export default async function SellingPricesPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -16,8 +17,8 @@ export default async function SellingPricesPage({ params }: { params: Promise<{ 
   ]);
   const t = await getTranslations('masterData.sellingPrices');
   return (
-    <main className="mx-auto max-w-4xl px-4 py-8">
-      <h1 className="text-2xl font-semibold">{t('title')}</h1>
+    <div>
+      <PageHeader title={t('title')} />
       <SellingPricesManager
         types={types.map((type) => ({
           id: type.id,
@@ -33,6 +34,6 @@ export default async function SellingPricesPage({ params }: { params: Promise<{ 
         }))}
         editable={can(user.role, 'selling_prices.write')}
       />
-    </main>
+    </div>
   );
 }

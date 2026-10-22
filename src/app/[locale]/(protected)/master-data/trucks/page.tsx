@@ -4,6 +4,7 @@ import { listTruckStatusLog, listTrucks } from '@/modules/master-data';
 import { TrucksManager } from '@/modules/master-data/ui/trucks/trucks-manager';
 import { can } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/next';
+import { PageHeader } from '@/ui';
 
 export default async function TrucksPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -19,14 +20,14 @@ export default async function TrucksPage({ params }: { params: Promise<{ locale:
   );
   const t = await getTranslations('masterData.trucks');
   return (
-    <main className="mx-auto max-w-3xl px-4 py-8">
-      <h1 className="text-2xl font-semibold">{t('title')}</h1>
+    <div>
+      <PageHeader title={t('title')} />
       <TrucksManager
         trucks={trucks}
         logs={logs}
         canEdit={can(user.role, 'trucks.write')}
         canLog={can(user.role, 'trucks.status.write')}
       />
-    </main>
+    </div>
   );
 }

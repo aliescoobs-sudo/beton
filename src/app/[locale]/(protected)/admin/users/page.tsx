@@ -4,6 +4,7 @@ import { getAuth } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/auth/page-guard';
 import { listUsers } from '@/modules/platform-security/service/user-admin';
 import { UsersAdmin } from '@/modules/platform-security/ui/users/users-admin';
+import { PageHeader } from '@/ui';
 
 export default async function UsersPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -15,9 +16,9 @@ export default async function UsersPage({ params }: { params: Promise<{ locale: 
   );
   const t = await getTranslations('admin');
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8">
-      <h1 className="text-2xl font-semibold">{t('title')}</h1>
+    <div>
+      <PageHeader title={t('title')} />
       <UsersAdmin users={users} selfId={owner.id} />
-    </main>
+    </div>
   );
 }

@@ -22,7 +22,7 @@ export interface SupplierRow {
 }
 
 const CATEGORIES = ['cement', 'aggregates', 'admixture', 'transport', 'fuel', 'other'] as const;
-const input = 'mt-1 block w-full rounded border border-gray-300 px-3 py-1';
+const input = 'input mt-1';
 
 /** Office, owner and partner create and edit; owner and partner archive (the server checks again on every write). */
 export function SuppliersManager({
@@ -77,11 +77,11 @@ export function SuppliersManager({
   const fields = (s?: SupplierRow) => (
     <>
       <label className="block">
-        <span className="text-sm font-medium">{t('name')}</span>
+        <span className="field-label">{t('name')}</span>
         <input name="name" defaultValue={s?.name} maxLength={120} required className={input} />
       </label>
       <label className="block">
-        <span className="text-sm font-medium">{t('category')}</span>
+        <span className="field-label">{t('category')}</span>
         <select name="category" defaultValue={s?.category ?? 'other'} className={input}>
           {CATEGORIES.map((c) => (
             <option key={c} value={c}>
@@ -91,15 +91,15 @@ export function SuppliersManager({
         </select>
       </label>
       <label className="block">
-        <span className="text-sm font-medium">{t('ice')}</span>
+        <span className="field-label">{t('ice')}</span>
         <input name="ice" defaultValue={s?.ice} inputMode="numeric" dir="ltr" className={input} />
       </label>
       <label className="block">
-        <span className="text-sm font-medium">{t('phone')}</span>
+        <span className="field-label">{t('phone')}</span>
         <input name="phone" defaultValue={s?.phone} type="tel" dir="ltr" className={input} />
       </label>
       <label className="block">
-        <span className="text-sm font-medium">{t('paymentTerms')}</span>
+        <span className="field-label">{t('paymentTerms')}</span>
         <input
           name="paymentTermsDays"
           type="number"
@@ -115,7 +115,7 @@ export function SuppliersManager({
 
   return (
     <div className="mt-6 space-y-6">
-      <section className="rounded border border-dashed border-gray-300 p-3">
+      <section className="rounded-lg border border-dashed border-line-strong bg-canvas/60 p-3">
         <h2 className="mb-2 font-medium">{t('new')}</h2>
         <form
           onSubmit={(e) => void submit('new', e, createSupplierAction)}
@@ -123,10 +123,7 @@ export function SuppliersManager({
           data-testid="supplier-new"
         >
           {fields()}
-          <button
-            type="submit"
-            className="h-fit w-fit self-end rounded bg-gray-900 px-3 py-1 text-sm text-white"
-          >
+          <button type="submit" className="btn btn-primary btn-sm h-fit w-fit self-end">
             {t('add')}
           </button>
           {message?.id === 'new' && (
@@ -138,13 +135,13 @@ export function SuppliersManager({
       </section>
       <ul className="space-y-3">
         {suppliers.map((s) => (
-          <li key={s.id} className="rounded border border-gray-200 p-3" data-testid={`supplier-${s.name}`}>
+          <li key={s.id} className="card p-3" data-testid={`supplier-${s.name}`}>
             <p className="mb-2 flex items-center gap-4 text-sm">
               <span dir="ltr" className="font-mono">
                 {s.code}
               </span>
               {s.status === 'archived' && (
-                <span className="text-gray-600" data-testid="supplier-archived">
+                <span className="text-muted" data-testid="supplier-archived">
                   {t('archivedBadge')}
                 </span>
               )}
@@ -156,14 +153,14 @@ export function SuppliersManager({
               >
                 {fields(s)}
                 <div className="flex items-end gap-3">
-                  <button type="submit" className="rounded bg-gray-900 px-3 py-1 text-sm text-white">
+                  <button type="submit" className="btn btn-primary btn-sm">
                     {t('save')}
                   </button>
                   {canArchive && (
                     <button
                       type="button"
                       onClick={() => void archive(s.id)}
-                      className="rounded border border-red-700 px-3 py-1 text-sm text-red-700"
+                      className="btn btn-danger btn-sm"
                       data-testid="supplier-archive"
                     >
                       {t('archive')}

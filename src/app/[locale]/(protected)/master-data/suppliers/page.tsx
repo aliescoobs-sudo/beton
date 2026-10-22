@@ -4,6 +4,7 @@ import { listSuppliers } from '@/modules/master-data';
 import { SuppliersManager } from '@/modules/master-data/ui/suppliers/suppliers-manager';
 import { can } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/next';
+import { PageHeader } from '@/ui';
 
 export default async function SuppliersPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -12,8 +13,8 @@ export default async function SuppliersPage({ params }: { params: Promise<{ loca
   const suppliers = await listSuppliers(getPool('app'), user);
   const t = await getTranslations('masterData.suppliers');
   return (
-    <main className="mx-auto max-w-4xl px-4 py-8">
-      <h1 className="text-2xl font-semibold">{t('title')}</h1>
+    <div>
+      <PageHeader title={t('title')} />
       <SuppliersManager
         suppliers={suppliers.map((s) => ({
           id: s.id,
@@ -27,6 +28,6 @@ export default async function SuppliersPage({ params }: { params: Promise<{ loca
         }))}
         canArchive={can(user.role, 'parties.archive')}
       />
-    </main>
+    </div>
   );
 }

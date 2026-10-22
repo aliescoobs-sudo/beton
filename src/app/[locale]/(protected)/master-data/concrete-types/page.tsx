@@ -4,6 +4,7 @@ import { listConcreteTypes } from '@/modules/master-data';
 import { ConcreteTypesManager } from '@/modules/master-data/ui/concrete-types/concrete-types-manager';
 import { can } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/next';
+import { PageHeader } from '@/ui';
 
 export default async function ConcreteTypesPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -12,9 +13,9 @@ export default async function ConcreteTypesPage({ params }: { params: Promise<{ 
   const types = await listConcreteTypes(getPool('app'), user);
   const t = await getTranslations('masterData.concreteTypes');
   return (
-    <main className="mx-auto max-w-3xl px-4 py-8">
-      <h1 className="text-2xl font-semibold">{t('title')}</h1>
+    <div>
+      <PageHeader title={t('title')} />
       <ConcreteTypesManager types={types} editable={can(user.role, 'recettes.write')} />
-    </main>
+    </div>
   );
 }

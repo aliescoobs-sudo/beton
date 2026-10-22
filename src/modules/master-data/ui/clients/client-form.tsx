@@ -27,7 +27,7 @@ export const EMPTY_CLIENT: ClientFormValues = {
   notes: '',
 };
 
-const input = 'mt-1 block w-full rounded border border-gray-300 px-3 py-1';
+const input = 'input mt-1';
 
 /**
  * Name and kind are all a new client needs; the rest sits under "more details". A second client on an existing ICE
@@ -96,7 +96,7 @@ export function ClientForm({
     <form onSubmit={(e) => void submit(e)} className="space-y-3" data-testid={testId}>
       <div className="flex flex-wrap items-end gap-3">
         <label className="block">
-          <span className="text-sm font-medium">{t('name')}</span>
+          <span className="field-label">{t('name')}</span>
           <input
             name="name"
             defaultValue={initial.name}
@@ -106,7 +106,7 @@ export function ClientForm({
           />
         </label>
         <label className="block">
-          <span className="text-sm font-medium">{t('kind')}</span>
+          <span className="field-label">{t('kind')}</span>
           <select
             name="kind"
             value={kind}
@@ -117,7 +117,7 @@ export function ClientForm({
             <option value="person">{t('kindPerson')}</option>
           </select>
         </label>
-        <button type="submit" className="rounded bg-gray-900 px-3 py-1 text-sm text-white">
+        <button type="submit" className="btn btn-primary btn-sm">
           {submitLabel}
         </button>
       </div>
@@ -126,20 +126,20 @@ export function ClientForm({
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           {kind === 'company' && (
             <label className="block">
-              <span className="text-sm font-medium">{t('ice')}</span>
+              <span className="field-label">{t('ice')}</span>
               <input name="ice" defaultValue={initial.ice} inputMode="numeric" dir="ltr" className={input} />
             </label>
           )}
           <label className="block">
-            <span className="text-sm font-medium">{t('phone')}</span>
+            <span className="field-label">{t('phone')}</span>
             <input name="phone" defaultValue={initial.phone} type="tel" dir="ltr" className={input} />
           </label>
           <label className="block">
-            <span className="text-sm font-medium">{t('contactName')}</span>
+            <span className="field-label">{t('contactName')}</span>
             <input name="contactName" defaultValue={initial.contactName} maxLength={120} className={input} />
           </label>
           <label className="block">
-            <span className="text-sm font-medium">{t('defaultZone')}</span>
+            <span className="field-label">{t('defaultZone')}</span>
             <select name="defaultZoneId" defaultValue={initial.defaultZoneId} className={input}>
               <option value="">—</option>
               {zones.map((zone) => (
@@ -150,7 +150,7 @@ export function ClientForm({
             </select>
           </label>
           <label className="block">
-            <span className="text-sm font-medium">{t('paymentTerms')}</span>
+            <span className="field-label">{t('paymentTerms')}</span>
             <input
               name="paymentTermsDays"
               type="number"
@@ -162,12 +162,12 @@ export function ClientForm({
             />
           </label>
           <label className="block sm:col-span-2">
-            <span className="text-sm font-medium">{t('notes')}</span>
+            <span className="field-label">{t('notes')}</span>
             <textarea name="notes" defaultValue={initial.notes} maxLength={2000} rows={2} className={input} />
           </label>
           {needsReason && (
             <label className="block sm:col-span-2">
-              <span className="text-sm font-medium">{t('iceOverrideReason')}</span>
+              <span className="field-label">{t('iceOverrideReason')}</span>
               <input name="iceOverrideReason" minLength={3} maxLength={500} required className={input} />
             </label>
           )}

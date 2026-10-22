@@ -6,6 +6,7 @@ import { requirePagePermission } from '@/modules/platform-security/auth/page-gua
 import { PARAMETER_KEYS, PARAMETERS } from '@/modules/platform-security/domain/parameters';
 import { readParameters } from '@/modules/platform-security/service/parameter-service';
 import { type ParameterRow, ParametersForm } from '@/modules/platform-security/ui/parameters/parameters-form';
+import { PageHeader } from '@/ui';
 
 function bounds(schema: z.ZodType): { min?: number; max?: number } {
   const def = schema as unknown as { minValue?: number | null; maxValue?: number | null };
@@ -25,12 +26,12 @@ export default async function ParametersPage({ params }: { params: Promise<{ loc
   });
   const t = await getTranslations('parameters');
   return (
-    <main className="mx-auto max-w-2xl px-4 py-8">
-      <h1 className="text-2xl font-semibold">{t('title')}</h1>
-      <p className="mt-2 text-sm text-gray-600" data-testid="restart-note">
+    <div className="mx-auto max-w-2xl">
+      <PageHeader title={t('title')} />
+      <p className="mt-2 text-sm text-muted" data-testid="restart-note">
         {t('restartNote')}
       </p>
       <ParametersForm rows={rows} editable={can(user.role, 'parameters.write')} />
-    </main>
+    </div>
   );
 }

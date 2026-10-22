@@ -14,7 +14,7 @@ export interface SellingTypeView {
   versions: { id: string; priceHtPerM3Centimes: number; effectiveFrom: string }[];
 }
 
-const INPUT = 'mt-1 block rounded border border-gray-300 px-3 py-1';
+const INPUT = 'input mt-1';
 
 /** Per concrete type: the list price versions (read-only) and, for owner and partner, a "new list price" form. */
 export function SellingPricesManager({ types, editable }: { types: SellingTypeView[]; editable: boolean }) {
@@ -49,17 +49,13 @@ export function SellingPricesManager({ types, editable }: { types: SellingTypeVi
 
   return (
     <div className="mt-6 space-y-6">
-      {!editable && <p className="text-sm text-gray-600">{t('readOnly')}</p>}
+      {!editable && <p className="text-sm text-muted">{t('readOnly')}</p>}
       {types.map((type) => (
-        <section
-          key={type.id}
-          className="rounded border border-gray-200 p-3"
-          data-testid={`sell-${type.code}`}
-        >
+        <section key={type.id} className="card p-3" data-testid={`sell-${type.code}`}>
           <h2 className="font-medium">
             <span dir="ltr">{type.code}</span> · <bdi>{type.label}</bdi>
           </h2>
-          {type.versions.length === 0 && <p className="mt-2 text-sm text-gray-600">{t('none')}</p>}
+          {type.versions.length === 0 && <p className="mt-2 text-sm text-muted">{t('none')}</p>}
           <ul className="mt-2 space-y-1 text-sm">
             {type.versions.map((v) => (
               <li key={v.id}>
@@ -85,7 +81,7 @@ export function SellingPricesManager({ types, editable }: { types: SellingTypeVi
                   <input name="effectiveFrom" type="date" required dir="ltr" className={INPUT} />
                 </label>
               </div>
-              <button type="submit" className="rounded bg-gray-900 px-3 py-1 text-sm text-white">
+              <button type="submit" className="btn btn-primary btn-sm">
                 {t('publish')}
               </button>
               {message?.id === type.id && (

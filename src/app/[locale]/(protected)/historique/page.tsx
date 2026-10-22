@@ -6,6 +6,7 @@ import { can, SERVICE_AUDIT_ACTIONS } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/auth/page-guard';
 import { listAuditEvents } from '@/modules/platform-security/service/audit-query';
 import { AuditHistory } from '@/modules/platform-security/ui/audit/audit-history';
+import { PageHeader } from '@/ui';
 
 const ACTIONS = ['insert', 'update', ...SERVICE_AUDIT_ACTIONS] as const;
 const filtersSchema = z.object({
@@ -62,12 +63,12 @@ export default async function HistoryPage({
     );
     return `/${locale}/historique?${q.toString()}`;
   };
-  const input = 'mt-1 block rounded border border-gray-300 px-2 py-1';
+  const input = 'input mt-1';
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-8">
-      <h1 className="text-2xl font-semibold">{t('title')}</h1>
-      {!seesAll && <p className="mt-2 text-sm text-gray-600">{t('ownOnly')}</p>}
+    <div>
+      <PageHeader title={t('title')} />
+      {!seesAll && <p className="mt-2 text-sm text-muted">{t('ownOnly')}</p>}
       <form method="get" className="mt-4 flex flex-wrap items-end gap-3 text-sm">
         <label>
           {t('from')}
@@ -105,7 +106,7 @@ export default async function HistoryPage({
             ))}
           </select>
         </label>
-        <button type="submit" className="rounded bg-gray-900 px-3 py-1 text-white">
+        <button type="submit" className="btn btn-primary btn-sm">
           {t('filter')}
         </button>
       </form>
@@ -115,6 +116,6 @@ export default async function HistoryPage({
         <span>{t('pageOf', { page: result.page, pages })}</span>
         {result.page < pages && <Link href={link(result.page + 1)}>{t('next')}</Link>}
       </nav>
-    </main>
+    </div>
   );
 }

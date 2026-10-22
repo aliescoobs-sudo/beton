@@ -2,7 +2,14 @@ import { expect, test } from '@playwright/test';
 import pg from 'pg';
 import { E2E_DATABASE } from '../scripts/db-bootstrap';
 import { testEnv } from '../tests/db-env';
-import { E2E_PASSWORD, E2E_USERS, msUntilNextStep, passwordStep, totpFromDisplayedKey } from './fixtures';
+import {
+  E2E_PASSWORD,
+  E2E_USERS,
+  logout,
+  msUntilNextStep,
+  passwordStep,
+  totpFromDisplayedKey,
+} from './fixtures';
 
 const migrator = new pg.Pool({ connectionString: testEnv(E2E_DATABASE).DATABASE_URL_MIGRATOR, max: 1 });
 test.afterAll(() => migrator.end());
@@ -38,7 +45,7 @@ for (const locale of ['fr', 'ar'] as const) {
     await expect(page.getByTestId('signed-in-as')).toContainText(user.name);
 
     // Logout ends the session server-side: the home page is no longer reachable.
-    await page.locator('button[type=button]').last().click();
+    await logout(page);
     await expect(page).toHaveURL(`/${locale}/login`);
     await page.goto(`/${locale}`);
     await expect(page).toHaveURL(`/${locale}/login`);
@@ -71,7 +78,7 @@ for (const locale of ['fr', 'ar'] as const) {
 
     // Login with a recovery code from the new set.
     await page.goto(`/${locale}`);
-    await page.locator('button[type=button]').last().click();
+    await logout(page);
     await expect(page).toHaveURL(`/${locale}/login`);
     await passwordStep(page, locale, user.email);
     await page.locator('form button[type=button]').click(); // switch to recovery code

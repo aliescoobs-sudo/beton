@@ -4,6 +4,7 @@ import { realClock } from '@/modules/clock';
 import { requirePagePermission } from '@/modules/platform-security/auth/page-guard';
 import { getChecklist } from '@/modules/platform-security/service/checklist';
 import { ChecklistPanel } from '@/modules/platform-security/ui/checklist/checklist-panel';
+import { PageHeader } from '@/ui';
 
 export default async function ChecklistPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -16,9 +17,9 @@ export default async function ChecklistPage({ params }: { params: Promise<{ loca
   });
   const t = await getTranslations('checklist');
   return (
-    <main className="mx-auto max-w-2xl px-4 py-8">
-      <h1 className="text-2xl font-semibold">{t('title')}</h1>
+    <div className="mx-auto max-w-2xl">
+      <PageHeader title={t('title')} />
       <ChecklistPanel items={checklist.items} complete={checklist.complete} />
-    </main>
+    </div>
   );
 }

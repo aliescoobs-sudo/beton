@@ -1,7 +1,25 @@
 {
   "shell": {
     "title": "BELGOBETON",
-    "tagline": "Pilote — données fictives uniquement"
+    "tagline": "Pilote — données fictives uniquement",
+    "userMenu": "Menu utilisateur",
+    "dismiss": "Fermer",
+    "nav": {
+      "main": "Navigation principale",
+      "open": "Menu",
+      "close": "Fermer le menu",
+      "dashboard": "Tableau de bord",
+      "sales": "Ventes",
+      "purchases": "Achats",
+      "production": "Production",
+      "masterData": "Données de base",
+      "administration": "Administration"
+    },
+    "dashboard": {
+      "emptyTitle": "Le tableau de bord arrive avec les prochains modules",
+      "emptyText": "Ventes, trésorerie et alertes apparaîtront ici dès que les modules correspondants seront livrés. En attendant, les données de base sont disponibles dans le menu.",
+      "action": "Voir les clients"
+    }
   },
   "auth": {
     "login": {
@@ -55,7 +73,8 @@
       "code": "Code à 6 chiffres",
       "confirm": "Confirmer",
       "cancel": "Annuler",
-      "invalid": "Code incorrect ou déjà utilisé."
+      "invalid": "Code incorrect ou déjà utilisé.",
+      "verified": "Identité confirmée."
     },
     "security": {
       "title": "Sécurité",

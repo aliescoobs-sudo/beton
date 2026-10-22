@@ -30,10 +30,10 @@ export function TwoFactorStep({ onDone }: { onDone: () => void }) {
   }
 
   return (
-    <form onSubmit={submit} className="mt-6 space-y-4" noValidate>
+    <form onSubmit={submit} className="space-y-4" noValidate>
       <h2 className="text-lg font-medium">{t('title')}</h2>
       <label className="block">
-        <span className="text-sm font-medium">{mode === 'totp' ? t('codeLabel') : t('recoveryLabel')}</span>
+        <span className="field-label">{mode === 'totp' ? t('codeLabel') : t('recoveryLabel')}</span>
         <input
           key={mode}
           name="code"
@@ -41,19 +41,15 @@ export function TwoFactorStep({ onDone }: { onDone: () => void }) {
           autoComplete="one-time-code"
           required
           dir="ltr"
-          className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 font-mono tracking-widest"
+          className="input num mt-1 font-mono tracking-widest"
         />
       </label>
       {problem && (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="text-sm text-status-late">
           {t(problem)}
         </p>
       )}
-      <button
-        type="submit"
-        disabled={pending}
-        className="w-full rounded bg-gray-900 px-4 py-2 font-medium text-white disabled:opacity-50"
-      >
+      <button type="submit" disabled={pending} className="btn btn-primary w-full">
         {t('submit')}
       </button>
       <button

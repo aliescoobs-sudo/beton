@@ -17,7 +17,13 @@ export function LogoutButton({ locale }: { locale: string }) {
     router.refresh();
   }
   return (
-    <button type="button" onClick={logout} className="rounded border border-gray-300 px-3 py-1 text-sm">
+    <button
+      type="button"
+      onClick={logout}
+      className="btn btn-ghost w-full justify-start"
+      data-testid="logout"
+      role="menuitem"
+    >
       {t('logout')}
     </button>
   );

@@ -42,16 +42,16 @@ export function ParametersForm({ rows, editable }: { rows: ParameterRow[]; edita
 
   return (
     <div className="mt-6 space-y-4">
-      {!editable && <p className="text-sm text-gray-600">{t('readOnly')}</p>}
+      {!editable && <p className="text-sm text-muted">{t('readOnly')}</p>}
       {rows.map((row) => (
         <form
           key={row.key}
           onSubmit={(e) => save(row, e)}
-          className="rounded border border-gray-200 p-3"
+          className="card p-3"
           data-testid={`param-${row.key}`}
         >
           <label className="block">
-            <span className="text-sm font-medium">{t(`keys.${parameterLabelKey(row.key)}` as never)}</span>
+            <span className="field-label">{t(`keys.${parameterLabelKey(row.key)}` as never)}</span>
             {editable ? (
               <input
                 name="value"
@@ -60,7 +60,7 @@ export function ParametersForm({ rows, editable }: { rows: ParameterRow[]; edita
                 min={row.min}
                 max={row.max}
                 dir="ltr"
-                className="mt-1 block w-40 rounded border border-gray-300 px-3 py-1"
+                className="input num mt-1 w-40"
               />
             ) : (
               <span className="mt-1 block font-mono" dir="ltr" data-testid="value">
@@ -69,10 +69,10 @@ export function ParametersForm({ rows, editable }: { rows: ParameterRow[]; edita
             )}
           </label>
           {row.min !== undefined && (
-            <p className="mt-1 text-xs text-gray-500">{t('bounds', { min: row.min, max: row.max ?? '' })}</p>
+            <p className="mt-1 text-xs text-muted">{t('bounds', { min: row.min, max: row.max ?? '' })}</p>
           )}
           {editable && (
-            <button type="submit" className="mt-2 rounded bg-gray-900 px-3 py-1 text-sm text-white">
+            <button type="submit" className="btn btn-primary btn-sm mt-2">
               {t('save')}
             </button>
           )}
