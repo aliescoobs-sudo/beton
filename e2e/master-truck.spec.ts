@@ -12,10 +12,11 @@ test('a partner adds a truck and the plant then logs a breakdown on it', async (
   const form = page.getByTestId('truck-new');
   await form.locator('input[name=code]').fill(code);
   await form.locator('input[name=plate]').fill(plate);
+  await form.locator('input[name=capacityM3]').fill('8,5');
   await form.locator('button[type=submit]').click();
   const row = page.getByTestId(`truck-${code}`);
   await expect(row).toBeVisible();
-  await expect(row.locator('input[name=capacityL]')).toHaveValue('8000');
+  await expect(row.locator('input[name=capacityM3]')).toHaveValue('8,5');
 
   const plantPage = await (await browser.newContext()).newPage();
   await loginAndEnrol(plantPage, 'fr', E2E_MD.truckPlant.email);
@@ -23,6 +24,7 @@ test('a partner adds a truck and the plant then logs a breakdown on it', async (
   const plantRow = plantPage.getByTestId(`truck-${code}`);
   // The plant reads the truck but cannot edit its plate or capacity.
   await expect(plantRow.getByTestId('truck-plate')).toHaveText(plate);
+  await expect(plantRow).toContainText('8,5 m³');
   await expect(plantRow.locator('input[name=plate]')).toHaveCount(0);
   const logForm = plantPage.getByTestId(`truck-log-form-${code}`);
   await expect(plantPage.getByTestId('truck-new')).toHaveCount(0);

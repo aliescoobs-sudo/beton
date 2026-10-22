@@ -8,6 +8,26 @@ export type TruckLogStatus = (typeof TRUCK_STATUSES)[number];
 export const DEFAULT_TRUCK_CAPACITY_L = 8000;
 export const TRUCK_CAPACITY_L = { min: 1000, max: 30000 } as const;
 
+/**
+ * Capacity is typed and shown in m³ (a truck mixer is "8 m³"), stored in litres. Exact decimal handling on the text,
+ * no float: "8", "8,5" and "8.25" are accepted, at most 3 decimals (1 m³ = 1000 L).
+ */
+export function parseCapacityM3(text: string): Result<number, 'INVALID'> {
+  const match = /^(\d{1,3})(?:[.,](\d{1,3}))?$/.exec(text.trim());
+  if (!match) return err('INVALID');
+  const litres = Number(match[1]) * 1000 + Number((match[2] ?? '').padEnd(3, '0'));
+  return litres >= TRUCK_CAPACITY_L.min && litres <= TRUCK_CAPACITY_L.max ? ok(litres) : err('INVALID');
+}
+
+/** 8000 -> "8", 8500 -> "8,5", 8250 -> "8,25". */
+export function formatCapacityM3(litres: number): string {
+  const whole = Math.floor(litres / 1000);
+  const decimals = String(litres % 1000)
+    .padStart(3, '0')
+    .replace(/0+$/, '');
+  return decimals ? `${whole},${decimals}` : `${whole}`;
+}
+
 export interface Truck {
   id: string;
   /** T1, T2...: typed once by a manager, never changes. */

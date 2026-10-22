@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { type FormEvent, useState } from 'react';
-import type { TruckStatusEntry } from '../../domain/truck';
+import { formatCapacityM3, parseCapacityM3, type TruckStatusEntry } from '../../domain/truck';
 import {
   createTruckAction,
   logTruckStatusAction,
@@ -18,6 +18,12 @@ export interface TruckRow {
   capacityL: number;
   status: 'active' | 'archived';
 }
+
+/** The form shows m³; the server gets litres. Text that is not a capacity goes through as NaN and is refused (INVALID). */
+const litres = (data: FormData) => {
+  const parsed = parseCapacityM3(String(data.get('capacityM3') ?? ''));
+  return parsed.ok ? parsed.value : Number.NaN;
+};
 
 const INPUT = 'mt-1 block rounded border border-gray-300 px-3 py-1';
 const BUTTON = 'rounded bg-gray-900 px-3 py-1 text-sm text-white';
@@ -88,7 +94,7 @@ export function TrucksManager({
                   void submit(truck.id, e, (d) =>
                     updateTruckAction(
                       truck.id,
-                      { plate: String(d.get('plate') ?? ''), capacityL: Number(d.get('capacityL')) },
+                      { plate: String(d.get('plate') ?? ''), capacityL: litres(d) },
                       d.get('archived') === 'on' ? 'archived' : 'active',
                     ),
                   )
@@ -112,12 +118,9 @@ export function TrucksManager({
                 <label className="block">
                   <span className="text-sm font-medium">{t('capacity')}</span>
                   <input
-                    name="capacityL"
-                    type="number"
-                    min={1000}
-                    max={30000}
-                    step={1}
-                    defaultValue={truck.capacityL}
+                    name="capacityM3"
+                    inputMode="decimal"
+                    defaultValue={formatCapacityM3(truck.capacityL)}
                     required
                     dir="ltr"
                     className={`${INPUT} w-28`}
@@ -141,7 +144,7 @@ export function TrucksManager({
                   {truck.plate}
                 </span>
                 <span>
-                  <bdi dir="ltr">{truck.capacityL}</bdi> L
+                  <bdi dir="ltr">{formatCapacityM3(truck.capacityL)}</bdi> m³
                 </span>
                 {truck.status === 'archived' && <span className="text-gray-600">{t('archived')}</span>}
               </p>
@@ -209,7 +212,7 @@ export function TrucksManager({
               createTruckAction({
                 code: String(d.get('code') ?? ''),
                 plate: String(d.get('plate') ?? ''),
-                capacityL: Number(d.get('capacityL')),
+                capacityL: litres(d),
               }),
             )
           }
@@ -227,12 +230,9 @@ export function TrucksManager({
           <label className="block">
             <span className="text-sm font-medium">{t('capacity')}</span>
             <input
-              name="capacityL"
-              type="number"
-              min={1000}
-              max={30000}
-              step={1}
-              defaultValue={8000}
+              name="capacityM3"
+              inputMode="decimal"
+              defaultValue={formatCapacityM3(8000)}
               required
               dir="ltr"
               className={`${INPUT} w-28`}

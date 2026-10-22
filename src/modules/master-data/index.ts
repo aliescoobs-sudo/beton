@@ -104,6 +104,8 @@ export {
 } from './service/selling-price-service';
 export {
   DEFAULT_TRUCK_CAPACITY_L,
+  formatCapacityM3,
+  parseCapacityM3,
   parseTruckInput,
   parseTruckStatusInput,
   TRUCK_STATUSES,
