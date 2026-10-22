@@ -1,5 +1,6 @@
 import pg from 'pg';
 import { afterAll, describe, expect, it } from 'vitest';
+import { ensureRoles } from '../scripts/db-bootstrap';
 import { withRlsContext } from '../src/lib/db/rls-context';
 import { seedPilotMasterData } from '../src/modules/master-data';
 import { SYSTEM_ACTOR_ID } from '../src/modules/platform-security';
@@ -7,9 +8,10 @@ import { testEnv } from './db-env';
 import { realSessionUser } from './helpers/actors';
 
 const env = testEnv();
+const seed = new pg.Pool({ connectionString: env.DATABASE_URL_SEED, max: 1 });
 const system = new pg.Pool({ connectionString: env.DATABASE_URL_SYSTEM, max: 1 });
 const app = new pg.Pool({ connectionString: env.DATABASE_URL_APP, max: 2 });
-afterAll(() => Promise.all([system.end(), app.end()]));
+afterAll(() => Promise.all([seed.end(), system.end(), app.end()]));
 
 // FORCE RLS applies to the table owner too, so reads go through an owner request context.
 const asOwner = async <T>(fn: (tx: pg.PoolClient) => Promise<T>) => {
@@ -41,7 +43,7 @@ describe('pilot master-data seed (decision 79)', () => {
   it('is idempotent: a second run adds no row and burns no code', async () => {
     const before = await counts();
     const seq = await sequence();
-    await seedPilotMasterData(system, allowed);
+    await seedPilotMasterData(seed, allowed);
     expect(await counts()).toBe(before);
     expect(await sequence()).toEqual(seq);
     expect(seq).toEqual([{ last_value: expect.anything() }]);
@@ -107,20 +109,73 @@ describe('pilot master-data seed (decision 79)', () => {
   });
 
   it('refuses outside simulation, on real data and in production', async () => {
-    await expect(seedPilotMasterData(system, { ...allowed, SIMULATION_ENABLED: false })).rejects.toThrow(
+    await expect(seedPilotMasterData(seed, { ...allowed, SIMULATION_ENABLED: false })).rejects.toThrow(
       /SIMULATION_ENABLED/,
     );
-    await expect(seedPilotMasterData(system, { ...allowed, REAL_DATA: true })).rejects.toThrow(/REAL_DATA/);
-    await expect(seedPilotMasterData(system, { ...allowed, NODE_ENV: 'production' })).rejects.toThrow(
+    await expect(seedPilotMasterData(seed, { ...allowed, REAL_DATA: true })).rejects.toThrow(/REAL_DATA/);
+    await expect(seedPilotMasterData(seed, { ...allowed, NODE_ENV: 'production' })).rejects.toThrow(
       /production/,
     );
   });
 
-  it('gives request roles no way in: only the system pool can insert seed rows', async () => {
+  it('runs as belgobeton_seed: the system role cannot insert master data, bump a counter or read prices', async () => {
+    const asSystem = <T>(fn: (tx: pg.PoolClient) => Promise<T>) =>
+      withRlsContext(system, { userId: SYSTEM_ACTOR_ID, role: 'system', requestId: 'x' }, fn);
+    for (const sql of [
+      `insert into concrete_type (id, code, label) values (gen_random_uuid(), 'ZQ1', 'x')`,
+      `insert into zone (id, name, one_way_min) values (gen_random_uuid(), 'Zone ZQ', 5)`,
+      `insert into truck (id, code, plate) values (gen_random_uuid(), 'T990', 'ZQ 1')`,
+      `select public.next_code('ZQ', 2)`,
+      `select count(*) from code_sequence`,
+      `select count(*) from purchase_price`,
+      `select count(*) from selling_price`,
+    ]) {
+      await expect(
+        asSystem((tx) => tx.query(sql)),
+        sql,
+      ).rejects.toMatchObject({ code: '42501' });
+    }
+  });
+
+  it('gives request roles and the seed role itself no way to do more than insert master data', async () => {
+    const asSeed = <T>(role: 'owner' | 'system', fn: (tx: pg.PoolClient) => Promise<T>) =>
+      withRlsContext(seed, { userId: SYSTEM_ACTOR_ID, role, requestId: 'x' }, fn);
+    // Row-level security still applies: the seed acts as the system actor, nothing else.
     await expect(
-      withRlsContext(system, { userId: SYSTEM_ACTOR_ID, role: 'owner', requestId: 'x' }, (tx) =>
+      asSeed('owner', (tx) =>
         tx.query(`insert into concrete_type (id, code, label) values (gen_random_uuid(), 'ZQ1', 'x')`),
       ),
-    ).rejects.toBeDefined();
+    ).rejects.toMatchObject({ code: '42501' });
+    for (const sql of [
+      `update concrete_type set label = 'x'`,
+      'delete from zone',
+      'truncate truck',
+      `update recette set effective_from = '2000-01-01'`,
+      `insert into parameter (key, value, updated_by, updated_at) values ('x.y', '1', gen_random_uuid(), now())`,
+      'select count(*) from "user"',
+      'select count(*) from audit_event',
+    ]) {
+      await expect(
+        asSeed('system', (tx) => tx.query(sql)),
+        sql,
+      ).rejects.toMatchObject({ code: '42501' });
+    }
+  });
+
+  it('db:bootstrap disables the seed role when the flags forbid it, and re-enables it in simulation', async () => {
+    const canLogin = async () =>
+      (await asOwner((tx) => tx.query(`select rolcanlogin from pg_roles where rolname = 'belgobeton_seed'`)))
+        .rows[0]?.rolcanlogin;
+    expect(await canLogin()).toBe(true);
+    try {
+      await ensureRoles(env); // no seed URL: real data or production
+      expect(await canLogin()).toBe(false);
+      const blocked = new pg.Pool({ connectionString: env.DATABASE_URL_SEED, max: 1 });
+      await expect(blocked.query('select 1')).rejects.toThrow();
+      await blocked.end().catch(() => undefined);
+    } finally {
+      await ensureRoles(env, env.DATABASE_URL_SEED);
+    }
+    expect(await canLogin()).toBe(true);
   });
 });

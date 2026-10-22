@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { loadBackupUrl, loadEnv, parseAuthSecrets, SECRET_ENV_NAMES, secretValuesOf } from './env';
+import {
+  loadBackupUrl,
+  loadEnv,
+  loadSeedUrl,
+  seedRoleAllowed,
+  parseAuthSecrets,
+  SECRET_ENV_NAMES,
+  secretValuesOf,
+} from './env';
 
 const valid = {
   NODE_ENV: 'development',
@@ -166,5 +174,29 @@ describe('simulation guard (AC-CLK-02)', () => {
 
   it('still allows production with simulation off', () => {
     expect(loadEnv({ ...valid, NODE_ENV: 'production' }).SIMULATION_ENABLED).toBe(false);
+  });
+});
+
+describe('the seed role is simulation only', () => {
+  const seed = 'postgres://belgobeton_seed:pw@localhost:5432/belgobeton';
+  const sim = { SIMULATION_ENABLED: 'true', NODE_ENV: 'development', DATABASE_URL_SEED: seed };
+
+  it('is allowed only with SIMULATION_ENABLED=true, no REAL_DATA, no production', () => {
+    expect(seedRoleAllowed(sim)).toBe(true);
+    expect(seedRoleAllowed({ ...sim, SIMULATION_ENABLED: 'false' })).toBe(false);
+    expect(seedRoleAllowed({ ...sim, SIMULATION_ENABLED: undefined })).toBe(false);
+    expect(seedRoleAllowed({ ...sim, REAL_DATA: 'true' })).toBe(false);
+    expect(seedRoleAllowed({ ...sim, NODE_ENV: 'production' })).toBe(false);
+  });
+
+  it('loadSeedUrl returns the URL in simulation and refuses everywhere else', () => {
+    expect(loadSeedUrl(sim)).toBe(seed);
+    expect(() => loadSeedUrl({ ...sim, REAL_DATA: 'true' })).toThrow(/refused/);
+    expect(() => loadSeedUrl({ ...sim, NODE_ENV: 'production' })).toThrow(/refused/);
+    expect(() => loadSeedUrl({ ...sim, DATABASE_URL_SEED: undefined })).toThrow(/DATABASE_URL_SEED/);
+  });
+
+  it('the app environment neither requires nor exposes DATABASE_URL_SEED', () => {
+    expect(loadEnv({ ...valid, DATABASE_URL_SEED: seed })).not.toHaveProperty('DATABASE_URL_SEED');
   });
 });

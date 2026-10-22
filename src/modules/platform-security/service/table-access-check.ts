@@ -11,7 +11,9 @@ export interface TableAccessViolation {
     | 'audit_trigger_missing'
     | 'app_role_has_access'
     | 'delete_granted'
-    | 'update_granted';
+    | 'update_granted'
+    | 'seed_role_overreach'
+    | 'system_can_seed';
 }
 
 /** Compares the live schema with TABLE_ACCESS (run as the migrator, which can see every table). */
@@ -54,9 +56,43 @@ export async function findTableAccessViolations(
       }
     }
   }
+  violations.push(...(await findSeedRoleViolations(client)));
   const present = new Set(rows.map((r) => r.name));
   for (const name of Object.keys(TABLE_ACCESS)) {
     if (!present.has(name)) violations.push({ table: name, problem: 'missing_table' });
+  }
+  return violations;
+}
+
+/**
+ * The pilot seed role (only where it exists) may SELECT and INSERT into the tables registered with `seed`, bump the
+ * code counter, and do nothing else; belgobeton_system may not insert into a seed table.
+ */
+async function findSeedRoleViolations(client: pg.Pool | pg.ClientBase): Promise<TableAccessViolation[]> {
+  const role = await client.query(`select 1 from pg_roles where rolname = 'belgobeton_seed'`);
+  const { rows } = await client.query<{
+    name: string;
+    seed_insert: boolean;
+    seed_update: boolean;
+    seed_other: boolean;
+    system_insert: boolean;
+  }>(`
+    select c.relname as name,
+           ${role.rowCount ? "has_table_privilege('belgobeton_seed', c.oid, 'INSERT')" : 'false'} as seed_insert,
+           ${role.rowCount ? "has_table_privilege('belgobeton_seed', c.oid, 'UPDATE')" : 'false'} as seed_update,
+           ${role.rowCount ? "has_table_privilege('belgobeton_seed', c.oid, 'DELETE, TRUNCATE, REFERENCES, TRIGGER')" : 'false'} as seed_other,
+           has_table_privilege('belgobeton_system', c.oid, 'INSERT') as system_insert
+      from pg_class c join pg_namespace n on n.oid = c.relnamespace
+     where n.nspname = 'public' and c.relkind in ('r', 'p')`);
+  const registry: Record<string, (typeof TABLE_ACCESS)[keyof typeof TABLE_ACCESS]> = TABLE_ACCESS;
+  const violations: TableAccessViolation[] = [];
+  for (const t of rows) {
+    const rule = registry[t.name];
+    const seed = rule && 'seed' in rule ? rule.seed : undefined;
+    if ((t.seed_insert && !seed) || (t.seed_update && seed !== 'counter') || t.seed_other) {
+      violations.push({ table: t.name, problem: 'seed_role_overreach' });
+    }
+    if (seed && t.system_insert) violations.push({ table: t.name, problem: 'system_can_seed' });
   }
   return violations;
 }

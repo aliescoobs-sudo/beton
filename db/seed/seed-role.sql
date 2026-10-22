@@ -1,0 +1,33 @@
+-- Grants of belgobeton_seed, the login role of the pilot seed (scripts/seed-pilot.ts). Not a migration: the role exists
+-- only where db:bootstrap ran with SIMULATION_ENABLED=true and neither REAL_DATA nor production, so runMigrations applies
+-- this file (as the migrator, idempotent) only when the role is there.
+-- The role reads and inserts master data and nothing else: no UPDATE (except the code counter), no DELETE, no TRUNCATE.
+-- Rows are still audited (the audit trigger runs as the inserting role: hence audit.record), and RLS still applies:
+-- the policies below accept only the request context role 'system', which the seed sets.
+GRANT USAGE ON SCHEMA public, ctx, audit TO belgobeton_seed;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA ctx TO belgobeton_seed;
+GRANT EXECUTE ON FUNCTION audit.record(text, text, text, jsonb, jsonb, text) TO belgobeton_seed;
+GRANT EXECUTE ON FUNCTION public.next_code(text, integer) TO belgobeton_seed;
+
+GRANT SELECT, INSERT, UPDATE ON public.code_sequence TO belgobeton_seed;
+DROP POLICY IF EXISTS seed_all ON public.code_sequence;
+CREATE POLICY seed_all ON public.code_sequence FOR ALL TO belgobeton_seed
+  USING (ctx.role() = 'system') WITH CHECK (ctx.role() = 'system');
+
+DO $$
+DECLARE
+  t text;
+  -- Tables whose rows carry created_by: the seed writes them as the request user (the system actor).
+  stamped text[] := ARRAY['recette', 'purchase_price', 'selling_price'];
+BEGIN
+  FOREACH t IN ARRAY ARRAY['zone', 'client', 'supplier', 'component', 'purchase_unit', 'concrete_type', 'truck',
+                           'recette', 'recette_line', 'purchase_price', 'selling_price'] LOOP
+    EXECUTE format('GRANT SELECT, INSERT ON public.%I TO belgobeton_seed', t);
+    EXECUTE format('DROP POLICY IF EXISTS seed_read ON public.%I', t);
+    EXECUTE format('CREATE POLICY seed_read ON public.%I FOR SELECT TO belgobeton_seed USING (ctx.role() = ''system'')', t);
+    EXECUTE format('DROP POLICY IF EXISTS seed_insert ON public.%I', t);
+    EXECUTE format(
+      'CREATE POLICY seed_insert ON public.%I FOR INSERT TO belgobeton_seed WITH CHECK (ctx.role() = ''system''%s)',
+      t, CASE WHEN t = ANY (stamped) THEN ' AND created_by = ctx.user_id()' ELSE '' END);
+  END LOOP;
+END $$;

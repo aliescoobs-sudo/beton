@@ -14,6 +14,11 @@ interface RlsTable {
   exception?: string;
   /** Master data and financial records: belgobeton_app has no DELETE or TRUNCATE privilege (AC-MD-06, R12). */
   noDelete?: boolean;
+  /**
+   * The pilot seed role (belgobeton_seed, simulation only) may read and insert here; 'counter' also lets it bump the
+   * code counter. belgobeton_system never inserts into such a table. See db/seed/seed-role.sql.
+   */
+  seed?: 'insert' | 'counter';
   /** Versioned records: belgobeton_app has no UPDATE either (a change is a new row), e.g. recettes (AC-MD-02). */
   insertOnly?: boolean;
 }
@@ -94,6 +99,7 @@ export const TABLE_ACCESS = {
     kind: 'rls',
     read: { owner: 'all', partner: 'all', office: 'all', plant: 'all', system: 'all', anonymous: 'none' },
     force: true,
+    seed: 'insert',
     audited: true,
     noDelete: true,
     exception: 'master-data T2: managers write (zones.write); every signed-in role reads.',
@@ -102,6 +108,7 @@ export const TABLE_ACCESS = {
     kind: 'rls',
     read: { owner: 'all', partner: 'all', office: 'all', plant: 'all', system: 'all', anonymous: 'none' },
     force: true,
+    seed: 'insert',
     audited: true,
     noDelete: true,
     exception:
@@ -111,6 +118,7 @@ export const TABLE_ACCESS = {
     kind: 'rls',
     read: { owner: 'all', partner: 'all', office: 'all', plant: 'all', system: 'all', anonymous: 'none' },
     force: true,
+    seed: 'insert',
     audited: true,
     noDelete: true,
     exception: 'master-data T6: managers write (components.write); factor_to_base is immutable (trigger).',
@@ -119,6 +127,7 @@ export const TABLE_ACCESS = {
     kind: 'rls',
     read: { owner: 'all', partner: 'all', office: 'all', plant: 'all', system: 'all', anonymous: 'none' },
     force: true,
+    seed: 'insert',
     audited: true,
     noDelete: true,
     exception:
@@ -128,6 +137,7 @@ export const TABLE_ACCESS = {
     kind: 'rls',
     read: { owner: 'all', partner: 'all', office: 'all', plant: 'all', system: 'all', anonymous: 'none' },
     force: true,
+    seed: 'insert',
     audited: true,
     noDelete: true,
     insertOnly: true,
@@ -139,6 +149,7 @@ export const TABLE_ACCESS = {
     kind: 'rls',
     read: { owner: 'all', partner: 'all', office: 'all', plant: 'all', system: 'all', anonymous: 'none' },
     force: true,
+    seed: 'insert',
     audited: true,
     noDelete: true,
     insertOnly: true,
@@ -146,24 +157,26 @@ export const TABLE_ACCESS = {
   },
   purchase_price: {
     kind: 'rls',
-    read: { owner: 'all', partner: 'all', office: 'all', plant: 'none', system: 'all', anonymous: 'none' },
+    read: { owner: 'all', partner: 'all', office: 'all', plant: 'none', system: 'none', anonymous: 'none' },
     force: true,
+    seed: 'insert',
     audited: true,
     noDelete: true,
     insertOnly: true,
     exception:
-      'master-data T10: insert-only versions, system reads and inserts for the pilot seed only (T15, simulation); managers write (purchase_prices.write); office reads, plant has no ' +
+      'master-data T10: insert-only versions, managers write (purchase_prices.write); office reads, plant has no ' +
       'access (AC-MD-07); the cost per m³ is computed, never stored.',
   },
   selling_price: {
     kind: 'rls',
-    read: { owner: 'all', partner: 'all', office: 'all', plant: 'none', system: 'all', anonymous: 'none' },
+    read: { owner: 'all', partner: 'all', office: 'all', plant: 'none', system: 'none', anonymous: 'none' },
     force: true,
+    seed: 'insert',
     audited: true,
     noDelete: true,
     insertOnly: true,
     exception:
-      'master-data T11: insert-only versions; system reads and inserts for the pilot seed only (T15); list prices (client_id null) written by managers ' +
+      'master-data T11: insert-only versions; list prices (client_id null) written by managers ' +
       '(selling_prices.write); per-client overrides (client_id set) by managers only, with a reason ' +
       '(client_price_override.write, CHECK + policy: AC-MD-10); office reads, plant has no access (AC-MD-07).',
   },
@@ -171,6 +184,7 @@ export const TABLE_ACCESS = {
     kind: 'rls',
     read: { owner: 'all', partner: 'all', office: 'all', plant: 'all', system: 'all', anonymous: 'none' },
     force: true,
+    seed: 'insert',
     audited: true,
     noDelete: true,
     exception:
@@ -192,16 +206,18 @@ export const TABLE_ACCESS = {
     kind: 'rls',
     read: { owner: 'all', partner: 'all', office: 'all', plant: 'none', system: 'none', anonymous: 'none' },
     force: true,
+    seed: 'counter',
     audited: true,
     noDelete: true,
     exception:
       'master-data T3: CLT-/FRN- counters, bumped by next_code() inside the creating transaction; the pilot seed ' +
-      '(belgobeton_system pool, role system) bumps CMP-, via a policy for belgobeton_system only.',
+      '(belgobeton_seed login, simulation only) bumps all of them, via a policy for belgobeton_seed only.',
   },
   client: {
     kind: 'rls',
     read: { owner: 'all', partner: 'all', office: 'all', plant: 'none', system: 'all', anonymous: 'none' },
     force: true,
+    seed: 'insert',
     audited: true,
     noDelete: true,
     exception:
@@ -222,6 +238,7 @@ export const TABLE_ACCESS = {
     kind: 'rls',
     read: { owner: 'all', partner: 'all', office: 'all', plant: 'none', system: 'all', anonymous: 'none' },
     force: true,
+    seed: 'insert',
     audited: true,
     noDelete: true,
     exception:

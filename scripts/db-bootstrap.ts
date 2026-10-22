@@ -4,7 +4,7 @@
 import { existsSync } from 'node:fs';
 import pg from 'pg';
 import { z } from 'zod';
-import { type Env, loadBackupUrl, loadEnv } from '../src/lib/env.ts';
+import { type Env, loadBackupUrl, loadEnv, loadSeedUrl, seedRoleAllowed } from '../src/lib/env.ts';
 import { handleHelp } from './cli-help';
 
 export const TEST_DATABASE = 'belgobeton_test';
@@ -25,15 +25,17 @@ const ROLE_NAMES = {
   auth: 'belgobeton_auth',
   system: 'belgobeton_system',
   backup: 'belgobeton_backup',
+  seed: 'belgobeton_seed',
 } as const;
 
-function roleUrls(env: Env) {
+function roleUrls(env: Env, seedUrl?: string) {
   return [
     { name: ROLE_NAMES.migrator, url: env.DATABASE_URL_MIGRATOR },
     { name: ROLE_NAMES.app, url: env.DATABASE_URL_APP },
     { name: ROLE_NAMES.auth, url: env.DATABASE_URL_AUTH },
     { name: ROLE_NAMES.system, url: env.DATABASE_URL_SYSTEM },
     { name: ROLE_NAMES.backup, url: loadBackupUrl(process.env) },
+    ...(seedUrl ? [{ name: ROLE_NAMES.seed, url: seedUrl }] : []),
   ];
 }
 
@@ -60,10 +62,14 @@ async function withClient<T>(url: string, fn: (client: pg.Client) => Promise<T>)
   }
 }
 
-/** Creates or re-aligns the four login roles: no elevated attribute, password from the env URLs. */
-export async function ensureRoles(env: Env): Promise<void> {
+/**
+ * Creates or re-aligns the login roles: no elevated attribute, password from the env URLs. The seed role is handled
+ * only with `seedUrl` (callers pass it only in simulation, see seedRoleAllowed): without it, an existing seed role is
+ * switched to NOLOGIN, so flipping a database to real data or production disables the seed's access.
+ */
+export async function ensureRoles(env: Env, seedUrl?: string): Promise<void> {
   await withClient(superuserUrl(env, 'postgres'), async (client) => {
-    for (const role of roleUrls(env)) {
+    for (const role of roleUrls(env, seedUrl)) {
       const url = new URL(role.url);
       if (decodeURIComponent(url.username) !== role.name) {
         throw new Error(`Database URL for ${role.name} must use user "${role.name}"`);
@@ -81,6 +87,10 @@ export async function ensureRoles(env: Env): Promise<void> {
       );
     }
     await client.query(`GRANT pg_read_all_data TO ${client.escapeIdentifier(ROLE_NAMES.backup)}`);
+    if (!seedUrl) {
+      const seed = await client.query('select 1 from pg_roles where rolname = $1', [ROLE_NAMES.seed]);
+      if (seed.rowCount) await client.query(`ALTER ROLE ${client.escapeIdentifier(ROLE_NAMES.seed)} NOLOGIN`);
+    }
   });
 }
 
@@ -97,9 +107,11 @@ export async function ensureDatabase(env: Env, database: string): Promise<void> 
 
   await withClient(superuserUrl(env, database), async (client) => {
     const db = client.escapeIdentifier(database);
-    const all = Object.values(ROLE_NAMES)
-      .map((name) => client.escapeIdentifier(name))
-      .join(', ');
+    const existing = await client.query<{ rolname: string }>(
+      'select rolname from pg_roles where rolname = any($1)',
+      [Object.values(ROLE_NAMES)],
+    );
+    const all = existing.rows.map((r) => client.escapeIdentifier(r.rolname)).join(', ');
     // Nothing for PUBLIC: no default CONNECT or TEMP on the database.
     await client.query(`REVOKE ALL ON DATABASE ${db} FROM PUBLIC`);
     await client.query(`GRANT CONNECT ON DATABASE ${db} TO ${all}`);
@@ -130,7 +142,8 @@ if (import.meta.main) {
   if (existsSync('.env.ops')) process.loadEnvFile('.env.ops');
   const env = loadEnv(process.env);
   const databases = [new URL(env.DATABASE_URL_MIGRATOR).pathname.slice(1), TEST_DATABASE];
-  await ensureRoles(env);
+  // The seed role is created only in simulation (never with REAL_DATA or in production).
+  await ensureRoles(env, seedRoleAllowed(process.env) ? loadSeedUrl(process.env) : undefined);
   for (const database of databases) await ensureDatabase(env, database);
   console.log(`Bootstrapped roles and databases: ${databases.join(', ')}`);
 }

@@ -6,7 +6,7 @@ const env = testEnv();
 const migrator = new pg.Pool({ connectionString: env.DATABASE_URL_MIGRATOR, max: 1 });
 afterAll(() => migrator.end());
 
-const runtimeRoles = ['belgobeton_app', 'belgobeton_auth', 'belgobeton_system'];
+const runtimeRoles = ['belgobeton_app', 'belgobeton_auth', 'belgobeton_system', 'belgobeton_seed'];
 
 async function roleRow(name: string) {
   const { rows } = await migrator.query(

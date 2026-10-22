@@ -11,14 +11,14 @@ import { E2E_BASE_URL, E2E_CSP, E2E_MD, E2E_OWNER, E2E_PASSWORD, E2E_PLANT, E2E_
 /** Fresh e2e database: an owner, a plant user and one partner per locale, none enrolled yet. */
 export default async function globalSetup() {
   const env = { ...testEnv(E2E_DATABASE), APP_BASE_URL: E2E_BASE_URL };
-  await ensureRoles(env);
+  await ensureRoles(env, env.DATABASE_URL_SEED);
   await recreateDatabase(env, E2E_DATABASE);
   await runMigrations(env.DATABASE_URL_MIGRATOR);
-  const system = new pg.Pool({ connectionString: env.DATABASE_URL_SYSTEM, max: 1 });
+  const seed = new pg.Pool({ connectionString: env.DATABASE_URL_SEED, max: 1 });
   try {
-    await seedPilotMasterData(system, { SIMULATION_ENABLED: true, REAL_DATA: false, NODE_ENV: 'test' });
+    await seedPilotMasterData(seed, { SIMULATION_ENABLED: true, REAL_DATA: false, NODE_ENV: 'test' });
   } finally {
-    await system.end();
+    await seed.end();
   }
 
   const authPool = new pg.Pool({ connectionString: env.DATABASE_URL_AUTH, max: 2 });

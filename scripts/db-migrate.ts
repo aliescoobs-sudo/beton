@@ -1,6 +1,6 @@
 // Applies db/migrations as the migrator role.
 //   corepack pnpm db:migrate
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import pg from 'pg';
@@ -9,10 +9,23 @@ import { handleHelp } from './cli-help';
 
 export const MIGRATIONS_FOLDER = 'db/migrations';
 
+export const SEED_ROLE_GRANTS_FILE = 'db/seed/seed-role.sql';
+
+/** The pilot seed's role exists only in simulation databases; where it can log in, it gets its (idempotent) grants. */
+export async function applySeedRoleGrants(pool: pg.Pool): Promise<boolean> {
+  const { rowCount } = await pool.query(
+    `select 1 from pg_roles where rolname = 'belgobeton_seed' and rolcanlogin`,
+  );
+  if (!rowCount) return false;
+  await pool.query(readFileSync(SEED_ROLE_GRANTS_FILE, 'utf8'));
+  return true;
+}
+
 export async function runMigrations(migratorUrl: string): Promise<void> {
   const pool = new pg.Pool({ connectionString: migratorUrl, max: 1 });
   try {
     await migrate(drizzle(pool), { migrationsFolder: MIGRATIONS_FOLDER });
+    await applySeedRoleGrants(pool);
   } finally {
     await pool.end();
   }

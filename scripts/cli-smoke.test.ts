@@ -92,7 +92,7 @@ describe('the ops secrets stay out of files Next.js loads', () => {
     '.env.local defines no superuser, backup or age-identity variable',
     () => {
       expect(readFileSync('.env.local', 'utf8')).not.toMatch(
-        /^\s*(POSTGRES_SUPERUSER_PASSWORD|BACKUP_AGE_IDENTITY_FILE|DATABASE_URL_BACKUP)\s*=/m,
+        /^\s*(POSTGRES_SUPERUSER_PASSWORD|BACKUP_AGE_IDENTITY_FILE|DATABASE_URL_BACKUP|DATABASE_URL_SEED)\s*=/m,
       );
     },
   );

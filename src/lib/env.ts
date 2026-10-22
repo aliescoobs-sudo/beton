@@ -114,6 +114,31 @@ export function loadBackupUrl(source: Record<string, string | undefined>): strin
   return parsed.data;
 }
 
+/**
+ * The pilot seed's database role exists only in simulation: SIMULATION_ENABLED=true, never with REAL_DATA=true and never
+ * in production (same rule as the seed guard and the boot guard). Read from the raw environment, like the backup URL.
+ */
+export function seedRoleAllowed(source: Record<string, string | undefined>): boolean {
+  return (
+    source.SIMULATION_ENABLED === 'true' && source.REAL_DATA !== 'true' && source.NODE_ENV !== 'production'
+  );
+}
+
+/**
+ * Pilot seed only (pnpm db:seed, db:bootstrap): the login of belgobeton_seed. Deliberately NOT part of the app
+ * environment, and refused outside simulation.
+ */
+export function loadSeedUrl(source: Record<string, string | undefined>): string {
+  if (!seedRoleAllowed(source)) {
+    throw new Error(
+      'DATABASE_URL_SEED refused: needs SIMULATION_ENABLED=true, REAL_DATA not "true", not production',
+    );
+  }
+  const parsed = postgresUrl.safeParse(source.DATABASE_URL_SEED);
+  if (!parsed.success) throw new Error('Invalid environment configuration:\n  DATABASE_URL_SEED: missing');
+  return parsed.data;
+}
+
 /** Names of variables whose values must never reach logs. */
 export const SECRET_ENV_NAMES = [
   'DATABASE_URL_APP',

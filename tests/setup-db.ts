@@ -8,15 +8,15 @@ import { testEnv } from './db-env';
 export default async function setup() {
   const env = testEnv();
   try {
-    await ensureRoles(env);
+    await ensureRoles(env, env.DATABASE_URL_SEED);
     await recreateTestDatabase(env);
     await runMigrations(env.DATABASE_URL_MIGRATOR);
     // The pilot seed (decision 79) is how components and concrete types exist, so the suite exercises it every run.
-    const system = new pg.Pool({ connectionString: env.DATABASE_URL_SYSTEM, max: 1 });
+    const seed = new pg.Pool({ connectionString: env.DATABASE_URL_SEED, max: 1 });
     try {
-      await seedPilotMasterData(system, { SIMULATION_ENABLED: true, REAL_DATA: false, NODE_ENV: 'test' });
+      await seedPilotMasterData(seed, { SIMULATION_ENABLED: true, REAL_DATA: false, NODE_ENV: 'test' });
     } finally {
-      await system.end();
+      await seed.end();
     }
   } catch (error) {
     const cause =

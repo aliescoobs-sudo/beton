@@ -68,4 +68,32 @@ describe('every table is registered with its access rule (T14 meta-test)', () =>
       await migrator.query('revoke select on login_attempt from belgobeton_app');
     }
   });
+
+  it('flags a seed role that can insert outside the seed tables, update, or delete (T15 review)', async () => {
+    for (const [grant, table] of [
+      ['insert', 'parameter'],
+      ['update', 'zone'],
+      ['delete', 'zone'],
+    ] as const) {
+      await migrator.query(`grant ${grant} on ${table} to belgobeton_seed`);
+      try {
+        expect(await findTableAccessViolations(migrator)).toContainEqual(
+          expect.objectContaining({ table, problem: 'seed_role_overreach' }),
+        );
+      } finally {
+        await migrator.query(`revoke ${grant} on ${table} from belgobeton_seed`);
+      }
+    }
+  });
+
+  it('flags a system role that can insert into a seed table', async () => {
+    await migrator.query('grant insert on zone to belgobeton_system');
+    try {
+      expect(await findTableAccessViolations(migrator)).toContainEqual(
+        expect.objectContaining({ table: 'zone', problem: 'system_can_seed' }),
+      );
+    } finally {
+      await migrator.query('revoke insert on zone from belgobeton_system');
+    }
+  });
 });
