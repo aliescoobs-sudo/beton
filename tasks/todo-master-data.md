@@ -62,7 +62,7 @@ Override form (managers only) with required reason; DB CHECK + RLS WITH CHECK + 
 Domain `isTruckAvailable(truck, date, log)`; service `unavailableDates(truckId, range)` for the future capacity check.
 **AC:** AC-MD-08 (breakdown for [D4, D6) → unavailable D4, D5, available D6). **Deps:** T13
 
-### - [ ] T15: Pilot master-data seed (S)
+### - [x] T15: Pilot master-data seed (S)
 Fake-data seed (the 5 zones of D53 with the fixed ids `019c0000-0000-7000-8000-00000000000{1..5}` — Tétouan centre 20, Martil 25, M'diq 30, Fnideq 45, Oued Laou 60 min, `ON CONFLICT DO NOTHING` since the dev database already holds them from the first 0017 —, clients, suppliers, 6 components, B20/B25/B30 recettes, price lists, 4 trucks, zones) behind `SIMULATION_ENABLED`; refuses with `REAL_DATA=true`. Full fixture is completed by `simulation`; this is the minimum so screens are not empty. *Started with T6/T7: `src/modules/master-data/service/pilot-seed.ts` + `scripts/seed-pilot.ts` already seed components, purchase units and concrete types (system actor, request id `seed`, guards for SIMULATION_ENABLED / REAL_DATA / production, idempotent, audited); T15 adds the rest (zones, clients, suppliers, recettes, prices, trucks). The test and e2e setups run it after migrating.*
 **AC:** idempotent; refuses outside simulation; every row audited as `system/seed`. **Deps:** T3–T13
 

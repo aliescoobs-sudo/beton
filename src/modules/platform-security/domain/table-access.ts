@@ -146,24 +146,24 @@ export const TABLE_ACCESS = {
   },
   purchase_price: {
     kind: 'rls',
-    read: { owner: 'all', partner: 'all', office: 'all', plant: 'none', system: 'none', anonymous: 'none' },
+    read: { owner: 'all', partner: 'all', office: 'all', plant: 'none', system: 'all', anonymous: 'none' },
     force: true,
     audited: true,
     noDelete: true,
     insertOnly: true,
     exception:
-      'master-data T10: insert-only versions, managers write (purchase_prices.write); office reads, plant has no ' +
+      'master-data T10: insert-only versions, system reads and inserts for the pilot seed only (T15, simulation); managers write (purchase_prices.write); office reads, plant has no ' +
       'access (AC-MD-07); the cost per m³ is computed, never stored.',
   },
   selling_price: {
     kind: 'rls',
-    read: { owner: 'all', partner: 'all', office: 'all', plant: 'none', system: 'none', anonymous: 'none' },
+    read: { owner: 'all', partner: 'all', office: 'all', plant: 'none', system: 'all', anonymous: 'none' },
     force: true,
     audited: true,
     noDelete: true,
     insertOnly: true,
     exception:
-      'master-data T11: insert-only versions; list prices (client_id null) written by managers ' +
+      'master-data T11: insert-only versions; system reads and inserts for the pilot seed only (T15); list prices (client_id null) written by managers ' +
       '(selling_prices.write); per-client overrides (client_id set) by managers only, with a reason ' +
       '(client_price_override.write, CHECK + policy: AC-MD-10); office reads, plant has no access (AC-MD-07).',
   },

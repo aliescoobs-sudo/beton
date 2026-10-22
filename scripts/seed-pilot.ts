@@ -1,4 +1,4 @@
-// Inserts the pilot master data (components, purchase units, concrete types) as the system actor, audited.
+// Inserts the pilot master data (zones, clients, suppliers, components, recettes, prices, trucks...) as the system actor, audited.
 // Needs SIMULATION_ENABLED=true; refuses with REAL_DATA=true or NODE_ENV=production. Idempotent.
 //   corepack pnpm db:seed
 import { existsSync } from 'node:fs';

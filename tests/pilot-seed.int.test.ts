@@ -22,7 +22,10 @@ const counts = () =>
   asOwner((tx) =>
     tx.query<{ n: string }>(
       `select (select count(*) from component) + (select count(*) from purchase_unit)
-            + (select count(*) from concrete_type) as n`,
+            + (select count(*) from concrete_type) + (select count(*) from zone) + (select count(*) from client)
+            + (select count(*) from supplier) + (select count(*) from truck) + (select count(*) from recette)
+            + (select count(*) from recette_line) + (select count(*) from purchase_price)
+            + (select count(*) from selling_price) as n`,
     ),
   ).then((r) => Number(r.rows[0]?.n));
 const sequence = () =>
@@ -49,15 +52,57 @@ describe('pilot master-data seed (decision 79)', () => {
       tx.query<{ table_name: string; n: string }>(
         `select table_name, count(*) as n from audit_event
         where actor_user_id = $1 and actor_kind = 'system' and request_id = 'seed' and action = 'insert'
-          and table_name in ('component', 'purchase_unit', 'concrete_type')
+          and table_name in ('component', 'purchase_unit', 'concrete_type', 'zone', 'client', 'supplier', 'truck',
+                             'recette', 'recette_line', 'purchase_price', 'selling_price')
         group by table_name order by table_name`,
         [SYSTEM_ACTOR_ID],
       ),
     );
     expect(rows.map((r) => [r.table_name, Number(r.n)])).toEqual([
+      ['client', 5],
       ['component', 6],
       ['concrete_type', 4],
+      ['purchase_price', 6],
       ['purchase_unit', 7],
+      ['recette', 3],
+      ['recette_line', 18],
+      ['selling_price', 4],
+      ['supplier', 5],
+      ['truck', 4],
+      ['zone', 5],
+    ]);
+  });
+
+  it('seeds the 5 zones of D53 with their fixed ids and trip times', async () => {
+    const { rows } = await asOwner((tx) =>
+      tx.query(
+        `select id, name, one_way_min from zone where id::text like '019c0000-0000-7000-8000-00000000000_' order by id`,
+      ),
+    );
+    expect(rows).toEqual([
+      { id: '019c0000-0000-7000-8000-000000000001', name: 'Tétouan centre', one_way_min: 20 },
+      { id: '019c0000-0000-7000-8000-000000000002', name: 'Martil', one_way_min: 25 },
+      { id: '019c0000-0000-7000-8000-000000000003', name: "M'diq", one_way_min: 30 },
+      { id: '019c0000-0000-7000-8000-000000000004', name: 'Fnideq', one_way_min: 45 },
+      { id: '019c0000-0000-7000-8000-000000000005', name: 'Oued Laou', one_way_min: 60 },
+    ]);
+  });
+
+  it('seeds usable prices: B20/B25/B30 have one recette of 6 lines, a list price, and Atlas has a B25 override', async () => {
+    const { rows } = await asOwner((tx) =>
+      tx.query(
+        `select t.code,
+                (select count(*) from recette_line l join recette r on r.id = l.recette_id where r.concrete_type_id = t.id) as lines,
+                (select price_ht_per_m3_centimes::int from selling_price p where p.concrete_type_id = t.id and p.client_id is null) as list,
+                (select price_ht_per_m3_centimes::int from selling_price p join client c on c.id = p.client_id
+                  where p.concrete_type_id = t.id and c.name like 'Entreprise Atlas BTP%') as atlas
+           from concrete_type t where t.code in ('B20', 'B25', 'B30') order by t.code`,
+      ),
+    );
+    expect(rows).toEqual([
+      { code: 'B20', lines: '6', list: 78000, atlas: null },
+      { code: 'B25', lines: '6', list: 85000, atlas: 82000 },
+      { code: 'B30', lines: '6', list: 92000, atlas: null },
     ]);
   });
 
