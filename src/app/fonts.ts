@@ -1,19 +1,42 @@
 import localFont from 'next/font/local';
 
-// IBM Plex Sans (Latin, variable weight) and IBM Plex Sans Arabic, self-hosted from src/fonts (SIL OFL, see LICENSE.txt)
-// through next/font: served from /_next/static/media, so no external request and the CSP (`font-src 'self'`) is unchanged.
-export const plexSans = localFont({
-  src: [{ path: '../fonts/IBMPlexSans-latin-variable.woff2', weight: '400 600', style: 'normal' }],
-  variable: '--font-plex-sans',
+// Alexandria (titles, section titles, large numbers) and Readex Pro (everything else), both SIL OFL, self-hosted from
+// src/fonts through next/font: served from /_next/static/media, so no external request and the CSP (`font-src 'self'`)
+// is unchanged. One instance per script and family: the Latin file has no Arabic glyphs, so Arabic text falls through
+// the font stack to the Arabic file (and the other way round).
+export const alexandriaLatin = localFont({
+  src: [{ path: '../fonts/Alexandria-latin-variable.woff2', weight: '100 900', style: 'normal' }],
+  variable: '--font-alexandria-latin',
   display: 'swap',
+  // No synthetic Arial fallback: it would answer for the glyphs the other script's file lacks before the stack reaches it.
+  adjustFontFallback: false,
+});
+export const alexandriaArabic = localFont({
+  src: [{ path: '../fonts/Alexandria-arabic-variable.woff2', weight: '100 900', style: 'normal' }],
+  variable: '--font-alexandria-arabic',
+  display: 'swap',
+  // No synthetic Arial fallback: it would answer for the glyphs the other script's file lacks before the stack reaches it.
+  adjustFontFallback: false,
+});
+export const readexLatin = localFont({
+  src: [{ path: '../fonts/ReadexPro-latin-variable.woff2', weight: '160 700', style: 'normal' }],
+  variable: '--font-readex-latin',
+  display: 'swap',
+  // No synthetic Arial fallback: it would answer for the glyphs the other script's file lacks before the stack reaches it.
+  adjustFontFallback: false,
+});
+export const readexArabic = localFont({
+  src: [{ path: '../fonts/ReadexPro-arabic-variable.woff2', weight: '160 700', style: 'normal' }],
+  variable: '--font-readex-arabic',
+  display: 'swap',
+  // No synthetic Arial fallback: it would answer for the glyphs the other script's file lacks before the stack reaches it.
+  adjustFontFallback: false,
 });
 
-export const plexArabic = localFont({
-  src: [
-    { path: '../fonts/IBMPlexSansArabic-arabic-400.woff2', weight: '400', style: 'normal' },
-    { path: '../fonts/IBMPlexSansArabic-arabic-500.woff2', weight: '500', style: 'normal' },
-    { path: '../fonts/IBMPlexSansArabic-arabic-600.woff2', weight: '600', style: 'normal' },
-  ],
-  variable: '--font-plex-arabic',
-  display: 'swap',
-});
+/** The four `variable` classes, set once on <html>. */
+export const fontClasses = [
+  alexandriaLatin.variable,
+  alexandriaArabic.variable,
+  readexLatin.variable,
+  readexArabic.variable,
+].join(' ');

@@ -57,7 +57,7 @@ export function EnrolFlow({ locale, reenrol = false }: { locale: string; reenrol
   }
 
   const error = problem && (
-    <p role="alert" className="text-sm text-status-late">
+    <p role="alert" className="text-sm text-signal">
       {t(problem)}
     </p>
   );
@@ -101,7 +101,7 @@ export function EnrolFlow({ locale, reenrol = false }: { locale: string; reenrol
         <p className="text-sm font-medium">{t('keyLabel')}</p>
         <p
           dir="ltr"
-          className="mt-1 break-all rounded bg-canvas p-3 font-mono text-lg tracking-wider"
+          className="mt-1 break-all bg-band p-3 font-mono text-lg tracking-wider"
           data-testid="totp-secret"
         >
           {secret.match(/.{1,4}/g)?.join(' ')}
@@ -111,7 +111,7 @@ export function EnrolFlow({ locale, reenrol = false }: { locale: string; reenrol
         </a>
       </section>
       <section>
-        <h2 className="font-medium">{t('codesTitle')}</h2>
+        <h2 className="text-xl">{t('codesTitle')}</h2>
         <p className="mt-1 text-sm">{t('codesIntro')}</p>
         <ol dir="ltr" className="mt-2 grid grid-cols-2 gap-1 font-mono" data-testid="recovery-codes">
           {enrolment.backupCodes.map((code) => (

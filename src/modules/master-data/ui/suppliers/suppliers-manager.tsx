@@ -115,8 +115,8 @@ export function SuppliersManager({
 
   return (
     <div className="mt-6 space-y-6">
-      <section className="rounded-lg border border-dashed border-line-strong bg-canvas/60 p-3">
-        <h2 className="mb-2 font-medium">{t('new')}</h2>
+      <section className="form-band">
+        <h2 className="mb-3 text-xl">{t('new')}</h2>
         <form
           onSubmit={(e) => void submit('new', e, createSupplierAction)}
           className="grid gap-3 sm:grid-cols-3"
@@ -135,7 +135,7 @@ export function SuppliersManager({
       </section>
       <ul className="space-y-3">
         {suppliers.map((s) => (
-          <li key={s.id} className="card p-3" data-testid={`supplier-${s.name}`}>
+          <li key={s.id} className="row-item" data-testid={`supplier-${s.name}`}>
             <p className="mb-2 flex items-center gap-4 text-sm">
               <span dir="ltr" className="font-mono">
                 {s.code}

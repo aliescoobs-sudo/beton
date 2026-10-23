@@ -13,12 +13,12 @@
       "purchases": "Achats",
       "production": "Production",
       "masterData": "Données de base",
-      "administration": "Administration"
+      "administration": "Administration",
+      "sub": "Pages du groupe"
     },
     "dashboard": {
-      "emptyTitle": "Le tableau de bord arrive avec les prochains modules",
-      "emptyText": "Ventes, trésorerie et alertes apparaîtront ici dès que les modules correspondants seront livrés. En attendant, les données de base sont disponibles dans le menu.",
-      "action": "Voir les clients"
+      "action": "Commencer par les clients",
+      "sentence": "Aucune commande ni aucun paiement n'est encore enregistré : le tableau de bord se remplira dès les premières saisies."
     }
   },
   "auth": {
@@ -165,7 +165,7 @@
       "new": "Nouveau client",
       "add": "Ajouter le client",
       "save": "Enregistrer",
-      "back": "← Clients",
+      "back": "Clients",
       "name": "Nom",
       "kind": "Type",
       "kindCompany": "Société",
@@ -423,7 +423,7 @@
     }
   },
   "clock": {
-    "simulation": "SIMULATION",
+    "simulation": "محاكاة / Simulation",
     "advance": {
       "oneDay": "+1 jour",
       "to": "Avancer à",
@@ -435,6 +435,7 @@
       "tooFar": "Avance maximale : 366 jours.",
       "disabled": "La simulation est désactivée.",
       "serverError": "Erreur serveur : l'avance a échoué."
-    }
+    },
+    "days": "Jours simulés"
   }
 }

@@ -83,10 +83,10 @@ export function SitesPanel({
 
   return (
     <section className="mt-8" data-testid="sites">
-      <h2 className="text-lg font-semibold">{t('title')}</h2>
+      <h2 className="text-xl">{t('title')}</h2>
       <ul className="mt-3 space-y-3">
         {sites.map((site) => (
-          <li key={site.id} className="card p-3" data-testid={`site-${site.label}`}>
+          <li key={site.id} className="row-item" data-testid={`site-${site.label}`}>
             <form
               onSubmit={(e) => void submit(site.id, e, (value) => updateSiteAction(site.id, value))}
               className="grid gap-3 sm:grid-cols-3"
@@ -106,7 +106,7 @@ export function SitesPanel({
       </ul>
       <form
         onSubmit={(e) => void submit('new', e, (value) => createSiteAction(clientId, value))}
-        className="mt-3 grid gap-3 rounded-lg border border-dashed border-line-strong bg-canvas/60 p-3 sm:grid-cols-3"
+        className="mt-3 grid gap-3 form-band sm:grid-cols-3"
         data-testid="site-new"
       >
         {fields()}

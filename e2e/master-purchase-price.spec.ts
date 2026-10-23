@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { E2E_MD, loginAndEnrol } from './fixtures';
+import { E2E_MD, loginAndEnrol, goNav } from './fixtures';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -13,14 +13,14 @@ test('a partner publishes a purchase price for cement in French, and the cost pe
   page,
 }) => {
   await loginAndEnrol(page, 'fr', E2E_MD.pricePartnerFr.email);
-  await page.getByTestId('suppliers-link').click();
+  await goNav(page, 'suppliers-link');
   const supplierForm = page.getByTestId('supplier-new');
   await supplierForm.locator('input[name=name]').fill(supplier);
   await supplierForm.locator('button[type=submit]').click();
   await expect(supplierForm.getByTestId('supplier-message')).toHaveText('Enregistré.');
 
   await page.goto('/fr');
-  await page.getByTestId('purchase-prices-link').click();
+  await goNav(page, 'purchase-prices-link');
   await expect(page).toHaveURL('/fr/master-data/purchase-prices');
   const form = page.getByTestId('price-new-Ciment');
   await form.locator('select[name=supplierId]').selectOption({ label: supplier });
@@ -47,7 +47,7 @@ test('office reads the prices without a form or a cost; the plant has no access'
   browser,
 }) => {
   await loginAndEnrol(page, 'fr', E2E_MD.priceOffice.email);
-  await page.getByTestId('purchase-prices-link').click();
+  await goNav(page, 'purchase-prices-link');
   await expect(page.getByTestId('price-Ciment')).toContainText('MAD HT');
   await expect(page.locator('button[type=submit]')).toHaveCount(0);
   await expect(page.getByTestId('cost-per-m3')).toHaveCount(0);
@@ -61,7 +61,7 @@ test('office reads the prices without a form or a cost; the plant has no access'
 
 test('the purchase prices screen renders right-to-left in Arabic', async ({ page }) => {
   await loginAndEnrol(page, 'ar', E2E_MD.pricePartnerAr.email);
-  await page.getByTestId('purchase-prices-link').click();
+  await goNav(page, 'purchase-prices-link');
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('أسعار الشراء');
   await page.setViewportSize({ width: 375, height: 800 });

@@ -33,7 +33,7 @@ for (const locale of ['fr', 'ar'] as const) {
     await page.goto(`/${locale}`);
     await page.screenshot({ path: `${OUT}/home-${locale}-phone.png` });
     await page.getByTestId('menu-button').click();
-    await expect(page.getByTestId('clients-link')).toBeVisible();
+    await expect(page.getByTestId('drawer-clients-link')).toBeVisible();
     await page.screenshot({ path: `${OUT}/menu-${locale}-phone.png` });
   });
 }

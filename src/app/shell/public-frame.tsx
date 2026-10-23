@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react';
 import { getTranslations } from 'next-intl/server';
-import { Card } from '@/ui';
-import { SimPill } from './sim-pill';
+import { SiloMark } from './brand';
+import { SimBand } from './sim-band';
 
-/** Frame of the pages shown before sign-in (login, enrolment): brand, simulation pill, one centred card. */
+/** Frame of the pages shown before sign-in (login, enrolment): the ink brand bar, the simulation band, one ruled block. */
 export async function PublicFrame({
   locale,
   title,
@@ -18,15 +18,18 @@ export async function PublicFrame({
   const t = await getTranslations('shell');
   return (
     <div className="flex min-h-dvh flex-col">
-      <header className="flex items-center justify-between px-4 py-3 md:px-8">
-        <span className="text-base font-semibold tracking-wide">{t('title')}</span>
-        <SimPill locale={locale} />
+      <header className="flex items-center gap-2.5 bg-ink px-4 py-3 text-white md:px-8">
+        <SiloMark />
+        <span className="font-display text-lg font-extrabold tracking-wide">{t('title')}</span>
       </header>
-      <main className="flex flex-1 items-start justify-center px-4 py-8 md:items-center">
-        <Card className={`w-full ${width} p-6 md:p-8`}>
-          <h1 className="text-2xl font-semibold">{title}</h1>
-          <div className="mt-5">{children}</div>
-        </Card>
+      <SimBand locale={locale} />
+      <main className="flex flex-1 items-start justify-center px-4 py-10 md:py-16">
+        <div className={`w-full ${width}`}>
+          <div className="border-t-[3px] border-ink pt-5">
+            <h1 className="text-3xl">{title}</h1>
+            <div className="mt-6">{children}</div>
+          </div>
+        </div>
       </main>
     </div>
   );

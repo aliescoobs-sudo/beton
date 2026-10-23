@@ -65,20 +65,29 @@ export function AdvanceControl({
   }
 
   return (
-    <div className="space-y-3 text-sm" data-testid="advance-control">
-      <button type="button" onClick={() => submit({ byDays: 1 })} className="btn btn-secondary btn-sm w-full">
+    <div
+      className="relative flex flex-wrap items-center gap-x-4 gap-y-1 text-sm"
+      data-testid="advance-control"
+    >
+      <button type="button" onClick={() => submit({ byDays: 1 })} className="btn btn-primary btn-sm">
         {t('oneDay')}
       </button>
-      <form onSubmit={advanceTo} className="space-y-2">
-        <label className="block">
-          <span className="field-label">{t('to')}</span>
-          <input name="date" type="date" required dir="ltr" className="input" />
-        </label>
-        <input name="time" type="time" required defaultValue="07:00" dir="ltr" className="input" />
-        <button type="submit" className="btn btn-primary btn-sm w-full">
-          {t('go')}
-        </button>
-      </form>
+      <details className="group">
+        <summary className="btn btn-secondary btn-sm cursor-pointer list-none">{t('to')}</summary>
+        <form
+          onSubmit={advanceTo}
+          className="pop absolute end-0 top-full z-50 mt-2 w-[min(20rem,90vw)] space-y-3 p-4"
+        >
+          <label className="block">
+            <span className="field-label">{t('to')}</span>
+            <input name="date" type="date" required dir="ltr" className="input" />
+          </label>
+          <input name="time" type="time" required defaultValue="07:00" dir="ltr" className="input" />
+          <button type="submit" className="btn btn-primary btn-sm w-full">
+            {t('go')}
+          </button>
+        </form>
+      </details>
       {message && (
         <p role="alert" className="field-error">
           {message}

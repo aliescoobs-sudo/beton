@@ -6,20 +6,42 @@ import { Button, EmptyState, Money, PageHeader, StatusPill, Table, Td, Th } from
 describe('design tokens', () => {
   const css = readFileSync('src/app/globals.css', 'utf8');
   it.each([
-    ['canvas', '#f6f5f3'],
-    ['surface', '#ffffff'],
-    ['line', '#e7e5e1'],
-    ['ink', '#1f2328'],
-    ['muted', '#6b6f76'],
-    ['sidebar', '#2b3440'],
-    ['accent', '#d9822b'],
+    ['canvas', '#e6e7e3'],
+    ['surface', '#f4f4f1'],
+    ['band', '#d5d7d2'],
+    ['ink', '#1b1d1c'],
+    ['muted', '#5e6360'],
+    ['rule', '#bfc2bd'],
+    ['field', '#8d918c'],
+    ['signal', '#d23a1e'],
+    ['ok', '#2f6b4f'],
+    ['amber', '#c08a12'],
+    ['sim', '#5b45a8'],
+    ['sim-past', '#b9bcb7'],
     ['status-paid', '#2e7d4f'],
     ['status-ontrack', '#2f6db5'],
     ['status-due', '#c9a227'],
     ['status-late', '#c0392b'],
     ['status-cancelled', '#8a8f98'],
-  ])('--color-%s is %s (D21/D22 status colours exactly)', (name, hex) => {
+  ])('--color-%s is %s (D21/D22 status colours unchanged)', (name, hex) => {
     expect(css).toContain(`--color-${name}: ${hex};`);
+  });
+
+  it('is flat: no shadow, control radius 2px, no tinted status background, tabular numerals on the page', () => {
+    expect(css).not.toMatch(/box-shadow|--shadow/);
+    expect(css).toContain('--radius-control: 2px;');
+    expect(css).toMatch(/html \{[^}]*font-variant-numeric: tabular-nums/);
+    const pill = css.slice(css.indexOf('.pill {'), css.indexOf('.pill::before'));
+    expect(pill).not.toMatch(/background|border:/);
+    expect(css.slice(css.indexOf('.pill::before'), css.indexOf('.pill-paid'))).toContain('inline-size: 10px');
+  });
+
+  it('loads Alexandria for titles and Readex Pro for text, from committed files', () => {
+    expect(css).toMatch(/--font-display:\s*var\(--font-alexandria-latin\)/);
+    expect(css).toMatch(/--font-sans:\s*var\(--font-readex-latin\)/);
+    for (const f of ['Alexandria-latin', 'Alexandria-arabic', 'ReadexPro-latin', 'ReadexPro-arabic']) {
+      expect(readFileSync(`src/fonts/${f}-variable.woff2`).length).toBeGreaterThan(10_000);
+    }
   });
 
   it('components use logical properties only (no left/right/margin-left in globals.css)', () => {

@@ -83,7 +83,7 @@ export function TrucksManager({
       {!canEdit && !canLog && <p className="text-sm text-muted">{t('readOnly')}</p>}
       <ul className="space-y-3">
         {trucks.map((truck) => (
-          <li key={truck.id} className="card p-3" data-testid={`truck-${truck.code}`}>
+          <li key={truck.id} className="row-item" data-testid={`truck-${truck.code}`}>
             {canEdit ? (
               <form
                 onSubmit={(e) =>
@@ -150,7 +150,7 @@ export function TrucksManager({
                 <li key={entry.id}>
                   <span className="font-medium">{t(`status.${entry.status}`)}</span>{' '}
                   <bdi dir="ltr">
-                    {entry.fromDate} → {entry.toDate ?? '…'}
+                    {entry.fromDate} – {entry.toDate ?? '…'}
                   </bdi>{' '}
                   — <bdi>{entry.reason}</bdi>
                 </li>
@@ -169,7 +169,7 @@ export function TrucksManager({
                     }),
                   )
                 }
-                className="mt-3 flex flex-wrap items-end gap-3 rounded-lg border border-dashed border-line-strong bg-canvas/60 p-3"
+                className="mt-3 flex flex-wrap items-end gap-3 form-band"
                 data-testid={`truck-log-form-${truck.code}`}
               >
                 <label className="block">
@@ -212,7 +212,7 @@ export function TrucksManager({
               }),
             )
           }
-          className="flex flex-wrap items-end gap-3 rounded-lg border border-dashed border-line-strong bg-canvas/60 p-3"
+          className="flex flex-wrap items-end gap-3 form-band"
           data-testid="truck-new"
         >
           <label className="block">

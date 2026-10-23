@@ -47,7 +47,7 @@ export function ParametersForm({ rows, editable }: { rows: ParameterRow[]; edita
         <form
           key={row.key}
           onSubmit={(e) => save(row, e)}
-          className="card p-3"
+          className="row-item"
           data-testid={`param-${row.key}`}
         >
           <label className="block">

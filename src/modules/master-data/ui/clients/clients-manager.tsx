@@ -28,8 +28,8 @@ export function ClientsManager({
   const t = useTranslations('masterData.clients');
   return (
     <div className="mt-6 space-y-6">
-      <section className="rounded-lg border border-dashed border-line-strong bg-canvas/60 p-3">
-        <h2 className="mb-2 font-medium">{t('new')}</h2>
+      <section className="form-band">
+        <h2 className="mb-3 text-xl">{t('new')}</h2>
         <ClientForm
           initial={EMPTY_CLIENT}
           zones={zones}
@@ -43,7 +43,7 @@ export function ClientsManager({
         {clients.map((client) => (
           <li
             key={client.id}
-            className="flex flex-wrap items-center gap-x-6 card p-3"
+            className="flex flex-wrap items-center gap-x-6 row-item"
             data-testid={`client-${client.name}`}
           >
             <span dir="ltr" className="font-mono text-sm">

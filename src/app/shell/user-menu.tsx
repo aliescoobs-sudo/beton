@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { LogoutButton } from '@/modules/platform-security/ui/logout-button';
 
-/** Name + role in the top bar; the menu holds the account actions (logout). Closes on Escape and outside click. */
+/** Name and role at the end of the top bar; the menu holds the account actions. Closes on Escape and outside click. */
 export function UserMenu({
   name,
   roleLabel,
@@ -29,7 +29,6 @@ export function UserMenu({
     };
   }, [open]);
 
-  const initial = [...name.trim()][0] ?? '?';
   return (
     <div ref={root} className="relative">
       <button
@@ -39,18 +38,18 @@ export function UserMenu({
         aria-expanded={open}
         aria-label={menuLabel}
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-line"
+        className="flex items-center gap-2.5 px-2 py-1 hover:bg-white/10"
       >
-        <span className="grid size-8 place-items-center rounded-full bg-sidebar text-sm font-semibold text-white">
-          {initial}
-        </span>
         <span className="hidden text-start leading-tight sm:block">
           <span className="block text-sm font-medium">{name}</span>
-          <span className="block text-xs text-muted">{roleLabel}</span>
+          <span className="block text-xs text-white/70">{roleLabel}</span>
+        </span>
+        <span className="grid size-8 place-items-center bg-white text-sm font-bold text-ink">
+          {[...name.trim()][0] ?? '?'}
         </span>
       </button>
       {open && (
-        <div className="card absolute end-0 top-full z-50 mt-2 w-60 p-2 shadow-pop" role="menu">
+        <div className="pop absolute end-0 top-full z-50 mt-1 w-60 p-2" role="menu">
           <p className="px-2 py-1.5 text-sm sm:hidden">
             <span className="block font-medium">{name}</span>
             <span className="block text-xs text-muted">{roleLabel}</span>

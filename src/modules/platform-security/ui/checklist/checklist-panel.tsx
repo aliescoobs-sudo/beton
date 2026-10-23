@@ -36,7 +36,7 @@ export function ChecklistPanel({ items, complete }: { items: ChecklistItem[]; co
       <p className="text-sm">{complete ? t('complete') : t('intro')}</p>
       <ul className="space-y-3">
         {items.map((item) => (
-          <li key={item.key} className="card p-3" data-testid={`check-${item.key}`}>
+          <li key={item.key} className="row-item" data-testid={`check-${item.key}`}>
             <div className="flex items-center justify-between gap-2">
               <span className="font-medium">{t(`items.${item.key}` as never)}</span>
               <StatusPill data-testid="status" status={item.status === 'done' ? 'paid' : 'neutral'}>

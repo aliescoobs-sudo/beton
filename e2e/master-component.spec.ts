@@ -1,11 +1,11 @@
 import { expect, test } from '@playwright/test';
-import { E2E_MD, loginAndEnrol } from './fixtures';
+import { E2E_MD, loginAndEnrol, goNav } from './fixtures';
 
 test.describe.configure({ mode: 'serial' });
 
 test('a partner adds a component with both names and a purchase unit in French', async ({ page }) => {
   await loginAndEnrol(page, 'fr', E2E_MD.componentPartnerFr.email);
-  await page.getByTestId('components-link').click();
+  await goNav(page, 'components-link');
   await expect(page).toHaveURL('/fr/master-data/components');
   await expect(page.getByTestId('component-CMP-01')).toContainText('Ciment');
 
@@ -26,14 +26,14 @@ test('a partner adds a component with both names and a purchase unit in French',
 
 test('plant reads components with no edit control', async ({ page }) => {
   await loginAndEnrol(page, 'fr', E2E_MD.componentPlant.email);
-  await page.getByTestId('components-link').click();
+  await goNav(page, 'components-link');
   await expect(page.getByTestId('component-CMP-01')).toContainText('Ciment');
   await expect(page.locator('button[type=submit]')).toHaveCount(0);
 });
 
 test('the components screen renders right-to-left in Arabic with Arabic names', async ({ page }) => {
   await loginAndEnrol(page, 'ar', E2E_MD.componentPartnerAr.email);
-  await page.getByTestId('components-link').click();
+  await goNav(page, 'components-link');
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
   await expect(page.getByTestId('component-CMP-01').getByTestId('component-name')).toHaveText('إسمنت');
   await page.setViewportSize({ width: 375, height: 800 });

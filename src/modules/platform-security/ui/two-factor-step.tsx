@@ -31,7 +31,7 @@ export function TwoFactorStep({ onDone }: { onDone: () => void }) {
 
   return (
     <form onSubmit={submit} className="space-y-4" noValidate>
-      <h2 className="text-lg font-medium">{t('title')}</h2>
+      <h2 className="text-xl">{t('title')}</h2>
       <label className="block">
         <span className="field-label">{mode === 'totp' ? t('codeLabel') : t('recoveryLabel')}</span>
         <input
@@ -45,7 +45,7 @@ export function TwoFactorStep({ onDone }: { onDone: () => void }) {
         />
       </label>
       {problem && (
-        <p role="alert" className="text-sm text-status-late">
+        <p role="alert" className="text-sm text-signal">
           {t(problem)}
         </p>
       )}

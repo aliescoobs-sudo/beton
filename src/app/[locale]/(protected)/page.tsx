@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { currentAuthState } from '@/modules/platform-security/auth/request-state';
-import { buttonClass, EmptyState, PageHeader } from '@/ui';
+import { buttonClass, PageHeader } from '@/ui';
 
 // @permission authenticated — any user with password + 2FA (guarded by the (protected) layout)
 export default async function HomePage({ params }: { params: Promise<{ locale: string }> }) {
@@ -21,40 +21,25 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
       {reenrol && (
         <p
           role="status"
-          className="mb-6 rounded-md border border-status-due/60 bg-status-due/10 p-3 text-sm"
+          className="mb-6 border-s-4 border-amber bg-band p-3 text-sm"
           data-testid="reenrol-banner"
         >
           {t('auth.session.reenrolBanner')}{' '}
-          <Link href={`/${locale}/security`} className="font-medium underline">
+          <Link href={`/${locale}/security`} className="font-semibold underline">
             {t('auth.session.reenrolLink')}
           </Link>
         </p>
       )}
-      <EmptyState
-        data-testid="dashboard-empty"
-        icon={
-          <svg
-            viewBox="0 0 24 24"
-            width="36"
-            height="36"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
-          </svg>
-        }
-        title={t('shell.dashboard.emptyTitle')}
-        description={t('shell.dashboard.emptyText')}
-        action={
-          <Link href={`/${locale}/master-data/clients`} className={buttonClass('secondary')}>
+      <section className="band" data-testid="dashboard-empty">
+        <p className="font-display max-w-4xl text-3xl font-bold leading-tight md:text-5xl">
+          {t('shell.dashboard.sentence')}
+        </p>
+        <div className="mt-8">
+          <Link href={`/${locale}/master-data/clients`} className={buttonClass('primary')}>
             {t('shell.dashboard.action')}
           </Link>
-        }
-      />
+        </div>
+      </section>
     </div>
   );
 }

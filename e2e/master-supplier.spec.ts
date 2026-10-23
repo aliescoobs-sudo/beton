@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { E2E_MD, loginAndEnrol } from './fixtures';
+import { E2E_MD, loginAndEnrol, goNav } from './fixtures';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -10,7 +10,7 @@ test('office creates a supplier but has no archive button; a partner archives it
   browser,
 }) => {
   await loginAndEnrol(page, 'fr', E2E_MD.supplierOffice.email);
-  await page.getByTestId('suppliers-link').click();
+  await goNav(page, 'suppliers-link');
   await expect(page).toHaveURL('/fr/master-data/suppliers');
   const form = page.getByTestId('supplier-new');
   await form.locator('input[name=name]').fill(name);
@@ -22,7 +22,7 @@ test('office creates a supplier but has no archive button; a partner archives it
 
   const partner = await browser.newPage();
   await loginAndEnrol(partner, 'fr', E2E_MD.supplierPartner.email);
-  await partner.getByTestId('suppliers-link').click();
+  await goNav(partner, 'suppliers-link');
   await partner.getByTestId(`supplier-${name}`).getByTestId('supplier-archive').click();
   await expect(partner.getByTestId(`supplier-${name}`).getByTestId('supplier-archived')).toBeVisible();
   await partner.close();

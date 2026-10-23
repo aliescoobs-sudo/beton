@@ -51,16 +51,21 @@ export function SellingPricesManager({ types, editable }: { types: SellingTypeVi
     <div className="mt-6 space-y-6">
       {!editable && <p className="text-sm text-muted">{t('readOnly')}</p>}
       {types.map((type) => (
-        <section key={type.id} className="card p-3" data-testid={`sell-${type.code}`}>
-          <h2 className="font-medium">
-            <span dir="ltr">{type.code}</span> · <bdi>{type.label}</bdi>
+        <section key={type.id} className="row-item" data-testid={`sell-${type.code}`}>
+          <h2 className="flex flex-wrap items-baseline gap-3 text-xl">
+            <span dir="ltr">{type.code}</span>
+            <bdi>{type.label}</bdi>
           </h2>
           {type.versions.length === 0 && <p className="mt-2 text-sm text-muted">{t('none')}</p>}
           <ul className="mt-2 space-y-1 text-sm">
             {type.versions.map((v) => (
-              <li key={v.id}>
-                <span dir="ltr">{v.effectiveFrom}</span> ·{' '}
-                <span dir="ltr">{formatCentimes(v.priceHtPerM3Centimes)} MAD HT / m³</span>
+              <li key={v.id} className="flex flex-wrap gap-x-5">
+                <span dir="ltr" className="num">
+                  {v.effectiveFrom}
+                </span>
+                <span dir="ltr" className="num">
+                  {formatCentimes(v.priceHtPerM3Centimes)} MAD HT / m³
+                </span>
               </li>
             ))}
           </ul>
@@ -70,7 +75,7 @@ export function SellingPricesManager({ types, editable }: { types: SellingTypeVi
               className="mt-3 space-y-3"
               data-testid={`sell-new-${type.code}`}
             >
-              <h3 className="text-sm font-medium">{t('newPrice')}</h3>
+              <h3 className="text-sm font-semibold">{t('newPrice')}</h3>
               <div className="flex flex-wrap gap-3">
                 <label className="block">
                   <span className="text-sm">{t('price')}</span>

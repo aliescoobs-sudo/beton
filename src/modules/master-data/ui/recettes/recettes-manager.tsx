@@ -106,16 +106,20 @@ export function RecettesManager({
         const latest = type.versions[0];
         const quantity = new Map(latest?.lines.map((l) => [l.componentId, l.qtyPerM3]));
         return (
-          <section key={type.id} className="card p-3" data-testid={`recette-${type.code}`}>
-            <h2 className="font-medium">
-              <span dir="ltr">{type.code}</span> · <bdi>{type.label}</bdi>
+          <section key={type.id} className="row-item" data-testid={`recette-${type.code}`}>
+            <h2 className="flex flex-wrap items-baseline gap-3 text-xl">
+              <span dir="ltr">{type.code}</span>
+              <bdi>{type.label}</bdi>
             </h2>
             {type.versions.length === 0 && <p className="mt-2 text-sm text-muted">{t('none')}</p>}
             <ul className="mt-2 space-y-2">
               {type.versions.map((v) => (
                 <li key={v.id} className="text-sm" data-testid={`recette-${type.code}-v${v.version}`}>
-                  <p className="font-medium">
-                    {t('version', { version: v.version })} · <span dir="ltr">{v.effectiveFrom}</span>
+                  <p className="flex flex-wrap gap-x-4 font-medium">
+                    <span>{t('version', { version: v.version })}</span>
+                    <span dir="ltr" className="num">
+                      {v.effectiveFrom}
+                    </span>
                   </p>
                   <ul className="ms-4 list-disc">
                     {v.lines.map((l) => {
@@ -142,7 +146,7 @@ export function RecettesManager({
                 className="mt-3 space-y-3"
                 data-testid={`recette-new-${type.code}`}
               >
-                <h3 className="text-sm font-medium">{t('newVersion')}</h3>
+                <h3 className="text-sm font-semibold">{t('newVersion')}</h3>
                 <label className="block">
                   <span className="text-sm">{t('effectiveFrom')}</span>
                   <input name="effectiveFrom" type="date" required dir="ltr" className={INPUT} />

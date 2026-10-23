@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { E2E_OWNER, E2E_PASSWORD, E2E_PLANT, loginAndEnrol } from './fixtures';
+import { E2E_OWNER, E2E_PASSWORD, E2E_PLANT, loginAndEnrol, goNav } from './fixtures';
 
 // Runs in file order (one worker): the plant user enrols first, so the owner can reset its 2FA later.
 test.describe.configure({ mode: 'serial' });
@@ -14,7 +14,7 @@ test('a non-owner gets a 404 on user admin (T13, SPEC §4)', async ({ page }) =>
 
 test('the owner creates, disables, re-enables a user and resets another user’s 2FA', async ({ page }) => {
   await loginAndEnrol(page, 'fr', E2E_OWNER.email);
-  await page.getByTestId('admin-link').click();
+  await goNav(page, 'admin-link');
   await expect(page).toHaveURL('/fr/admin/users');
 
   // Create (sensitive, but the second factor is fresh right after login: no dialog).
@@ -44,7 +44,7 @@ test('the owner creates, disables, re-enables a user and resets another user’s
 
   // Parameters (T19): the owner tightens the step-up window, the change persists, then restores the default.
   await page.goto('/fr');
-  await page.getByTestId('parameters-link').click();
+  await goNav(page, 'parameters-link');
   await expect(page).toHaveURL('/fr/parameters');
   const stepUp = page.getByTestId('param-auth.step_up_minutes');
   await stepUp.locator('input[name=value]').fill('8');
@@ -71,7 +71,9 @@ test('the owner creates, disables, re-enables a user and resets another user’s
   // Audit viewer (T20): the last parameter change shows its before/after diff.
   await page.goto('/fr/historique?table=parameter&action=update');
   const latest = page.getByTestId('audit-event').first();
-  await expect(latest.getByTestId('audit-action')).toContainText('update · parameter · auth.step_up_minutes');
+  for (const part of ['update', 'parameter', 'auth.step_up_minutes']) {
+    await expect(latest.getByTestId('audit-action')).toContainText(part);
+  }
   await expect(latest.getByTestId('diff-value')).toContainText('8');
   await expect(latest.getByTestId('diff-value')).toContainText('10');
 });

@@ -5,7 +5,7 @@ import { currentAuthState } from '@/modules/platform-security/auth/request-state
 import { SecurityAlertBanner } from '@/modules/platform-security/ui/alerts/security-alert-banner';
 import { AppShell } from '../../shell/app-shell';
 import { buildNav } from '../../shell/nav-model';
-import { SimPill } from '../../shell/sim-pill';
+import { SimBand } from '../../shell/sim-band';
 import { UserMenu } from '../../shell/user-menu';
 
 /** Every page in this group needs a fully authenticated (password + 2FA) session. */
@@ -29,10 +29,11 @@ export default async function ProtectedLayout({
         brand: t('shell.title'),
         open: t('shell.nav.open'),
         close: t('shell.nav.close'),
-        userMenu: t('shell.userMenu'),
         mainNav: t('shell.nav.main'),
+        subNav: t('shell.nav.sub'),
       }}
-      simPill={<SimPill locale={locale} />}
+      homeHref={`/${locale}`}
+      simBand={<SimBand locale={locale} />}
       userMenu={
         <UserMenu
           name={state.user.name}

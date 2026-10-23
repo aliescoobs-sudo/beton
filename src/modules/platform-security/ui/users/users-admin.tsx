@@ -39,7 +39,7 @@ export function UsersAdmin({ users, selfId }: { users: ManagedUser[]; selfId: st
     void run(() => createUserAction(data), t('created')).then(() => form.reset());
   }
 
-  const cell = 'border-b border-line px-2 py-2 text-start';
+  const cell = 'border-b border-rule px-2 py-2 text-start';
   const input = 'input mt-1';
 
   return (
@@ -107,7 +107,7 @@ export function UsersAdmin({ users, selfId }: { users: ManagedUser[]; selfId: st
       </div>
 
       <form onSubmit={create} className="max-w-md space-y-3" data-testid="create-user">
-        <h2 className="font-medium">{t('createTitle')}</h2>
+        <h2 className="text-xl">{t('createTitle')}</h2>
         <label className="block">
           <span className="text-sm">{t('name')}</span>
           <input name="name" required className={input} />

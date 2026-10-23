@@ -5,7 +5,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { directionOf, routing } from '@/i18n/routing';
 import { FakeDataBanner } from '@/modules/platform-security/ui/fake-data-banner';
 import { ToastProvider } from '@/ui';
-import { plexArabic, plexSans } from '../fonts';
+import { fontClasses } from '../fonts';
 import '../globals.css';
 
 export function generateStaticParams() {
@@ -25,7 +25,7 @@ export default async function LocaleLayout({
   const t = await getTranslations('shell');
 
   return (
-    <html lang={locale} dir={directionOf(locale)} className={`${plexSans.variable} ${plexArabic.variable}`}>
+    <html lang={locale} dir={directionOf(locale)} className={fontClasses}>
       <body>
         <NextIntlClientProvider>
           <FakeDataBanner />

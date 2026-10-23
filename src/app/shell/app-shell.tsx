@@ -4,32 +4,35 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { cn } from '@/ui';
-import { NavGlyph } from './icons';
+import { SiloMark } from './brand';
 import type { NavGroup } from './nav-model';
 
 interface ShellLabels {
   brand: string;
   open: string;
   close: string;
-  userMenu: string;
   mainNav: string;
+  subNav: string;
 }
 
 /**
- * The signed-in frame: sidebar on the inline-start side (right in Arabic), a phone menu that opens the same
- * navigation as a drawer, and a top bar with the page title, the simulation pill and the user menu.
- * The navigation is rendered once, so it is also the only copy of each link for tests and screen readers.
+ * The signed-in frame. A dark ink top bar carries the brand, the main groups as tabs (4px signal-red underline on
+ * the current one) and the user menu. Under it come the simulation band (when simulated) and a light band with the
+ * current group's pages. On a phone the tabs and pages move into a drawer. Each link has one visible copy, so tests
+ * and screen readers see it once.
  */
 export function AppShell({
   groups,
   labels,
-  simPill,
+  homeHref,
+  simBand,
   userMenu,
   children,
 }: {
   groups: NavGroup[];
   labels: ShellLabels;
-  simPill: ReactNode;
+  homeHref: string;
+  simBand: ReactNode;
   userMenu: ReactNode;
   children: ReactNode;
 }) {
@@ -37,14 +40,14 @@ export function AppShell({
   // The drawer is open for one pathname only, so navigating closes it without an effect.
   const [openAt, setOpenAt] = useState<string | null>(null);
   const open = openAt === pathname;
-  const setOpen = (value: boolean) => setOpenAt(value ? pathname : null);
-  const drawer = useRef<HTMLElement>(null);
+  const drawer = useRef<HTMLDivElement>(null);
 
-  // Longest matching href wins, so /master-data/clients/123 highlights Clients and "/fr" only matches the home link.
-  const all = groups.flatMap((g) => g.links);
-  const active = all
-    .filter((l) => pathname === l.href || pathname.startsWith(`${l.href}/`))
-    .sort((a, b) => b.href.length - a.href.length)[0];
+  // Longest matching href wins, so /master-data/clients/123 selects Clients and "/fr" only matches the home link.
+  const all = groups.flatMap((g) => g.links.map((l) => ({ group: g, link: l })));
+  const current = all
+    .filter(({ link }) => pathname === link.href || pathname.startsWith(`${link.href}/`))
+    .sort((a, b) => b.link.href.length - a.link.href.length)[0];
+  const currentGroup = current?.group;
 
   useEffect(() => {
     if (!open) return;
@@ -55,90 +58,137 @@ export function AppShell({
   }, [open]);
 
   return (
-    <div className="min-h-dvh md:grid md:grid-cols-[16.5rem_minmax(0,1fr)]">
+    <div className="flex min-h-dvh flex-col">
+      <header className="bg-ink text-white">
+        <div className="flex items-stretch gap-2 px-4 md:gap-6 md:px-8">
+          <Link href={homeHref} className="flex items-center gap-2.5 py-3" aria-label={labels.brand}>
+            <SiloMark />
+            <span className="font-display text-lg font-extrabold tracking-wide">{labels.brand}</span>
+          </Link>
+          <nav aria-label={labels.mainNav} className="hidden flex-1 items-stretch gap-1 md:flex">
+            {groups.map((group) => {
+              const isCurrent = group.id === currentGroup?.id;
+              return (
+                <Link
+                  key={group.id}
+                  href={group.links[0]?.href ?? homeHref}
+                  data-testid={`tab-${group.id}`}
+                  aria-current={isCurrent ? 'page' : undefined}
+                  className={cn(
+                    'flex items-center border-b-4 px-3.5 text-sm font-medium',
+                    isCurrent
+                      ? 'border-signal text-white'
+                      : 'border-transparent text-white/70 hover:text-white',
+                  )}
+                >
+                  {group.label}
+                </Link>
+              );
+            })}
+          </nav>
+          <span className="flex-1 md:hidden" />
+          <div className="flex items-center gap-2 py-2">
+            {userMenu}
+            <button
+              type="button"
+              className="px-2 py-1 text-sm font-medium underline decoration-2 underline-offset-4 md:hidden"
+              onClick={() => setOpenAt(pathname)}
+              aria-expanded={open}
+              aria-controls="app-drawer"
+              data-testid="menu-button"
+            >
+              {labels.open}
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {simBand}
+
+      {currentGroup && currentGroup.links.length > 1 && (
+        <div className="border-b border-rule bg-band">
+          <nav aria-label={labels.subNav} className="flex gap-1 overflow-x-auto px-4 md:px-8">
+            {currentGroup.links.map((link) => {
+              const isCurrent = current?.link.href === link.href;
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  data-testid={link.testId}
+                  aria-current={isCurrent ? 'page' : undefined}
+                  className={cn(
+                    'whitespace-nowrap border-b-[3px] px-3 py-2.5 text-sm',
+                    isCurrent ? 'border-ink font-semibold' : 'border-transparent hover:border-field',
+                  )}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
+      )}
+
       {open && (
         <div
-          className="fixed inset-0 z-40 bg-ink/40 md:hidden"
-          onClick={() => setOpen(false)}
-          aria-hidden="true"
-        />
-      )}
-      <aside
-        id="app-nav"
-        ref={drawer}
-        aria-label={labels.mainNav}
-        className={cn(
-          'flex-col bg-sidebar text-sidebar-ink md:sticky md:top-0 md:flex md:h-dvh md:w-auto',
-          open ? 'fixed inset-y-0 start-0 z-50 flex w-72 max-w-[85vw]' : 'hidden',
-        )}
-      >
-        <div className="flex items-center justify-between px-5 py-4">
-          <span className="text-base font-semibold tracking-wide">{labels.brand}</span>
+          className="fixed inset-0 z-50 md:hidden"
+          ref={drawer}
+          id="app-drawer"
+          role="dialog"
+          aria-modal="true"
+          aria-label={labels.mainNav}
+        >
           <button
             type="button"
-            className="rounded p-1 text-sidebar-muted hover:text-sidebar-ink md:hidden"
-            onClick={() => setOpen(false)}
+            className="absolute inset-0 bg-ink/60"
+            onClick={() => setOpenAt(null)}
             aria-label={labels.close}
-          >
-            ×
-          </button>
-        </div>
-        <nav className="flex-1 overflow-y-auto px-3 pb-6">
-          {groups.map((group) => (
-            <div key={group.id} className="mt-4 first:mt-0">
-              {group.label && (
-                <p className="px-2 pb-1 text-[0.7rem] font-semibold uppercase tracking-wider text-sidebar-muted">
-                  {group.label}
-                </p>
-              )}
-              <ul className="space-y-0.5">
-                {group.links.map((link) => {
-                  const current = active?.href === link.href;
-                  return (
-                    <li key={link.href}>
-                      <Link
-                        href={link.href}
-                        data-testid={link.testId}
-                        aria-current={current ? 'page' : undefined}
-                        className={cn(
-                          'flex items-center gap-3 rounded-md px-2.5 py-2 text-sm',
-                          current
-                            ? 'bg-sidebar-hover font-medium text-white shadow-[inset_3px_0_0_var(--color-accent)] rtl:shadow-[inset_-3px_0_0_var(--color-accent)]'
-                            : 'text-sidebar-ink hover:bg-sidebar-hover',
-                        )}
-                      >
-                        <NavGlyph name={link.icon} />
-                        <span className="min-w-0 truncate">{link.label}</span>
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
+          />
+          <div className="absolute inset-y-0 start-0 flex w-80 max-w-[88vw] flex-col overflow-y-auto bg-ink text-white">
+            <div className="flex items-center justify-between px-5 py-4">
+              <span className="flex items-center gap-2.5">
+                <SiloMark />
+                <span className="font-display text-lg font-extrabold">{labels.brand}</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setOpenAt(null)}
+                className="px-2 text-sm underline decoration-2 underline-offset-4"
+              >
+                {labels.close}
+              </button>
             </div>
-          ))}
-        </nav>
-      </aside>
+            <nav className="flex-1 px-5 pb-8">
+              {groups.map((group) => (
+                <div key={group.id} className="mt-5 first:mt-0">
+                  <p className="font-display text-base font-bold text-white/70">{group.label}</p>
+                  <ul className="mt-1">
+                    {group.links.map((link) => (
+                      <li key={link.href}>
+                        <Link
+                          href={link.href}
+                          data-testid={`drawer-${link.testId}`}
+                          aria-current={current?.link.href === link.href ? 'page' : undefined}
+                          className={cn(
+                            'block border-s-4 py-2 ps-3 text-sm',
+                            current?.link.href === link.href
+                              ? 'border-signal font-semibold'
+                              : 'border-transparent text-white/85',
+                          )}
+                        >
+                          {link.label}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </nav>
+          </div>
+        </div>
+      )}
 
-      <div className="flex min-w-0 flex-col">
-        <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-line bg-surface px-4 py-2.5 md:px-8">
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm md:hidden"
-            onClick={() => setOpen(true)}
-            aria-expanded={open}
-            aria-controls="app-nav"
-            data-testid="menu-button"
-          >
-            ☰ <span>{labels.open}</span>
-          </button>
-          <p className="min-w-0 flex-1 truncate text-sm font-semibold" data-testid="topbar-title">
-            {active?.label ?? labels.brand}
-          </p>
-          {simPill}
-          {userMenu}
-        </header>
-        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 md:px-8 md:py-8">{children}</main>
-      </div>
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 md:px-8 md:py-10">{children}</main>
     </div>
   );
 }

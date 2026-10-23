@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { E2E_MD, loginAndEnrol } from './fixtures';
+import { E2E_MD, loginAndEnrol, goNav } from './fixtures';
 
 // Serial: the office test reads the clients the partner test creates.
 test.describe.configure({ mode: 'serial' });
@@ -11,7 +11,7 @@ test('a partner creates a client from a name alone, is blocked on a duplicate IC
   page,
 }) => {
   await loginAndEnrol(page, 'fr', E2E_MD.clientPartnerFr.email);
-  await page.getByTestId('clients-link').click();
+  await goNav(page, 'clients-link');
   await expect(page).toHaveURL('/fr/master-data/clients');
 
   const form = page.getByTestId('client-new');
@@ -66,7 +66,7 @@ test('an office user creates a client but is blocked on a duplicate ICE and cann
   page,
 }) => {
   await loginAndEnrol(page, 'fr', E2E_MD.clientOffice.email);
-  await page.getByTestId('clients-link').click();
+  await goNav(page, 'clients-link');
   const form = page.getByTestId('client-new');
   await form.locator('input[name=name]').fill(`${name} bureau`);
   await form.locator('select[name=kind]').selectOption('company');
@@ -86,6 +86,7 @@ test('an office user creates a client but is blocked on a duplicate ICE and cann
 test('plant has no clients page (404)', async ({ page }) => {
   await loginAndEnrol(page, 'fr', E2E_MD.clientPlant.email);
   await expect(page.getByTestId('clients-link')).toHaveCount(0);
+  await expect(page.getByTestId('tab-sales')).toHaveCount(0);
   const response = await page.goto('/fr/master-data/clients');
   expect(response?.status()).toBe(404);
 });
@@ -94,7 +95,7 @@ test('the clients screen renders right-to-left in Arabic and a partner can creat
   page,
 }) => {
   await loginAndEnrol(page, 'ar', E2E_MD.clientPartnerAr.email);
-  await page.getByTestId('clients-link').click();
+  await goNav(page, 'clients-link');
   await expect(page).toHaveURL('/ar/master-data/clients');
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('الزبائن');

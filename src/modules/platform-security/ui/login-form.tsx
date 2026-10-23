@@ -54,7 +54,7 @@ export function LoginForm({ locale, onTwoFactor }: { locale: string; onTwoFactor
         />
       </label>
       {problem && (
-        <p role="alert" className="text-sm text-status-late">
+        <p role="alert" className="text-sm text-signal">
           {t(problem)}
         </p>
       )}

@@ -60,28 +60,33 @@ export function OverridesPanel({
   }
 
   return (
-    <section className="mt-8 card p-3" data-testid="overrides">
-      <h2 className="font-medium">{t('title')}</h2>
+    <section className="mt-8 row-item" data-testid="overrides">
+      <h2 className="text-xl">{t('title')}</h2>
       {overrides.length === 0 && <p className="mt-2 text-sm text-muted">{t('none')}</p>}
       <ul className="mt-2 space-y-1 text-sm">
         {overrides.map((o) => (
-          <li key={o.id} data-testid="override-row">
-            <span dir="ltr">{o.typeCode}</span> · <span dir="ltr">{o.effectiveFrom}</span> ·{' '}
-            <span dir="ltr">{formatCentimes(o.priceHtPerM3Centimes)} MAD HT / m³</span> ·{' '}
-            {t('reasonShown', { reason: o.reason })}
+          <li key={o.id} data-testid="override-row" className="flex flex-wrap gap-x-5">
+            <span dir="ltr">{o.typeCode}</span>
+            <span dir="ltr" className="num">
+              {o.effectiveFrom}
+            </span>
+            <span dir="ltr" className="num">
+              {formatCentimes(o.priceHtPerM3Centimes)} MAD HT / m³
+            </span>
+            <span>{t('reasonShown', { reason: o.reason })}</span>
           </li>
         ))}
       </ul>
       {editable && (
         <form onSubmit={(e) => void submit(e)} className="mt-3 space-y-3" data-testid="override-new">
-          <h3 className="text-sm font-medium">{t('newOverride')}</h3>
+          <h3 className="text-sm font-semibold">{t('newOverride')}</h3>
           <div className="flex flex-wrap gap-3">
             <label className="block">
               <span className="text-sm">{t('type')}</span>
               <select name="concreteTypeId" required className={INPUT}>
                 {types.map((type) => (
                   <option key={type.id} value={type.id}>
-                    <bdi dir="ltr">{type.code}</bdi> · <bdi>{type.label}</bdi>
+                    {type.code} {type.label}
                   </option>
                 ))}
               </select>

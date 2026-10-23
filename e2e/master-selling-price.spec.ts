@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { E2E_MD, loginAndEnrol } from './fixtures';
+import { E2E_MD, loginAndEnrol, goNav } from './fixtures';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -10,7 +10,7 @@ const date = new Date(Date.UTC(2200, 0, 1) + Math.floor((Date.now() - 1.78e12) /
 
 test('a partner publishes a list price for B25 in French; the same date is refused', async ({ page }) => {
   await loginAndEnrol(page, 'fr', E2E_MD.sellPartnerFr.email);
-  await page.getByTestId('selling-prices-link').click();
+  await goNav(page, 'selling-prices-link');
   await expect(page).toHaveURL('/fr/master-data/selling-prices');
   const form = page.getByTestId('sell-new-B25');
   await form.locator('input[name=price]').fill('950,00');
@@ -28,7 +28,7 @@ test('a partner publishes a list price for B25 in French; the same date is refus
 
 test('office reads the list prices without a form; the plant has no access', async ({ page, browser }) => {
   await loginAndEnrol(page, 'fr', E2E_MD.sellOffice.email);
-  await page.getByTestId('selling-prices-link').click();
+  await goNav(page, 'selling-prices-link');
   await expect(page.getByTestId('sell-B25')).toContainText('MAD HT / m³');
   await expect(page.locator('button[type=submit]')).toHaveCount(0);
 
@@ -41,7 +41,7 @@ test('office reads the list prices without a form; the plant has no access', asy
 
 test('the selling prices screen renders right-to-left in Arabic', async ({ page }) => {
   await loginAndEnrol(page, 'ar', E2E_MD.sellPartnerAr.email);
-  await page.getByTestId('selling-prices-link').click();
+  await goNav(page, 'selling-prices-link');
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('أسعار البيع (القائمة)');
   await page.setViewportSize({ width: 375, height: 800 });

@@ -57,7 +57,7 @@ export function ConcreteTypesManager({ types, editable }: { types: ConcreteTypeR
       {!editable && <p className="text-sm text-muted">{t('readOnly')}</p>}
       <ul className="space-y-3">
         {types.map((type) => (
-          <li key={type.id} className="card p-3" data-testid={`type-${type.code}`}>
+          <li key={type.id} className="row-item" data-testid={`type-${type.code}`}>
             {editable ? (
               <form
                 onSubmit={(e) =>
@@ -115,7 +115,7 @@ export function ConcreteTypesManager({ types, editable }: { types: ConcreteTypeR
               }),
             )
           }
-          className="flex flex-wrap items-end gap-3 rounded-lg border border-dashed border-line-strong bg-canvas/60 p-3"
+          className="flex flex-wrap items-end gap-3 form-band"
           data-testid="type-new"
         >
           <label className="block">

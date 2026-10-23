@@ -48,7 +48,7 @@ export function ZonesManager({ zones, editable }: { zones: ZoneRow[]; editable: 
       {!editable && <p className="text-sm text-muted">{t('readOnly')}</p>}
       <ul className="space-y-3">
         {zones.map((zone) => (
-          <li key={zone.id} className="card p-3" data-testid={`zone-${zone.name}`}>
+          <li key={zone.id} className="row-item" data-testid={`zone-${zone.name}`}>
             {editable ? (
               <form
                 onSubmit={(e) => void submit(zone.id, e, (input) => updateZoneAction(zone.id, input))}
@@ -102,7 +102,7 @@ export function ZonesManager({ zones, editable }: { zones: ZoneRow[]; editable: 
       {editable && (
         <form
           onSubmit={(e) => void submit('new', e, createZoneAction)}
-          className="flex flex-wrap items-end gap-3 rounded-lg border border-dashed border-line-strong bg-canvas/60 p-3"
+          className="flex flex-wrap items-end gap-3 form-band"
           data-testid="zone-new"
         >
           <label className="block">

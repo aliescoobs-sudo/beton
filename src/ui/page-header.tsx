@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-/** The one h1 of a page, with an optional description and the page's main actions on the inline-end side. */
+/** The one h1 of a page (Alexandria), under a 3px ink rule, with its description and main actions. */
 export function PageHeader({
   title,
   description,
@@ -11,12 +11,12 @@ export function PageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
+    <header className="mb-8 flex flex-wrap items-start justify-between gap-3 border-t-[3px] border-ink pt-4">
       <div className="min-w-0">
-        <h1 className="text-2xl font-semibold">{title}</h1>
-        {description && <p className="mt-1 max-w-2xl text-sm text-muted">{description}</p>}
+        <h1 className="text-3xl md:text-4xl">{title}</h1>
+        {description && <p className="mt-2 max-w-2xl text-sm text-muted">{description}</p>}
       </div>
-      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+      {actions && <div className="flex flex-wrap items-center gap-3">{actions}</div>}
     </header>
   );
 }

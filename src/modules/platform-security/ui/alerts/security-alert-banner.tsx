@@ -15,10 +15,7 @@ export async function SecurityAlertBanner({ user, locale }: { user: SessionUser;
     timeZone: 'Africa/Casablanca',
   });
   return (
-    <div
-      className="mb-6 space-y-2 rounded-md border border-status-late/40 bg-status-late/10 px-4 py-3"
-      data-testid="security-alerts"
-    >
+    <div className="mb-6 space-y-2 border-s-4 border-signal bg-band px-4 py-3" data-testid="security-alerts">
       {alerts.map((alert) => (
         <form
           key={alert.id}

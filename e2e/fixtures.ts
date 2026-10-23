@@ -70,6 +70,30 @@ export async function passwordStep(page: Page, locale: string, email: string) {
   await page.click('button[type=submit]');
 }
 
+const NAV_GROUP: Record<string, string> = {
+  'clients-link': 'sales',
+  'selling-prices-link': 'sales',
+  'suppliers-link': 'purchases',
+  'purchase-prices-link': 'purchases',
+  'recettes-link': 'production',
+  'trucks-link': 'production',
+  'zones-link': 'masterData',
+  'concrete-types-link': 'masterData',
+  'components-link': 'masterData',
+  'admin-link': 'administration',
+  'parameters-link': 'administration',
+  'checklist-link': 'administration',
+  'history-link': 'administration',
+  'security-link': 'administration',
+};
+
+/** Opens a page through the navigation: the group tab first when the page's link is not in the current band. */
+export async function goNav(page: Page, linkTestId: string) {
+  const link = page.getByTestId(linkTestId);
+  if (!(await link.isVisible())) await page.getByTestId(`tab-${NAV_GROUP[linkTestId]}`).click();
+  await link.click();
+}
+
 /** Opens the user menu in the top bar and signs out. */
 export async function logout(page: Page) {
   await page.getByTestId('user-menu').click();

@@ -80,7 +80,7 @@ export function ComponentsManager({
       {!editable && <p className="text-sm text-muted">{t('readOnly')}</p>}
       <ul className="space-y-3">
         {components.map((c) => (
-          <li key={c.id} className="card p-3" data-testid={`component-${c.code}`}>
+          <li key={c.id} className="row-item" data-testid={`component-${c.code}`}>
             <p className="flex flex-wrap items-baseline gap-x-4">
               <span dir="ltr" className="text-sm text-muted">
                 {c.code}
@@ -89,7 +89,9 @@ export function ComponentsManager({
                 {locale === 'ar' ? c.nameAr : c.nameFr}
               </span>
               <span dir="ltr" className="text-sm">
-                {t('baseUnitValue', { unit: c.baseUnit })} ·{' '}
+                {t('baseUnitValue', { unit: c.baseUnit })}
+              </span>
+              <span dir="ltr" className="text-sm">
                 {t('thresholdValue', { count: c.lowStockThreshold })}
               </span>
               {c.status === 'archived' && <span className="text-sm text-muted">{t('archivedBadge')}</span>}
@@ -217,7 +219,7 @@ export function ComponentsManager({
       {editable && (
         <form
           onSubmit={(e) => void submit('new', e, (d) => createComponentAction(fields(d)))}
-          className="flex flex-wrap items-end gap-3 rounded-lg border border-dashed border-line-strong bg-canvas/60 p-3"
+          className="flex flex-wrap items-end gap-3 form-band"
           data-testid="component-new"
         >
           <label className="block">

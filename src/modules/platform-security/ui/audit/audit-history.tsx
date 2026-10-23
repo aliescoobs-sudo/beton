@@ -37,16 +37,17 @@ export function AuditHistory({
       {rows.map((row) => {
         const changes = auditDiff(row.before, row.after);
         return (
-          <li key={row.id} className="card p-3 text-sm" data-testid="audit-event">
+          <li key={row.id} className="row-item text-sm" data-testid="audit-event">
             <div className="flex flex-wrap gap-x-4 gap-y-1">
               <span>{format.format(row.at)}</span>
               {row.simAt && (
                 <span className="text-muted">{t('simulated', { at: format.format(row.simAt) })}</span>
               )}
               <span className="font-medium">{who(row)}</span>
-              <span className="font-mono" dir="ltr" data-testid="audit-action">
-                {row.action} · {row.table}
-                {row.rowId ? ` · ${row.rowId}` : ''}
+              <span className="flex flex-wrap gap-x-3 font-mono" dir="ltr" data-testid="audit-action">
+                <span>{row.action}</span>
+                <span>{row.table}</span>
+                {row.rowId && <span>{row.rowId}</span>}
               </span>
               {row.reason && <span className="text-muted">{row.reason}</span>}
             </div>
@@ -63,8 +64,8 @@ export function AuditHistory({
                   {changes.map((c) => (
                     <tr key={c.field} data-testid={`diff-${c.field}`}>
                       <td className="font-mono">{c.field}</td>
-                      <td className="font-mono text-status-late">{show(c.before)}</td>
-                      <td className="font-mono text-status-paid">{show(c.after)}</td>
+                      <td className="font-mono text-signal">{show(c.before)}</td>
+                      <td className="font-mono text-ok">{show(c.after)}</td>
                     </tr>
                   ))}
                 </tbody>

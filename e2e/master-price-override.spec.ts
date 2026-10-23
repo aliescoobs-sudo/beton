@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { E2E_MD, loginAndEnrol } from './fixtures';
+import { E2E_MD, loginAndEnrol, goNav } from './fixtures';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -11,7 +11,7 @@ const name = `Client Prix E2E ${Date.now()}`;
 
 test('a partner gives a client a price override with a reason, in French', async ({ page }) => {
   await loginAndEnrol(page, 'fr', E2E_MD.ovPartnerFr.email);
-  await page.getByTestId('clients-link').click();
+  await goNav(page, 'clients-link');
   const create = page.getByTestId('client-new');
   await create.locator('input[name=name]').fill(name);
   await create.locator('button[type=submit]').click();
@@ -34,7 +34,7 @@ test('a partner gives a client a price override with a reason, in French', async
 
 test('office sees the override but has no form', async ({ page }) => {
   await loginAndEnrol(page, 'fr', E2E_MD.ovOffice.email);
-  await page.getByTestId('clients-link').click();
+  await goNav(page, 'clients-link');
   await page.getByTestId(`client-${name}`).getByRole('link', { name }).click();
   await expect(page.getByTestId('override-row')).toContainText('Accord cadre chantier Martil');
   await expect(page.getByTestId('override-new')).toHaveCount(0);
@@ -42,7 +42,7 @@ test('office sees the override but has no form', async ({ page }) => {
 
 test('the overrides panel renders right-to-left in Arabic', async ({ page }) => {
   await loginAndEnrol(page, 'ar', E2E_MD.ovPartnerAr.email);
-  await page.getByTestId('clients-link').click();
+  await goNav(page, 'clients-link');
   const arabic = `زبون الأسعار ${Date.now()}`;
   const create = page.getByTestId('client-new');
   await create.locator('input[name=name]').fill(arabic);

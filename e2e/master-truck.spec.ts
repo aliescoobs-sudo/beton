@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { E2E_MD, loginAndEnrol } from './fixtures';
+import { E2E_MD, loginAndEnrol, goNav } from './fixtures';
 
 // T800-T899: the pilot seed uses T1-T4, the integration tests T900+.
 const code = `T${800 + (Date.now() % 100)}`;
@@ -7,7 +7,7 @@ const plate = `E2E-${Date.now().toString(36).toUpperCase()}`.slice(0, 20);
 
 test('a partner adds a truck and the plant then logs a breakdown on it', async ({ page, browser }) => {
   await loginAndEnrol(page, 'fr', E2E_MD.truckPartnerFr.email);
-  await page.getByTestId('trucks-link').click();
+  await goNav(page, 'trucks-link');
   await expect(page).toHaveURL('/fr/master-data/trucks');
   const form = page.getByTestId('truck-new');
   await form.locator('input[name=code]').fill(code);
@@ -20,7 +20,7 @@ test('a partner adds a truck and the plant then logs a breakdown on it', async (
 
   const plantPage = await (await browser.newContext()).newPage();
   await loginAndEnrol(plantPage, 'fr', E2E_MD.truckPlant.email);
-  await plantPage.getByTestId('trucks-link').click();
+  await goNav(plantPage, 'trucks-link');
   const plantRow = plantPage.getByTestId(`truck-${code}`);
   // The plant reads the truck but cannot edit its plate or capacity.
   await expect(plantRow.getByTestId('truck-plate')).toHaveText(plate);
@@ -39,14 +39,14 @@ test('a partner adds a truck and the plant then logs a breakdown on it', async (
 
 test('office reads trucks and their log with no edit control', async ({ page }) => {
   await loginAndEnrol(page, 'fr', E2E_MD.truckOffice.email);
-  await page.getByTestId('trucks-link').click();
+  await goNav(page, 'trucks-link');
   await expect(page).toHaveURL('/fr/master-data/trucks');
   await expect(page.locator('button[type=submit]')).toHaveCount(0);
 });
 
 test('the trucks screen renders right-to-left in Arabic', async ({ page }) => {
   await loginAndEnrol(page, 'ar', E2E_MD.truckPartnerAr.email);
-  await page.getByTestId('trucks-link').click();
+  await goNav(page, 'trucks-link');
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('الشاحنات');
   await page.setViewportSize({ width: 375, height: 800 });

@@ -99,15 +99,18 @@ export function PurchasePricesManager({
     <div className="mt-6 space-y-6">
       {!editable && <p className="text-sm text-muted">{t('readOnly')}</p>}
       {costs && (
-        <section className="card p-3" data-testid="cost-per-m3">
-          <h2 className="font-medium">{t('costTitle')}</h2>
+        <section className="row-item" data-testid="cost-per-m3">
+          <h2 className="text-xl">{t('costTitle')}</h2>
           <p className="text-sm text-muted">
             {t('costAt')} <span dir="ltr">{businessDate}</span>
           </p>
           <ul className="mt-2 space-y-1 text-sm">
             {costs.map((c) => (
-              <li key={c.code} data-testid={`cost-${c.code}`}>
-                <span dir="ltr">{c.code}</span> · <bdi>{c.label}</bdi> :{' '}
+              <li key={c.code} data-testid={`cost-${c.code}`} className="flex flex-wrap gap-x-4">
+                <span dir="ltr" className="font-semibold">
+                  {c.code}
+                </span>
+                <bdi>{c.label}</bdi>
                 {c.costCentimes === null ? (
                   t('costMissing')
                 ) : (
@@ -121,15 +124,18 @@ export function PurchasePricesManager({
       {components.map((c) => {
         const seed = proposed[c.id];
         return (
-          <section key={c.id} className="card p-3" data-testid={`price-${c.nameFr}`}>
-            <h2 className="font-medium" dir="auto">
+          <section key={c.id} className="row-item" data-testid={`price-${c.nameFr}`}>
+            <h2 className="text-xl" dir="auto">
               {name(c)}
             </h2>
             {c.history.length === 0 && <p className="mt-2 text-sm text-muted">{t('none')}</p>}
             <ul className="mt-2 space-y-1 text-sm">
               {c.history.map((h) => (
-                <li key={h.id}>
-                  <span dir="ltr">{h.effectiveFrom}</span> · {h.supplierName} ·{' '}
+                <li key={h.id} className="flex flex-wrap gap-x-5">
+                  <span dir="ltr" className="num">
+                    {h.effectiveFrom}
+                  </span>
+                  <bdi>{h.supplierName}</bdi>
                   <span dir="ltr">
                     {formatCentimes(h.priceHtCentimes)} MAD HT / {h.unitLabel}
                   </span>
@@ -143,7 +149,7 @@ export function PurchasePricesManager({
                 className="mt-3 space-y-3"
                 data-testid={`price-new-${c.nameFr}`}
               >
-                <h3 className="text-sm font-medium">{t('newPrice')}</h3>
+                <h3 className="text-sm font-semibold">{t('newPrice')}</h3>
                 <div className="flex flex-wrap gap-3">
                   <label className="block">
                     <span className="text-sm">{t('supplier')}</span>

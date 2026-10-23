@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { E2E_MD, loginAndEnrol } from './fixtures';
+import { E2E_MD, loginAndEnrol, goNav } from './fixtures';
 
 // Serial: the office test reads the zone the partner test creates (migrations seed no zone).
 test.describe.configure({ mode: 'serial' });
@@ -8,7 +8,7 @@ test('a partner adds, edits and cannot duplicate a zone in French (AC-MD-09 firs
   page,
 }) => {
   await loginAndEnrol(page, 'fr', E2E_MD.partnerFr.email);
-  await page.getByTestId('zones-link').click();
+  await goNav(page, 'zones-link');
   await expect(page).toHaveURL('/fr/master-data/zones');
 
   const name = `Zone E2E ${Date.now()}`;
@@ -33,7 +33,7 @@ test('a partner adds, edits and cannot duplicate a zone in French (AC-MD-09 firs
 
 test('an office user reads the zones with no edit control', async ({ page }) => {
   await loginAndEnrol(page, 'fr', E2E_MD.office.email);
-  await page.getByTestId('zones-link').click();
+  await goNav(page, 'zones-link');
   await expect(page.getByTestId('zone-name').first()).toBeVisible();
   await expect(page.locator('input[name=name]')).toHaveCount(0);
   await expect(page.locator('button[type=submit]')).toHaveCount(0);
@@ -41,7 +41,7 @@ test('an office user reads the zones with no edit control', async ({ page }) => 
 
 test('the zones screen renders right-to-left in Arabic and a partner can edit', async ({ page }) => {
   await loginAndEnrol(page, 'ar', E2E_MD.partnerAr.email);
-  await page.getByTestId('zones-link').click();
+  await goNav(page, 'zones-link');
   await expect(page).toHaveURL('/ar/master-data/zones');
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('مناطق التسليم');

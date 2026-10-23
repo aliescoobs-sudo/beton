@@ -38,7 +38,7 @@ export function RecoveryCodesPanel() {
 
   return (
     <section className="mt-6 space-y-3">
-      <h2 className="font-medium">{t('recoveryTitle')}</h2>
+      <h2 className="text-xl">{t('recoveryTitle')}</h2>
       <p className="text-sm">{t('recoveryIntro')}</p>
       {codes ? (
         <div>
@@ -62,7 +62,7 @@ export function RecoveryCodesPanel() {
             />
           </label>
           {problem && (
-            <p role="alert" className="text-sm text-status-late">
+            <p role="alert" className="text-sm text-signal">
               {t(problem)}
             </p>
           )}
