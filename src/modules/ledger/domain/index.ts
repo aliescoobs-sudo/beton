@@ -15,3 +15,4 @@ export {
   MAX_PAYMENT_DAYS,
   REGULARIZATION_WINDOW_DAYS,
 } from './legal';
+export { DOC_NUMBER_WIDTH, DOC_PREFIXES, docYearOf, formatDocNumber, type DocPrefix } from './doc-number';

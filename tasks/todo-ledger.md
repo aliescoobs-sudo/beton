@@ -13,7 +13,7 @@ Pure `ledger/domain`: `computeTotals(volumeL, unitPriceHtPerM3, vatBp)` via `mul
 **AC:** AC-LED-01 (domain: 120 m³ × 780,00 → 93 600,00 / 18 720,00 / 112 320,00; 20/40/40 → 22 464,00 / 44 928,00 / 44 928,00), AC-LED-02 (domain: Σ ≠ TTC is `Err`), AC-LED-11 (helpers + scan test, red test first), AC-LED-13 (grep test: no literal rate in `ledger/domain`). fast-check: for any amounts and splits Σ items = TTC exactly.
 **Verify:** `pnpm test src/modules/ledger src/lib src/modules/platform-security` · **Files:** ledger/domain/{totals,plan,instrument-dates,legal}.ts + tests, platform-security/domain/parameters.ts, platform-security/index.ts, master-data/service/request.ts, eslint config · **Deps:** none
 
-### - [ ] L2: Yearly document counters (S)
+### - [x] L2: Yearly document counters (S)
 Migration `doc_sequence (prefix, year, last_value)`, FORCE RLS, audit; `public.next_doc_number(prefix, year, width)` (row-locked, a rolled-back transaction returns its number); `TABLE_ACCESS`, matrix fixture; domain `formatDocNumber`.
 **AC:** AC-LED-08 (counter part: 10 parallel calls → 10 consecutive numbers; gapless after a rollback; a new year restarts at 1); office/plant cannot write the table directly.
 **Verify:** `pnpm test:integration doc-sequence rls` · **Files:** migration, ledger/service/doc-number.ts, tests · **Deps:** L1

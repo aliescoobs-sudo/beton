@@ -131,6 +131,20 @@ const FIXTURES: Record<
                 from code_sequence where key like 'MX_' and $1::text is not null`;
     },
   },
+  doc_sequence: {
+    // Written only through next_doc_number(): owner and office may call it. Persistent by design, like code_sequence.
+    writers: ['owner', 'office'],
+    seed: (tx, actor) => {
+      const role = Object.entries(actors).find(([, id]) => id === actor)![0];
+      return tx.query(`select public.next_doc_number($1, 2099, 5)`, [
+        { owner: 'MXO', office: 'MXF' }[role as 'owner' | 'office'],
+      ]);
+    },
+    get visible() {
+      return `select case prefix when 'MXO' then '${actors.owner}' when 'MXF' then '${actors.office}' end as owner
+                from doc_sequence where prefix in ('MXO', 'MXF') and year = 2099 and $1::text is not null`;
+    },
+  },
   client: {
     writers: ['owner', 'partner', 'office'],
     seed: (tx, actor) =>

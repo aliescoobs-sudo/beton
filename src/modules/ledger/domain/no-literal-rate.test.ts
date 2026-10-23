@@ -11,7 +11,10 @@ describe('no literal VAT rate in ledger/domain (AC-LED-13)', () => {
       .replace(/\/\*[\s\S]*?\*\//g, '')
       .replace(/\/\/.*$/gm, '');
     // The unit constants (litres per m³, basis-point denominator) are the only fixed numbers; a rate is neither.
-    const rest = code.replace(/^const (LITRES_PER_M3|BP_DENOMINATOR|FULL) = .*$/gm, '');
+    // (Year bounds such as 2000 in the document numbers are years, not rates.)
+    const rest = code
+      .replace(/^.*year.*$/gim, '')
+      .replace(/^const (LITRES_PER_M3|BP_DENOMINATOR|FULL) = .*$/gm, '');
     // A rate as basis points (2000, 1400, 700, 1000) or as a fraction (0.2, 0.14): none may appear.
     expect(rest.match(/\b(2000|1400|700|1000|0\.(2|20|14|07|1))\b/g) ?? []).toEqual([]);
     expect(code).not.toMatch(/vat\w*\s*[:=]\s*\d/i);

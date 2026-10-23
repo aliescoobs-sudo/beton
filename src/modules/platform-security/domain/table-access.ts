@@ -429,6 +429,26 @@ export const TABLE_ACCESS = {
       'master-data T5: owner/partner/office write (archive: owner/partner, by trigger); plant has no access; ' +
       'belgobeton_system reads and may only update phone_enc (key rotation).',
   },
+  doc_sequence: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'none',
+      office: 'none',
+      plant: 'none',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'ledger L2: CMD-/ACH-/FA- yearly counters. Written only by public.next_doc_number() (SECURITY DEFINER; owner, ' +
+      'office and the seed may call it) so the app role has no INSERT/UPDATE; read by the owner and support: office ' +
+      'numbers documents but never reads the counters (blind entry, DECISIONS 81).',
+  },
   user: { kind: 'auth_only', reason: 'Better Auth account table (ADR 0001)' },
   session: { kind: 'auth_only', reason: 'Better Auth sessions (ADR 0001)' },
   account: { kind: 'auth_only', reason: 'Better Auth credentials: password hashes (ADR 0001)' },
