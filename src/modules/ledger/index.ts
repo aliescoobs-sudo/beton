@@ -8,3 +8,4 @@ export {
   type OrderPreview,
   previewOrder,
 } from './service/order-service';
+export { cancelOrder, type CancelOrderError, type CancelledOrder } from './service/order-reversal';

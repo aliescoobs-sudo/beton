@@ -29,10 +29,16 @@ One-screen form in fr/ar: client search by name/code, site, type, m³ (litres st
 **AC:** AC-LED-10 (timed Playwright script: office user, 2-item plan, < 120 s without AI; result in `docs/pilot/entry-timing.md`), form shows amounts that equal the service's; AC-MD-09 style RTL check for the screen.
 **Verify:** `pnpm exec playwright test e2e/ledger-order.spec.ts` · **Files:** app/[locale]/(protected)/orders/new/page.tsx, ledger/ui/orders/*, messages, e2e/ledger-order.spec.ts · **Deps:** L3
 
-### - [ ] L5: Reversal pattern: cancel an order (M)
+### - [x] L5: Reversal pattern: cancel an order (M)
+Built: `cancelOrder` (owner only, DECISIONS 81), migration 0033 (reversal guards, owner-only reversal policies, derived `is_reversed` on `sales_order_ops`). The cancel button and its step-up (`ledger.reverse_entry`) need an order screen: they ship with L7's order detail; the service takes `today` from the caller.
 `cancelOrder(orderId, reason)`: inserts a reversing `order` row and negated `payment_plan_item` rows (`reverses_id`), optional replacement order in the same transaction, mandatory reason, one audit event with the reason. A reversal cannot be reversed, an order cannot be reversed twice (unique `reverses_id`). Reversal window: office within `reversal_window_days`, older needs `ledger.reverse_old`. Derived `is_reversed` in reads. Meta-test: no UPDATE/DELETE/TRUNCATE grant on `order`, `payment_plan_item`.
 **AC:** AC-LED-03 (orders: no DELETE path, cancel = reversing row + audited reason), AC-LED-17 (office ≤ 2 days ok, older refused, owner/partner ok).
 **Verify:** `pnpm test:integration order-reversal rls` + e2e cancel from the order screen · **Files:** migration (unique reverses_id), ledger/service/order-service.ts, ledger/ui/orders/cancel-order.tsx, tests · **Deps:** L3 (L4 for the button)
+
+### - [ ] L5b: Correction requests (office → owner) (S)
+Office cannot read what it entered, so it cannot reverse or edit it (DECISIONS 81). It files a correction request: a record naming the document code and a reason, with no amount; the owner (and support, read-only) sees the queue and posts the reversal through L5. Insert-only table `correction_request`, office/owner insert, owner/support read, service `requestCorrection(documentCode, reason)`, owner-side `listCorrectionRequests`. Resolution is the owner's reversal (linked by code); no status column to update.
+**AC:** office can file a request for an existing document code without learning anything about it (unknown and existing codes answer the same); partner/plant/support cannot file; owner/support read; audited.
+**Verify:** `pnpm test:integration correction-request rls` · **Files:** migration, ledger/service/correction-service.ts, tests, table-access, matrix · **Deps:** L5
 
 ### Checkpoint CP-L1: Pattern
 - [ ] L1–L5 green; insert-only + reversal + DB invariants + visibility reviewed with Ali before the pattern is copied

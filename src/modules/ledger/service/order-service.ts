@@ -34,7 +34,7 @@ export interface CreatedOrder {
   code: string;
 }
 
-const dbFailure = (error: unknown): OrderError => {
+export const dbFailure = (error: unknown): OrderError => {
   const { code, message } = error as { code?: string; message?: string };
   if (code === '23514') {
     if (/client is not active/.test(message ?? '')) return 'CLIENT_ARCHIVED';
@@ -48,7 +48,7 @@ const dbFailure = (error: unknown): OrderError => {
   throw error;
 };
 
-interface PreparedOrder {
+export interface PreparedOrder {
   clientId: string;
   zoneId: string | null;
   priceId: string;
@@ -59,7 +59,7 @@ interface PreparedOrder {
 }
 
 /** Everything an order is made of, computed from the database and the domain functions; writes nothing. */
-async function prepareOrder(
+export async function prepareOrder(
   tx: pg.PoolClient,
   v: OrderInput,
   today: string,
@@ -124,6 +124,52 @@ async function prepareOrder(
   });
 }
 
+/** Writes the order and its plan items (no RETURNING: office has no SELECT policy, blind entry). Inside a transaction. */
+export async function insertOrderRows(
+  tx: pg.PoolClient,
+  actor: SessionUser,
+  v: OrderInput,
+  p: PreparedOrder,
+  today: string,
+): Promise<CreatedOrder> {
+  const id = randomUUID();
+  const code = await nextDocNumber(tx, 'CMD', today);
+  // No RETURNING: office has no SELECT policy on the table (blind entry).
+  await tx.query(
+    `insert into sales_order (id, code, client_id, site_id, zone_id, concrete_type_id, volume_l, order_date,
+                                  delivery_date, selling_price_id, unit_price_ht_centimes, vat_rate_bp,
+                                  total_ht_centimes, total_vat_centimes, total_ttc_centimes, brought_by_user_id, created_by)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
+    [
+      id,
+      code,
+      p.clientId,
+      v.siteId,
+      p.zoneId,
+      v.concreteTypeId,
+      v.volumeL,
+      today,
+      v.deliveryDate,
+      p.priceId,
+      p.unitPrice,
+      p.vatRateBp,
+      p.totals.totalHt,
+      p.totals.totalVat,
+      p.totals.totalTtc,
+      v.broughtByUserId,
+      actor.id,
+    ],
+  );
+  for (const [n, item] of p.plan.entries()) {
+    await tx.query(
+      `insert into payment_plan_item (id, order_id, seq, direction, method, due_date, amount_centimes, created_by)
+           values ($1, $2, $3, 'in', $4, $5, $6, $7)`,
+      [randomUUID(), id, n + 1, item.method, item.dueDate, item.amount, actor.id],
+    );
+  }
+  return { id, code };
+}
+
 /**
  * Creates an order and its payment plan in one transaction (AC-LED-01, AC-LED-02, AC-LED-13, AC-LED-18). The price is
  * resolved by the database for the client on the order date (office cannot read prices), the VAT rate is the parameter
@@ -145,43 +191,7 @@ export async function createOrder(
     return await inRequest(appPool, actor, async (tx): Promise<Result<CreatedOrder, OrderError>> => {
       const prepared = await prepareOrder(tx, v, deps.today);
       if (!prepared.ok) return prepared;
-      const p = prepared.value;
-      const id = randomUUID();
-      const code = await nextDocNumber(tx, 'CMD', deps.today);
-      // No RETURNING: office has no SELECT policy on the table (blind entry).
-      await tx.query(
-        `insert into sales_order (id, code, client_id, site_id, zone_id, concrete_type_id, volume_l, order_date,
-                                  delivery_date, selling_price_id, unit_price_ht_centimes, vat_rate_bp,
-                                  total_ht_centimes, total_vat_centimes, total_ttc_centimes, brought_by_user_id, created_by)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
-        [
-          id,
-          code,
-          p.clientId,
-          v.siteId,
-          p.zoneId,
-          v.concreteTypeId,
-          v.volumeL,
-          deps.today,
-          v.deliveryDate,
-          p.priceId,
-          p.unitPrice,
-          p.vatRateBp,
-          p.totals.totalHt,
-          p.totals.totalVat,
-          p.totals.totalTtc,
-          v.broughtByUserId,
-          actor.id,
-        ],
-      );
-      for (const [n, item] of p.plan.entries()) {
-        await tx.query(
-          `insert into payment_plan_item (id, order_id, seq, direction, method, due_date, amount_centimes, created_by)
-           values ($1, $2, $3, 'in', $4, $5, $6, $7)`,
-          [randomUUID(), id, n + 1, item.method, item.dueDate, item.amount, actor.id],
-        );
-      }
-      return ok({ id, code });
+      return ok(await insertOrderRows(tx, actor, v, prepared.value, deps.today));
     });
   } catch (error) {
     return err(dbFailure(error));
@@ -228,7 +238,7 @@ export async function previewOrder(
 }
 
 /** A ledger parameter as the roles that create documents may read it: the stored value over the default. */
-async function ledgerParameter(
+export async function ledgerParameter(
   tx: pg.PoolClient,
   key: 'vat_rate_bp' | 'reversal_window_days' | 'clearing_delay_days',
 ): Promise<number> {

@@ -497,6 +497,7 @@ describe('visibility and immutability (AC-SEC-04, AC-SEC-05, DECISIONS 81)', () 
           'concrete_type_id',
           'delivery_date',
           'id',
+          'is_reversed',
           'reverses_id',
           'site_id',
           'site_label',
