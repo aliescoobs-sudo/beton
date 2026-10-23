@@ -455,5 +455,62 @@
       "serverError": "Erreur serveur : l'avance a échoué."
     },
     "days": "Jours simulés"
+  },
+  "ledger": {
+    "orders": {
+      "title": "Nouvelle commande",
+      "link": "Nouvelle commande",
+      "blindNote": "Saisie aveugle : les prix et les montants ne sont pas affichés ; seul le numéro de la commande vous est rendu.",
+      "clientSearch": "Rechercher un client (nom ou code)",
+      "client": "Client",
+      "site": "Chantier",
+      "zone": "Zone",
+      "type": "Type de béton",
+      "volume": "Volume (m³)",
+      "deliveryDate": "Date de livraison",
+      "plan": "Échéancier de paiement",
+      "preset": "Modèle",
+      "presets": {
+        "cash": "Comptant à la livraison",
+        "advance50": "50 % d'avance + 50 % à la livraison",
+        "installments3": "3 échéances à 30, 60 et 90 jours",
+        "cheque30": "Chèque à 30 jours",
+        "custom": "Personnalisé"
+      },
+      "methods": {
+        "cash": "Espèces",
+        "cheque": "Chèque",
+        "lcn": "LCN",
+        "transfer": "Virement",
+        "advance": "Avance",
+        "installment": "Échéance"
+      },
+      "itemMethod": "Mode",
+      "itemDue": "Échéance",
+      "itemShare": "Type de part",
+      "sharePercent": "Part (%)",
+      "shareAmount": "Montant (MAD)",
+      "addItem": "Ajouter une échéance",
+      "removeItem": "Retirer",
+      "percentSum": "Total des parts : {sum} %",
+      "save": "Enregistrer la commande",
+      "saved": "Commande {code} enregistrée.",
+      "another": "Saisir une autre commande",
+      "preview": "Aperçu des montants",
+      "previewTitle": "Montants calculés",
+      "unitPrice": "Prix HT par m³",
+      "totalHt": "Total HT",
+      "totalVat": "TVA ({rate} %)",
+      "totalTtc": "Total TTC",
+      "invalid": "Valeur refusée : vérifiez le client, le volume (m³), la date et l'échéancier.",
+      "notFound": "Client, chantier ou type introuvable.",
+      "clientArchived": "Ce client est archivé : il n'accepte plus de nouvelle commande.",
+      "typeInactive": "Ce type de béton est archivé.",
+      "noPrice": "Aucun prix de vente en vigueur pour ce client et ce type à cette date.",
+      "planInvalid": "L'échéancier ne correspond pas au total de la commande.",
+      "deliveryBeforeOrder": "La livraison ne peut pas précéder la date du jour.",
+      "conflict": "Conflit : réessayez.",
+      "error": "Action refusée."
+    }
   }
 }

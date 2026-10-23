@@ -19,3 +19,4 @@ export { DOC_NUMBER_WIDTH, DOC_PREFIXES, docYearOf, formatDocNumber, type DocPre
 export { addDaysIso, isRealDate } from './dates';
 export { PLAN_PRESETS, presetItems, type PlanPreset } from './plan-presets';
 export { type OrderInput, parseOrderInput } from './order';
+export { formatPercentBp, parsePercentBp } from './percent';

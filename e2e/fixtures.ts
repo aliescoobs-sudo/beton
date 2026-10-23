@@ -32,6 +32,10 @@ export const E2E_MD = {
   recettePartnerFr: { email: 'e2e-re-partner-fr@belgobeton.test', name: 'Associé Recettes' },
   recettePartnerAr: { email: 'e2e-re-partner-ar@belgobeton.test', name: 'شريك الوصفات' },
   recettePlant: { email: 'e2e-re-plant@belgobeton.test', name: 'Centrale Recettes' },
+  orderOffice: { email: 'e2e-or-office@belgobeton.test', name: 'Bureau Commandes' },
+  orderOfficeAr: { email: 'e2e-or-office-ar@belgobeton.test', name: 'مكتب الطلبيات' },
+  orderPartner: { email: 'e2e-or-partner@belgobeton.test', name: 'Associé Commandes' },
+  orderPlant: { email: 'e2e-or-plant@belgobeton.test', name: 'Centrale Commandes' },
   priceSupport: { email: 'e2e-pp-support@belgobeton.test', name: 'Support Prix' },
   sellSupport: { email: 'e2e-sp-support@belgobeton.test', name: 'Support Ventes' },
   ovSupport: { email: 'e2e-ov-support@belgobeton.test', name: 'Support Remises' },
@@ -77,6 +81,7 @@ export async function passwordStep(page: Page, locale: string, email: string) {
 const NAV_GROUP: Record<string, string> = {
   'clients-link': 'sales',
   'selling-prices-link': 'sales',
+  'orders-new-link': 'sales',
   'suppliers-link': 'purchases',
   'purchase-prices-link': 'purchases',
   'recettes-link': 'production',

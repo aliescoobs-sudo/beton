@@ -24,7 +24,7 @@ Migration `order`, `payment_plan_item` (insert-only, `reverses_id`, direction in
 **AC:** AC-LED-01, AC-LED-02 (service + DB trigger), AC-LED-13 (VAT 1400 only affects later orders), AC-LED-18 (archived client refused on a new order, old orders still show it), AC-SEC-04 for `order`, `payment_plan_item` × 4 roles.
 **Verify:** `pnpm test:integration order rls` · **Files:** migration, ledger/service/order-service.ts, ledger/db queries, index.ts, table-access.ts, matrix fixture, tests/order.int.test.ts · **Deps:** L1, L2
 
-### - [ ] L4: Order entry screen (M)
+### - [x] L4: Order entry screen (M)
 One-screen form in fr/ar: client search by name/code, site, type, m³ (litres stored), date, resolved price prefilled, plan presets, live totals from the domain function, `bdi`/`dir=ltr` for codes and amounts, i18n keys under `ledger.orders`. Nav entry filtered by `orders.write`.
 **AC:** AC-LED-10 (timed Playwright script: office user, 2-item plan, < 120 s without AI; result in `docs/pilot/entry-timing.md`), form shows amounts that equal the service's; AC-MD-09 style RTL check for the screen.
 **Verify:** `pnpm exec playwright test e2e/ledger-order.spec.ts` · **Files:** app/[locale]/(protected)/orders/new/page.tsx, ledger/ui/orders/*, messages, e2e/ledger-order.spec.ts · **Deps:** L3

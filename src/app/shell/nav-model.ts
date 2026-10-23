@@ -29,6 +29,12 @@ const GROUPS: GroupDef[] = [
         allowed: 'parties.read',
       },
       {
+        path: '/orders/new',
+        labelKey: 'ledger.orders.link',
+        testId: 'orders-new-link',
+        allowed: 'orders.write',
+      },
+      {
         path: '/master-data/selling-prices',
         labelKey: 'masterData.sellingPrices.link',
         testId: 'selling-prices-link',

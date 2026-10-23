@@ -51,6 +51,20 @@ export async function listSites(
   }
 }
 
+/** Id, client, label and zone of every site (no address, so nothing is decrypted): what an order form offers. */
+export async function listSiteOptions(
+  appPool: pg.Pool,
+  actor: SessionUser,
+): Promise<{ id: string; clientId: string; label: string; zoneId: string | null }[]> {
+  await require(appPool, actor, 'parties.read');
+  const { rows } = await inRequest(appPool, actor, (tx) =>
+    tx.query<{ id: string; clientId: string; label: string; zoneId: string | null }>(
+      `select id, client_id as "clientId", label, zone_id as "zoneId" from client_site order by lower(label)`,
+    ),
+  );
+  return rows;
+}
+
 /** Shared by create and update: the database errors that mean "bad input" rather than "broken server". */
 function failure(error: unknown): SiteError {
   const code = (error as { code?: string }).code;
