@@ -32,3 +32,11 @@ export function formatCentimes(amount: number): string {
   const whole = String(Math.trunc(abs / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   return `${sign}${whole},${String(abs % 100).padStart(2, '0')}`;
 }
+
+// Arithmetic on money goes through these helpers only (AC-LED-11): `+ - * /` on a Centimes value anywhere else is
+// refused by scripts/centimes-arithmetic.test.ts. Results are checked to stay safe integers.
+export const addCentimes = (a: Centimes, b: Centimes): Centimes => centimes((a as number) + (b as number));
+export const subCentimes = (a: Centimes, b: Centimes): Centimes => centimes((a as number) - (b as number));
+export const negateCentimes = (a: Centimes): Centimes => centimes(-(a as number));
+export const sumCentimes = (amounts: readonly Centimes[]): Centimes =>
+  amounts.reduce<Centimes>((total, amount) => addCentimes(total, amount), centimes(0));

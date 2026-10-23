@@ -141,7 +141,10 @@
       "clock__job__morning_recompute": "إعادة الحساب الصباحية",
       "clock__job__daily_brief": "الملخص اليومي",
       "clock__job__due_reminders": "تذكيرات الآجال",
-      "clock__job__day_close": "إغلاق اليوم"
+      "clock__job__day_close": "إغلاق اليوم",
+      "vat_rate_bp": "نسبة الضريبة على القيمة المضافة (نقاط أساس: 2000 = 20٪)",
+      "reversal_window_days": "مهلة إلغاء قيد (بالأيام)",
+      "clearing_delay_days": "مهلة تحصيل الشيك أو الكمبيالة (أيام عمل)"
     },
     "restartNote": "لا تُطبَّق أوقات المهام المجدولة إلا بعد إعادة تشغيل الخادم."
   },

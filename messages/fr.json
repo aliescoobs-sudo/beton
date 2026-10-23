@@ -141,7 +141,10 @@
       "clock__job__morning_recompute": "Recalcul du matin",
       "clock__job__daily_brief": "Brief quotidien",
       "clock__job__due_reminders": "Rappels d'échéances",
-      "clock__job__day_close": "Clôture de la journée"
+      "clock__job__day_close": "Clôture de la journée",
+      "vat_rate_bp": "Taux de TVA (points de base : 2000 = 20 %)",
+      "reversal_window_days": "Délai pour annuler une écriture (jours)",
+      "clearing_delay_days": "Délai d'encaissement d'un chèque ou LCN (jours ouvrés)"
     },
     "restartNote": "Les heures des tâches planifiées ne sont prises en compte qu'après un redémarrage du serveur."
   },

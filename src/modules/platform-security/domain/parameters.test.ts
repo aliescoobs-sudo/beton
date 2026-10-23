@@ -15,6 +15,9 @@ describe('parameter registry (T19)', () => {
       'clock.job.daily_brief': '07:00',
       'clock.job.due_reminders': '07:05',
       'clock.job.day_close': '20:00',
+      vat_rate_bp: 2000,
+      reversal_window_days: 2,
+      clearing_delay_days: 1,
     });
   });
 
@@ -30,6 +33,11 @@ describe('parameter registry (T19)', () => {
     ['auth.session_absolute_hours', 48],
     ['auth.lockout_window_minutes', 1.5],
     ['clock.job.day_close', '25:00'],
+    ['vat_rate_bp', 2501], // bounded 0–2500
+    ['vat_rate_bp', -1],
+    ['vat_rate_bp', 20.5],
+    ['reversal_window_days', 31],
+    ['clearing_delay_days', 11],
     ['clock.job.day_close', 2000],
   ])('rejects %s = %j', (key, value) => {
     expect(parseParameter(key as never, value).ok).toBe(false);

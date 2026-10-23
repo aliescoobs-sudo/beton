@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { centimes, type Centimes } from '@/lib/money';
+import { addCentimes, centimes, type Centimes } from '@/lib/money';
 import { baseQty, costOf } from '@/lib/quantity';
 import { err, ok, type Result } from '@/lib/result';
 import { dateField } from './date-field';
@@ -61,12 +61,12 @@ export function componentCostPerM3(
   prices: readonly PricePoint[],
   date: string,
 ): Result<Centimes, 'NO_PRICE'> {
-  let total = 0;
+  let total = centimes(0);
   for (const line of lines) {
     const price = resolvePurchasePrice(prices, line.componentId, date);
     if (!price.ok) return err('NO_PRICE');
     const { priceHtCentimes, factorToBase } = price.value;
-    total += costOf(baseQty(line.qtyPerM3), centimes(priceHtCentimes), factorToBase);
+    total = addCentimes(total, costOf(baseQty(line.qtyPerM3), centimes(priceHtCentimes), factorToBase));
   }
-  return ok(centimes(total));
+  return ok(total);
 }

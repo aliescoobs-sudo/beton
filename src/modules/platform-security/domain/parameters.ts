@@ -45,6 +45,22 @@ export const PARAMETERS = {
     description: 'Due-date reminders (HH:MM)',
   },
   'clock.job.day_close': { default: '20:00', schema: minutesOfDay, description: 'Day close (HH:MM)' },
+  // Ledger (DECISIONS 66; plan decisions 8): configurable, never hard-coded. Each document stores the VAT rate in force.
+  vat_rate_bp: {
+    default: 2000,
+    schema: z.number().int().min(0).max(2500),
+    description: 'VAT rate in basis points (2000 = 20 %), stored on each document when it is created',
+  },
+  reversal_window_days: {
+    default: 2,
+    schema: z.number().int().min(0).max(30),
+    description: 'Days after which a ledger entry can only be reversed by the owner',
+  },
+  clearing_delay_days: {
+    default: 1,
+    schema: z.number().int().min(0).max(10),
+    description: 'Working days before a deposited cheque or LCN clears',
+  },
 } as const;
 
 export type ParameterKey = keyof typeof PARAMETERS;

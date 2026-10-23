@@ -1,6 +1,15 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { centimes, formatCentimes, mulDivRound, parseCentimes } from './money';
+import {
+  addCentimes,
+  centimes,
+  formatCentimes,
+  mulDivRound,
+  negateCentimes,
+  parseCentimes,
+  subCentimes,
+  sumCentimes,
+} from './money';
 
 describe('centimes', () => {
   it('accepts safe integers and refuses fractions, NaN and unsafe values', () => {
@@ -73,6 +82,28 @@ describe('parseCentimes / formatCentimes', () => {
     fc.assert(
       fc.property(fc.integer({ min: 0, max: 9_999_999_999 }), (n) => {
         expect(parseCentimes(formatCentimes(n))).toBe(n);
+      }),
+    );
+  });
+});
+
+describe('Centimes arithmetic helpers (AC-LED-11)', () => {
+  it('add, subtract, negate and sum stay exact integers', () => {
+    expect(addCentimes(centimes(150), centimes(275))).toBe(425);
+    expect(subCentimes(centimes(150), centimes(275))).toBe(-125);
+    expect(negateCentimes(centimes(150))).toBe(-150);
+    expect(sumCentimes([])).toBe(0);
+    expect(sumCentimes([centimes(1), centimes(2), centimes(3)])).toBe(6);
+  });
+
+  it('refuses a result that is not a safe integer', () => {
+    expect(() => addCentimes(centimes(Number.MAX_SAFE_INTEGER), centimes(1))).toThrow(RangeError);
+  });
+
+  it('property: sumCentimes equals the exact sum', () => {
+    fc.assert(
+      fc.property(fc.array(fc.integer({ min: -1_000_000, max: 1_000_000 })), (xs) => {
+        return sumCentimes(xs.map(centimes)) === xs.reduce((a, b) => a + b, 0);
       }),
     );
   });
