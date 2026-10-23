@@ -225,6 +225,13 @@
       "when": 1792591228000,
       "tag": "0031_doc_sequence",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1792591229000,
+      "tag": "0032_sales_order",
+      "breakpoints": true
     }
   ]
 }

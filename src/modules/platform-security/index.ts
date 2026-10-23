@@ -22,3 +22,4 @@ export { auditDenied, authorize, type Authorization } from './auth/guards';
 export type { SessionUser } from './auth/session-gate';
 export { ForbiddenError } from './service/user-admin';
 export { inRequest, isMalformedId, isUniqueViolation, require } from './service/request';
+export { parameterOrDefault } from './domain/parameters';

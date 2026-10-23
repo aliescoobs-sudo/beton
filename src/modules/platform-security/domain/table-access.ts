@@ -25,6 +25,8 @@ interface RlsTable {
    * flagged table, and its audit rows are hidden from the others (audit.is_money_table).
    */
   money?: true;
+  /** Roles that may INSERT into a money table without being able to read it back (blind entry, DECISIONS 81). */
+  blindWriters?: readonly DbRole[];
   /** Versioned records: belgobeton_app has no UPDATE either (a change is a new row), e.g. recettes (AC-MD-02). */
   insertOnly?: boolean;
 }
@@ -448,6 +450,49 @@ export const TABLE_ACCESS = {
       'ledger L2: CMD-/ACH-/FA- yearly counters. Written only by public.next_doc_number() (SECURITY DEFINER; owner, ' +
       'office and the seed may call it) so the app role has no INSERT/UPDATE; read by the owner and support: office ' +
       'numbers documents but never reads the counters (blind entry, DECISIONS 81).',
+  },
+  sales_order: {
+    kind: 'rls',
+    money: true,
+    blindWriters: ['office'],
+    read: {
+      owner: 'all',
+      partner: 'none',
+      office: 'none',
+      plant: 'none',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'ledger L3: insert-only orders (a correction is a reversing row). Owner and support read; office inserts and ' +
+      'cannot read back (no SELECT policy, no RETURNING); partner and plant read the view sales_order_ops, which has ' +
+      'operational fields only (AC-SEC-05). Price guard, plan balance and archived-client trigger live in the database.',
+  },
+  payment_plan_item: {
+    kind: 'rls',
+    money: true,
+    blindWriters: ['office'],
+    read: {
+      owner: 'all',
+      partner: 'none',
+      office: 'none',
+      plant: 'none',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'ledger L3: insert-only plan items; Σ items = order total is a deferred constraint trigger. Same visibility as ' +
+      'sales_order.',
   },
   user: { kind: 'auth_only', reason: 'Better Auth account table (ADR 0001)' },
   session: { kind: 'auth_only', reason: 'Better Auth sessions (ADR 0001)' },

@@ -8,6 +8,7 @@ import { RLS_TABLES, TABLE_ACCESS } from '../src/modules/platform-security/domai
 import { recordMoneyView } from '../src/modules/platform-security';
 import { testEnv } from './db-env';
 import { realActor, realSessionUser, type TestActor } from './helpers/actors';
+import { insertOrder, orderMaster } from './helpers/ledger-fixtures';
 
 // DECISIONS 81 (provisional): money visibility enforced by the database. Every table flagged `money` in TABLE_ACCESS
 // gives zero rows to partner, office, plant, system and anonymous; the owner and support read; support writes nothing;
@@ -48,6 +49,9 @@ const SEED: Record<MoneyTable, (tx: pg.PoolClient, actor: string) => Promise<unk
       [component.rows[0]?.id, supplier.rows[0]?.id, unit.rows[0]?.id, actor],
     );
   },
+  sales_order: async (tx, actor) => insertOrder(tx, actor, await orderMaster(app, actors.owner.id, marker)),
+  payment_plan_item: async (tx, actor) =>
+    insertOrder(tx, actor, await orderMaster(app, actors.owner.id, marker)),
   selling_price: async (tx, actor) => {
     const type = await tx.query<{ id: string }>(
       `insert into concrete_type (id, code, label) values (gen_random_uuid(), 'V' || upper(substr(md5(random()::text), 1, 8)), $1) returning id`,
@@ -119,16 +123,27 @@ describe.each(MONEY_TABLES)('money table %s (DECISIONS 81)', (table) => {
     }
   });
 
+  const blind = (): readonly string[] =>
+    'blindWriters' in TABLE_ACCESS[table] ? [...(TABLE_ACCESS[table].blindWriters as readonly string[])] : [];
+
   it.each(['support', 'partner', 'office', 'plant'] as const)(
-    'refuses a write by %s under RLS',
+    'refuses a write by %s under RLS unless it is a blind writer',
     async (role) => {
-      await expect(
-        inCtx(role, actors[role].id, (tx) => SEED[table](tx, actors[role].id)),
-      ).rejects.toMatchObject({
-        code: '42501',
-      });
+      const write = inCtx(role, actors[role].id, (tx) => SEED[table](tx, actors[role].id));
+      if (blind().includes(role)) await expect(write).resolves.not.toThrow();
+      else await expect(write).rejects.toMatchObject({ code: '42501' });
     },
   );
+
+  it('a blind writer inserts but cannot read the row back, not even with RETURNING', async () => {
+    for (const role of blind() as 'office'[]) {
+      await expect(
+        inCtx(role, actors[role].id, (tx) => tx.query(`select 1 from ${table}`)),
+      ).resolves.toMatchObject({
+        rows: [],
+      });
+    }
+  });
 
   it('hides its audit rows (they hold the amounts) from partner, office and plant; owner and support read them', async () => {
     for (const role of ['partner', 'office', 'plant'] as const) {

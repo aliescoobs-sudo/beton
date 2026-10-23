@@ -91,3 +91,10 @@ export function parseParameter<K extends ParameterKey>(
 export function parameterLabelKey(key: string): string {
   return key.replaceAll('.', '__');
 }
+
+/** A stored value over the default: an absent or no longer valid value falls back to the default. */
+export function parameterOrDefault<K extends ParameterKey>(key: K, stored: unknown): ParameterValues[K] {
+  const parsed =
+    stored === null || stored === undefined ? { ok: false as const } : parseParameter(key, stored);
+  return parsed.ok ? parsed.value : (PARAMETERS[key].default as ParameterValues[K]);
+}

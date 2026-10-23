@@ -5,6 +5,7 @@ import { DB_ROLES, withRlsContext } from '../../src/lib/db/rls-context';
 import { RLS_TABLES, TABLE_ACCESS } from '../../src/modules/platform-security/domain/table-access';
 import { testEnv } from '../db-env';
 import { realActor } from '../helpers/actors';
+import { insertOrder, orderMaster } from '../helpers/ledger-fixtures';
 import { resetSimClock } from '../helpers/reset-sim-clock';
 import { ANONYMOUS_ACTOR_ID, SYSTEM_ACTOR_ID } from '../../src/modules/platform-security/auth/actors';
 import { USER_ROLES } from '../../src/modules/platform-security/domain/permissions';
@@ -130,6 +131,19 @@ const FIXTURES: Record<
                                when 'MXF' then '${actors.office}' end as owner
                 from code_sequence where key like 'MX_' and $1::text is not null`;
     },
+  },
+  sales_order: {
+    writers: ['owner', 'office'],
+    seed: async (tx, actor) => insertOrder(tx, actor, await orderMaster(app, actors.owner, marker)),
+    visible: `select o.created_by::text as owner from sales_order o join client c on c.id = o.client_id
+               where c.name = 'fx' || $1`,
+  },
+  payment_plan_item: {
+    // The items are written together with their order by the same actors (seeded by the sales_order fixture above).
+    writers: ['owner', 'office'],
+    seed: async () => undefined,
+    visible: `select i.created_by::text as owner from payment_plan_item i join sales_order o on o.id = i.order_id
+                join client c on c.id = o.client_id where c.name = 'fx' || $1`,
   },
   doc_sequence: {
     // Written only through next_doc_number(): owner and office may call it. Persistent by design, like code_sequence.
