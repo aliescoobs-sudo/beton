@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { E2E_OWNER, E2E_PASSWORD, E2E_PLANT, loginAndEnrol, goNav } from './fixtures';
+import { E2E_PASSWORD, E2E_PLANT, loginAndEnrol, loginOwner, goNav } from './fixtures';
 
 // Runs in file order (one worker): the plant user enrols first, so the owner can reset its 2FA later.
 test.describe.configure({ mode: 'serial' });
@@ -13,7 +13,7 @@ test('a non-owner gets a 404 on user admin (T13, SPEC §4)', async ({ page }) =>
 });
 
 test('the owner creates, disables, re-enables a user and resets another user’s 2FA', async ({ page }) => {
-  await loginAndEnrol(page, 'fr', E2E_OWNER.email);
+  await loginOwner(page, 'fr');
   await goNav(page, 'admin-link');
   await expect(page).toHaveURL('/fr/admin/users');
 

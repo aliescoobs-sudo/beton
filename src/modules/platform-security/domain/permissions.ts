@@ -3,22 +3,33 @@
  * read this one table. Default deny: a permission not listed here is granted to nobody.
  * Field-level restrictions inside a permission (e.g. plant sees orders without prices) live in field-visibility.ts.
  */
-export const USER_ROLES = ['owner', 'partner', 'office', 'plant'] as const;
+export const USER_ROLES = ['owner', 'partner', 'office', 'plant', 'support'] as const;
 export type Role = (typeof USER_ROLES)[number];
 
-const ALL = ['owner', 'partner', 'office', 'plant'] as const;
+// DECISIONS 81 (provisional): `support` reads everything and writes nothing, so it joins every read list and no write
+// list. Money (prices, balances, totals, instruments, invoices) is read by the owner and support only; the partner has
+// no money access for now; office writes money blind (it never reads it back); plant sees no money.
+const ALL = ['owner', 'partner', 'office', 'plant', 'support'] as const;
 const MANAGERS = ['owner', 'partner'] as const;
+const MANAGERS_READ = ['owner', 'partner', 'support'] as const;
 const OFFICE = ['owner', 'partner', 'office'] as const;
+const OFFICE_READ = ['owner', 'partner', 'office', 'support'] as const;
+const PLANT_READ = ['owner', 'partner', 'plant', 'support'] as const;
 const PLANT = ['owner', 'partner', 'plant'] as const;
+/** Money: read by the owner and support; written by the owner. */
+const MONEY_READ = ['owner', 'support'] as const;
+const MONEY_WRITE = ['owner'] as const;
+/** Blind entry: office (and the owner) create money records and never read them back. */
+const BLIND_WRITE = ['owner', 'office'] as const;
 
 export const PERMISSIONS = {
   // Users, roles, 2FA reset
   'users.manage': ['owner'],
   // Parameters
-  'parameters.read': MANAGERS,
+  'parameters.read': MANAGERS_READ,
   'parameters.write': ['owner'],
   // Clients / suppliers
-  'parties.read': OFFICE,
+  'parties.read': OFFICE_READ,
   'parties.write': OFFICE,
   // Archiving replaces deleting; a second client on an existing ICE needs a recorded reason
   'parties.archive': MANAGERS,
@@ -30,55 +41,61 @@ export const PERMISSIONS = {
   'recettes.read': ALL,
   'recettes.write': MANAGERS,
   // Purchase prices, component costs (office: on the purchases they enter)
-  'purchase_prices.read': OFFICE,
-  'purchase_prices.write': MANAGERS,
+  'purchase_prices.read': MONEY_READ,
+  'purchase_prices.write': MONEY_WRITE,
   // Selling prices, per-client overrides (✅ A27)
-  'selling_prices.read': OFFICE,
-  'selling_prices.write': MANAGERS,
-  'client_price_override.write': MANAGERS,
+  'selling_prices.read': MONEY_READ,
+  'selling_prices.write': MONEY_WRITE,
+  'client_price_override.write': MONEY_WRITE,
   // Trucks, zones
   'trucks.read': ALL,
   'trucks.write': MANAGERS,
   'trucks.status.write': PLANT,
   'zones.read': ALL,
   'zones.write': MANAGERS,
-  // Orders + payment plan (plant: operational fields only)
-  'orders.read': ALL,
-  'orders.write': OFFICE,
-  'orders.price_override': MANAGERS,
+  // Orders + payment plan: operational fields (code, type, m³, date, site/zone) for the partner and the plant, amounts
+  // for the owner and support; office writes blind (field-visibility.ts)
+  'orders.read': ['owner', 'partner', 'plant', 'support'],
+  'orders.read_money': MONEY_READ,
+  'orders.write': BLIND_WRITE,
+  'orders.price_override': MONEY_WRITE,
   // Payment instruments, money account entries
-  'instruments.read': OFFICE,
-  'instruments.write': OFFICE,
+  'instruments.read': MONEY_READ,
+  'instruments.write': BLIND_WRITE,
   // Invoices
-  'invoices.read': OFFICE,
-  'invoices.write': OFFICE,
-  // Purchases, supplier payments (plant: receipt lines)
-  'purchases.read': ALL,
-  'purchases.write': OFFICE,
-  // Reversing entries; older than the reversal window: managers only
-  'ledger.reverse': OFFICE,
-  'ledger.reverse_old': MANAGERS,
+  'invoices.read': MONEY_READ,
+  'invoices.write': BLIND_WRITE,
+  // Purchases, supplier payments (plant: receipt lines, no amount)
+  'purchases.read': ['owner', 'plant', 'support'],
+  'purchases.read_money': MONEY_READ,
+  'purchases.write': BLIND_WRITE,
+  // Reversing entries are the owner's; office asks for a correction instead (it cannot read what it entered)
+  'ledger.reverse': MONEY_WRITE,
+  'ledger.reverse_old': MONEY_WRITE,
+  'corrections.request': BLIND_WRITE,
+  'corrections.read': ['owner', 'support'],
   // Deliveries / BL (✅ A11)
   'deliveries.read': ALL,
   'deliveries.write': PLANT,
-  'deliveries.bl_return': ALL,
+  'deliveries.bl_return': ['owner', 'partner', 'office', 'plant'],
   // Stock movements, physical count, plant import
-  'stock.read': PLANT,
+  'stock.read': PLANT_READ,
   'stock.write': PLANT,
   'reconciliation.close': MANAGERS,
   // Derived figures
-  'margins.read': MANAGERS,
-  'cash.read': MANAGERS,
+  'margins.read': MONEY_READ,
+  'cash.read': MONEY_READ,
+  // Security alerts (break-glass) are not money: owner and partner see and acknowledge them (support reads the table).
   'alerts.risk.read': MANAGERS,
-  'alerts.reclassify': MANAGERS,
-  'due_items.read': OFFICE,
-  'alerts.stock.read': PLANT,
-  'accounts.colour.read': OFFICE,
+  'alerts.reclassify': MONEY_WRITE,
+  'due_items.read': MONEY_READ,
+  'alerts.stock.read': PLANT_READ,
+  'accounts.colour.read': MONEY_READ,
   // Audit log viewer
-  'audit.read_all': MANAGERS,
+  'audit.read_all': MANAGERS_READ,
   'audit.read_own': ALL,
   // AI (🟡 A22)
-  'ai.qa': MANAGERS,
+  'ai.qa': MONEY_READ,
   'ai.assisted_entry': OFFICE,
   // Pilot operations
   'simulation.control': ['owner'],

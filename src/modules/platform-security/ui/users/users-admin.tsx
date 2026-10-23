@@ -119,7 +119,7 @@ export function UsersAdmin({ users, selfId }: { users: ManagedUser[]; selfId: st
         <label className="block">
           <span className="text-sm">{t('role')}</span>
           <select name="role" className={input} defaultValue="office">
-            {(['partner', 'office', 'plant'] as const).map((r) => (
+            {(['partner', 'office', 'plant', 'support'] as const).map((r) => (
               <option key={r} value={r}>
                 {t(`roles.${r}`)}
               </option>

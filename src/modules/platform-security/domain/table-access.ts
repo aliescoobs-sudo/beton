@@ -19,6 +19,12 @@ interface RlsTable {
    * code counter. belgobeton_system never inserts into such a table. See db/seed/seed-role.sql.
    */
   seed?: 'insert' | 'counter';
+  /**
+   * Money data (DECISIONS 81): partner, office, plant and the system read nothing; the owner and support read; only the
+   * owner writes (office may insert blind where a later table allows it). tests/money-visibility.int.test.ts checks every
+   * flagged table, and its audit rows are hidden from the others (audit.is_money_table).
+   */
+  money?: true;
   /** Versioned records: belgobeton_app has no UPDATE either (a change is a new row), e.g. recettes (AC-MD-02). */
   insertOnly?: boolean;
 }
@@ -37,7 +43,15 @@ interface AuthOnlyTable {
 export const TABLE_ACCESS = {
   audit_event: {
     kind: 'rls',
-    read: { owner: 'all', partner: 'all', office: 'own', plant: 'own', system: 'none', anonymous: 'none' },
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'own',
+      plant: 'own',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
     force: false,
     audited: false,
     exception:
@@ -46,7 +60,15 @@ export const TABLE_ACCESS = {
   },
   parameter: {
     kind: 'rls',
-    read: { owner: 'all', partner: 'all', office: 'none', plant: 'none', system: 'all', anonymous: 'none' },
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'none',
+      plant: 'none',
+      system: 'all',
+      anonymous: 'none',
+      support: 'all',
+    },
     force: true,
     audited: true,
     exception:
@@ -54,34 +76,74 @@ export const TABLE_ACCESS = {
   },
   security_checklist_item: {
     kind: 'rls',
-    read: { owner: 'all', partner: 'all', office: 'none', plant: 'none', system: 'all', anonymous: 'none' },
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'none',
+      plant: 'none',
+      system: 'all',
+      anonymous: 'none',
+      support: 'all',
+    },
     force: true,
     audited: true,
     exception: 'Also readable by belgobeton_system (banner, REAL_DATA boot guard); writes: owner only.',
   },
   security_check_run: {
     kind: 'rls',
-    read: { owner: 'all', partner: 'all', office: 'none', plant: 'none', system: 'all', anonymous: 'none' },
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'none',
+      plant: 'none',
+      system: 'all',
+      anonymous: 'none',
+      support: 'all',
+    },
     force: true,
     audited: true,
     exception: 'Append-only automated evidence, inserted by belgobeton_system with the system actor only.',
   },
   security_alert: {
     kind: 'rls',
-    read: { owner: 'all', partner: 'all', office: 'none', plant: 'none', system: 'all', anonymous: 'none' },
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'none',
+      plant: 'none',
+      system: 'all',
+      anonymous: 'none',
+      support: 'all',
+    },
     force: true,
     audited: true,
     exception: 'Inserted by belgobeton_system with the system actor (break-glass CLI).',
   },
   security_alert_ack: {
     kind: 'rls',
-    read: { owner: 'own', partner: 'own', office: 'none', plant: 'none', system: 'none', anonymous: 'none' },
+    read: {
+      owner: 'own',
+      partner: 'own',
+      office: 'none',
+      plant: 'none',
+      system: 'none',
+      anonymous: 'none',
+      support: 'none',
+    },
     force: true,
     audited: true,
   },
   sim_clock: {
     kind: 'rls',
-    read: { owner: 'all', partner: 'all', office: 'all', plant: 'all', system: 'all', anonymous: 'none' },
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'all',
+      plant: 'all',
+      system: 'all',
+      anonymous: 'none',
+      support: 'all',
+    },
     force: true,
     audited: true,
     exception:
@@ -90,14 +152,30 @@ export const TABLE_ACCESS = {
   },
   scheduled_job_run: {
     kind: 'rls',
-    read: { owner: 'all', partner: 'all', office: 'none', plant: 'none', system: 'all', anonymous: 'none' },
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'none',
+      plant: 'none',
+      system: 'all',
+      anonymous: 'none',
+      support: 'all',
+    },
     force: true,
     audited: true,
     exception: 'SPEC-clock §3 idempotency ledger; written only by the system actor (job runner).',
   },
   zone: {
     kind: 'rls',
-    read: { owner: 'all', partner: 'all', office: 'all', plant: 'all', system: 'all', anonymous: 'none' },
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'all',
+      plant: 'all',
+      system: 'all',
+      anonymous: 'none',
+      support: 'all',
+    },
     force: true,
     seed: 'insert',
     audited: true,
@@ -106,7 +184,15 @@ export const TABLE_ACCESS = {
   },
   component: {
     kind: 'rls',
-    read: { owner: 'all', partner: 'all', office: 'all', plant: 'all', system: 'all', anonymous: 'none' },
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'all',
+      plant: 'all',
+      system: 'all',
+      anonymous: 'none',
+      support: 'all',
+    },
     force: true,
     seed: 'insert',
     audited: true,
@@ -116,7 +202,15 @@ export const TABLE_ACCESS = {
   },
   purchase_unit: {
     kind: 'rls',
-    read: { owner: 'all', partner: 'all', office: 'all', plant: 'all', system: 'all', anonymous: 'none' },
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'all',
+      plant: 'all',
+      system: 'all',
+      anonymous: 'none',
+      support: 'all',
+    },
     force: true,
     seed: 'insert',
     audited: true,
@@ -125,7 +219,15 @@ export const TABLE_ACCESS = {
   },
   concrete_type: {
     kind: 'rls',
-    read: { owner: 'all', partner: 'all', office: 'all', plant: 'all', system: 'all', anonymous: 'none' },
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'all',
+      plant: 'all',
+      system: 'all',
+      anonymous: 'none',
+      support: 'all',
+    },
     force: true,
     seed: 'insert',
     audited: true,
@@ -135,7 +237,15 @@ export const TABLE_ACCESS = {
   },
   recette: {
     kind: 'rls',
-    read: { owner: 'all', partner: 'all', office: 'all', plant: 'all', system: 'all', anonymous: 'none' },
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'all',
+      plant: 'all',
+      system: 'all',
+      anonymous: 'none',
+      support: 'all',
+    },
     force: true,
     seed: 'insert',
     audited: true,
@@ -147,7 +257,15 @@ export const TABLE_ACCESS = {
   },
   recette_line: {
     kind: 'rls',
-    read: { owner: 'all', partner: 'all', office: 'all', plant: 'all', system: 'all', anonymous: 'none' },
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'all',
+      plant: 'all',
+      system: 'all',
+      anonymous: 'none',
+      support: 'all',
+    },
     force: true,
     seed: 'insert',
     audited: true,
@@ -157,32 +275,58 @@ export const TABLE_ACCESS = {
   },
   purchase_price: {
     kind: 'rls',
-    read: { owner: 'all', partner: 'all', office: 'all', plant: 'none', system: 'none', anonymous: 'none' },
+    money: true,
+    read: {
+      owner: 'all',
+      partner: 'none',
+      office: 'none',
+      plant: 'none',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
     force: true,
     seed: 'insert',
     audited: true,
     noDelete: true,
     insertOnly: true,
     exception:
-      'master-data T10: insert-only versions, managers write (purchase_prices.write); office reads, plant has no ' +
-      'access (AC-MD-07); the cost per m³ is computed, never stored.',
+      'master-data T10, money since 81: insert-only versions, the owner writes (purchase_prices.write); owner and ' +
+      'support read, nobody else (AC-MD-07); the cost per m³ is computed, never stored.',
   },
   selling_price: {
     kind: 'rls',
-    read: { owner: 'all', partner: 'all', office: 'all', plant: 'none', system: 'none', anonymous: 'none' },
+    money: true,
+    read: {
+      owner: 'all',
+      partner: 'none',
+      office: 'none',
+      plant: 'none',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
     force: true,
     seed: 'insert',
     audited: true,
     noDelete: true,
     insertOnly: true,
     exception:
-      'master-data T11: insert-only versions; list prices (client_id null) written by managers ' +
-      '(selling_prices.write); per-client overrides (client_id set) by managers only, with a reason ' +
-      '(client_price_override.write, CHECK + policy: AC-MD-10); office reads, plant has no access (AC-MD-07).',
+      'master-data T11, money since 81: insert-only versions; list prices (client_id null) written by the owner ' +
+      '(selling_prices.write); per-client overrides (client_id set) by the owner only, with a reason ' +
+      '(client_price_override.write, CHECK + policy: AC-MD-10); owner and support read, nobody else (AC-MD-07).',
   },
   truck: {
     kind: 'rls',
-    read: { owner: 'all', partner: 'all', office: 'all', plant: 'all', system: 'all', anonymous: 'none' },
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'all',
+      plant: 'all',
+      system: 'all',
+      anonymous: 'none',
+      support: 'all',
+    },
     force: true,
     seed: 'insert',
     audited: true,
@@ -193,7 +337,15 @@ export const TABLE_ACCESS = {
   },
   truck_status_log: {
     kind: 'rls',
-    read: { owner: 'all', partner: 'all', office: 'all', plant: 'all', system: 'all', anonymous: 'none' },
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'all',
+      plant: 'all',
+      system: 'all',
+      anonymous: 'none',
+      support: 'all',
+    },
     force: true,
     audited: true,
     noDelete: true,
@@ -204,7 +356,15 @@ export const TABLE_ACCESS = {
   },
   code_sequence: {
     kind: 'rls',
-    read: { owner: 'all', partner: 'all', office: 'all', plant: 'none', system: 'none', anonymous: 'none' },
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'all',
+      plant: 'none',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
     force: true,
     seed: 'counter',
     audited: true,
@@ -215,7 +375,15 @@ export const TABLE_ACCESS = {
   },
   client: {
     kind: 'rls',
-    read: { owner: 'all', partner: 'all', office: 'all', plant: 'none', system: 'all', anonymous: 'none' },
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'all',
+      plant: 'none',
+      system: 'all',
+      anonymous: 'none',
+      support: 'all',
+    },
     force: true,
     seed: 'insert',
     audited: true,
@@ -226,7 +394,15 @@ export const TABLE_ACCESS = {
   },
   client_site: {
     kind: 'rls',
-    read: { owner: 'all', partner: 'all', office: 'all', plant: 'none', system: 'all', anonymous: 'none' },
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'all',
+      plant: 'none',
+      system: 'all',
+      anonymous: 'none',
+      support: 'all',
+    },
     force: true,
     audited: true,
     noDelete: true,
@@ -236,7 +412,15 @@ export const TABLE_ACCESS = {
   },
   supplier: {
     kind: 'rls',
-    read: { owner: 'all', partner: 'all', office: 'all', plant: 'none', system: 'all', anonymous: 'none' },
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'all',
+      plant: 'none',
+      system: 'all',
+      anonymous: 'none',
+      support: 'all',
+    },
     force: true,
     seed: 'insert',
     audited: true,

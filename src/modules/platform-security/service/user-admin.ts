@@ -78,14 +78,14 @@ export async function createManagedUser(
   input: {
     email: string;
     name: string;
-    role: 'partner' | 'office' | 'plant';
+    role: 'partner' | 'office' | 'plant' | 'support';
     locale: 'fr' | 'ar';
     password: string;
   },
 ): Promise<{ id: string }> {
   await assertCanManage(deps, actor);
-  if (!['partner', 'office', 'plant'].includes(input.role))
-    throw new Error('Role must be partner, office or plant');
+  if (!['partner', 'office', 'plant', 'support'].includes(input.role))
+    throw new Error('Role must be partner, office, plant or support');
   return createUser(deps.auth, deps.authPool, { ...input, actor: actorOf(actor) });
 }
 

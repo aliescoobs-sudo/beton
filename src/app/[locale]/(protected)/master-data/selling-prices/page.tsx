@@ -2,7 +2,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { getPool } from '@/lib/db/pools';
 import { listSellingPrices, listSelectableConcreteTypes } from '@/modules/master-data';
 import { SellingPricesManager } from '@/modules/master-data/ui/selling-prices/selling-prices-manager';
-import { can } from '@/modules/platform-security';
+import { can, recordMoneyView } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/next';
 import { PageHeader } from '@/ui';
 
@@ -11,6 +11,7 @@ export default async function SellingPricesPage({ params }: { params: Promise<{ 
   setRequestLocale(locale);
   const user = await requirePagePermission(locale, 'selling_prices.read');
   const pool = getPool('app');
+  await recordMoneyView(pool, user, 'screen:selling-prices');
   const [types, prices] = await Promise.all([
     listSelectableConcreteTypes(pool, user),
     listSellingPrices(pool, user),

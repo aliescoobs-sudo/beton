@@ -25,13 +25,13 @@ const app = new pg.Pool({ connectionString: env.DATABASE_URL_APP, max: 2 });
 afterAll(() => app.end());
 
 const deps = { cipher: fieldCipherFrom(parseKeyring(env.FIELD_ENCRYPTION_KEYS)) };
-const users = {} as Record<'owner' | 'partner' | 'office' | 'plant', SessionUser>;
+const users = {} as Record<'owner' | 'partner' | 'office' | 'plant' | 'support', SessionUser>;
 const inCtx = <T>(user: SessionUser, fn: (tx: pg.PoolClient) => Promise<T>) =>
   withRlsContext(app, { userId: user.id, role: user.role, requestId: 'test' }, fn);
 const rand = () => Math.random().toString(36).slice(2, 9).toUpperCase();
 
 beforeAll(async () => {
-  for (const role of ['owner', 'partner', 'office', 'plant'] as const) {
+  for (const role of ['owner', 'partner', 'office', 'plant', 'support'] as const) {
     users[role] = await realSessionUser(env.DATABASE_URL_MIGRATOR, role);
   }
 });
@@ -57,7 +57,7 @@ const override = (
 ) => ({ concreteTypeId, clientId, priceHtPerM3Centimes, effectiveFrom, reason });
 
 describe('per-client price override (master-data T12, AC-MD-03, AC-MD-10)', () => {
-  it.each(['owner', 'partner'] as const)('%s saves an override that beats the list price', async (role) => {
+  it.each(['owner'] as const)('%s saves an override that beats the list price', async (role) => {
     const type = await newType();
     const client = await newClient();
     const other = await newClient();
@@ -74,16 +74,16 @@ describe('per-client price override (master-data T12, AC-MD-03, AC-MD-10)', () =
     if (!made.ok) throw new Error(made.error);
     expect(made.value).toMatchObject({ clientId: client.id, reason: 'Gros chantier' });
 
-    expect(await resolveSellingPriceFor(app, users.office, type.id, client.id, '2026-03-01')).toMatchObject({
+    expect(await resolveSellingPriceFor(app, users.support, type.id, client.id, '2026-03-01')).toMatchObject({
       ok: true,
       value: { id: made.value.id, priceHtPerM3Centimes: 85_000 },
     });
     // Before the override starts, and for another client: the list price.
-    expect(await resolveSellingPriceFor(app, users.office, type.id, client.id, '2026-01-15')).toMatchObject({
+    expect(await resolveSellingPriceFor(app, users.support, type.id, client.id, '2026-01-15')).toMatchObject({
       ok: true,
       value: { clientId: null, priceHtPerM3Centimes: 95_000 },
     });
-    expect(await resolveSellingPriceFor(app, users.office, type.id, other.id, '2026-03-01')).toMatchObject({
+    expect(await resolveSellingPriceFor(app, users.support, type.id, other.id, '2026-03-01')).toMatchObject({
       ok: true,
       value: { clientId: null },
     });
@@ -126,7 +126,7 @@ describe('per-client price override (master-data T12, AC-MD-03, AC-MD-10)', () =
     });
   });
 
-  it.each(['office', 'plant'] as const)(
+  it.each(['partner', 'office', 'plant', 'support'] as const)(
     '%s is refused by the service and by direct SQL under RLS',
     async (role) => {
       const type = await newType();
@@ -153,23 +153,20 @@ describe('per-client price override (master-data T12, AC-MD-03, AC-MD-10)', () =
     },
   );
 
-  it.each([undefined, '', '   '])(
-    'owner/partner without a reason (%j) is refused by the service',
-    async (reason) => {
-      const type = await newType();
-      const client = await newClient();
-      expect(
-        await createClientOverride(app, users.owner, {
-          ...override(type.id, client.id, 80_000, '2026-02-01'),
-          reason,
-        }),
-      ).toEqual({
-        ok: false,
-        error: 'INVALID',
-      });
-      expect(await listSellingPrices(app, users.owner, { clientId: client.id })).toEqual([]);
-    },
-  );
+  it.each([undefined, '', '   '])('owner without a reason (%j) is refused by the service', async (reason) => {
+    const type = await newType();
+    const client = await newClient();
+    expect(
+      await createClientOverride(app, users.owner, {
+        ...override(type.id, client.id, 80_000, '2026-02-01'),
+        reason,
+      }),
+    ).toEqual({
+      ok: false,
+      error: 'INVALID',
+    });
+    expect(await listSellingPrices(app, users.owner, { clientId: client.id })).toEqual([]);
+  });
 
   it('a client row with no reason is refused by the CHECK, and one with a blank reason by the column CHECK', async () => {
     const type = await newType();
@@ -210,7 +207,7 @@ describe('per-client price override (master-data T12, AC-MD-03, AC-MD-10)', () =
     const client = await newClient();
     const made = await createClientOverride(
       app,
-      users.partner,
+      users.owner,
       override(type.id, client.id, 80_000, '2026-02-01', 'Accord cadre 2026'),
     );
     if (!made.ok) throw new Error(made.error);

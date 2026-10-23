@@ -1,6 +1,6 @@
 import { mkdirSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
-import { E2E_MD, loginAndEnrol } from './fixtures';
+import { loginOwner } from './fixtures';
 
 // Design review screenshots (full page, desktop and phone) written to docs/ui/screenshots. Only with
 // UI_SCREENSHOTS=1, so a normal e2e run never rewrites tracked images:  UI_SCREENSHOTS=1 pnpm exec playwright test e2e/design-screenshots.spec.ts
@@ -22,8 +22,7 @@ const SCREENS = [
 for (const locale of ['fr', 'ar'] as const) {
   test(`design screenshots ${locale}`, async ({ page }) => {
     mkdirSync(OUT, { recursive: true });
-    const user = locale === 'ar' ? E2E_MD.screensPartnerAr : E2E_MD.screensPartnerFr;
-    await loginAndEnrol(page, locale, user.email);
+    await loginOwner(page, locale);
     for (const [name, path] of SCREENS) {
       await page.goto(`/${locale}${path}`);
       await page.waitForLoadState('networkidle');

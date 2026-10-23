@@ -211,7 +211,7 @@ const FIXTURES: Record<
     visible: `select split_part(t.label, ':', 2) as owner from recette_line l join recette r on r.id = l.recette_id join concrete_type t on t.id = r.concrete_type_id where t.label like 'l' || $1 || ':%'`,
   },
   purchase_price: {
-    writers: ['owner', 'partner'],
+    writers: ['owner'],
     seed: async (tx, actor) => {
       const supplier = await tx.query<{ id: string }>(
         `insert into supplier (id, code, name, category) values (gen_random_uuid(), public.next_code('FRN', 2), $1, 'other') returning id`,
@@ -234,7 +234,7 @@ const FIXTURES: Record<
     visible: `select split_part(s.name, ':', 2) as owner from purchase_price p join supplier s on s.id = p.supplier_id where s.name like 'pp' || $1 || ':%'`,
   },
   selling_price: {
-    writers: ['owner', 'partner'],
+    writers: ['owner'],
     seed: async (tx, actor) => {
       const type = await tx.query<{ id: string }>(
         `insert into concrete_type (id, code, label) values (gen_random_uuid(), 'S' || upper(substr(md5(random()::text), 1, 8)), $1) returning id`,

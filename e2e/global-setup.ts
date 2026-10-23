@@ -6,10 +6,20 @@ import { createAuth } from '../src/modules/platform-security/auth/create-auth';
 import { BOOTSTRAP_ACTOR_ID } from '../src/modules/platform-security/auth/actors';
 import { createUser } from '../src/modules/platform-security/auth/user-service';
 import { testEnv } from '../tests/db-env';
-import { E2E_BASE_URL, E2E_CSP, E2E_MD, E2E_OWNER, E2E_PASSWORD, E2E_PLANT, E2E_USERS } from './fixtures';
+import {
+  E2E_BASE_URL,
+  E2E_CSP,
+  E2E_MD,
+  E2E_OWNER,
+  E2E_PASSWORD,
+  E2E_PLANT,
+  E2E_USERS,
+  resetOwnerState,
+} from './fixtures';
 
 /** Fresh e2e database: an owner, a plant user and one partner per locale, none enrolled yet. */
 export default async function globalSetup() {
+  resetOwnerState();
   const env = { ...testEnv(E2E_DATABASE), APP_BASE_URL: E2E_BASE_URL };
   await ensureRoles(env, env.DATABASE_URL_SEED);
   await recreateDatabase(env, E2E_DATABASE);
@@ -57,6 +67,9 @@ export default async function globalSetup() {
       [E2E_MD.recettePartnerFr, 'partner', 'fr'],
       [E2E_MD.recettePartnerAr, 'partner', 'ar'],
       [E2E_MD.recettePlant, 'plant', 'fr'],
+      [E2E_MD.priceSupport, 'support', 'fr'],
+      [E2E_MD.sellSupport, 'support', 'fr'],
+      [E2E_MD.ovSupport, 'support', 'fr'],
       [E2E_MD.pricePartnerFr, 'partner', 'fr'],
       [E2E_MD.pricePartnerAr, 'partner', 'ar'],
       [E2E_MD.priceOffice, 'office', 'fr'],

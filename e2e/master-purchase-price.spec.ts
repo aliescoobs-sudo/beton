@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { E2E_MD, loginAndEnrol, goNav } from './fixtures';
+import { E2E_MD, loginAndEnrol, loginOwner, goNav } from './fixtures';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -9,10 +9,10 @@ const date = new Date(Date.UTC(2200, 0, 1) + Math.floor((Date.now() - 1.78e12) /
   .slice(0, 10);
 const supplier = `Ciments E2E ${Date.now()}`;
 
-test('a partner publishes a purchase price for cement in French, and the cost per m³ appears', async ({
+test('the owner publishes a purchase price for cement in French, and the cost per m³ appears', async ({
   page,
 }) => {
-  await loginAndEnrol(page, 'fr', E2E_MD.pricePartnerFr.email);
+  await loginOwner(page, 'fr');
   await goNav(page, 'suppliers-link');
   await page.getByTestId('supplier-add').click();
   const supplierForm = page.getByTestId('supplier-new');
@@ -43,25 +43,28 @@ test('a partner publishes a purchase price for cement in French, and the cost pe
   await expect(page.getByTestId('cost-per-m3')).toBeVisible();
 });
 
-test('office reads the prices without a form or a cost; the plant has no access', async ({
+test('support reads the prices and the cost with no form; partner, office and plant have no access (DECISIONS 81)', async ({
   page,
   browser,
 }) => {
-  await loginAndEnrol(page, 'fr', E2E_MD.priceOffice.email);
+  await loginAndEnrol(page, 'fr', E2E_MD.priceSupport.email);
   await goNav(page, 'purchase-prices-link');
   await expect(page.getByTestId('price-Ciment')).toContainText('MAD HT');
+  await expect(page.getByTestId('cost-per-m3')).toBeVisible();
   await expect(page.locator('button[type=submit]')).toHaveCount(0);
-  await expect(page.getByTestId('cost-per-m3')).toHaveCount(0);
 
-  const plant = await browser.newPage();
-  await loginAndEnrol(plant, 'fr', E2E_MD.pricePlant.email);
-  const response = await plant.goto('/fr/master-data/purchase-prices');
-  expect(response?.status()).toBe(404);
-  await plant.close();
+  for (const user of [E2E_MD.pricePartnerFr, E2E_MD.priceOffice, E2E_MD.pricePlant]) {
+    const other = await browser.newPage();
+    await loginAndEnrol(other, 'fr', user.email);
+    await expect(other.getByTestId('purchase-prices-link')).toHaveCount(0);
+    const response = await other.goto('/fr/master-data/purchase-prices');
+    expect(response?.status(), user.email).toBe(404);
+    await other.close();
+  }
 });
 
 test('the purchase prices screen renders right-to-left in Arabic', async ({ page }) => {
-  await loginAndEnrol(page, 'ar', E2E_MD.pricePartnerAr.email);
+  await loginOwner(page, 'ar');
   await goNav(page, 'purchase-prices-link');
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('أسعار الشراء');

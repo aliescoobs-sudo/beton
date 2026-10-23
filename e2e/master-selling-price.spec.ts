@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { E2E_MD, loginAndEnrol, goNav } from './fixtures';
+import { E2E_MD, loginAndEnrol, loginOwner, goNav } from './fixtures';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -8,8 +8,8 @@ const date = new Date(Date.UTC(2200, 0, 1) + Math.floor((Date.now() - 1.78e12) /
   .toISOString()
   .slice(0, 10);
 
-test('a partner publishes a list price for B25 in French; the same date is refused', async ({ page }) => {
-  await loginAndEnrol(page, 'fr', E2E_MD.sellPartnerFr.email);
+test('the owner publishes a list price for B25 in French; the same date is refused', async ({ page }) => {
+  await loginOwner(page, 'fr');
   await goNav(page, 'selling-prices-link');
   await expect(page).toHaveURL('/fr/master-data/selling-prices');
   const form = page.getByTestId('sell-new-B25');
@@ -26,21 +26,27 @@ test('a partner publishes a list price for B25 in French; the same date is refus
   );
 });
 
-test('office reads the list prices without a form; the plant has no access', async ({ page, browser }) => {
-  await loginAndEnrol(page, 'fr', E2E_MD.sellOffice.email);
+test('support reads the list prices with no form; partner, office and plant have no access (DECISIONS 81)', async ({
+  page,
+  browser,
+}) => {
+  await loginAndEnrol(page, 'fr', E2E_MD.sellSupport.email);
   await goNav(page, 'selling-prices-link');
   await expect(page.getByTestId('sell-B25')).toContainText('MAD HT / m³');
   await expect(page.locator('button[type=submit]')).toHaveCount(0);
 
-  const plant = await browser.newPage();
-  await loginAndEnrol(plant, 'fr', E2E_MD.sellPlant.email);
-  const response = await plant.goto('/fr/master-data/selling-prices');
-  expect(response?.status()).toBe(404);
-  await plant.close();
+  for (const user of [E2E_MD.sellPartnerFr, E2E_MD.sellOffice, E2E_MD.sellPlant]) {
+    const other = await browser.newPage();
+    await loginAndEnrol(other, 'fr', user.email);
+    await expect(other.getByTestId('selling-prices-link')).toHaveCount(0);
+    const response = await other.goto('/fr/master-data/selling-prices');
+    expect(response?.status(), user.email).toBe(404);
+    await other.close();
+  }
 });
 
 test('the selling prices screen renders right-to-left in Arabic', async ({ page }) => {
-  await loginAndEnrol(page, 'ar', E2E_MD.sellPartnerAr.email);
+  await loginOwner(page, 'ar');
   await goNav(page, 'selling-prices-link');
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('أسعار البيع (القائمة)');

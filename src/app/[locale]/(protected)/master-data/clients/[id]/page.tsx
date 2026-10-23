@@ -12,7 +12,7 @@ import {
 import { ClientDetail } from '@/modules/master-data/ui/clients/client-detail';
 import { OverridesPanel } from '@/modules/master-data/ui/selling-prices/overrides-panel';
 import { SitesPanel } from '@/modules/master-data/ui/sites/sites-panel';
-import { can } from '@/modules/platform-security';
+import { can, recordMoneyView } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/next';
 import { PageHeader } from '@/ui';
 
@@ -20,12 +20,15 @@ export default async function ClientPage({ params }: { params: Promise<{ locale:
   const { locale, id } = await params;
   setRequestLocale(locale);
   const user = await requirePagePermission(locale, 'parties.read');
+  // Price overrides are money: only the owner and support read them (DECISIONS 81).
+  const showOverrides = can(user.role, 'selling_prices.read');
+  if (showOverrides) await recordMoneyView(getPool('app'), user, 'screen:client-overrides');
   const [client, zones, sites, types, prices] = await Promise.all([
     getClient(getPool('app'), user, id),
     listZones(getPool('app'), user),
     listSites(getPool('app'), user, id),
     listSelectableConcreteTypes(getPool('app'), user),
-    listSellingPrices(getPool('app'), user, { clientId: id }),
+    showOverrides ? listSellingPrices(getPool('app'), user, { clientId: id }) : Promise.resolve([]),
   ]);
   if (!client) notFound();
   const typeCode = new Map(types.map((type) => [type.id, type.code]));
@@ -80,18 +83,20 @@ export default async function ClientPage({ params }: { params: Promise<{ locale:
         }))}
         zones={zones.map(({ id: zoneId, name }) => ({ id: zoneId, name }))}
       />
-      <OverridesPanel
-        clientId={client.id}
-        overrides={prices.map((p) => ({
-          id: p.id,
-          typeCode: typeCode.get(p.concreteTypeId) ?? '—',
-          priceHtPerM3Centimes: p.priceHtPerM3Centimes,
-          effectiveFrom: p.effectiveFrom,
-          reason: p.reason ?? '',
-        }))}
-        types={types}
-        editable={can(user.role, 'client_price_override.write') && client.status === 'active'}
-      />
+      {showOverrides && (
+        <OverridesPanel
+          clientId={client.id}
+          overrides={prices.map((p) => ({
+            id: p.id,
+            typeCode: typeCode.get(p.concreteTypeId) ?? '—',
+            priceHtPerM3Centimes: p.priceHtPerM3Centimes,
+            effectiveFrom: p.effectiveFrom,
+            reason: p.reason ?? '',
+          }))}
+          types={types}
+          editable={can(user.role, 'client_price_override.write') && client.status === 'active'}
+        />
+      )}
     </div>
   );
 }

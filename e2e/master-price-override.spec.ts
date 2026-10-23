@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { E2E_MD, loginAndEnrol, goNav } from './fixtures';
+import { E2E_MD, loginAndEnrol, loginOwner, goNav } from './fixtures';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -9,8 +9,8 @@ const date = new Date(Date.UTC(2200, 0, 1) + Math.floor((Date.now() - 1.78e12) /
   .slice(0, 10);
 const name = `Client Prix E2E ${Date.now()}`;
 
-test('a partner gives a client a price override with a reason, in French', async ({ page }) => {
-  await loginAndEnrol(page, 'fr', E2E_MD.ovPartnerFr.email);
+test('the owner gives a client a price override with a reason, in French', async ({ page }) => {
+  await loginOwner(page, 'fr');
   await goNav(page, 'clients-link');
   const create = page.getByTestId('client-new');
   await create.locator('input[name=name]').fill(name);
@@ -32,16 +32,30 @@ test('a partner gives a client a price override with a reason, in French', async
   await expect(page.getByTestId('override-row')).toContainText('Accord cadre chantier Martil');
 });
 
-test('office sees the override but has no form', async ({ page }) => {
-  await loginAndEnrol(page, 'fr', E2E_MD.ovOffice.email);
+test('support sees the override but has no form; office and partner see no price panel (DECISIONS 81)', async ({
+  page,
+  browser,
+}) => {
+  await loginAndEnrol(page, 'fr', E2E_MD.ovSupport.email);
   await goNav(page, 'clients-link');
   await page.getByTestId(`client-${name}`).getByRole('link', { name }).click();
   await expect(page.getByTestId('override-row')).toContainText('Accord cadre chantier Martil');
   await expect(page.getByTestId('override-new')).toHaveCount(0);
+
+  for (const user of [E2E_MD.ovOffice, E2E_MD.ovPartnerFr]) {
+    const other = await browser.newPage();
+    await loginAndEnrol(other, 'fr', user.email);
+    await goNav(other, 'clients-link');
+    await other.getByTestId(`client-${name}`).getByRole('link', { name }).click();
+    await expect(other.getByTestId('overrides')).toHaveCount(0);
+    await expect(other.locator('body')).not.toContainText('Accord cadre chantier Martil');
+    await expect(other.locator('body')).not.toContainText('MAD');
+    await other.close();
+  }
 });
 
 test('the overrides panel renders right-to-left in Arabic', async ({ page }) => {
-  await loginAndEnrol(page, 'ar', E2E_MD.ovPartnerAr.email);
+  await loginOwner(page, 'ar');
   await goNav(page, 'clients-link');
   const arabic = `زبون الأسعار ${Date.now()}`;
   const create = page.getByTestId('client-new');

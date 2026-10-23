@@ -117,7 +117,8 @@
       "owner": "Propriétaire",
       "partner": "Associé",
       "office": "Bureau",
-      "plant": "Centrale"
+      "plant": "Centrale",
+      "support": "Support"
     },
     "error": "Action refusée.",
     "confirmReset": "Réinitialiser la 2FA de cet utilisateur ? Il devra configurer une nouvelle application à sa prochaine connexion."

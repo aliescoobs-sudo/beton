@@ -57,8 +57,8 @@ export function resolveRecette<T extends { effectiveFrom: string }>(
 
 /**
  * What leaves the service for a recette (SPEC-platform-security §4 layer 4, AC-MD-07/AC-SEC-05). Quantities per m³
- * are all the plant and the office ever get; the computed cost (filled in by purchase prices, T10) is for owner and
- * partner only. The allowlist means a field added later stays hidden until someone lists it.
+ * are all the plant and the office ever get; the computed cost (filled in by purchase prices, T10) is money: owner and
+ * support only (DECISIONS 81). The allowlist means a field added later stays hidden until someone lists it.
  */
 export interface RecetteView extends Recette {
   componentCostPerM3Centimes?: number;
@@ -66,7 +66,8 @@ export interface RecetteView extends Recette {
 
 export const recetteVisibility = defineVisibility<RecetteView>({
   owner: 'all',
-  partner: 'all',
+  support: 'all',
+  partner: ['id', 'concreteTypeId', 'version', 'effectiveFrom', 'lines'],
   office: ['id', 'concreteTypeId', 'version', 'effectiveFrom', 'lines'],
   plant: ['id', 'concreteTypeId', 'version', 'effectiveFrom', 'lines'],
 });

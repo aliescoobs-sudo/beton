@@ -27,14 +27,14 @@ const env = testEnv();
 const app = new pg.Pool({ connectionString: env.DATABASE_URL_APP, max: 2 });
 afterAll(() => app.end());
 
-const users = {} as Record<'owner' | 'partner' | 'office' | 'plant', SessionUser>;
+const users = {} as Record<'owner' | 'partner' | 'office' | 'plant' | 'support', SessionUser>;
 const inCtx = <T>(user: SessionUser, fn: (tx: pg.PoolClient) => Promise<T>) =>
   withRlsContext(app, { userId: user.id, role: user.role, requestId: 'test' }, fn);
 const rand = () => Math.random().toString(36).slice(2, 9).toUpperCase();
 let supplier: Supplier;
 
 beforeAll(async () => {
-  for (const role of ['owner', 'partner', 'office', 'plant'] as const) {
+  for (const role of ['owner', 'partner', 'office', 'plant', 'support'] as const) {
     users[role] = await realSessionUser(env.DATABASE_URL_MIGRATOR, role);
   }
   const s = await createSupplier(app, users.owner, { name: `Fournisseur prix ${rand()}`, category: 'other' });
@@ -75,7 +75,7 @@ describe('purchase prices and cost per m³ (master-data T10, AC-MD-04)', () => {
     const made = await createPurchasePrice(app, users.owner, price(component.id, tonne.id, 145_000));
     expect(made.ok).toBe(true);
     const type = await typeWith([{ componentId: component.id, qtyPerM3: 2_500_000 }]);
-    expect(await componentCostPerM3For(app, users.partner, type.id, '2026-06-01')).toEqual({
+    expect(await componentCostPerM3For(app, users.support, type.id, '2026-06-01')).toEqual({
       ok: true,
       value: 362_500,
     });
@@ -112,7 +112,7 @@ describe('purchase prices and cost per m³ (master-data T10, AC-MD-04)', () => {
       error: 'NO_PRICE',
     });
     await createPurchasePrice(app, users.owner, price(component.id, kg.id, 200, '2026-01-01'));
-    await createPurchasePrice(app, users.partner, price(component.id, kg.id, 300, '2026-06-01'));
+    await createPurchasePrice(app, users.owner, price(component.id, kg.id, 300, '2026-06-01'));
     expect(await componentCostPerM3For(app, users.owner, type.id, '2026-05-31')).toEqual({
       ok: true,
       value: 2000,
@@ -174,36 +174,43 @@ describe('purchase prices and cost per m³ (master-data T10, AC-MD-04)', () => {
     });
   });
 
-  it.each(['office', 'plant'] as const)('%s cannot write a price (service and RLS)', async (role) => {
-    const { component, kg } = await newComponent();
-    await expect(createPurchasePrice(app, users[role], price(component.id, kg.id, 5))).rejects.toBeInstanceOf(
-      ForbiddenError,
-    );
-    await expect(
-      inCtx(users[role], (tx) =>
-        tx.query(
-          `insert into purchase_price (id, component_id, supplier_id, purchase_unit_id, price_ht_centimes, effective_from, created_by)
+  it.each(['partner', 'office', 'plant', 'support'] as const)(
+    '%s cannot write a price (service and RLS)',
+    async (role) => {
+      const { component, kg } = await newComponent();
+      await expect(
+        createPurchasePrice(app, users[role], price(component.id, kg.id, 5)),
+      ).rejects.toBeInstanceOf(ForbiddenError);
+      await expect(
+        inCtx(users[role], (tx) =>
+          tx.query(
+            `insert into purchase_price (id, component_id, supplier_id, purchase_unit_id, price_ht_centimes, effective_from, created_by)
            values (gen_random_uuid(), $1, $2, $3, 5, '2030-01-01', $4)`,
-          [component.id, supplier.id, kg.id, users[role].id],
+            [component.id, supplier.id, kg.id, users[role].id],
+          ),
         ),
-      ),
-    ).rejects.toMatchObject({ code: '42501' });
-  });
+      ).rejects.toMatchObject({ code: '42501' });
+    },
+  );
 
-  it('office reads the prices but not the cost per m³; the plant sees nothing at all (AC-MD-07)', async () => {
+  it('owner and support read prices and cost; partner, office and plant see nothing at all (AC-MD-07, DECISIONS 81)', async () => {
     const { component, kg } = await newComponent();
     await createPurchasePrice(app, users.owner, price(component.id, kg.id, 5));
-    expect(await listPurchasePrices(app, users.office, component.id)).toHaveLength(1);
     const type = await typeWith([{ componentId: component.id, qtyPerM3: 1000 }]);
-    await expect(componentCostPerM3For(app, users.office, type.id, '2026-06-01')).rejects.toBeInstanceOf(
-      ForbiddenError,
-    );
-    await expect(listPurchasePrices(app, users.plant)).rejects.toBeInstanceOf(ForbiddenError);
-    await expect(componentCostPerM3For(app, users.plant, type.id, '2026-06-01')).rejects.toBeInstanceOf(
-      ForbiddenError,
-    );
-    const { rows } = await inCtx(users.plant, (tx) => tx.query(`select * from purchase_price`));
-    expect(rows).toEqual([]);
+    for (const role of ['owner', 'support'] as const) {
+      expect(await listPurchasePrices(app, users[role], component.id)).toHaveLength(1);
+      expect(await componentCostPerM3For(app, users[role], type.id, '2026-06-01')).toMatchObject({
+        ok: true,
+      });
+    }
+    for (const role of ['partner', 'office', 'plant'] as const) {
+      await expect(listPurchasePrices(app, users[role])).rejects.toBeInstanceOf(ForbiddenError);
+      await expect(componentCostPerM3For(app, users[role], type.id, '2026-06-01')).rejects.toBeInstanceOf(
+        ForbiddenError,
+      );
+      const { rows } = await inCtx(users[role], (tx) => tx.query(`select * from purchase_price`));
+      expect(rows).toEqual([]);
+    }
   });
 
   it('is insert-only: no UPDATE or DELETE', async () => {

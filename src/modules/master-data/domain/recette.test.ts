@@ -72,12 +72,12 @@ describe('recetteVisibility (AC-MD-07)', () => {
     lines: [{ componentId: 'c1', qtyPerM3: 1 }],
     componentCostPerM3Centimes: 362_500,
   };
-  it.each(['plant', 'office'] as const)('%s never sees the component cost', (role) => {
+  it.each(['plant', 'office', 'partner'] as const)('%s never sees the component cost', (role) => {
     const seen = project(recetteVisibility, role, row);
     expect(seen).not.toHaveProperty('componentCostPerM3Centimes');
     expect(seen.lines).toEqual(row.lines);
   });
-  it.each(['owner', 'partner'] as const)('%s sees the component cost', (role) => {
+  it.each(['owner', 'support'] as const)('%s sees the component cost', (role) => {
     expect(project(recetteVisibility, role, row).componentCostPerM3Centimes).toBe(362_500);
   });
 });

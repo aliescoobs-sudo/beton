@@ -11,7 +11,7 @@ import {
   listSuppliers,
 } from '@/modules/master-data';
 import { PurchasePricesManager } from '@/modules/master-data/ui/purchase-prices/purchase-prices-manager';
-import { can } from '@/modules/platform-security';
+import { can, recordMoneyView } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/next';
 import { PageHeader } from '@/ui';
 
@@ -20,6 +20,7 @@ export default async function PurchasePricesPage({ params }: { params: Promise<{
   setRequestLocale(locale);
   const user = await requirePagePermission(locale, 'purchase_prices.read');
   const pool = getPool('app');
+  await recordMoneyView(pool, user, 'screen:purchase-prices');
   const businessDate = businessDateOf((await getRequestClock()).now());
   const [components, units, prices, suppliers] = await Promise.all([
     listComponents(pool, user),

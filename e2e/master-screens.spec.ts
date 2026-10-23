@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, type Page, test } from '@playwright/test';
-import { E2E_MD, loginAndEnrol } from './fixtures';
+import { loginOwner } from './fixtures';
 
 // T16 / AC-MD-09: every master-data screen, in fr (ltr) and ar (rtl), on a phone and a desktop width: right direction,
 // no horizontal overflow, no missing translation (a missing key renders as its path), no CSP violation, Latin codes
@@ -83,8 +83,8 @@ async function checkScreen(page: Page, locale: 'fr' | 'ar', name: string) {
 for (const locale of ['fr', 'ar'] as const) {
   test(`every master-data screen renders correctly in ${locale}`, async ({ page }) => {
     const problems = watch(page);
-    const user = locale === 'ar' ? E2E_MD.screensPartnerAr : E2E_MD.screensPartnerFr;
-    await loginAndEnrol(page, locale, user.email);
+    // Only the owner reaches the price screens (DECISIONS 81), so the owner walks every master-data screen.
+    await loginOwner(page, locale);
 
     for (const screen of SCREENS) {
       await page.goto(`/${locale}/master-data/${screen}`);

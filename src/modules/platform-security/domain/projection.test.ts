@@ -22,13 +22,15 @@ interface SampleDelivery {
 
 const orderVisibility = defineVisibility<SampleOrder>({
   owner: 'all',
-  partner: 'all',
+  support: 'all',
+  partner: ['code', 'concreteType', 'volumeL', 'deliveryDate', 'zone'],
   office: 'all',
   plant: ['code', 'concreteType', 'volumeL', 'deliveryDate', 'zone'],
 });
 const deliveryVisibility = defineVisibility<SampleDelivery>({
   owner: 'all',
-  partner: 'all',
+  support: 'all',
+  partner: ['blNo', 'volumeL'],
   office: ['blNo', 'volumeL'],
   plant: ['blNo', 'volumeL'],
 });
@@ -70,9 +72,9 @@ describe('project (field visibility per role, default deny)', () => {
     ]);
   });
 
-  it('owner and partner see everything', () => {
+  it('owner and support see everything', () => {
     expect(project(deliveryVisibility, 'owner', delivery)).toEqual(delivery);
-    expect(project(orderVisibility, 'partner', order)).toEqual(order);
+    expect(project(orderVisibility, 'support', order)).toEqual(order);
   });
 
   it('drops a field added to the row but not to the allowlist (new fields are hidden by default)', () => {

@@ -44,7 +44,7 @@ async function ownerAction(fn: (user: SessionUser) => Promise<void>): Promise<Ad
 const newUserSchema = z.object({
   email: z.email(),
   name: z.string().trim().min(1).max(120),
-  role: z.enum(['partner', 'office', 'plant']),
+  role: z.enum(['partner', 'office', 'plant', 'support']),
   locale: z.enum(['fr', 'ar']),
   password: z.string().min(1).max(128),
 });
