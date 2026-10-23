@@ -494,6 +494,25 @@ export const TABLE_ACCESS = {
       'ledger L3: insert-only plan items; Σ items = order total is a deferred constraint trigger. Same visibility as ' +
       'sales_order.',
   },
+  correction_request: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'none',
+      office: 'none',
+      plant: 'none',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'ledger L5b: correction requests (document code + reason, no amount). Office and the owner insert; the owner ' +
+      'and support read; office cannot read back (blind entry, DECISIONS 81).',
+  },
   user: { kind: 'auth_only', reason: 'Better Auth account table (ADR 0001)' },
   session: { kind: 'auth_only', reason: 'Better Auth sessions (ADR 0001)' },
   account: { kind: 'auth_only', reason: 'Better Auth credentials: password hashes (ADR 0001)' },

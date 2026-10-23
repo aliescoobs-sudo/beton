@@ -9,3 +9,8 @@ export {
   previewOrder,
 } from './service/order-service';
 export { cancelOrder, type CancelOrderError, type CancelledOrder } from './service/order-reversal';
+export {
+  type CorrectionRequest,
+  listCorrectionRequests,
+  requestCorrection,
+} from './service/correction-service';

@@ -132,6 +132,16 @@ const FIXTURES: Record<
                 from code_sequence where key like 'MX_' and $1::text is not null`;
     },
   },
+  correction_request: {
+    writers: ['owner', 'office'],
+    seed: (tx, actor) =>
+      tx.query(
+        `insert into correction_request (id, document_code, reason, requested_by)
+         values (gen_random_uuid(), 'CMD-2026-00001', $1, $2)`,
+        [`${marker}:${actor}`, actor],
+      ),
+    visible: `select split_part(reason, ':', 2) as owner from correction_request where reason like $1 || ':%'`,
+  },
   sales_order: {
     writers: ['owner', 'office'],
     seed: async (tx, actor) => insertOrder(tx, actor, await orderMaster(app, actors.owner, marker)),

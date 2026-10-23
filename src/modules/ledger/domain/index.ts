@@ -21,3 +21,4 @@ export { PLAN_PRESETS, presetItems, type PlanPreset } from './plan-presets';
 export { type OrderInput, parseOrderInput } from './order';
 export { formatPercentBp, parsePercentBp } from './percent';
 export { daysBetween, needsOldEntryPermission } from './reversal';
+export { type CorrectionInput, DOCUMENT_CODE, parseCorrectionInput } from './correction';

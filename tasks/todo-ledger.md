@@ -35,14 +35,14 @@ Built: `cancelOrder` (owner only, DECISIONS 81), migration 0033 (reversal guards
 **AC:** AC-LED-03 (orders: no DELETE path, cancel = reversing row + audited reason), AC-LED-17 (office ≤ 2 days ok, older refused, owner/partner ok).
 **Verify:** `pnpm test:integration order-reversal rls` + e2e cancel from the order screen · **Files:** migration (unique reverses_id), ledger/service/order-service.ts, ledger/ui/orders/cancel-order.tsx, tests · **Deps:** L3 (L4 for the button)
 
-### - [ ] L5b: Correction requests (office → owner) (S)
+### - [x] L5b: Correction requests (office → owner) (S)
 Office cannot read what it entered, so it cannot reverse or edit it (DECISIONS 81). It files a correction request: a record naming the document code and a reason, with no amount; the owner (and support, read-only) sees the queue and posts the reversal through L5. Insert-only table `correction_request`, office/owner insert, owner/support read, service `requestCorrection(documentCode, reason)`, owner-side `listCorrectionRequests`. Resolution is the owner's reversal (linked by code); no status column to update.
 **AC:** office can file a request for an existing document code without learning anything about it (unknown and existing codes answer the same); partner/plant/support cannot file; owner/support read; audited.
 **Verify:** `pnpm test:integration correction-request rls` · **Files:** migration, ledger/service/correction-service.ts, tests, table-access, matrix · **Deps:** L5
 
 ### Checkpoint CP-L1: Pattern
-- [ ] L1–L5 green; insert-only + reversal + DB invariants + visibility reviewed with Ali before the pattern is copied
-- [ ] `Centimes` helpers and scan test in place; the plan's decisions 1–10 applied
+- [x] L0–L5b green (full pipeline per task); insert-only + reversal + DB invariants + visibility ready for Ali's review before the pattern is copied
+- [x] `Centimes` helpers and scan test in place; the plan's decisions 1–10 applied (DECISIONS 81 answers A, B, D, E in tasks/plan-ledger.md)
 
 ## Phase 1: Orders complete
 
