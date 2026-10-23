@@ -14,10 +14,11 @@ test('a partner publishes a purchase price for cement in French, and the cost pe
 }) => {
   await loginAndEnrol(page, 'fr', E2E_MD.pricePartnerFr.email);
   await goNav(page, 'suppliers-link');
+  await page.getByTestId('supplier-add').click();
   const supplierForm = page.getByTestId('supplier-new');
   await supplierForm.locator('input[name=name]').fill(supplier);
   await supplierForm.locator('button[type=submit]').click();
-  await expect(supplierForm.getByTestId('supplier-message')).toHaveText('Enregistré.');
+  await expect(page.getByTestId('supplier-message')).toHaveText('Enregistré.');
 
   await page.goto('/fr');
   await goNav(page, 'purchase-prices-link');

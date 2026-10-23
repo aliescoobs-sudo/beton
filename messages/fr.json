@@ -145,6 +145,11 @@
     "restartNote": "Les heures des tâches planifiées ne sont prises en compte qu'après un redémarrage du serveur."
   },
   "masterData": {
+    "common": {
+      "edit": "Modifier",
+      "cancel": "Annuler",
+      "actions": "Actions"
+    },
     "zones": {
       "title": "Zones de livraison",
       "link": "Zones",
@@ -225,7 +230,8 @@
         "transport": "Transport",
         "fuel": "Carburant",
         "other": "Autre"
-      }
+      },
+      "code": "Code"
     },
     "components": {
       "title": "Composants",
@@ -234,8 +240,6 @@
       "nameFr": "Nom (français)",
       "nameAr": "Nom (arabe)",
       "baseUnit": "Unité de base",
-      "baseUnitValue": "Unité de base : {unit}",
-      "thresholdValue": "Seuil bas : {count}",
       "threshold": "Seuil bas ({unit})",
       "thresholdShort": "Seuil bas (unité de base)",
       "unitLabel": "Unité d'achat",
@@ -249,7 +253,9 @@
       "saved": "Enregistré.",
       "invalid": "Valeur refusée (noms fr et ar obligatoires, contenu entier positif).",
       "duplicate": "Ce nom ou cette unité existe déjà.",
-      "error": "Action refusée."
+      "error": "Action refusée.",
+      "name": "Nom",
+      "code": "Code"
     },
     "concreteTypes": {
       "title": "Types de béton",
@@ -263,7 +269,9 @@
       "saved": "Enregistré.",
       "invalid": "Valeur refusée (code en majuscules, ex. B25 ; libellé obligatoire).",
       "duplicate": "Ce code existe déjà.",
-      "error": "Action refusée."
+      "error": "Action refusée.",
+      "status": "Statut",
+      "codeColumn": "Code"
     },
     "recettes": {
       "title": "Recettes",
@@ -282,7 +290,11 @@
       "invalidQuantity": "Quantité invalide pour {name} (nombre positif, 3 décimales au plus, unité affichée).",
       "magnitudeWarning": "Écart d'un facteur 10 ou plus avec la version précédente : {names}. Vérifiez l'unité, puis cliquez à nouveau pour publier.",
       "publishAnyway": "Publier quand même",
-      "unitOf": "Unité de {name}"
+      "unitOf": "Unité de {name}",
+      "component": "Composant",
+      "qtyPerM3": "Quantité par m³",
+      "newVersionButton": "Nouvelle version",
+      "olderVersions": "Versions précédentes ({count})"
     },
     "purchasePrices": {
       "title": "Prix d'achat",
@@ -360,7 +372,9 @@
         "available": "Disponible",
         "breakdown": "Panne",
         "roadblock": "Route coupée"
-      }
+      },
+      "statusColumn": "Statut",
+      "codeColumn": "Code"
     }
   },
   "history": {

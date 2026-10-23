@@ -10,12 +10,15 @@ test('a partner adds a component with both names and a purchase unit in French',
   await expect(page.getByTestId('component-CMP-01')).toContainText('Ciment');
 
   const name = `Fibre ${Date.now()}`;
+  await page.getByTestId('component-add').click();
   const form = page.getByTestId('component-new');
   await form.locator('input[name=nameFr]').fill(name);
   await form.locator('input[name=nameAr]').fill('ألياف');
   await form.locator('button[type=submit]').click();
-  const row = page.locator('li', { hasText: name }).first();
+  const row = page.locator('tbody', { hasText: name }).first();
   await expect(row).toBeVisible();
+
+  await row.locator('[data-testid^=unit-add-]').click();
 
   const unit = row.locator('form[data-testid^=unit-new]');
   await unit.locator('input[name=label]').fill('sac 25 kg');

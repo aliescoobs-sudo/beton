@@ -44,14 +44,13 @@ test('a partner creates a client from a name alone, is blocked on a duplicate IC
   // A site is added to the first client from its page.
   await page.goto('/fr/master-data/clients');
   await page.getByTestId(`client-${name}`).getByRole('link', { name }).click();
+  await page.getByTestId('site-add').click();
   const site = page.getByTestId('site-new');
   await site.locator('input[name=label]').fill('Chantier Martil');
   await site.locator('input[name=address]').fill('12 rue Hassan II');
   await site.locator('button[type=submit]').click();
-  await expect(site.getByTestId('site-message')).toHaveText('Enregistré.');
-  await expect(page.getByTestId('site-Chantier Martil').locator('input[name=address]')).toHaveValue(
-    '12 rue Hassan II',
-  );
+  await expect(page.getByTestId('site-message')).toHaveText('Enregistré.');
+  await expect(page.getByTestId('site-Chantier Martil')).toContainText('12 rue Hassan II');
 
   // Archive the second one: it stays listed, flagged.
   await page.goto('/fr/master-data/clients');

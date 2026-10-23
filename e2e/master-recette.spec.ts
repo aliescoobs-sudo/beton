@@ -13,12 +13,15 @@ test('a partner publishes a recette version for B25 in French', async ({ page })
   await loginAndEnrol(page, 'fr', E2E_MD.recettePartnerFr.email);
   await goNav(page, 'recettes-link');
   await expect(page).toHaveURL('/fr/master-data/recettes');
+  await page.getByTestId('recette-open-B25').click();
   const form = page.getByTestId('recette-new-B25');
   await form.locator('input[name=effectiveFrom]').fill(date);
   await form.locator('input[name^=qty-]').first().fill('350');
   await form.locator('button[type=submit]').click();
   await expect(page.getByTestId('recette-B25')).toContainText(date);
   await expect(page.getByTestId('recette-B25')).toContainText('350 kg');
+  // The form closes once the version is published: reopen it (pre-filled from the new version).
+  await page.getByTestId('recette-open-B25').click();
   // Typing grams where kilograms are expected (350 g instead of 350 kg) is flagged, not published.
   await form.locator('input[name^=qty-]').first().fill('0,35');
   await form.locator('input[name=effectiveFrom]').fill(date.replace(/^2200/, '2201'));
@@ -45,7 +48,7 @@ test('plant reads the recette with no form', async ({ page }) => {
     'selling_price',
     'margin',
   ]);
-  await expect(page.locator('body')).not.toContainText(/MAD|DH|prix|سعر/i);
+  await expect(page.locator('body')).not.toContainText(/\b(?:MAD|DH)\b|prix|سعر/i);
 });
 
 test('the recettes screen renders right-to-left in Arabic', async ({ page }) => {

@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { type FormEvent, useState } from 'react';
+import { Table, Th } from '@/ui';
+import { ActionsTh, AddButton, CancelButton, EditButton, FormRow, type Message, Notice } from '../read-mode';
 import {
   archiveSupplierAction,
   createSupplierAction,
@@ -34,7 +36,9 @@ export function SuppliersManager({
 }) {
   const t = useTranslations('masterData.suppliers');
   const router = useRouter();
-  const [message, setMessage] = useState<{ id: string; text: string } | null>(null);
+  const [message, setMessage] = useState<Message | null>(null);
+  // 'new' = the add form, a supplier id = that row's edit form; null = read mode.
+  const [open, setOpen] = useState<string | null>(null);
 
   async function submit(
     id: string,
@@ -42,8 +46,7 @@ export function SuppliersManager({
     action: (input: unknown) => Promise<SupplierActionResult>,
   ) {
     event.preventDefault();
-    const form = event.currentTarget;
-    const data = new FormData(form);
+    const data = new FormData(event.currentTarget);
     const text = (name: string) => String(data.get(name) ?? '');
     const result = await action({
       name: text('name'),
@@ -53,12 +56,13 @@ export function SuppliersManager({
       paymentTermsDays: text('paymentTermsDays') === '' ? undefined : Number(text('paymentTermsDays')),
     });
     if (result.ok) {
-      setMessage({ id, text: t('saved') });
-      if (id === 'new') form.reset();
+      setMessage({ id, text: t('saved'), ok: true });
+      setOpen(null);
       return router.refresh();
     }
     setMessage({
       id,
+      ok: false,
       text:
         result.error === 'DUPLICATE_ICE'
           ? t('duplicateIce')
@@ -71,7 +75,7 @@ export function SuppliersManager({
   async function archive(id: string) {
     const result = await archiveSupplierAction(id);
     if (result.ok) return router.refresh();
-    setMessage({ id, text: t('error') });
+    setMessage({ id, text: t('error'), ok: false });
   }
 
   const fields = (s?: SupplierRow) => (
@@ -113,74 +117,115 @@ export function SuppliersManager({
     </>
   );
 
+  const columns = 7;
   return (
-    <div className="mt-6 space-y-6">
-      <section className="form-band">
-        <h2 className="mb-3 text-xl">{t('new')}</h2>
-        <form
-          onSubmit={(e) => void submit('new', e, createSupplierAction)}
-          className="grid gap-3 sm:grid-cols-3"
-          data-testid="supplier-new"
-        >
-          {fields()}
-          <button type="submit" className="btn btn-primary btn-sm h-fit w-fit self-end">
-            {t('add')}
-          </button>
-          {message?.id === 'new' && (
-            <p role="status" className="text-sm sm:col-span-3" data-testid="supplier-message">
-              {message.text}
-            </p>
-          )}
-        </form>
-      </section>
-      <ul className="space-y-3">
-        {suppliers.map((s) => (
-          <li key={s.id} className="row-item" data-testid={`supplier-${s.name}`}>
-            <p className="mb-2 flex items-center gap-4 text-sm">
-              <span dir="ltr" className="font-mono">
-                {s.code}
-              </span>
-              {s.status === 'archived' && (
-                <span className="text-muted" data-testid="supplier-archived">
-                  {t('archivedBadge')}
-                </span>
+    <div className="mt-6 space-y-4">
+      <Notice message={message} testId="supplier-message" />
+      {open === 'new' ? (
+        <section className="form-band">
+          <h2 className="mb-3 text-xl">{t('new')}</h2>
+          <form
+            onSubmit={(e) => void submit('new', e, createSupplierAction)}
+            className="grid gap-3 sm:grid-cols-3"
+            data-testid="supplier-new"
+          >
+            {fields()}
+            <div className="flex items-end gap-3">
+              <button type="submit" className="btn btn-primary btn-sm">
+                {t('add')}
+              </button>
+              <CancelButton onClick={() => setOpen(null)} />
+            </div>
+            <Notice message={message} id="new" testId="supplier-message" />
+          </form>
+        </section>
+      ) : (
+        <AddButton label={t('add')} onClick={() => setOpen('new')} testId="supplier-add" />
+      )}
+      <Table>
+        <thead>
+          <tr>
+            <Th>{t('code')}</Th>
+            <Th>{t('name')}</Th>
+            <Th>{t('category')}</Th>
+            <Th>{t('ice')}</Th>
+            <Th>{t('phone')}</Th>
+            <Th numeric>{t('paymentTerms')}</Th>
+            <ActionsTh />
+          </tr>
+        </thead>
+        <tbody>
+          {suppliers.map((s) => (
+            <tr key={s.id} data-testid={`supplier-${s.name}`}>
+              {open === s.id ? (
+                <FormRow columns={columns}>
+                  <form
+                    onSubmit={(e) => void submit(s.id, e, (value) => updateSupplierAction(s.id, value))}
+                    className="grid gap-3 py-2 sm:grid-cols-3"
+                  >
+                    <p className="text-sm sm:col-span-3">
+                      <span dir="ltr" className="font-mono">
+                        {s.code}
+                      </span>
+                    </p>
+                    {fields(s)}
+                    <div className="flex items-end gap-3">
+                      <button type="submit" className="btn btn-primary btn-sm">
+                        {t('save')}
+                      </button>
+                      <CancelButton onClick={() => setOpen(null)} />
+                    </div>
+                    <Notice message={message} id={s.id} testId="supplier-message" />
+                  </form>
+                </FormRow>
+              ) : (
+                <>
+                  <td>
+                    <span dir="ltr" className="font-mono">
+                      {s.code}
+                    </span>
+                  </td>
+                  <td className="font-medium">
+                    <bdi>{s.name}</bdi>
+                    {s.status === 'archived' && (
+                      <span className="ms-3 text-muted" data-testid="supplier-archived">
+                        {t('archivedBadge')}
+                      </span>
+                    )}
+                  </td>
+                  <td>{t(`categories.${s.category as (typeof CATEGORIES)[number]}`)}</td>
+                  <td>
+                    <bdi dir="ltr">{s.ice}</bdi>
+                  </td>
+                  <td>
+                    <bdi dir="ltr">{s.phone}</bdi>
+                  </td>
+                  <td className="is-num">
+                    <bdi dir="ltr">{s.paymentTermsDays}</bdi>
+                  </td>
+                  <td className="whitespace-nowrap text-end">
+                    {s.status === 'active' && (
+                      <>
+                        <EditButton onClick={() => setOpen(s.id)} testId="supplier-edit" />
+                        {canArchive && (
+                          <button
+                            type="button"
+                            onClick={() => void archive(s.id)}
+                            className="btn btn-danger btn-sm"
+                            data-testid="supplier-archive"
+                          >
+                            {t('archive')}
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </td>
+                </>
               )}
-            </p>
-            {s.status === 'active' ? (
-              <form
-                onSubmit={(e) => void submit(s.id, e, (value) => updateSupplierAction(s.id, value))}
-                className="grid gap-3 sm:grid-cols-3"
-              >
-                {fields(s)}
-                <div className="flex items-end gap-3">
-                  <button type="submit" className="btn btn-primary btn-sm">
-                    {t('save')}
-                  </button>
-                  {canArchive && (
-                    <button
-                      type="button"
-                      onClick={() => void archive(s.id)}
-                      className="btn btn-danger btn-sm"
-                      data-testid="supplier-archive"
-                    >
-                      {t('archive')}
-                    </button>
-                  )}
-                </div>
-                {message?.id === s.id && (
-                  <p role="status" className="text-sm sm:col-span-3" data-testid="supplier-message">
-                    {message.text}
-                  </p>
-                )}
-              </form>
-            ) : (
-              <p className="font-medium">
-                <bdi>{s.name}</bdi>
-              </p>
-            )}
-          </li>
-        ))}
-      </ul>
+            </tr>
+          ))}
+        </tbody>
+      </Table>
     </div>
   );
 }

@@ -9,10 +9,10 @@ export interface SimDay {
 const DAY_MS = 86_400_000;
 
 /**
- * The days around the simulated date for the simulation strip: `before` days filled, today solid, `after` days dashed.
+ * The days around the simulated date for the simulation strip: `before` days filled (a week centred on today by default), today solid, `after` days dashed.
  * Calendar arithmetic on the business date string (UTC midnights, so no time zone or DST can shift a day).
  */
-export function simDays(today: string, before = 7, after = 7): SimDay[] {
+export function simDays(today: string, before = 3, after = 3): SimDay[] {
   const [y, m, d] = today.split('-').map(Number) as [number, number, number];
   const base = Date.UTC(y, m - 1, d);
   const days: SimDay[] = [];

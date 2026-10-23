@@ -12,6 +12,7 @@ test('a partner adds, edits and cannot duplicate a zone in French (AC-MD-09 firs
   await expect(page).toHaveURL('/fr/master-data/zones');
 
   const name = `Zone E2E ${Date.now()}`;
+  await page.getByTestId('zone-add').click();
   const form = page.getByTestId('zone-new');
   await form.locator('input[name=name]').fill(name);
   await form.locator('input[name=oneWayMin]').fill('33');
@@ -19,11 +20,16 @@ test('a partner adds, edits and cannot duplicate a zone in French (AC-MD-09 firs
   const row = page.getByTestId(`zone-${name}`);
   await expect(row).toBeVisible();
 
+  await row.getByTestId('zone-edit').click();
   await row.locator('input[name=oneWayMin]').fill('34');
   await row.locator('button[type=submit]').click();
-  await expect(row.getByTestId('zone-message')).toHaveText('Enregistré.');
+  // The row goes back to read mode once the save is accepted.
+  await expect(row.locator('input[name=oneWayMin]')).toHaveCount(0);
+  await expect(page.getByTestId('zone-message')).toHaveText('Enregistré.');
   await page.reload();
-  await expect(page.getByTestId(`zone-${name}`).locator('input[name=oneWayMin]')).toHaveValue('34');
+  await expect(page.getByTestId(`zone-${name}`).getByTestId('zone-minutes')).toContainText('34');
+
+  await page.getByTestId('zone-add').click();
 
   await form.locator('input[name=name]').fill(name.toUpperCase());
   await form.locator('input[name=oneWayMin]').fill('10');
@@ -45,7 +51,7 @@ test('the zones screen renders right-to-left in Arabic and a partner can edit', 
   await expect(page).toHaveURL('/ar/master-data/zones');
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('مناطق التسليم');
-  await expect(page.getByTestId('zone-new')).toBeVisible();
+  await expect(page.getByTestId('zone-add')).toBeVisible();
   // No horizontal overflow at phone width.
   await page.setViewportSize({ width: 375, height: 800 });
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);

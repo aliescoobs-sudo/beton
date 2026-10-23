@@ -9,6 +9,7 @@ test('a partner adds a truck and the plant then logs a breakdown on it', async (
   await loginAndEnrol(page, 'fr', E2E_MD.truckPartnerFr.email);
   await goNav(page, 'trucks-link');
   await expect(page).toHaveURL('/fr/master-data/trucks');
+  await page.getByTestId('truck-add').click();
   const form = page.getByTestId('truck-new');
   await form.locator('input[name=code]').fill(code);
   await form.locator('input[name=plate]').fill(plate);
@@ -16,6 +17,7 @@ test('a partner adds a truck and the plant then logs a breakdown on it', async (
   await form.locator('button[type=submit]').click();
   const row = page.getByTestId(`truck-${code}`);
   await expect(row).toBeVisible();
+  await row.getByTestId('truck-edit').click();
   await expect(row.locator('input[name=capacityM3]')).toHaveValue('8,5');
 
   const plantPage = await (await browser.newContext()).newPage();
@@ -26,6 +28,7 @@ test('a partner adds a truck and the plant then logs a breakdown on it', async (
   await expect(plantRow.getByTestId('truck-plate')).toHaveText(plate);
   await expect(plantRow).toContainText('8,5 m³');
   await expect(plantRow.locator('input[name=plate]')).toHaveCount(0);
+  await plantPage.getByTestId(`truck-log-open-${code}`).click();
   const logForm = plantPage.getByTestId(`truck-log-form-${code}`);
   await expect(plantPage.getByTestId('truck-new')).toHaveCount(0);
   await logForm.locator('select[name=status]').selectOption('breakdown');

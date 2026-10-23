@@ -11,6 +11,7 @@ const SCREENS = [
   ['home', ''],
   ['clients', '/master-data/clients'],
   ['recettes', '/master-data/recettes'],
+  ['suppliers', '/master-data/suppliers'],
   ['zones', '/master-data/zones'],
   ['trucks', '/master-data/trucks'],
   ['purchase-prices', '/master-data/purchase-prices'],

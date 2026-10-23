@@ -27,4 +27,14 @@ describe('SimBadge', () => {
     expect(html.match(/sim-day-future/g)).toHaveLength(2);
     expect(html.indexOf('sim-day-future')).toBeLessThan(html.indexOf('+1'));
   });
+
+  it('shows a week centred on today, each day with its weekday and date', () => {
+    const days = simDays('2026-11-26');
+    expect(days).toHaveLength(7);
+    expect(days.findIndex((d) => d.state === 'today')).toBe(3);
+    const html = renderToStaticMarkup(<SimBadge label="SIM" at="26/11" days={days} locale="fr" />);
+    expect(html).toContain('jeu.');
+    expect(html.match(/sim-day-weekday/g)).toHaveLength(7);
+    expect(html.match(/sim-day-date/g)).toHaveLength(7);
+  });
 });

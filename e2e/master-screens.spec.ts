@@ -97,6 +97,7 @@ for (const locale of ['fr', 'ar'] as const) {
     await page.getByRole('link', { name: 'Entreprise Atlas BTP (fictif)' }).click();
     await expect(page.getByTestId('sites')).toBeVisible();
     const label = `Chantier ${'très-long-'.repeat(6)}${Date.now()}`;
+    await page.getByTestId('site-add').click();
     const site = page.getByTestId('site-new');
     await site.locator('input[name=label]').fill(label);
     await site

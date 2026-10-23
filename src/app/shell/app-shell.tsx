@@ -60,7 +60,7 @@ export function AppShell({
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="bg-ink text-white">
-        <div className="flex items-stretch gap-2 px-4 md:gap-6 md:px-8">
+        <div className="mx-auto flex w-full max-w-[1240px] items-stretch gap-2 px-4 md:gap-6 md:px-8">
           <Link href={homeHref} className="flex items-center gap-2.5 py-3" aria-label={labels.brand}>
             <SiloMark />
             <span className="font-display text-lg font-extrabold tracking-wide">{labels.brand}</span>
@@ -107,7 +107,10 @@ export function AppShell({
 
       {currentGroup && currentGroup.links.length > 1 && (
         <div className="border-b border-rule bg-band">
-          <nav aria-label={labels.subNav} className="flex gap-1 overflow-x-auto px-4 md:px-8">
+          <nav
+            aria-label={labels.subNav}
+            className="mx-auto flex w-full max-w-[1240px] gap-1 overflow-x-auto px-4 md:px-8"
+          >
             {currentGroup.links.map((link) => {
               const isCurrent = current?.link.href === link.href;
               return (
@@ -188,7 +191,7 @@ export function AppShell({
         </div>
       )}
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 md:px-8 md:py-10">{children}</main>
+      <main className="mx-auto w-full max-w-[1240px] flex-1 px-4 py-8 md:px-8 md:py-10">{children}</main>
     </div>
   );
 }

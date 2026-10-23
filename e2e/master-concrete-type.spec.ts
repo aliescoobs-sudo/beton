@@ -7,6 +7,7 @@ test('a partner reads the seeded types and adds one in French', async ({ page })
   await expect(page).toHaveURL('/fr/master-data/concrete-types');
   await expect(page.getByTestId('type-B25')).toBeVisible();
   const code = `E${Date.now().toString(36).toUpperCase()}`.slice(0, 10);
+  await page.getByTestId('type-add').click();
   const form = page.getByTestId('type-new');
   await form.locator('input[name=code]').fill(code);
   await form.locator('input[name=label]').fill('Béton E2E');

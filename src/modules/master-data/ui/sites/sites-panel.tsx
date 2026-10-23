@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { type FormEvent, useState } from 'react';
+import { Table, Th } from '@/ui';
+import { ActionsTh, AddButton, CancelButton, EditButton, FormRow, type Message, Notice } from '../read-mode';
 import { createSiteAction, updateSiteAction, type SiteActionResult } from './actions';
 
 export interface SiteRow {
@@ -26,7 +28,9 @@ export function SitesPanel({
 }) {
   const t = useTranslations('masterData.sites');
   const router = useRouter();
-  const [message, setMessage] = useState<{ id: string; text: string } | null>(null);
+  const [message, setMessage] = useState<Message | null>(null);
+  // 'new' = the add form, a site id = that row's edit form; null = read mode.
+  const [open, setOpen] = useState<string | null>(null);
 
   async function submit(
     id: string,
@@ -34,20 +38,20 @@ export function SitesPanel({
     action: (input: unknown) => Promise<SiteActionResult>,
   ) {
     event.preventDefault();
-    const form = event.currentTarget;
-    const data = new FormData(form);
+    const data = new FormData(event.currentTarget);
     const result = await action({
       label: String(data.get('label') ?? ''),
       address: String(data.get('address') ?? ''),
       zoneId: String(data.get('zoneId') ?? ''),
     });
     if (result.ok) {
-      setMessage({ id, text: t('saved') });
-      if (id === 'new') form.reset();
+      setMessage({ id, text: t('saved'), ok: true });
+      setOpen(null);
       return router.refresh();
     }
     setMessage({
       id,
+      ok: false,
       text:
         result.error === 'DUPLICATE_LABEL'
           ? t('duplicate')
@@ -81,44 +85,80 @@ export function SitesPanel({
     </>
   );
 
+  const zoneName = new Map(zones.map((z) => [z.id, z.name]));
+
   return (
     <section className="mt-8" data-testid="sites">
       <h2 className="text-xl">{t('title')}</h2>
-      <ul className="mt-3 space-y-3">
-        {sites.map((site) => (
-          <li key={site.id} className="row-item" data-testid={`site-${site.label}`}>
-            <form
-              onSubmit={(e) => void submit(site.id, e, (value) => updateSiteAction(site.id, value))}
-              className="grid gap-3 sm:grid-cols-3"
-            >
-              {fields(site)}
-              <button type="submit" className="btn btn-primary btn-sm w-fit">
-                {t('save')}
+      <div className="mt-3 space-y-3">
+        <Notice message={message} testId="site-message" />
+        {open === 'new' ? (
+          <form
+            onSubmit={(e) => void submit('new', e, (value) => createSiteAction(clientId, value))}
+            className="form-band grid gap-3 sm:grid-cols-3"
+            data-testid="site-new"
+          >
+            {fields()}
+            <div className="flex items-end gap-3">
+              <button type="submit" className="btn btn-primary btn-sm">
+                {t('add')}
               </button>
-              {message?.id === site.id && (
-                <p role="status" className="text-sm" data-testid="site-message">
-                  {message.text}
-                </p>
-              )}
-            </form>
-          </li>
-        ))}
-      </ul>
-      <form
-        onSubmit={(e) => void submit('new', e, (value) => createSiteAction(clientId, value))}
-        className="mt-3 grid gap-3 form-band sm:grid-cols-3"
-        data-testid="site-new"
-      >
-        {fields()}
-        <button type="submit" className="btn btn-primary btn-sm w-fit">
-          {t('add')}
-        </button>
-        {message?.id === 'new' && (
-          <p role="status" className="text-sm" data-testid="site-message">
-            {message.text}
-          </p>
+              <CancelButton onClick={() => setOpen(null)} />
+            </div>
+            <Notice message={message} id="new" testId="site-message" />
+          </form>
+        ) : (
+          <AddButton label={t('add')} onClick={() => setOpen('new')} testId="site-add" />
         )}
-      </form>
+        <Table>
+          <thead>
+            <tr>
+              <Th>{t('label')}</Th>
+              <Th>{t('address')}</Th>
+              <Th>{t('zone')}</Th>
+              <ActionsTh />
+            </tr>
+          </thead>
+          <tbody>
+            {sites.map((site) => (
+              <tr key={site.id} data-testid={`site-${site.label}`}>
+                {open === site.id ? (
+                  <FormRow columns={4}>
+                    <form
+                      onSubmit={(e) => void submit(site.id, e, (value) => updateSiteAction(site.id, value))}
+                      className="grid gap-3 py-2 sm:grid-cols-3"
+                    >
+                      {fields(site)}
+                      <div className="flex items-end gap-3">
+                        <button type="submit" className="btn btn-primary btn-sm">
+                          {t('save')}
+                        </button>
+                        <CancelButton onClick={() => setOpen(null)} />
+                      </div>
+                      <Notice message={message} id={site.id} testId="site-message" />
+                    </form>
+                  </FormRow>
+                ) : (
+                  <>
+                    <td className="font-medium">
+                      <bdi>{site.label}</bdi>
+                    </td>
+                    <td>
+                      <bdi>{site.address}</bdi>
+                    </td>
+                    <td>
+                      <bdi>{zoneName.get(site.zoneId) ?? ''}</bdi>
+                    </td>
+                    <td className="text-end">
+                      <EditButton onClick={() => setOpen(site.id)} testId="site-edit" />
+                    </td>
+                  </>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      </div>
     </section>
   );
 }

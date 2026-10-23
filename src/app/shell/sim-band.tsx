@@ -16,6 +16,7 @@ export async function SimBand({ locale }: { locale: string }) {
       at={formatSimDate(clock.now(), locale)}
       days={simDays(businessDateOf(clock.now()))}
       daysLabel={t('days')}
+      locale={locale}
     >
       <AdvanceSlot />
     </SimBadge>
