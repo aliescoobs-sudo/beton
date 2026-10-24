@@ -81,6 +81,12 @@ const GROUPS: GroupDef[] = [
         allowed: 'instruments.read',
       },
       {
+        path: '/opening',
+        labelKey: 'ledger.opening.link',
+        testId: 'opening-link',
+        allowed: 'opening.read',
+      },
+      {
         path: '/cash',
         labelKey: 'ledger.cash.link',
         testId: 'cash-link',

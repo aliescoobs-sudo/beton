@@ -617,6 +617,33 @@
         "cancelled": "Annulé"
       },
       "lastDay": "Dernier jour pour régulariser"
+    },
+    "opening": {
+      "title": "État d'ouverture",
+      "link": "État d'ouverture",
+      "intro": "L'application démarre au milieu de l'activité : la date d'ouverture (une seule fois), les soldes de caisse et de banque, ce que les clients nous doivent et ce que nous devons aux fournisseurs. Les chèques, LCN et échéanciers en cours se saisissent avec leurs vraies dates.",
+      "openingDate": "Date d'ouverture",
+      "enterDate": "Enregistrer la date",
+      "onceNote": "Cette date ne s'enregistre qu'une fois.",
+      "notEntered": "La date d'ouverture n'est pas encore saisie par le propriétaire.",
+      "kind": "Type",
+      "client": "Client",
+      "supplier": "Fournisseur",
+      "party": "Tiers",
+      "amountClient": "Montant dû par le client (MAD)",
+      "amountSupplier": "Montant dû au fournisseur (MAD)",
+      "reference": "Référence",
+      "add": "Ajouter",
+      "owed": "Solde à l'ouverture",
+      "clientOwes": "Le client nous doit",
+      "weOwe": "Nous devons",
+      "invalid": "Valeur refusée.",
+      "alreadyEntered": "La date d'ouverture est déjà saisie.",
+      "openingFirst": "Saisissez d'abord la date d'ouverture.",
+      "duplicate": "Ce tiers a déjà un solde d'ouverture.",
+      "partyArchived": "Ce tiers est archivé ou introuvable.",
+      "notFound": "Introuvable.",
+      "error": "Action refusée."
     }
   }
 }

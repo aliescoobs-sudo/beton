@@ -10,6 +10,7 @@ import { testEnv } from './db-env';
 import { realActor, realSessionUser, type TestActor } from './helpers/actors';
 import {
   allocationScene,
+  ensureOpening,
   insertInstrument,
   insertMovementReversal,
   insertOrder,
@@ -91,6 +92,13 @@ const SEED: Record<MoneyTable, (tx: pg.PoolClient, actor: string) => Promise<unk
       (await orderMaster(app, actors.owner.id, marker)).clientId,
     );
     return insertMovementReversal(tx, actor, original, `mv ${marker}`);
+  },
+  opening_party_balance: async (tx, actor) => {
+    await ensureOpening(app, actors.owner.id, marker);
+    return tx.query(
+      `insert into opening_party_balance (id, client_id, amount_centimes, created_by) values (gen_random_uuid(), $1, 100, $2)`,
+      [(await orderMaster(app, actors.owner.id, marker)).clientId, actor],
+    );
   },
   allocation: async (tx, actor) => {
     const scene = await allocationScene(app, actors.owner.id, marker);

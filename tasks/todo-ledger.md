@@ -61,7 +61,7 @@ Order list and detail (office/managers: plan, state of each échéance: `pending
 
 ## Phase 2a: Opening state and pilot scenario (owner's brief 2026-10-24)
 
-### - [ ] L33: Opening state (M)
+### - [x] L33: Opening state (M)
 The app starts in the middle of real activity. Already covered: cash and bank opening balances (L8); instruments in hand at go-live and installment plans (the normal services, entered by the owner with explicit past dates: received cheques/LCN not cleared, issued cheques not presented, orders with running plans). New here: `ledger_opening` (singleton, insert-only: the opening date, entered once, owner only, audited) and `opening_party_balance` (insert-only: client or supplier, amount owed to us or by us at the opening date, reference text; owner only, money). Opening stock per component belongs to `operations` (O-tasks). Statements (L27) and the cash position (L16) read these rows.
 **AC (new AC-LED-25):** the opening is entered once (a second is refused); owner only, support reads; a party opening balance is audited and appears in that party's statement; money-visibility and RLS matrix cover both tables; office/partner/plant read nothing.
 **Verify:** `pnpm test:integration opening rls` · **Files:** migration, service, tests · **Deps:** L8, L11

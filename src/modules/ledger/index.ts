@@ -45,3 +45,10 @@ export {
   unallocate,
 } from './service/allocation-service';
 export { getCashPosition } from './service/cash-service';
+export {
+  addPartyOpeningBalance,
+  enterOpeningDate,
+  getOpeningState,
+  type OpeningError,
+  type OpeningState,
+} from './service/opening-service';

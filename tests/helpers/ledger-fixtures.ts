@@ -257,3 +257,13 @@ export async function insertOrderWithItems(
   }
   return { id, code, itemIds };
 }
+
+/** The opening date is a singleton shared by the whole test database: whoever needs it first enters it (2026-01-01). */
+export function ensureOpening(app: pg.Pool, ownerId: string, marker: string) {
+  return withRlsContext(app, { userId: ownerId, role: 'owner', requestId: marker }, (tx) =>
+    tx.query(
+      `insert into ledger_opening (opening_date, created_by) values ('2026-01-01', $1) on conflict do nothing`,
+      [ownerId],
+    ),
+  );
+}

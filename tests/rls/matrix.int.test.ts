@@ -7,6 +7,7 @@ import { testEnv } from '../db-env';
 import { realActor } from '../helpers/actors';
 import {
   allocationScene,
+  ensureOpening,
   insertInstrument,
   insertMovementReversal,
   insertOrder,
@@ -203,6 +204,28 @@ const FIXTURES: Record<
       return insertMovementReversal(tx, actor, original, `${marker}:${actor}`);
     },
     visible: `select split_part(reason, ':', 2) as owner from money_movement where source = 'reversal' and reason like $1 || ':%'`,
+  },
+  ledger_opening: {
+    // A singleton: the first writer enters it, later inserts do nothing. The others are refused by the policy.
+    writers: ['owner'],
+    seed: (tx, actor) =>
+      tx.query(
+        `insert into ledger_opening (opening_date, created_by) values ('2026-01-01', $1) on conflict do nothing`,
+        [actor],
+      ),
+    visible: `select created_by::text as owner from ledger_opening where $1::text is not null`,
+  },
+  opening_party_balance: {
+    writers: ['owner'],
+    seed: async (tx, actor) => {
+      await ensureOpening(app, actors.owner, marker);
+      return tx.query(
+        `insert into opening_party_balance (id, client_id, amount_centimes, created_by) values (gen_random_uuid(), $1, 100, $2)`,
+        [(await orderMaster(app, actors.owner, marker)).clientId, actor],
+      );
+    },
+    visible: `select b.created_by::text as owner from opening_party_balance b join client c on c.id = b.client_id
+                where c.name = 'fx' || $1`,
   },
   allocation: {
     // Office covers orders only through allocate_to_order; the direct insert is the owner's.

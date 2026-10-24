@@ -611,6 +611,44 @@ export const TABLE_ACCESS = {
     exception:
       'ledger L11: an instrument covers plan items; insert-only (undoing is a negated row with a reason). The owner inserts; office covers an order by code only through allocate_to_order (SECURITY DEFINER, returns a count). A guard trigger with advisory locks keeps the sums within the instrument and the item.',
   },
+  ledger_opening: {
+    kind: 'rls',
+
+    read: {
+      owner: 'all',
+      partner: 'none',
+      office: 'none',
+      plant: 'none',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'ledger L33: the opening date, a singleton entered once by the owner (the app starts in the middle of activity); owner and support read.',
+  },
+  opening_party_balance: {
+    kind: 'rls',
+    money: true,
+    read: {
+      owner: 'all',
+      partner: 'none',
+      office: 'none',
+      plant: 'none',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'ledger L33: what a client owes us or we owe a supplier on the opening date; insert-only, owner writes, owner and support read; its audit rows hold the amount and are hidden from the others.',
+  },
   correction_request: {
     kind: 'rls',
     read: {
