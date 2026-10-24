@@ -76,7 +76,7 @@ Migration `payment_instrument`, `instrument_event` (append-only), `money_movemen
 **AC:** AC-LED-04 (illegal transitions rejected by the service and by direct SQL; `cleared` = exactly one movement with the right sign), AC-LED-03 (instruments, events, movements), AC-SEC-04/05 (office reads instruments, not movements).
 **Verify:** `pnpm test:integration instrument rls` · **Files:** migration, ledger/service/instrument-service.ts, tests/instrument.int.test.ts, table-access.ts, matrix · **Deps:** L8, L9
 
-### - [ ] L11: Allocations: instruments cover plan items (M)
+### - [x] L11: Allocations: instruments cover plan items (M)
 Migration `allocation` (insert-only; reversal = negated row). Trigger (advisory lock) keeps Σ per instrument ≤ instrument amount and Σ per item ≤ item amount. `allocate`/`unallocate`; plan-item state now uses allocations (`covered`, `partially_covered`); one instrument covers several items and vice versa.
 **AC:** property test: Σ allocations never exceed either side under 10 parallel allocations; covered state correct; AC-SEC-04.
 **Verify:** `pnpm test:integration allocation rls` · **Files:** migration, ledger/service/allocation-service.ts, plan-state.ts, tests · **Deps:** L3, L10

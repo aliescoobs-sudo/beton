@@ -33,3 +33,10 @@ export {
   receiveInstrument,
   reverseMovement,
 } from './service/instrument-service';
+export {
+  allocate,
+  type AllocationError,
+  type ItemCoverage,
+  orderCoverage,
+  unallocate,
+} from './service/allocation-service';

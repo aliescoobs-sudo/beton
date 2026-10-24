@@ -187,3 +187,73 @@ export function insertMovementReversal(
     [original.accountId, -original.amountCentimes, original.id, reason, actorId],
   );
 }
+
+/** An order of 9 360,00 TTC (one item) for a client of its own and a cheque of the same amount from that client, both by the owner. */
+export interface AllocationScene {
+  clientId: string;
+  orderId: string;
+  orderCode: string;
+  itemId: string;
+  instrumentId: string;
+}
+const allocCache = new Map<string, Promise<AllocationScene>>();
+
+export function allocationScene(app: pg.Pool, ownerId: string, marker: string): Promise<AllocationScene> {
+  let made = allocCache.get(marker);
+  if (!made) {
+    made = (async () => {
+      const master = await orderMaster(app, ownerId, marker);
+      return withRlsContext(app, { userId: ownerId, role: 'owner', requestId: marker }, async (tx) => {
+        const client = await tx.query<{ id: string }>(
+          `insert into client (id, code, name, kind) values (gen_random_uuid(), public.next_code('CLT', 3), $1, 'person') returning id`,
+          [`al${marker}`],
+        );
+        const clientId = client.rows[0]?.id as string;
+        const order = await insertOrder(tx, ownerId, { ...master, clientId });
+        const item = await tx.query<{ id: string }>(`select id from payment_plan_item where order_id = $1`, [
+          order.id,
+        ]);
+        const instrument = await insertInstrument(tx, ownerId, { clientId, amountCentimes: 936_000 });
+        return {
+          clientId,
+          orderId: order.id,
+          orderCode: order.code,
+          itemId: item.rows[0]?.id as string,
+          instrumentId: instrument.id,
+        };
+      });
+    })();
+    allocCache.set(marker, made);
+  }
+  return made;
+}
+
+/** An order of 9 360,00 TTC split into the given item amounts (centimes, summing to 936 000), for a given client. */
+export async function insertOrderWithItems(
+  tx: pg.PoolClient,
+  actorId: string,
+  master: OrderMaster,
+  clientId: string,
+  items: number[],
+): Promise<{ id: string; code: string; itemIds: string[] }> {
+  const id = randomUUID();
+  const code = (await tx.query<{ n: string }>(`select public.next_doc_number('CMD', 2026, 5) as n`)).rows[0]
+    ?.n as string;
+  await tx.query(
+    `insert into sales_order (id, code, client_id, concrete_type_id, volume_l, order_date, delivery_date, selling_price_id,
+                              unit_price_ht_centimes, vat_rate_bp, total_ht_centimes, total_vat_centimes, total_ttc_centimes, created_by)
+     values ($1, $2, $3, $4, 10000, '2026-06-01', '2026-06-02', $5, $6, 2000, 780000, 156000, 936000, $7)`,
+    [id, code, clientId, master.typeId, master.sellingPriceId, master.unitPriceCentimes, actorId],
+  );
+  const itemIds: string[] = [];
+  for (const [n, amount] of items.entries()) {
+    const itemId = randomUUID();
+    itemIds.push(itemId);
+    await tx.query(
+      `insert into payment_plan_item (id, order_id, seq, direction, method, due_date, amount_centimes, created_by)
+       values ($1, $2, $3, 'in', 'cheque', $4, $5, $6)`,
+      [itemId, id, n + 1, `2026-07-0${n + 1}`, amount, actorId],
+    );
+  }
+  return { id, code, itemIds };
+}

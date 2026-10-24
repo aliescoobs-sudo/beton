@@ -31,7 +31,19 @@ function normalise<T extends z.infer<typeof paper>>(v: T) {
 const complete = (v: ReturnType<typeof normalise>) =>
   v.method === 'cheque' || v.method === 'lcn' ? v.number !== null && v.writtenDate !== null : true;
 
-const receiveSchema = paper.extend({ clientId: z.uuid() }).transform(normalise).refine(complete);
+const ORDER_CODE = /^CMD-[0-9]{4}-[0-9]{5,}$/;
+const receiveSchema = paper
+  .extend({
+    clientId: z.uuid(),
+    // The order this payment is for: the oldest open items of that order are covered (office cannot read items).
+    orderCode: z
+      .string()
+      .transform((v) => v.trim().toUpperCase())
+      .pipe(z.string().regex(ORDER_CODE))
+      .nullish(),
+  })
+  .transform(normalise)
+  .refine(complete);
 const issueSchema = paper.extend({ supplierId: z.uuid() }).transform(normalise).refine(complete);
 
 export type ReceiveInstrumentInput = z.infer<typeof receiveSchema>;
@@ -64,5 +76,22 @@ export const parseCancelInput = (input: unknown): Result<CancelInstrumentInput, 
 };
 export const parseReverseInput = (input: unknown): Result<ReverseMovementInput, 'INVALID'> => {
   const p = reverseSchema.safeParse(input);
+  return p.success ? ok(p.data) : err('INVALID');
+};
+
+const allocateSchema = z.object({
+  instrumentId: z.uuid(),
+  itemId: z.uuid(),
+  amountCentimes: z.number().int().positive().safe(),
+});
+const unallocateSchema = z.object({ allocationId: z.uuid(), reason: text(500) });
+export type AllocateInput = z.infer<typeof allocateSchema>;
+export type UnallocateInput = z.infer<typeof unallocateSchema>;
+export const parseAllocateInput = (input: unknown): Result<AllocateInput, 'INVALID'> => {
+  const p = allocateSchema.safeParse(input);
+  return p.success ? ok(p.data) : err('INVALID');
+};
+export const parseUnallocateInput = (input: unknown): Result<UnallocateInput, 'INVALID'> => {
+  const p = unallocateSchema.safeParse(input);
   return p.success ? ok(p.data) : err('INVALID');
 };

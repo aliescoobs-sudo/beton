@@ -9,6 +9,7 @@ import { recordMoneyView } from '../src/modules/platform-security';
 import { testEnv } from './db-env';
 import { realActor, realSessionUser, type TestActor } from './helpers/actors';
 import {
+  allocationScene,
   insertInstrument,
   insertMovementReversal,
   insertOrder,
@@ -90,6 +91,14 @@ const SEED: Record<MoneyTable, (tx: pg.PoolClient, actor: string) => Promise<unk
       (await orderMaster(app, actors.owner.id, marker)).clientId,
     );
     return insertMovementReversal(tx, actor, original, `mv ${marker}`);
+  },
+  allocation: async (tx, actor) => {
+    const scene = await allocationScene(app, actors.owner.id, marker);
+    return tx.query(
+      `insert into allocation (id, instrument_id, payment_plan_item_id, amount_centimes, created_by)
+       values (gen_random_uuid(), $1, $2, 100, $3)`,
+      [scene.instrumentId, scene.itemId, actor],
+    );
   },
   selling_price: async (tx, actor) => {
     const type = await tx.query<{ id: string }>(

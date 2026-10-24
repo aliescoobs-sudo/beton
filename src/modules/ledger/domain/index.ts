@@ -46,6 +46,10 @@ export {
   parseOpeningBalanceInput,
 } from './money-account';
 export {
+  type AllocateInput,
+  parseAllocateInput,
+  parseUnallocateInput,
+  type UnallocateInput,
   type CancelInstrumentInput,
   type ClearInstrumentInput,
   type IssueInstrumentInput,
@@ -57,3 +61,4 @@ export {
   type ReceiveInstrumentInput,
   type ReverseMovementInput,
 } from './instrument-input';
+export { ITEM_STATES, itemState, type ItemState } from './plan-state';

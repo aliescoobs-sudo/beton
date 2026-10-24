@@ -6,6 +6,7 @@ import { RLS_TABLES, TABLE_ACCESS } from '../../src/modules/platform-security/do
 import { testEnv } from '../db-env';
 import { realActor } from '../helpers/actors';
 import {
+  allocationScene,
   insertInstrument,
   insertMovementReversal,
   insertOrder,
@@ -202,6 +203,20 @@ const FIXTURES: Record<
       return insertMovementReversal(tx, actor, original, `${marker}:${actor}`);
     },
     visible: `select split_part(reason, ':', 2) as owner from money_movement where source = 'reversal' and reason like $1 || ':%'`,
+  },
+  allocation: {
+    // Office covers orders only through allocate_to_order; the direct insert is the owner's.
+    writers: ['owner'],
+    seed: async (tx, actor) => {
+      const scene = await allocationScene(app, actors.owner, marker);
+      return tx.query(
+        `insert into allocation (id, instrument_id, payment_plan_item_id, amount_centimes, created_by)
+         values (gen_random_uuid(), $1, $2, 100, $3)`,
+        [scene.instrumentId, scene.itemId, actor],
+      );
+    },
+    visible: `select a.created_by::text as owner from allocation a join payment_instrument i on i.id = a.instrument_id
+                join client c on c.id = i.client_id where c.name = 'al' || $1`,
   },
   sales_order: {
     writers: ['owner', 'office'],

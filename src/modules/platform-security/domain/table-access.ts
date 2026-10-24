@@ -592,6 +592,25 @@ export const TABLE_ACCESS = {
     exception:
       'ledger L10: signed cash movements, written only by the SECURITY DEFINER trigger on a cleared event (exactly one per instrument); the owner may insert a reversing movement (exact negation, once). Nobody else has an INSERT path.',
   },
+  allocation: {
+    kind: 'rls',
+    money: true,
+    read: {
+      owner: 'all',
+      partner: 'none',
+      office: 'none',
+      plant: 'none',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'ledger L11: an instrument covers plan items; insert-only (undoing is a negated row with a reason). The owner inserts; office covers an order by code only through allocate_to_order (SECURITY DEFINER, returns a count). A guard trigger with advisory locks keeps the sums within the instrument and the item.',
+  },
   correction_request: {
     kind: 'rls',
     read: {

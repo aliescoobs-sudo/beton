@@ -267,6 +267,13 @@
       "when": 1792591234000,
       "tag": "0037_payment_instrument",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1792591235000,
+      "tag": "0038_allocation",
+      "breakpoints": true
     }
   ]
 }

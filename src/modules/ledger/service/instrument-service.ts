@@ -20,7 +20,8 @@ export type InstrumentError =
   | 'PARTY_ARCHIVED'
   | 'ACCOUNT_MISMATCH'
   | 'DUPLICATE'
-  | 'CONFLICT';
+  | 'CONFLICT'
+  | 'NOTHING_TO_ALLOCATE';
 
 /** What a write returns to the caller: the identity, never an amount (office enters blind, DECISIONS 81). */
 export interface InstrumentRef {
@@ -42,6 +43,8 @@ export function instrumentFailure(error: unknown): InstrumentError {
   if (e.code === '40001' || e.code === '40P01') return 'CONFLICT';
   throw error;
 }
+
+class NothingToAllocate extends Error {}
 
 async function insertEvent(
   tx: pg.PoolClient,
@@ -67,6 +70,7 @@ async function enter(
     bank: string | null;
     writtenDate: string | null;
     partyId: string;
+    orderCode?: string | null;
   },
   today: string,
 ): Promise<Result<InstrumentRef, InstrumentError>> {
@@ -106,9 +110,18 @@ async function enter(
           accountId: caisse.rows[0]?.id,
         });
       }
+      if (v.orderCode) {
+        // Covers the oldest open items of that order; a code that fits nothing rolls the whole entry back.
+        const covered = await tx.query<{ n: number }>('select public.allocate_to_order($1, $2) as n', [
+          id,
+          v.orderCode,
+        ]);
+        if (!covered.rows[0]?.n) throw new NothingToAllocate();
+      }
     });
     return ok({ id });
   } catch (error) {
+    if (error instanceof NothingToAllocate) return err('NOTHING_TO_ALLOCATE');
     return err(instrumentFailure(error));
   }
 }
