@@ -22,8 +22,11 @@ export {
   setOpeningBalance,
 } from './service/money-account-service';
 export {
+  bounceInstrument,
   cancelInstrument,
   clearInstrument,
+  disputeInstrument,
+  regularizeInstrument,
   depositInstruments,
   type InstrumentError,
   type InstrumentEventView,

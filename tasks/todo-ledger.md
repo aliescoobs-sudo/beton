@@ -86,7 +86,7 @@ Migration `allocation` (insert-only; reversal = negated row). Trigger (advisory 
 **AC:** AC-LED-14 (early deposit/clearing allowed and flagged; not flagged when on or after the written date), AC-LED-04 (one batch = one event per instrument).
 **Verify:** `pnpm test:integration deposit` · **Files:** instrument-service.ts, domain early flag, tests · **Deps:** L10
 
-### - [ ] L13: Bounce, 30-day window, regularize, dispute (M)
+### - [x] L13: Bounce, 30-day window, regularize, dispute (M)
 `bounceInstrument` sets `regularization_deadline = bounced_date + 30`, reverses its allocations (items uncovered, overdue if past due), optional bank-fee `money_movement(source='expense')` (owner/partner, Q5). `regularizeInstrument` requires a new covering instrument (cash/transfer/cheque) and closes the window; `disputeInstrument` closes it and flags the client. A bounced instrument stays in history next to the new one.
 **AC:** AC-LED-05 (cheque from CLT-08 bounced on D3 → deadline D3+30, items un-covered, overdue if past due), AC-LED-06 (regularize needs a covering instrument, window closes, history shows both).
 **Verify:** `pnpm test:integration bounce regularize` · **Files:** instrument-service.ts, domain, tests · **Deps:** L11, L12

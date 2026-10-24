@@ -5,13 +5,17 @@ import { err, ok, type Result } from '@/lib/result';
 import { inRequest, isMalformedId, require, type SessionUser } from '@/modules/platform-security';
 import { isEarly, isPostDated } from '../domain/instrument-dates';
 import {
+  parseBounceInput,
   parseCancelInput,
+  parseDisputeInput,
+  parseRegularizeInput,
   parseClearInput,
   parseDepositInput,
   parseIssueInput,
   parseReceiveInput,
   parseReverseInput,
 } from '../domain/instrument-input';
+import { regularizationDeadline } from '../domain/instrument';
 import type { InstrumentDirection, InstrumentMethod, InstrumentState } from '../domain/instrument';
 
 export type InstrumentError =
@@ -22,7 +26,9 @@ export type InstrumentError =
   | 'ACCOUNT_MISMATCH'
   | 'DUPLICATE'
   | 'CONFLICT'
-  | 'NOTHING_TO_ALLOCATE';
+  | 'NOTHING_TO_ALLOCATE'
+  | 'WINDOW_CLOSED'
+  | 'COVERING_INVALID';
 
 /** What a write returns to the caller: the identity, never an amount (office enters blind, DECISIONS 81). */
 export interface InstrumentRef {
@@ -34,6 +40,8 @@ export function instrumentFailure(error: unknown): InstrumentError {
   const message = e.message ?? '';
   if (e.code === '23514') {
     if (/illegal transition/.test(message)) return 'ILLEGAL_TRANSITION';
+    if (/window is closed/.test(message)) return 'WINDOW_CLOSED';
+    if (/covering instrument/.test(message)) return 'COVERING_INVALID';
     if (/not active/.test(message)) return 'PARTY_ARCHIVED';
     if (/account/.test(message)) return 'ACCOUNT_MISMATCH';
     if (/unknown/.test(message)) return 'NOT_FOUND';
@@ -50,13 +58,30 @@ class NothingToAllocate extends Error {}
 async function insertEvent(
   tx: pg.PoolClient,
   actor: SessionUser,
-  e: { instrumentId: string; event: string; date: string; accountId?: string | null; reason?: string | null },
+  e: {
+    id?: string;
+    instrumentId: string;
+    event: string;
+    date: string;
+    accountId?: string | null;
+    reason?: string | null;
+    coveringInstrumentId?: string | null;
+  },
 ): Promise<void> {
   // No RETURNING: office has no SELECT policy.
   await tx.query(
-    `insert into instrument_event (id, instrument_id, event, at_date, money_account_id, reason, created_by)
-     values ($1, $2, $3, $4, $5, $6, $7)`,
-    [randomUUID(), e.instrumentId, e.event, e.date, e.accountId ?? null, e.reason ?? null, actor.id],
+    `insert into instrument_event (id, instrument_id, event, at_date, money_account_id, reason, covering_instrument_id, created_by)
+     values ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    [
+      e.id ?? randomUUID(),
+      e.instrumentId,
+      e.event,
+      e.date,
+      e.accountId ?? null,
+      e.reason ?? null,
+      e.coveringInstrumentId ?? null,
+      actor.id,
+    ],
   );
 }
 
@@ -209,6 +234,124 @@ export async function depositInstruments(
   }
 }
 
+/**
+ * A deposited cheque or LCN came back unpaid (law 71.24): the bounce opens a 30-day window to regularize it, takes the
+ * instrument off every plan item it covered (negated allocations, so the items are uncovered and overdue when past
+ * due), and records the bank's fee as an expense movement when the owner gives it. All in one transaction.
+ */
+export async function bounceInstrument(
+  appPool: pg.Pool,
+  actor: SessionUser,
+  input: unknown,
+): Promise<Result<{ id: string; regularizationDeadline: string }, InstrumentError>> {
+  await require(appPool, actor, 'instruments.manage');
+  const parsed = parseBounceInput(input);
+  if (!parsed.ok) return err('INVALID');
+  const v = parsed.value;
+  const eventId = randomUUID();
+  try {
+    await inRequest(appPool, actor, async (tx) => {
+      await insertEvent(tx, actor, {
+        id: eventId,
+        instrumentId: v.instrumentId,
+        event: 'bounced',
+        date: v.date,
+      });
+      const open = await tx.query<{ id: string; payment_plan_item_id: string; amount_centimes: string }>(
+        `select a.id, a.payment_plan_item_id, a.amount_centimes::text from allocation a
+          where a.instrument_id = $1 and a.reverses_id is null
+            and not exists (select 1 from allocation r where r.reverses_id = a.id)`,
+        [v.instrumentId],
+      );
+      for (const a of open.rows) {
+        await tx.query(
+          `insert into allocation (id, instrument_id, payment_plan_item_id, amount_centimes, reverses_id, reason, created_by)
+           values ($1, $2, $3, $4, $5, 'chèque ou LCN rejeté', $6)`,
+          [
+            randomUUID(),
+            v.instrumentId,
+            a.payment_plan_item_id,
+            negateCentimes(centimes(Number(a.amount_centimes))),
+            a.id,
+            actor.id,
+          ],
+        );
+      }
+      if (v.feeCentimes) {
+        const account = await tx.query<{ account: string }>(
+          `select money_account_id as account from instrument_event where instrument_id = $1 and event = 'deposited' order by seq desc limit 1`,
+          [v.instrumentId],
+        );
+        await tx.query(
+          `insert into money_movement (id, account_id, amount_centimes, movement_date, source, source_id, reason, created_by)
+           values ($1, $2, $3, $4, 'expense', $5, 'frais de rejet', $6)`,
+          [
+            randomUUID(),
+            account.rows[0]?.account,
+            negateCentimes(centimes(v.feeCentimes)),
+            v.date,
+            eventId,
+            actor.id,
+          ],
+        );
+      }
+    });
+    return ok({ id: v.instrumentId, regularizationDeadline: regularizationDeadline(v.date) });
+  } catch (error) {
+    return err(instrumentFailure(error));
+  }
+}
+
+/** Within the window, a new instrument that covers the bounced one regularizes it (closing the window). */
+export async function regularizeInstrument(
+  appPool: pg.Pool,
+  actor: SessionUser,
+  input: unknown,
+): Promise<Result<InstrumentRef, InstrumentError>> {
+  await require(appPool, actor, 'instruments.manage');
+  const parsed = parseRegularizeInput(input);
+  if (!parsed.ok) return err('INVALID');
+  const v = parsed.value;
+  try {
+    await inRequest(appPool, actor, (tx) =>
+      insertEvent(tx, actor, {
+        instrumentId: v.instrumentId,
+        event: 'regularized',
+        date: v.date,
+        coveringInstrumentId: v.coveringInstrumentId,
+      }),
+    );
+    return ok({ id: v.instrumentId });
+  } catch (error) {
+    return err(instrumentFailure(error));
+  }
+}
+
+/** The client contests: the window closes without regularization and the client is flagged (derived from the event). */
+export async function disputeInstrument(
+  appPool: pg.Pool,
+  actor: SessionUser,
+  input: unknown,
+): Promise<Result<InstrumentRef, InstrumentError>> {
+  await require(appPool, actor, 'instruments.manage');
+  const parsed = parseDisputeInput(input);
+  if (!parsed.ok) return err('INVALID');
+  const v = parsed.value;
+  try {
+    await inRequest(appPool, actor, (tx) =>
+      insertEvent(tx, actor, {
+        instrumentId: v.instrumentId,
+        event: 'disputed',
+        date: v.date,
+        reason: v.reason,
+      }),
+    );
+    return ok({ id: v.instrumentId });
+  } catch (error) {
+    return err(instrumentFailure(error));
+  }
+}
+
 /** The owner cancels an instrument that is not final, with a reason. Office asks for a correction instead. */
 export async function cancelInstrument(
   appPool: pg.Pool,
@@ -279,6 +422,9 @@ export interface InstrumentEventView {
   atDate: string;
   accountId: string | null;
   reason: string | null;
+  /** Set on a bounce: the last day to regularize (law 71.24). */
+  regularizationDeadline: string | null;
+  coveringInstrumentId: string | null;
   /** Deposited or cleared before the date written on the paper (AC-LED-14). */
   early: boolean;
 }
@@ -295,6 +441,8 @@ export interface InstrumentView {
   writtenDate: string | null;
   receivedDate: string;
   postDated: boolean;
+  /** The client has contested a bounced instrument (derived from a `disputed` event). */
+  clientDisputed: boolean;
   state: InstrumentState;
   stateDate: string;
   events: InstrumentEventView[];
@@ -311,7 +459,15 @@ interface InstrumentRow {
   bank: string | null;
   written_date: string | null;
   received_date: string;
-  events: { event: InstrumentState; at_date: string; account_id: string | null; reason: string | null }[];
+  client_disputed: boolean;
+  events: {
+    event: InstrumentState;
+    at_date: string;
+    account_id: string | null;
+    reason: string | null;
+    deadline: string | null;
+    covering: string | null;
+  }[];
 }
 
 /** The instruments with their events, newest first. Owner and support only (the page records the support view). */
@@ -323,8 +479,13 @@ export async function listInstruments(appPool: pg.Pool, actor: SessionUser): Pro
               coalesce(c.name, s.name) as party_name, i.number, i.bank,
               to_char(i.written_date, 'YYYY-MM-DD') as written_date, to_char(i.received_date, 'YYYY-MM-DD') as received_date,
               (select json_agg(json_build_object('event', e.event, 'at_date', to_char(e.at_date, 'YYYY-MM-DD'),
-                                                 'account_id', e.money_account_id, 'reason', e.reason) order by e.seq)
-                 from instrument_event e where e.instrument_id = i.id) as events
+                                                 'account_id', e.money_account_id, 'reason', e.reason,
+                                                 'deadline', to_char(e.regularization_deadline, 'YYYY-MM-DD'),
+                                                 'covering', e.covering_instrument_id) order by e.seq)
+                 from instrument_event e where e.instrument_id = i.id) as events,
+              (i.client_id is not null and exists (
+                 select 1 from payment_instrument d join instrument_event de on de.instrument_id = d.id and de.event = 'disputed'
+                  where d.client_id = i.client_id)) as client_disputed
          from payment_instrument i
          left join client c on c.id = i.client_id left join supplier s on s.id = i.supplier_id
         order by i.created_at desc, i.id`,
@@ -336,6 +497,8 @@ export async function listInstruments(appPool: pg.Pool, actor: SessionUser): Pro
       atDate: e.at_date,
       accountId: e.account_id,
       reason: e.reason,
+      regularizationDeadline: e.deadline,
+      coveringInstrumentId: e.covering,
       early: (e.event === 'deposited' || e.event === 'cleared') && isEarly(e.at_date, r.written_date),
     }));
     const last = events[events.length - 1] as InstrumentEventView;
@@ -351,6 +514,7 @@ export async function listInstruments(appPool: pg.Pool, actor: SessionUser): Pro
       writtenDate: r.written_date,
       receivedDate: r.received_date,
       postDated: r.written_date !== null && isPostDated(r.written_date, r.received_date),
+      clientDisputed: r.client_disputed,
       state: last.event,
       stateDate: last.atDate,
       events,

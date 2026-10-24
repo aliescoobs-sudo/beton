@@ -110,3 +110,27 @@ export const parseDepositInput = (input: unknown): Result<DepositInput, 'INVALID
   const p = depositSchema.safeParse(input);
   return p.success ? ok(p.data) : err('INVALID');
 };
+
+const bounceSchema = z.object({
+  instrumentId: z.uuid(),
+  date,
+  // The bank's fee for the bounce, when the owner knows it (centimes, whole).
+  feeCentimes: z.number().int().positive().safe().nullish(),
+});
+const regularizeSchema = z.object({ instrumentId: z.uuid(), coveringInstrumentId: z.uuid(), date });
+const disputeSchema = z.object({ instrumentId: z.uuid(), reason: text(500), date });
+export type BounceInput = z.infer<typeof bounceSchema>;
+export type RegularizeInput = z.infer<typeof regularizeSchema>;
+export type DisputeInput = z.infer<typeof disputeSchema>;
+export const parseBounceInput = (input: unknown): Result<BounceInput, 'INVALID'> => {
+  const p = bounceSchema.safeParse(input);
+  return p.success ? ok(p.data) : err('INVALID');
+};
+export const parseRegularizeInput = (input: unknown): Result<RegularizeInput, 'INVALID'> => {
+  const p = regularizeSchema.safeParse(input);
+  return p.success ? ok(p.data) : err('INVALID');
+};
+export const parseDisputeInput = (input: unknown): Result<DisputeInput, 'INVALID'> => {
+  const p = disputeSchema.safeParse(input);
+  return p.success ? ok(p.data) : err('INVALID');
+};
