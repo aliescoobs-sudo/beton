@@ -17,6 +17,9 @@ export interface BreakGlassDeps {
 
 const system = { userId: SYSTEM_ACTOR_ID, role: 'system' as const };
 
+/** The stored text of the alert: a fixed sentence, never built from data (it names no client, amount or balance). */
+export const OWNER_2FA_RESET_DETAIL = 'Owner 2FA reset with user:reset-owner-2fa';
+
 async function assertSuperuser(adminUrl: string): Promise<void> {
   const client = new pg.Client({ connectionString: adminUrl, connectionTimeoutMillis: 5000 });
   try {
@@ -50,7 +53,7 @@ export async function resetOwnerTwoFactor(deps: BreakGlassDeps): Promise<{ owner
   await withRlsContext(deps.systemPool, { ...system, requestId: uuidv7(realClock.now()) }, (tx) =>
     tx.query(`insert into security_alert (kind, at, detail) values ('owner_2fa_reset', $1, $2)`, [
       realClock.now(),
-      'Owner 2FA reset with user:reset-owner-2fa',
+      OWNER_2FA_RESET_DETAIL,
     ]),
   );
   return { ownerId };
