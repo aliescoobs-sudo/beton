@@ -8,4 +8,6 @@ export {
   parseBlReturnInput,
   parseCancelLoadInput,
   parseLoadInput,
+  type OpeningStockInput,
+  parseOpeningStockInput,
 } from './load-input';

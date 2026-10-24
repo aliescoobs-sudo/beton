@@ -3,7 +3,7 @@ import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { withRlsContext } from '../src/lib/db/rls-context';
 import { cancelOrder } from '../src/modules/ledger';
-import { createLoad, recordBlReturn } from '../src/modules/operations';
+import { cancelLoad, createLoad, recordBlReturn } from '../src/modules/operations';
 import type { SessionUser } from '../src/modules/platform-security/auth/session-gate';
 import { setParameter } from '../src/modules/platform-security/service/parameter-service';
 import { testEnv } from './db-env';
@@ -251,9 +251,24 @@ describe('cancelling a load: the database rules', () => {
     if (!l.ok) throw new Error('setup');
     const original = await fetch(l.value.id);
     await expect(reverse(users.plant, original)).rejects.toMatchObject({ code: '42501' });
+    await expect(
+      cancelLoad(app, users.plant, { deliveryId: l.value.id, reason: 'erreur de saisie' }, { today: TODAY }),
+    ).rejects.toThrow();
     await expect(reverse(users.owner, original, -1999)).rejects.toMatchObject({ code: '23514' });
-    await reverse(users.partner, original);
+    expect(
+      (
+        await cancelLoad(
+          app,
+          users.partner,
+          { deliveryId: l.value.id, reason: 'chargement erroné' },
+          { today: TODAY },
+        )
+      ).ok,
+    ).toBe(true);
     await expect(reverse(users.owner, original)).rejects.toMatchObject({ code: '23505' });
+    expect(
+      await cancelLoad(app, users.owner, { deliveryId: l.value.id, reason: 'encore' }, { today: TODAY }),
+    ).toEqual({ ok: false, error: 'ALREADY_CANCELLED' });
     const rev = (
       await inCtx(users.owner, (tx) =>
         tx.query<{ id: string }>('select id from delivery where reverses_id = $1', [original.id]),
@@ -263,7 +278,7 @@ describe('cancelling a load: the database rules', () => {
       reverse(users.owner, { ...original, id: rev.id, volume_l: -2000 }, 2000),
     ).rejects.toMatchObject({ code: '23514' });
     // The cancelled load gives its volume back to the order.
-    expect((await load(users.plant, o.id, 10_000 > 8000 ? 8000 : 0)).ok).toBe(true);
+    expect((await load(users.plant, o.id, 8000)).ok).toBe(true);
   });
 
   it('nobody edits or deletes a load or a return', async () => {

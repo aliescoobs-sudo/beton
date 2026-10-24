@@ -695,6 +695,24 @@ export const TABLE_ACCESS = {
     exception:
       'operations O2: the signed-BL return, one row per delivery (A11); plant, office, owner and partner record it, a second attempt is a unique violation.',
   },
+  stock_movement: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'none',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      "operations O3: stock movements in integer base units (no money). A load writes its own, checked line by line against the recette in force and for completeness at commit; cancelling writes reversing movements; the opening stock is the owner's and the partner's. Office does not read stock.",
+  },
   correction_request: {
     kind: 'rls',
     read: {

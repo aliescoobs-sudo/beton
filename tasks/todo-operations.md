@@ -14,7 +14,7 @@ Migration `delivery` (id, bl_no `BL-YYYY-nnnnn`, order_id, truck_id, volume_l, l
 **AC:** AC-OPS-01, AC-OPS-08, AC-OPS-10 (two concurrent returns → exactly one), plant cannot number CMD/FA/ACH, AC-SEC-04 for both tables.
 **Verify:** `pnpm test:integration delivery rls` · **Files:** migration, operations/service/delivery-service.ts, table-access, matrix, tests · **Deps:** O1, ledger L3
 
-### - [ ] O3: Stock movements on a load, levels, opening stock (M)
+### - [x] O3: Stock movements on a load, levels, opening stock (M)
 Migration `stock_movement` (id, component_id, movement_date, qty_base signed, source `delivery|receipt|count_adjustment|opening|reversal`, source_id, reverses_id; insert-only; unique per source and component). `createLoad` writes one movement per recette line in the same transaction from the recette in force on the load date; `cancelLoad` writes the cancelling row and reversing movements; `getStockLevels()`; owner enters opening stock once per component with a date.
 **AC:** AC-OPS-02 end to end, AC-OPS-04, a load without a recette in force is refused, rollback leaves no movement, AC-SEC-04.
 **Verify:** `pnpm test:integration stock-movement rls` · **Files:** migration, service, tests · **Deps:** O2

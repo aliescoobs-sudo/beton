@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type pg from 'pg';
 import { withRlsContext } from '../../src/lib/db/rls-context';
+import { consumptionForLoad } from '../../src/modules/operations';
 
 /** Master data an order needs: an active client, an active concrete type and a list price in force from 2000. */
 export interface OrderMaster {
@@ -355,6 +356,21 @@ export async function insertDelivery(
      values ($1, $2, $3, $4, $5, '2026-06-01', $6, $7)`,
     [id, blNo, scene.orderId, scene.truckId, volumeL, scene.recetteId, actorId],
   );
+  // The stock the load takes out, from the recette in force (what the service does), or the commit is refused.
+  const lines = await tx.query<{ component_id: string; qty_per_m3: string }>(
+    `select component_id, qty_per_m3::text from recette_line where recette_id = $1`,
+    [scene.recetteId],
+  );
+  for (const q of consumptionForLoad(
+    lines.rows.map((l) => ({ componentId: l.component_id, qtyPerM3: Number(l.qty_per_m3) })),
+    volumeL,
+  ).filter((x) => x.qtyBase !== 0)) {
+    await tx.query(
+      `insert into stock_movement (id, component_id, movement_date, qty_base, source, source_id, created_by)
+       values (gen_random_uuid(), $1, '2026-06-01', $2, 'delivery', $3, $4)`,
+      [q.componentId, -q.qtyBase, id, actorId],
+    );
+  }
   return { id, blNo };
 }
 

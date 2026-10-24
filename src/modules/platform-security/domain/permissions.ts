@@ -87,10 +87,14 @@ export const PERMISSIONS = {
   // Deliveries / BL (✅ A11)
   'deliveries.read': ALL,
   'deliveries.write': PLANT,
+  // Cancelling a load writes a reversing row and reversing stock movements: managers
+  'deliveries.cancel': MANAGERS,
   'deliveries.bl_return': ['owner', 'partner', 'office', 'plant'],
   // Stock movements, physical count, plant import
   'stock.read': PLANT_READ,
   'stock.write': PLANT,
+  // The opening stock of a component (entered once, with a date)
+  'stock.opening': MANAGERS,
   'reconciliation.close': MANAGERS,
   // Derived figures
   'margins.read': MONEY_READ,

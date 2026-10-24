@@ -10,7 +10,8 @@ import {
   require,
   type SessionUser,
 } from '@/modules/platform-security';
-import { parseBlReturnInput, parseLoadInput } from '../domain/load-input';
+import { consumptionForLoad } from '../domain/consumption';
+import { parseBlReturnInput, parseCancelLoadInput, parseLoadInput } from '../domain/load-input';
 import { remainingVolume } from '../domain/stock';
 import { tripExceedsLimit } from '../domain/trip';
 
@@ -138,9 +139,114 @@ export async function createLoad(
          values ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [id, blNo, v.orderId, v.truckId, volumeL, deps.today, recetteId, actor.id],
       );
+      await writeLoadMovements(tx, actor, { id, recetteId, volumeL, date: deps.today });
       return ok({ id, blNo, volumeL, warnings });
     });
   } catch (error) {
+    return err(deliveryFailure(error));
+  }
+}
+
+/**
+ * The stock a load takes out: every line of the recette in force times the volume (domain/consumption.ts, one rounding
+ * per line), written in the load's own transaction. A line that rounds to nothing writes nothing.
+ */
+async function writeLoadMovements(
+  tx: pg.PoolClient,
+  actor: SessionUser,
+  load: { id: string; recetteId: string; volumeL: number; date: string },
+): Promise<void> {
+  const lines = await tx.query<{ component_id: string; qty_per_m3: string }>(
+    `select component_id, qty_per_m3::text from recette_line where recette_id = $1 order by component_id`,
+    [load.recetteId],
+  );
+  const taken = consumptionForLoad(
+    lines.rows.map((l) => ({ componentId: l.component_id, qtyPerM3: Number(l.qty_per_m3) })),
+    load.volumeL,
+  ).filter((q) => q.qtyBase !== 0);
+  for (const q of taken) {
+    await tx.query(
+      `insert into stock_movement (id, component_id, movement_date, qty_base, source, source_id, created_by)
+       values ($1, $2, $3, $4, 'delivery', $5, $6)`,
+      [randomUUID(), q.componentId, load.date, -q.qtyBase, load.id, actor.id],
+    );
+  }
+}
+
+export interface CancelledLoad {
+  id: string;
+  blNo: string;
+}
+
+/**
+ * Owner or partner cancels a load (AC-OPS-04): a reversing delivery row with its own BL number, and reversing stock
+ * movements for every movement of the load. The original rows are untouched; the volume goes back to the order.
+ */
+export async function cancelLoad(
+  appPool: pg.Pool,
+  actor: SessionUser,
+  input: unknown,
+  deps: { today: string },
+): Promise<Result<CancelledLoad, DeliveryError | 'ALREADY_CANCELLED'>> {
+  await require(appPool, actor, 'deliveries.cancel');
+  const parsed = parseCancelLoadInput(input);
+  if (!parsed.ok) return err('INVALID');
+  const v = parsed.value;
+  try {
+    return await inRequest(
+      appPool,
+      actor,
+      async (tx): Promise<Result<CancelledLoad, DeliveryError | 'ALREADY_CANCELLED'>> => {
+        const original = await tx.query<{
+          order_id: string;
+          truck_id: string;
+          recette_id: string;
+          volume_l: number;
+          reverses_id: string | null;
+          cancelled: boolean;
+        }>(
+          `select d.order_id, d.truck_id, d.recette_id, d.volume_l, d.reverses_id,
+                exists (select 1 from delivery r where r.reverses_id = d.id) as cancelled
+           from delivery d where d.id = $1`,
+          [v.deliveryId],
+        );
+        const o = original.rows[0];
+        if (!o || o.reverses_id) return err('NOT_FOUND');
+        if (o.cancelled) return err('ALREADY_CANCELLED');
+        const id = randomUUID();
+        const blNo = await nextDocNumber(tx, 'BL', deps.today);
+        await tx.query(
+          `insert into delivery (id, bl_no, order_id, truck_id, volume_l, load_date, recette_id, reverses_id, reason, created_by)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+          [
+            id,
+            blNo,
+            o.order_id,
+            o.truck_id,
+            -o.volume_l,
+            deps.today,
+            o.recette_id,
+            v.deliveryId,
+            v.reason,
+            actor.id,
+          ],
+        );
+        const moved = await tx.query<{ id: string; component_id: string; qty_base: string }>(
+          `select id, component_id, qty_base::text from stock_movement where source = 'delivery' and source_id = $1`,
+          [v.deliveryId],
+        );
+        for (const m of moved.rows) {
+          await tx.query(
+            `insert into stock_movement (id, component_id, movement_date, qty_base, source, source_id, reverses_id, reason, created_by)
+           values ($1, $2, $3, $4, 'reversal', $5, $6, $7, $8)`,
+            [randomUUID(), m.component_id, deps.today, -Number(m.qty_base), id, m.id, v.reason, actor.id],
+          );
+        }
+        return ok({ id, blNo });
+      },
+    );
+  } catch (error) {
+    if (isUniqueViolation(error)) return err('ALREADY_CANCELLED');
     return err(deliveryFailure(error));
   }
 }

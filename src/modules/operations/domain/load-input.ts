@@ -22,6 +22,13 @@ const cancelSchema = z.object({
     .pipe(z.string().min(3).max(500)),
 });
 
+const openingSchema = z.object({
+  componentId: z.uuid(),
+  // Integer base units (g, mL or L), positive: a component with nothing in stock needs no opening row.
+  qtyBase: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),
+  date: dateText,
+});
+export type OpeningStockInput = z.infer<typeof openingSchema>;
 export type LoadInput = z.infer<typeof loadSchema>;
 export type BlReturnInput = z.infer<typeof returnSchema>;
 export type CancelLoadInput = z.infer<typeof cancelSchema>;
@@ -35,3 +42,4 @@ const parse =
 export const parseLoadInput = parse(loadSchema);
 export const parseBlReturnInput = parse(returnSchema);
 export const parseCancelLoadInput = parse(cancelSchema);
+export const parseOpeningStockInput = parse(openingSchema);

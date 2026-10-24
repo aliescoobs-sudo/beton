@@ -235,6 +235,15 @@ const FIXTURES: Record<
     visible: `select r.created_by::text as owner from delivery_return r join delivery d on d.id = r.delivery_id
                 where d.bl_no like 'BL-2098-%' and $1::text is not null`,
   },
+  stock_movement: {
+    // Written with a load (plant, owner, partner); numbered in 2097 so the query finds only these, one cement movement each.
+    writers: ['owner', 'partner', 'plant'],
+    seed: async (tx, actor) =>
+      insertDelivery(tx, actor, await deliveryScene(app, actors.owner, marker), 77, 2097),
+    visible: `select m.created_by::text as owner from stock_movement m join delivery d on d.id = m.source_id
+                where d.bl_no like 'BL-2097-%' and m.component_id = (select id from component where lower(name_fr) = 'ciment')
+                  and $1::text is not null`,
+  },
   ledger_opening: {
     // A singleton: the first writer enters it, later inserts do nothing. The others are refused by the policy.
     writers: ['owner'],
