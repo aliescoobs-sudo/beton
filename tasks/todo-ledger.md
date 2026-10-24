@@ -134,7 +134,7 @@ Statement tab on the client and supplier pages (owner and support; the Comptes l
 **Verify:** `pnpm exec playwright test e2e/ledger-statement.spec.ts` · **Files:** pages, ledger/ui/statement/*, lib/csv.ts + test, messages, e2e · **Deps:** L27
 
 ### Checkpoint CP-L3: Instruments and statements
-- [ ] AC-LED-03 (instruments), 04, 05, 06, 07, 14, 19, 20, 21 (orders and instruments part) green; office cannot read money tables; both locales render
+- [x] AC-LED-03 (instruments), 04, 05, 06, 07, 14, 19, 20, 21 (orders and instruments part) green (note: docs/checkpoints/CP-L3.md); office cannot read money tables; both locales render
 
 ## Phase 3: Invoices (law 69-21)
 
