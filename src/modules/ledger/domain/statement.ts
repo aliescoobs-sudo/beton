@@ -5,7 +5,8 @@ import { addCentimes, type Centimes, centimes, sumCentimes } from '@/lib/money';
 // the financial side: what was paid). Pure: the service reads the rows, this arranges and adds them up.
 
 export type StatementSection = 'commercial' | 'financial';
-export type StatementLineType = 'opening' | 'order' | 'order_cancelled' | 'payment';
+export type StatementLineType =
+  'opening' | 'order' | 'order_cancelled' | 'invoice' | 'credit_note' | 'payment';
 export type LineStatus =
   | 'booked'
   | 'cancelled'
@@ -55,7 +56,7 @@ export interface StatementSummary {
   ordered: Centimes;
   /** Orders that were cancelled. */
   cancelled: Centimes;
-  /** Invoiced and delivered come with invoices and deliveries; until then they are zero. */
+  /** Invoices net of their credit notes (an invoice is a document on top of the order: it never moves the balance). */
   invoiced: Centimes;
   /** Payments cleared. */
   paid: Centimes;
@@ -130,7 +131,7 @@ export function buildStatement(
     summary: {
       ordered: total((l) => l.type === 'order' && l.status !== 'cancelled'),
       cancelled: total((l) => l.type === 'order' && l.status === 'cancelled'),
-      invoiced: zero,
+      invoiced: total((l) => l.type === 'invoice' || l.type === 'credit_note'),
       paid: negate(total((l) => l.type === 'payment' && l.status === 'cleared')),
       pending: negate(
         total((l) => l.type === 'payment' && ['received', 'deposited', 'issued'].includes(l.status)),
@@ -144,7 +145,14 @@ export function buildStatement(
 
 const negate = (a: Centimes): Centimes => centimes(-Number(a));
 
-const TYPES: readonly StatementLineType[] = ['opening', 'order', 'order_cancelled', 'payment'];
+const TYPES: readonly StatementLineType[] = [
+  'opening',
+  'order',
+  'order_cancelled',
+  'invoice',
+  'credit_note',
+  'payment',
+];
 const STATUSES: readonly LineStatus[] = [
   'booked',
   'cancelled',

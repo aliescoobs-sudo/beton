@@ -8,7 +8,7 @@ import {
   require,
   type SessionUser,
 } from '@/modules/platform-security';
-import { parseOpeningStockInput } from '../domain/load-input';
+import { parseOpeningStockInput, parseThresholdInput } from '../domain/load-input';
 import { stockStatus, type StockStatus } from '../domain/stock';
 
 export interface StockLevel {
@@ -27,8 +27,17 @@ export interface StockLevel {
 export async function getStockLevels(appPool: pg.Pool, actor: SessionUser): Promise<StockLevel[]> {
   await require(appPool, actor, 'stock.read');
   const { rows } = await inRequest(appPool, actor, (tx) =>
-    tx.query<{ id: string; name_fr: string; name_ar: string; base_unit: string; level: string }>(
-      `select c.id, c.name_fr, c.name_ar, c.base_unit, coalesce(sum(m.qty_base), 0)::text as level
+    tx.query<{
+      id: string;
+      name_fr: string;
+      name_ar: string;
+      base_unit: string;
+      level: string;
+      low: string | null;
+    }>(
+      `select c.id, c.name_fr, c.name_ar, c.base_unit, coalesce(sum(m.qty_base), 0)::text as level,
+              (select t.low_qty_base::text from stock_threshold t where t.component_id = c.id
+                order by t.created_at desc, t.id desc limit 1) as low
          from component c left join stock_movement m on m.component_id = c.id
         where c.status = 'active' group by c.id order by c.code`,
     ),
@@ -39,8 +48,8 @@ export async function getStockLevels(appPool: pg.Pool, actor: SessionUser): Prom
     nameAr: r.name_ar,
     baseUnit: r.base_unit,
     level: Number(r.level),
-    lowThreshold: null,
-    status: stockStatus(Number(r.level), null),
+    lowThreshold: r.low === null ? null : Number(r.low),
+    status: stockStatus(Number(r.level), r.low === null ? null : Number(r.low)),
   }));
 }
 
@@ -68,6 +77,33 @@ export async function setOpeningStock(
     return ok({ id });
   } catch (error) {
     if (isUniqueViolation(error)) return err('ALREADY_ENTERED');
+    const e = error as { code?: string };
+    if (e.code === '23503' || isMalformedId(error)) return err('NOT_FOUND');
+    throw error;
+  }
+}
+
+export type ThresholdError = 'INVALID' | 'NOT_FOUND';
+
+/** The level below which a component is "low": a new row, the latest one is in force. Owner or partner. */
+export async function setStockThreshold(
+  appPool: pg.Pool,
+  actor: SessionUser,
+  input: unknown,
+): Promise<Result<{ id: string }, ThresholdError>> {
+  await require(appPool, actor, 'stock.threshold');
+  const parsed = parseThresholdInput(input);
+  if (!parsed.ok) return err('INVALID');
+  const id = randomUUID();
+  try {
+    await inRequest(appPool, actor, (tx) =>
+      tx.query(
+        `insert into stock_threshold (id, component_id, low_qty_base, created_by) values ($1, $2, $3, $4)`,
+        [id, parsed.value.componentId, parsed.value.lowQtyBase, actor.id],
+      ),
+    );
+    return ok({ id });
+  } catch (error) {
     const e = error as { code?: string };
     if (e.code === '23503' || isMalformedId(error)) return err('NOT_FOUND');
     throw error;

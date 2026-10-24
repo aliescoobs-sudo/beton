@@ -110,6 +110,12 @@ const GROUPS: GroupDef[] = [
         allowed: 'deliveries.read',
       },
       {
+        path: '/receipts',
+        labelKey: 'operations.receipts.link',
+        testId: 'receipts-link',
+        allowed: 'receipts.read',
+      },
+      {
         path: '/stock',
         labelKey: 'operations.stock.link',
         testId: 'stock-link',

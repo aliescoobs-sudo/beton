@@ -10,9 +10,12 @@ import { testEnv } from './db-env';
 import { realActor, realSessionUser, type TestActor } from './helpers/actors';
 import {
   allocationScene,
+  deliveryScene,
+  newDelivery,
   ensureOpening,
   insertInstrument,
   insertMovementReversal,
+  insertInvoice,
   insertOrder,
   insertPurchase,
   moneyMaster,
@@ -117,6 +120,17 @@ const SEED: Record<MoneyTable, (tx: pg.PoolClient, actor: string) => Promise<unk
     insertPurchase(tx, actor, await purchaseMaster(app, actors.owner.id, marker)),
   purchase_plan_item: async (tx, actor) =>
     insertPurchase(tx, actor, await purchaseMaster(app, actors.owner.id, marker)),
+  // Invoice and lines are written together, by the same actors; each writer invoices a load of its own.
+  invoice: async (tx, actor) => {
+    const scene = await deliveryScene(app, actors.owner.id, marker);
+    const delivery = await newDelivery(app, actors.owner.id, marker, scene, 50, 2098);
+    return insertInvoice(tx, actor, scene, delivery, `dl${marker}`);
+  },
+  invoice_line: async (tx, actor) => {
+    const scene = await deliveryScene(app, actors.owner.id, marker);
+    const delivery = await newDelivery(app, actors.owner.id, marker, scene, 50, 2098);
+    return insertInvoice(tx, actor, scene, delivery, `dl${marker}`);
+  },
   selling_price: async (tx, actor) => {
     const type = await tx.query<{ id: string }>(
       `insert into concrete_type (id, code, label) values (gen_random_uuid(), 'V' || upper(substr(md5(random()::text), 1, 8)), $1) returning id`,

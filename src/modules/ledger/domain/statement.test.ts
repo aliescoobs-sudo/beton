@@ -161,3 +161,21 @@ describe('statementToCsv', () => {
     expect(csv.split('\r\n')[0]).toContain("'=HYPERLINK");
   });
 });
+
+describe('invoices in a statement (AC-LED-19)', () => {
+  const withInvoices: StatementLine[] = [
+    line('o1', '2026-08-10', 'order', 1_000_000, 'booked'),
+    line('f1', '2026-08-31', 'invoice', 1_000_000, 'cancelled', false),
+    line('a1', '2026-09-02', 'credit_note', -1_000_000, 'booked', false),
+    line('f2', '2026-09-03', 'invoice', 600_000, 'booked', false),
+  ];
+  const s = buildStatement(withInvoices, [], TODAY);
+  it('are documents on top of the order: listed in the commercial section, never added to the balance', () => {
+    expect(s.commercial.map((r) => r.id)).toEqual(['o1', 'f1', 'a1', 'f2']);
+    expect(s.commercial.map((r) => r.balanceAfter)).toEqual([1_000_000, 1_000_000, 1_000_000, 1_000_000]);
+    expect(s.closing).toBe(1_000_000);
+  });
+  it('the summary shows what was invoiced, net of credit notes', () => {
+    expect(s.summary.invoiced).toBe(600_000);
+  });
+});

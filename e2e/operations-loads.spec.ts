@@ -3,7 +3,12 @@ import { randomUUID } from 'node:crypto';
 import pg from 'pg';
 import { E2E_DATABASE } from '../scripts/db-bootstrap';
 import { testEnv } from '../tests/db-env';
-import { deliveryScene, type DeliveryScene } from '../tests/helpers/ledger-fixtures';
+import {
+  deliveryScene,
+  type DeliveryScene,
+  newReceivablePurchase,
+  purchaseMaster,
+} from '../tests/helpers/ledger-fixtures';
 import { E2E_MD, goNav, loginAndEnrol, logout } from './fixtures';
 
 // operations O4: the plant loads an order from the day's list; no price, total or client contact anywhere on the screens.
@@ -42,13 +47,25 @@ test('the plant loads an order, gets a BL number, marks the signed BL back, and 
   await expect(page.locator('body')).not.toContainText(/MAD|DH|\d\s?\d{3},\d{2}/);
 
   await page.getByTestId(`note-link-${blNo}`).click();
-  await expect(page.getByTestId('delivery-note')).toContainText(blNo);
+  await expect(page.getByRole('heading', { level: 1 })).toContainText(blNo);
   await expect(page.getByTestId('delivery-note')).toContainText(orderCode);
   await expect(page.getByTestId('delivery-note')).toContainText('Signature du chauffeur');
   await expect(page.locator('body')).not.toContainText(/MAD|DH|\d\s?\d{3},\d{2}/);
   await page.goto('/fr/loads');
 
+  // A purchase to receive: quantities only, the stock goes up by 30 t.
+  const owner = (await migrator.query<{ id: string }>(`select id from "user" where role = 'owner'`)).rows[0];
+  const marker = `e2ers${randomUUID().replace(/-/g, '').slice(0, 8)}`;
+  const master = await purchaseMaster(app, owner?.id as string, marker);
+  const purchase = await newReceivablePurchase(app, owner?.id as string, master, marker);
+  await goNav(page, 'receipts-link');
+  await expect(page.getByTestId(`purchase-${purchase.code}`)).toBeVisible();
+  await expect(page.locator('body')).not.toContainText(/MAD|DH|\d\s?\d{3},\d{2}|F-20/);
+  await page.getByTestId(`receive-${purchase.code}`).click();
+  await expect(page.getByTestId(`purchase-${purchase.code}`)).toContainText('Reçu le');
+
   await goNav(page, 'stock-link');
+  await expect(page.getByTestId(`stock-${master.componentId}`)).toContainText('30 000 kg');
   await expect(page).toHaveURL('/fr/stock');
   await expect(page.getByTestId('stock-levels')).toBeVisible();
   await logout(page);

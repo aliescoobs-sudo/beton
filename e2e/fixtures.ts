@@ -104,6 +104,7 @@ const NAV_GROUP: Record<string, string> = {
   'trucks-link': 'production',
   'loads-link': 'production',
   'stock-link': 'production',
+  'receipts-link': 'production',
   'accounts-link': 'finance',
   'cash-link': 'finance',
   'statements-link': 'finance',

@@ -13,9 +13,11 @@ import {
   ensureOpening,
   insertInstrument,
   insertMovementReversal,
+  insertInvoice,
   insertOrder,
   insertPurchase,
   moneyMaster,
+  newReceivablePurchase,
   newCashMovement,
   orderMaster,
   purchaseMaster,
@@ -313,6 +315,46 @@ const FIXTURES: Record<
     seed: async () => undefined,
     visible: `select i.created_by::text as owner from purchase_plan_item i join purchase p on p.id = i.purchase_id
                 join supplier s on s.id = p.supplier_id where s.name = 'ps' || $1`,
+  },
+  purchase_receipt: {
+    // Only record_receipt() writes it (owner, partner, plant); every writer receives a purchase of its own.
+    writers: ['owner', 'partner', 'plant'],
+    seed: async (tx, actor) => {
+      const pm = await purchaseMaster(app, actors.owner, marker);
+      const p = await newReceivablePurchase(app, actors.owner, pm, marker);
+      return tx.query(`select public.record_receipt($1, '2026-06-02')`, [p.id]);
+    },
+    // Through the quantities view: partner and plant read no purchase table.
+    visible: `select r.created_by::text as owner from purchase_receipt r join purchase_line_ops o on o.purchase_id = r.purchase_id
+                where o.name_fr = 'ps' || $1`,
+  },
+  stock_threshold: {
+    writers: ['owner', 'partner'],
+    seed: async (tx, actor) => {
+      const pm = await purchaseMaster(app, actors.owner, marker);
+      return tx.query(
+        `insert into stock_threshold (id, component_id, low_qty_base, created_by) values (gen_random_uuid(), $1, 1000, $2)`,
+        [pm.componentId, actor],
+      );
+    },
+    visible: `select t.created_by::text as owner from stock_threshold t join component c on c.id = t.component_id
+                where c.name_fr = 'ps' || $1`,
+  },
+  invoice: {
+    writers: ['owner', 'office'],
+    seed: async (tx, actor) => {
+      const scene = await deliveryScene(app, actors.owner, marker);
+      const delivery = await newDelivery(app, actors.owner, marker, scene, 50, 2098);
+      return insertInvoice(tx, actor, scene, delivery, `dl${marker}`);
+    },
+    visible: `select i.created_by::text as owner from invoice i where i.client_name = 'dl' || $1`,
+  },
+  invoice_line: {
+    // Written together with their invoice by the same actors (seeded by the invoice fixture above).
+    writers: ['owner', 'office'],
+    seed: async () => undefined,
+    visible: `select l.created_by::text as owner from invoice_line l join invoice i on i.id = l.invoice_id
+                where i.client_name = 'dl' || $1`,
   },
   doc_sequence: {
     // Written only through next_doc_number(): owner and office may call it. Persistent by design, like code_sequence.

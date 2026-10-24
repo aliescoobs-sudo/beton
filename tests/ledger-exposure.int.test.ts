@@ -69,10 +69,12 @@ describe('functions the application role can execute', () => {
     'public.allocate_to_order(p_instrument uuid, p_order_code text)',
     'public.default_cash_account()',
     'public.delivery_note(p_delivery uuid)',
+    'public.invoice_source(p_order uuid)',
     'public.ledger_parameter(p_key text)',
     'public.next_code(p_key text, p_width integer)',
     'public.ops_parameter(p_key text)',
     'public.next_doc_number(p_prefix text, p_year integer, p_width integer)',
+    'public.record_receipt(p_purchase uuid, p_date date)',
     'public.resolve_selling_price(p_type uuid, p_client uuid, p_date date)',
   ];
 

@@ -2,8 +2,11 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { getPool } from '@/lib/db/pools';
 import { getStockLevels } from '@/modules/operations';
 import { formatStockQty } from '@/modules/operations/ui/format';
+import { ThresholdForm } from '@/modules/operations/ui/threshold-form';
+import { can } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/next';
 import { EmptyState, PageHeader, StatusPill, Table, Td, Th } from '@/ui';
+import { thresholdAction } from './actions';
 
 /** Stock of every component, summed from its movements, with its status against the low threshold. Quantities only. */
 export default async function StockPage({ params }: { params: Promise<{ locale: string }> }) {
@@ -11,6 +14,7 @@ export default async function StockPage({ params }: { params: Promise<{ locale: 
   setRequestLocale(locale);
   const user = await requirePagePermission(locale, 'stock.read');
   const levels = await getStockLevels(getPool('app'), user);
+  const canSet = can(user.role, 'stock.threshold');
   const t = await getTranslations('operations.stock');
   return (
     <div>
@@ -25,6 +29,7 @@ export default async function StockPage({ params }: { params: Promise<{ locale: 
               <Th numeric>{t('level')}</Th>
               <Th numeric>{t('threshold')}</Th>
               <Th>{t('status')}</Th>
+              {canSet && <Th>{t('setThreshold')}</Th>}
             </tr>
           </thead>
           <tbody>
@@ -43,6 +48,15 @@ export default async function StockPage({ params }: { params: Promise<{ locale: 
                       {t(`statuses.${l.status}`)}
                     </StatusPill>
                   </Td>
+                  {canSet && (
+                    <Td>
+                      <ThresholdForm
+                        componentId={l.componentId}
+                        baseUnit={l.baseUnit}
+                        save={thresholdAction}
+                      />
+                    </Td>
+                  )}
                 </tr>
               );
             })}

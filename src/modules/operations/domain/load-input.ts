@@ -28,6 +28,17 @@ const openingSchema = z.object({
   qtyBase: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),
   date: dateText,
 });
+const receiptSchema = z.object({
+  purchaseId: z.uuid(),
+  /** Defaults to today in the service. */
+  receivedDate: dateText.nullish(),
+});
+const thresholdSchema = z.object({
+  componentId: z.uuid(),
+  lowQtyBase: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),
+});
+export type ReceiptInput = z.infer<typeof receiptSchema>;
+export type ThresholdInput = z.infer<typeof thresholdSchema>;
 export type OpeningStockInput = z.infer<typeof openingSchema>;
 export type LoadInput = z.infer<typeof loadSchema>;
 export type BlReturnInput = z.infer<typeof returnSchema>;
@@ -43,3 +54,5 @@ export const parseLoadInput = parse(loadSchema);
 export const parseBlReturnInput = parse(returnSchema);
 export const parseCancelLoadInput = parse(cancelSchema);
 export const parseOpeningStockInput = parse(openingSchema);
+export const parseReceiptInput = parse(receiptSchema);
+export const parseThresholdInput = parse(thresholdSchema);

@@ -559,6 +559,48 @@ export const TABLE_ACCESS = {
     exception:
       'ledger L20: insert-only outgoing plan items; the sum equals the purchase total is a deferred constraint trigger. Same visibility as purchase.',
   },
+  invoice: {
+    kind: 'rls',
+    seed: 'insert',
+    money: true,
+    blindWriters: ['office'],
+    read: {
+      owner: 'all',
+      partner: 'none',
+      office: 'none',
+      plant: 'none',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'ledger L17: insert-only invoices (FA numbers from the gapless document counter; a credit note is a reversing row with its own number). Owner and support read; office inserts and cannot read back. The client name and ICE and the VAT rate are copied at creation; due date at most 120 days (law 69-21); the order, client, VAT and a load invoiced once are checked by triggers.',
+  },
+  invoice_line: {
+    kind: 'rls',
+    seed: 'insert',
+    money: true,
+    blindWriters: ['office'],
+    read: {
+      owner: 'all',
+      partner: 'none',
+      office: 'none',
+      plant: 'none',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'ledger L17: insert-only invoice lines, one per load (volume x the order unit price, rounded once, checked by a trigger; the sum equals the invoice total HT at commit). Same visibility as invoice.',
+  },
   money_account: {
     kind: 'rls',
     seed: 'insert',
@@ -775,6 +817,43 @@ export const TABLE_ACCESS = {
     insertOnly: true,
     exception:
       "operations O3: stock movements in integer base units (no money). A load writes its own, checked line by line against the recette in force and for completeness at commit; cancelling writes reversing movements; the opening stock is the owner's and the partner's. Office does not read stock.",
+  },
+  purchase_receipt: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'none',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'ledger L21 / operations O5: the receipt of a purchase, once (unique per purchase). No INSERT grant for the application: only public.record_receipt() writes it (owner, partner, plant; a reviewed SECURITY DEFINER function that returns the id and no amount), together with the stock movements, which the database checks against the purchase lines and for completeness at commit. Quantities only, so no money flag; office reads nothing.',
+  },
+  stock_threshold: {
+    kind: 'rls',
+    seed: 'insert',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'none',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'operations O5: low-stock threshold per component in base units (insert-only, the latest row is in force). Owner and partner write; owner, partner, plant and support read; no money.',
   },
   correction_request: {
     kind: 'rls',

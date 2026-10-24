@@ -93,8 +93,12 @@ export const PERMISSIONS = {
   // Stock movements, physical count, plant import
   'stock.read': PLANT_READ,
   'stock.write': PLANT,
-  // The opening stock of a component (entered once, with a date)
+  // The opening stock of a component (entered once, with a date), and the low-stock threshold per component
   'stock.opening': MANAGERS,
+  'stock.threshold': MANAGERS,
+  // Receiving a purchase puts its stocked lines into the stock; quantities only, no amount
+  'receipts.read': PLANT_READ,
+  'receipts.write': PLANT,
   'reconciliation.close': MANAGERS,
   // Derived figures
   'margins.read': MONEY_READ,

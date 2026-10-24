@@ -106,3 +106,12 @@ export {
   purchaseDueDate,
   type PurchaseTotals,
 } from './purchase';
+export {
+  computeInvoiceTotals,
+  type InvoiceDueError,
+  invoiceDueDate,
+  type InvoiceInput,
+  invoiceIssueDeadline,
+  type InvoiceTotals,
+  parseInvoiceInput,
+} from './invoice';

@@ -72,6 +72,34 @@ async function loadParties(tx: Tx, kind: PartyKind, ids: readonly string[]): Pro
         counted: true,
       });
     }
+    const invoices = await tx.query<{
+      id: string;
+      client_id: string;
+      number: string;
+      total: string;
+      date: string;
+      credit: boolean;
+      cancelled: boolean;
+    }>(
+      `select i.id, i.client_id, i.number, i.total_ttc_centimes::text as total, to_char(i.invoice_date, 'YYYY-MM-DD') as date,
+              (i.credit_note_of is not null) as credit,
+              exists (select 1 from invoice c where c.credit_note_of = i.id) as cancelled
+         from invoice i where i.client_id = any($1)`,
+      [ids],
+    );
+    // An invoice documents what the order already booked: shown in the commercial section, never added to the balance.
+    for (const i of invoices.rows) {
+      data.get(i.client_id)?.lines.push({
+        id: `invoice-${i.id}`,
+        section: 'commercial',
+        date: i.date,
+        type: i.credit ? 'credit_note' : 'invoice',
+        code: i.number,
+        status: i.cancelled ? 'cancelled' : 'booked',
+        amountCentimes: centimes(Number(i.total)),
+        counted: false,
+      });
+    }
     const items = await tx.query<{ client_id: string; due: string; amount: string; covered: string }>(
       `select o.client_id, to_char(i.due_date, 'YYYY-MM-DD') as due, i.amount_centimes::text as amount,
               coalesce((select sum(a.amount_centimes) from allocation a where a.payment_plan_item_id = i.id), 0)::text as covered

@@ -115,11 +115,13 @@ export function StatementView({
           <span className="field-label">{t('type')}</span>
           <select name="type" defaultValue={filter.type} className="input mt-1" data-testid="filter-type">
             <option value="">—</option>
-            {(['opening', 'order', 'order_cancelled', 'payment'] as const).map((x) => (
-              <option key={x} value={x}>
-                {t(`types.${x}`)}
-              </option>
-            ))}
+            {(['opening', 'order', 'order_cancelled', 'invoice', 'credit_note', 'payment'] as const).map(
+              (x) => (
+                <option key={x} value={x}>
+                  {t(`types.${x}`)}
+                </option>
+              ),
+            )}
           </select>
         </label>
         <label className="block">

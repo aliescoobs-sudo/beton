@@ -264,4 +264,4 @@ export async function listPurchases(appPool: pg.Pool, actor: SessionUser): Promi
 }
 
 /** SQL fragment: the purchase has its receipt (L21). Defined here so the list and the receipt view agree. */
-export const RECEIVED_SQL = `false`;
+export const RECEIVED_SQL = `exists (select 1 from purchase_receipt r where r.purchase_id = p.id)`;

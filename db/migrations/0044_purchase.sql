@@ -268,7 +268,7 @@ $$;
 -- invoice number, due date or plan). Services (transport, fuel) are not listed: nothing to put in the stock.
 CREATE VIEW public.purchase_line_ops AS
   SELECT p.id AS purchase_id, p.code, s.code AS supplier_code, p.order_date, l.id AS line_id, l.seq,
-         c.id AS component_id, c.name_fr, c.name_ar, u.label AS unit_label, l.qty_milli,
+         c.id AS component_id, c.name_fr, c.name_ar, u.label AS unit_label, u.factor_to_base, l.qty_milli,
          EXISTS (SELECT 1 FROM public.purchase r WHERE r.reverses_id = p.id) AS is_reversed
     FROM public.purchase p
     JOIN public.supplier s ON s.id = p.supplier_id

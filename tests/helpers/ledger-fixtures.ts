@@ -457,3 +457,54 @@ export async function insertPurchase(
   );
   return { id, code };
 }
+
+/**
+ * A fresh purchase (30 t of the master's component) nobody has received yet, made by the owner for a supplier of its own
+ * (`rc<marker>`), so that fixtures counting the master supplier's purchases are not disturbed.
+ */
+export async function newReceivablePurchase(
+  app: pg.Pool,
+  ownerId: string,
+  master: PurchaseMaster,
+  marker: string,
+): Promise<{ id: string; code: string }> {
+  return withRlsContext(app, { userId: ownerId, role: 'owner', requestId: marker }, async (tx) => {
+    const supplier = await tx.query<{ id: string }>(
+      `insert into supplier (id, code, name, category) values (gen_random_uuid(), public.next_code('FRN', 2), $1, 'cement') returning id`,
+      [`rc${marker}${randomUUID().slice(0, 8)}`],
+    );
+    return insertPurchase(tx, ownerId, { ...master, supplierId: supplier.rows[0]?.id as string });
+  });
+}
+
+/**
+ * Invoices one load of the delivery scene's order (unit price 780,00 per m³, VAT 2000 bp), the way the service does: number
+ * from next_doc_number, no RETURNING. For `volumeL` = 50: line HT 39,00, VAT 7,80, TTC 46,80. Run it inside the actor's
+ * transaction; the load must be that of `delivery`.
+ */
+export async function insertInvoice(
+  tx: pg.PoolClient,
+  actorId: string,
+  scene: Pick<DeliveryScene, 'orderId' | 'clientId'>,
+  delivery: { id: string; blNo: string },
+  clientName: string,
+  volumeL = 50,
+): Promise<{ id: string; number: string }> {
+  const id = randomUUID();
+  const number = (await tx.query<{ n: string }>(`select public.next_doc_number('FA', 2026, 5) as n`)).rows[0]
+    ?.n as string;
+  const ht = Math.round((78_000 * volumeL) / 1000);
+  const vat = Math.round((ht * 2000) / 10_000);
+  await tx.query(
+    `insert into invoice (id, number, order_id, client_id, client_name, invoice_date, issue_deadline, due_date, vat_rate_bp,
+                          total_ht_centimes, total_vat_centimes, total_ttc_centimes, created_by)
+     values ($1, $2, $3, $4, $5, '2026-06-02', '2026-06-30', '2026-08-01', 2000, $6, $7, $8, $9)`,
+    [id, number, scene.orderId, scene.clientId, clientName, ht, vat, ht + vat, actorId],
+  );
+  await tx.query(
+    `insert into invoice_line (id, invoice_id, seq, delivery_id, description, volume_l, unit_price_ht_centimes, line_ht_centimes, created_by)
+     values (gen_random_uuid(), $1, 1, $2, $3, $4, 78000, $5, $6)`,
+    [id, delivery.id, `BL ${delivery.blNo}`, volumeL, ht, actorId],
+  );
+  return { id, number };
+}

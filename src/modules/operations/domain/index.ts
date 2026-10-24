@@ -10,4 +10,8 @@ export {
   parseLoadInput,
   type OpeningStockInput,
   parseOpeningStockInput,
+  parseReceiptInput,
+  parseThresholdInput,
+  type ReceiptInput,
+  type ThresholdInput,
 } from './load-input';

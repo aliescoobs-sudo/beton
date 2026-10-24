@@ -17,6 +17,15 @@ export {
   type PurchaseError,
   type PurchaseView,
 } from './service/purchase-service';
+export {
+  cancelInvoice,
+  type CancelInvoiceError,
+  createInvoice,
+  type CreatedInvoice,
+  type InvoiceError,
+  type InvoiceView,
+  listInvoices,
+} from './service/invoice-service';
 export { cancelOrder, type CancelOrderError, type CancelledOrder } from './service/order-reversal';
 export {
   type CorrectionRequest,

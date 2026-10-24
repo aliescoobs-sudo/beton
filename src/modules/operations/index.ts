@@ -14,7 +14,9 @@ export {
   getStockLevels,
   type OpeningStockError,
   setOpeningStock,
+  setStockThreshold,
   type StockLevel,
+  type ThresholdError,
 } from './service/stock-service';
 export {
   type DeliveryRow,
@@ -23,3 +25,11 @@ export {
   type LoadableOrder,
 } from './service/plant-views';
 export { type DeliveryNote, getDeliveryNote, recordNotePrint } from './service/delivery-note';
+export {
+  listReceivable,
+  type ReceivableLine,
+  type ReceivablePurchase,
+  type ReceiptError,
+  recordReceipt,
+  type ReceivedStock,
+} from './service/receipt-service';
