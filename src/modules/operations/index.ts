@@ -22,3 +22,4 @@ export {
   listLoadableOrders,
   type LoadableOrder,
 } from './service/plant-views';
+export { type DeliveryNote, getDeliveryNote, recordNotePrint } from './service/delivery-note';

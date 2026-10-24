@@ -383,3 +383,12 @@
     color: var(--color-ink);
   }
 }
+
+/* A printed page (delivery note) carries the document only: no navigation, no buttons. */
+@media print {
+  body > * header,
+  body > * nav,
+  .no-print {
+    display: none !important;
+  }
+}

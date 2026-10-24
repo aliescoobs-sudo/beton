@@ -111,7 +111,13 @@ export default async function LoadsPage({ params }: { params: Promise<{ locale: 
               {deliveries.map((d) => (
                 <tr key={d.id} data-testid={`delivery-${d.blNo}`}>
                   <Td>
-                    <bdi dir="ltr">{d.blNo}</bdi>
+                    <a
+                      href={`/${locale}/deliveries/${d.id}`}
+                      data-testid={`note-link-${d.blNo}`}
+                      className="underline"
+                    >
+                      <bdi dir="ltr">{d.blNo}</bdi>
+                    </a>
                   </Td>
                   <Td>
                     <bdi dir="ltr">{d.orderCode ?? '—'}</bdi>

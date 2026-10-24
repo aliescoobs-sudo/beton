@@ -812,6 +812,21 @@
         "low": "Bas",
         "short": "Négatif"
       }
+    },
+    "note": {
+      "title": "Bon de livraison",
+      "print": "Imprimer",
+      "company": "Informations légales de l'entreprise : à renseigner (profil de l'entreprise, plus tard).",
+      "client": "Client",
+      "site": "Chantier · zone",
+      "order": "Commande",
+      "type": "Béton",
+      "volume": "Volume",
+      "truck": "Camion",
+      "loadedAt": "Chargé le",
+      "cancelled": "Chargement annulé : ce bon ne doit pas être utilisé.",
+      "signDriver": "Signature du chauffeur",
+      "signClient": "Signature du client (réception)"
     }
   }
 }

@@ -41,6 +41,13 @@ test('the plant loads an order, gets a BL number, marks the signed BL back, and 
   await expect(page.getByTestId(`delivery-${blNo}`)).toContainText('Rentré le');
   await expect(page.locator('body')).not.toContainText(/MAD|DH|\d\s?\d{3},\d{2}/);
 
+  await page.getByTestId(`note-link-${blNo}`).click();
+  await expect(page.getByTestId('delivery-note')).toContainText(blNo);
+  await expect(page.getByTestId('delivery-note')).toContainText(orderCode);
+  await expect(page.getByTestId('delivery-note')).toContainText('Signature du chauffeur');
+  await expect(page.locator('body')).not.toContainText(/MAD|DH|\d\s?\d{3},\d{2}/);
+  await page.goto('/fr/loads');
+
   await goNav(page, 'stock-link');
   await expect(page).toHaveURL('/fr/stock');
   await expect(page.getByTestId('stock-levels')).toBeVisible();
