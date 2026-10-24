@@ -686,6 +686,58 @@
         "title": "Remise en banque",
         "deposit": "Remettre {count} titre(s)"
       }
+    },
+    "statements": {
+      "title": "Comptes clients et fournisseurs",
+      "link": "Comptes",
+      "clients": "Clients",
+      "suppliers": "Fournisseurs",
+      "party": "Tiers",
+      "owesUs": "Nous doit",
+      "weOwe": "Nous devons",
+      "late": "En retard",
+      "nextDue": "Prochaine échéance",
+      "flags": "Signaux",
+      "dispute": "Litige",
+      "lateFlag": "Retard",
+      "back": "Comptes",
+      "date": "Date",
+      "type": "Type",
+      "code": "Pièce",
+      "status": "État",
+      "amount": "Montant",
+      "balance": "Solde",
+      "ordered": "Commandé",
+      "cancelled": "Annulé",
+      "paid": "Payé (encaissé)",
+      "pending": "Payé, pas encore encaissé",
+      "due": "À échoir",
+      "invoicedLater": "Facturé et livré apparaîtront avec les factures et les livraisons.",
+      "from": "Du",
+      "to": "Au",
+      "apply": "Filtrer",
+      "export": "Exporter en CSV",
+      "carriedIn": "Solde reporté avant la période",
+      "commercial": "Côté commercial",
+      "financial": "Côté financier",
+      "noLines": "Aucune ligne pour ces filtres.",
+      "types": {
+        "opening": "Solde d'ouverture",
+        "order": "Commande",
+        "order_cancelled": "Annulation de commande",
+        "payment": "Paiement"
+      },
+      "statuses": {
+        "booked": "Enregistré",
+        "cancelled": "Annulé",
+        "received": "Reçu",
+        "deposited": "Remis en banque",
+        "issued": "Émis",
+        "cleared": "Encaissé",
+        "bounced": "Rejeté",
+        "regularized": "Régularisé",
+        "disputed": "Litige"
+      }
     }
   }
 }

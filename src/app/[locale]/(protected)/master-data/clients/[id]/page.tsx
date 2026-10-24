@@ -33,6 +33,7 @@ export default async function ClientPage({ params }: { params: Promise<{ locale:
   if (!client) notFound();
   const typeCode = new Map(types.map((type) => [type.id, type.code]));
   const t = await getTranslations('masterData.clients');
+  const tStatements = await getTranslations('ledger.statements');
   return (
     <div>
       <Link
@@ -41,6 +42,15 @@ export default async function ClientPage({ params }: { params: Promise<{ locale:
       >
         {t('back')}
       </Link>
+      {can(user.role, 'statements.read') && (
+        <Link
+          href={`/${locale}/statements/client/${id}`}
+          className="mb-2 ms-4 inline-block text-sm underline"
+          data-testid="client-statement-link"
+        >
+          {tStatements('link')}
+        </Link>
+      )}
       <PageHeader
         title={
           <>

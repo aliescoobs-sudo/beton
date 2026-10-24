@@ -69,6 +69,8 @@ export default async function globalSetup() {
       [E2E_MD.recettePlant, 'plant', 'fr'],
       [E2E_MD.orderOffice, 'office', 'fr'],
       [E2E_MD.acctSupport, 'support', 'fr'],
+      [E2E_MD.stmSupport, 'support', 'fr'],
+      [E2E_MD.stmOffice, 'office', 'fr'],
       [E2E_MD.openSupport, 'support', 'fr'],
       [E2E_MD.openOffice, 'office', 'fr'],
       [E2E_MD.payOffice, 'office', 'fr'],

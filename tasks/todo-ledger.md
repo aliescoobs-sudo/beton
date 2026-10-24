@@ -123,12 +123,12 @@ Deposit batch, clear, bounce (with window), regularize, dispute, cancel (reason)
 **AC:** AC-LED-07; AC-SEC-05 (office refused by service, RLS and page 404; `expectNoFields` on office responses).
 **Verify:** `pnpm test:integration cash-position` + e2e · **Files:** ledger/domain/cash-position.ts, service, page, tests · **Deps:** L10
 
-### - [ ] L27: Account statement: domain and read model (M)
+### - [x] L27: Account statement: domain and read model (M)
 `buildStatement(lines, filter)` (pure): commercial and financial sections kept apart, signed amounts, running balance per row, summary (invoiced, delivered, paid, due, late, cancelled), filters (date range, type, status) with the carried-in opening balance; reversed documents stay listed as cancelled. Services `clientStatement` / `supplierStatement` (permission `statements.read`, owner and support; support views audited). Sources land with their task: orders and plan items, instruments, allocations, movements now; invoices and credit notes (L17/L18), purchases and receipts (L20/L21), supplier payments (L22), deliveries (`operations`) each add their lines and a statement assertion to their own tests.
 **AC:** AC-LED-19, AC-LED-20, AC-LED-21 (service and RLS: office, partner, plant get nothing; `expectNoFields`); property test: closing balance = Σ signed lines for any filter split.
 **Verify:** `pnpm test src/modules/ledger/domain` · `pnpm test:integration statement` · **Files:** ledger/domain/statement.ts + test, service/statement-service.ts, permissions.ts, tests · **Deps:** L11 (L10)
 
-### - [ ] L28: Account statement screens and CSV (M)
+### - [x] L28: Account statement screens and CSV (M)
 Statement tab on the client and supplier pages (owner and support; the Comptes list links to it): two sections, filters, running balance, status badges, late and cancelled highlighted, fr/ar with Latin numbers in LTR. Shared pure CSV writer `lib/csv.ts` (UTF-8 BOM, `;`, decimal comma, quotes escaped, cells starting with `= + - @` neutralised) and an audited `export` action for the filtered view.
 **AC:** AC-LED-19 through the UI; CSV test (escaping, formula injection, amounts equal the screen); AC-LED-21 page 404 for office/partner/plant; support view audited; RTL check.
 **Verify:** `pnpm exec playwright test e2e/ledger-statement.spec.ts` · **Files:** pages, ledger/ui/statement/*, lib/csv.ts + test, messages, e2e · **Deps:** L27

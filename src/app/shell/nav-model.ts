@@ -75,6 +75,12 @@ const GROUPS: GroupDef[] = [
         allowed: 'money_accounts.read',
       },
       {
+        path: '/statements',
+        labelKey: 'ledger.statements.link',
+        testId: 'statements-link',
+        allowed: 'statements.read',
+      },
+      {
         path: '/instruments',
         labelKey: 'ledger.instruments.link',
         testId: 'instruments-link',

@@ -67,6 +67,8 @@ export const E2E_MD = {
   payPlant: { email: 'e2e-py-plant@belgobeton.test', name: 'Centrale Paiements' },
   openSupport: { email: 'e2e-op-support@belgobeton.test', name: 'Support Ouverture' },
   openOffice: { email: 'e2e-op-office@belgobeton.test', name: 'Bureau Ouverture' },
+  stmSupport: { email: 'e2e-st-support@belgobeton.test', name: 'Support Comptes Tiers' },
+  stmOffice: { email: 'e2e-st-office@belgobeton.test', name: 'Bureau Comptes Tiers' },
   acctPartner: { email: 'e2e-ac-partner@belgobeton.test', name: 'Associé Comptes' },
 } as const;
 export const E2E_CSP = { email: 'e2e-csp@belgobeton.test', name: 'CSP E2E' } as const;
@@ -99,6 +101,7 @@ const NAV_GROUP: Record<string, string> = {
   'trucks-link': 'production',
   'accounts-link': 'finance',
   'cash-link': 'finance',
+  'statements-link': 'finance',
   'opening-link': 'finance',
   'instruments-link': 'finance',
   'payments-new-link': 'sales',

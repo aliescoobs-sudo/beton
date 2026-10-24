@@ -52,3 +52,11 @@ export {
   type OpeningError,
   type OpeningState,
 } from './service/opening-service';
+export {
+  type AccountRow,
+  getClientStatement,
+  getSupplierStatement,
+  listAccounts,
+  type PartyKind,
+  type PartyStatement,
+} from './service/statement-service';

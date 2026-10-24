@@ -22,3 +22,19 @@ export async function recordMoneyView(
     (tx) => recordAuditEvent(tx, { action: 'view', table: screen }),
   );
 }
+
+/**
+ * Every export of money data (a CSV of a statement, the accountant's files) is audited as `export`, for every role that
+ * can do it (DECISIONS 82): the owner included, because what leaves the screen leaves the application.
+ */
+export async function recordMoneyExport(
+  pool: pg.Pool,
+  actor: { id: string; role: Role },
+  what: string,
+): Promise<void> {
+  await withRlsContext(
+    pool,
+    { userId: actor.id, role: actor.role, requestId: uuidv7(realClock.now()) },
+    (tx) => recordAuditEvent(tx, { action: 'export', table: what }),
+  );
+}

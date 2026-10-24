@@ -62,6 +62,8 @@ export const PERMISSIONS = {
   // Caisse and bank accounts with their opening balances (owner writes; owner and support read)
   'money_accounts.read': MONEY_READ,
   'money_accounts.write': MONEY_WRITE,
+  // Account statements of clients and suppliers (owner and support; each view is audited for support)
+  'statements.read': MONEY_READ,
   // The opening state: the date and what clients and suppliers owe on it (owner enters once)
   'opening.read': MONEY_READ,
   'opening.write': MONEY_WRITE,

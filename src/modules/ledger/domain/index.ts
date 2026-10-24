@@ -83,3 +83,17 @@ export {
   parsePartyOpeningInput,
   type PartyOpeningInput,
 } from './opening';
+export {
+  parseStatementFilter,
+  buildStatement,
+  type DueItem,
+  type LineStatus,
+  type Statement,
+  type StatementFilter,
+  type StatementLine,
+  type StatementLineType,
+  type StatementRow,
+  type StatementSection,
+  type StatementSummary,
+} from './statement';
+export { plainAmount, statementToCsv } from './statement-csv';
