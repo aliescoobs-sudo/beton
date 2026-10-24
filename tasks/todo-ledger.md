@@ -66,7 +66,7 @@ Migration `money_account` (caisse/bank), `opening_balance`; owner/partner read a
 **AC:** AC-SEC-04 for both tables × 4 roles (office: no read); opening balance insert-only; OQ9 values are fake.
 **Verify:** `pnpm test:integration money-account rls` · **Files:** migration, ledger/service/money-account-service.ts, ui, tests · **Deps:** L1
 
-### - [ ] L9: Instrument state machine (domain) (S)
+### - [x] L9: Instrument state machine (domain) (S)
 Pure `nextState(direction, method, state, event)`: incoming `received → deposited → cleared | bounced`, `bounced → regularized | disputed`, outgoing `issued → cleared | bounced`, cash/transfer `received|issued → cleared` same day, any non-final → `cancelled`. `regularizationDeadline(bouncedDate) = +30 days`. fast-check: every pair not in the table is rejected.
 **AC:** AC-LED-04 (domain: `cleared → bounced`, cheque `received → cleared` without deposit rejected).
 **Verify:** `pnpm test src/modules/ledger/domain` · **Files:** ledger/domain/instrument.ts + test · **Deps:** L1

@@ -22,3 +22,18 @@ export { type OrderInput, parseOrderInput } from './order';
 export { formatPercentBp, parsePercentBp } from './percent';
 export { daysBetween, needsOldEntryPermission } from './reversal';
 export { type CorrectionInput, DOCUMENT_CODE, parseCorrectionInput } from './correction';
+export {
+  INSTRUMENT_DIRECTIONS,
+  INSTRUMENT_EVENTS,
+  INSTRUMENT_METHODS,
+  INSTRUMENT_STATES,
+  initialState,
+  isFinalState,
+  nextState,
+  regularizationDeadline,
+  type InstrumentDirection,
+  type InstrumentEvent,
+  type InstrumentMethod,
+  type InstrumentState,
+  type TransitionError,
+} from './instrument';
