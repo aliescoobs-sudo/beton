@@ -228,12 +228,12 @@ CREATE OR REPLACE FUNCTION audit.is_money_table(p_table text) RETURNS boolean LA
 $$;
 --> statement-breakpoint
 
--- What an invoice is made of, for the roles that create one and cannot read orders (office): the order's client and unit
--- price and its loads that no live invoice covers yet. Used server-side to build the lines; office is never shown the
+-- What an invoice is made of, for the roles that create one and cannot read orders (office): found by the order's code, the
+-- order's client and unit price and its loads that no live invoice covers yet. Used server-side to build the lines; office is never shown the
 -- price (the same deliberate door as resolve_selling_price, DECISIONS 81 answer A).
-CREATE FUNCTION public.invoice_source(p_order uuid)
+CREATE FUNCTION public.invoice_source(p_order_code text)
 RETURNS TABLE (
-  order_code text, type_code text, client_id uuid, client_name text, client_ice text, unit_price_ht_centimes bigint,
+  order_id uuid, order_code text, type_code text, client_id uuid, client_code text, client_name text, client_ice text, unit_price_ht_centimes bigint,
   vat_rate_bp integer, delivery_id uuid, bl_no text, load_date date, volume_l integer
 ) LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = '' AS $$
 BEGIN
@@ -242,12 +242,12 @@ BEGIN
       USING ERRCODE = 'insufficient_privilege';
   END IF;
   RETURN QUERY
-    SELECT o.code, t.code, c.id, c.name, c.ice, o.unit_price_ht_centimes, o.vat_rate_bp, d.id, d.bl_no, d.load_date, d.volume_l
+    SELECT o.id, o.code, t.code, c.id, c.code, c.name, c.ice, o.unit_price_ht_centimes, o.vat_rate_bp, d.id, d.bl_no, d.load_date, d.volume_l
       FROM public.sales_order o
       JOIN public.client c ON c.id = o.client_id
       JOIN public.concrete_type t ON t.id = o.concrete_type_id
       JOIN public.delivery d ON d.order_id = o.id AND d.reverses_id IS NULL
-     WHERE o.id = p_order AND o.reverses_id IS NULL
+     WHERE o.code = p_order_code AND o.reverses_id IS NULL
        AND NOT EXISTS (SELECT 1 FROM public.sales_order r WHERE r.reverses_id = o.id)
        AND NOT EXISTS (SELECT 1 FROM public.delivery r WHERE r.reverses_id = d.id)
        AND NOT EXISTS (
@@ -257,6 +257,6 @@ BEGIN
      ORDER BY d.load_date, d.bl_no;
 END $$;
 --> statement-breakpoint
-REVOKE ALL ON FUNCTION public.invoice_source(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.invoice_source(text) FROM PUBLIC;
 --> statement-breakpoint
-GRANT EXECUTE ON FUNCTION public.invoice_source(uuid) TO belgobeton_app;
+GRANT EXECUTE ON FUNCTION public.invoice_source(text) TO belgobeton_app;

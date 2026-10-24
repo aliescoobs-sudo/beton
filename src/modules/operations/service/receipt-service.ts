@@ -8,7 +8,9 @@ import {
   require,
   type SessionUser,
 } from '@/modules/platform-security';
+import { type Effect, visibleEffects } from '@/modules/ledger';
 import { parseReceiptInput } from '../domain/load-input';
+import { stockEffects } from './effects';
 
 export type ReceiptError =
   | 'INVALID'
@@ -35,6 +37,8 @@ export function receiptFailure(error: unknown): ReceiptError {
 
 export interface ReceivedStock {
   receiptId: string;
+  /** What the receipt changed: its document and the stock of every component. Filtered by role. */
+  effects: Effect[];
 }
 
 /**
@@ -67,7 +71,16 @@ export async function recordReceipt(
         parsed.value.purchaseId,
         date,
       ]);
-      return ok({ receiptId: rows[0]?.id as string });
+      const receiptId = rows[0]?.id as string;
+      const code = await tx.query<{ code: string }>(
+        'select code from purchase_line_ops where purchase_id = $1 limit 1',
+        [parsed.value.purchaseId],
+      );
+      const effects: Effect[] = [
+        { kind: 'document', document: 'receipt', code: code.rows[0]?.code ?? '' },
+        ...(await stockEffects(tx, 'receipt', receiptId)),
+      ];
+      return ok({ receiptId, effects: visibleEffects(effects, actor.role) });
     });
   } catch (error) {
     return err(receiptFailure(error));

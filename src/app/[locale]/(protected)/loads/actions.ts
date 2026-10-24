@@ -2,6 +2,7 @@
 
 import { getRequestClock } from '@/app/request-clock';
 import { getPool } from '@/lib/db/pools';
+import type { Effect } from '@/modules/ledger';
 import { createLoad, type DeliveryError, recordBlReturn } from '@/modules/operations';
 import { authorize, ForbiddenError, type Permission } from '@/modules/platform-security';
 import { currentAuthState } from '@/modules/platform-security/next';
@@ -25,7 +26,7 @@ async function guarded<T>(
 // @permission deliveries.write (plant, owner, partner): the result carries the BL number and quantities only
 export async function createLoadAction(
   input: unknown,
-): Promise<{ ok: true; blNo: string; volumeL: number; warnings: string[] } | Failure> {
+): Promise<{ ok: true; blNo: string; volumeL: number; warnings: string[]; effects: Effect[] } | Failure> {
   return guarded('deliveries.write', async (user) => {
     const today = (await getRequestClock()).today();
     const result = await createLoad(getPool('app'), user, input, { today });
@@ -35,6 +36,7 @@ export async function createLoadAction(
           blNo: result.value.blNo,
           volumeL: result.value.volumeL,
           warnings: result.value.warnings,
+          effects: result.value.effects,
         }
       : result;
   });

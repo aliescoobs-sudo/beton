@@ -2,10 +2,12 @@ import { randomUUID } from 'node:crypto';
 import type pg from 'pg';
 import { err, ok, type Result } from '@/lib/result';
 import { inRequest, isMalformedId, require, type SessionUser } from '@/modules/platform-security';
+import { type Effect, visibleEffects } from '../domain/effects';
 import {
   computeInvoiceTotals,
   invoiceDueDate,
   invoiceIssueDeadline,
+  type InvoiceInput,
   parseInvoiceInput,
 } from '../domain/invoice';
 import { nextDocNumber } from './doc-number';
@@ -22,6 +24,8 @@ export type InvoiceError =
 export interface CreatedInvoice {
   id: string;
   number: string;
+  /** What the invoice changed; the money facts only for a role that reads money. */
+  effects: Effect[];
 }
 
 export const invoiceFailure = (error: unknown): InvoiceError => {
@@ -38,9 +42,11 @@ export const invoiceFailure = (error: unknown): InvoiceError => {
 };
 
 interface SourceRow {
+  order_id: string;
   order_code: string;
   type_code: string;
   client_id: string;
+  client_code: string;
   client_name: string;
   client_ice: string | null;
   unit_price_ht_centimes: string;
@@ -71,74 +77,91 @@ export async function createInvoice(
   if (!due.ok) return err(due.error);
 
   try {
-    return await inRequest(appPool, actor, async (tx): Promise<Result<CreatedInvoice, InvoiceError>> => {
-      const source = await tx.query<SourceRow>(
-        `select order_code, type_code, client_id, client_name, client_ice, unit_price_ht_centimes::text, vat_rate_bp,
-                delivery_id, bl_no, to_char(load_date, 'YYYY-MM-DD') as load_date, volume_l
-           from public.invoice_source($1)`,
-        [v.orderId],
-      );
-      if (source.rows.length === 0) return err('NOTHING_TO_INVOICE');
-      const chosen = v.deliveryIds
-        ? source.rows.filter((r) => v.deliveryIds?.includes(r.delivery_id))
-        : source.rows;
-      if (v.deliveryIds && chosen.length !== new Set(v.deliveryIds).size) return err('NOT_FOUND');
-      const head = chosen[0] as SourceRow;
-      const lines = chosen.map((r) => ({
-        volumeL: r.volume_l,
-        unitPriceHtCentimes: Number(r.unit_price_ht_centimes),
-      }));
-      const totals = computeInvoiceTotals(lines, head.vat_rate_bp);
-      if (!totals.ok) return err('INVALID');
-      const lastLoad = chosen.reduce((m, r) => (r.load_date > m ? r.load_date : m), head.load_date);
-
-      const id = randomUUID();
-      const number = await nextDocNumber(tx, 'FA', deps.today);
-      // No RETURNING: office has no SELECT policy on the table (blind entry).
-      await tx.query(
-        `insert into invoice (id, number, order_id, client_id, client_name, client_ice, invoice_date, issue_deadline,
-                              due_date, vat_rate_bp, total_ht_centimes, total_vat_centimes, total_ttc_centimes, created_by)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
-        [
-          id,
-          number,
-          v.orderId,
-          head.client_id,
-          head.client_name,
-          head.client_ice,
-          deps.today,
-          invoiceIssueDeadline(lastLoad),
-          due.value,
-          head.vat_rate_bp,
-          totals.value.totalHt,
-          totals.value.totalVat,
-          totals.value.totalTtc,
-          actor.id,
-        ],
-      );
-      for (const [n, r] of chosen.entries()) {
-        await tx.query(
-          `insert into invoice_line (id, invoice_id, seq, delivery_id, description, volume_l, unit_price_ht_centimes,
-                                     line_ht_centimes, created_by)
-           values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-          [
-            randomUUID(),
-            id,
-            n + 1,
-            r.delivery_id,
-            `Béton ${r.type_code} — BL ${r.bl_no} du ${r.load_date}`,
-            r.volume_l,
-            r.unit_price_ht_centimes,
-            totals.value.lineHt[n],
-            actor.id,
-          ],
-        );
-      }
-      return ok({ id, number });
-    });
+    return await inRequest(appPool, actor, (tx) => insertInvoiceRows(tx, actor, v, due.value, deps.today));
   } catch (error) {
     return err(invoiceFailure(error));
   }
+}
+
+/**
+ * The rows of an invoice in the caller's transaction: the loads of the order that no live invoice covers (from the
+ * reviewed source function), totals from the domain function, the FA number, lines. Shared by `createInvoice` and the
+ * pilot scenario (which runs as the system actor).
+ */
+export async function insertInvoiceRows(
+  tx: pg.PoolClient,
+  actor: SessionUser,
+  v: InvoiceInput,
+  due: string,
+  today: string,
+): Promise<Result<CreatedInvoice, InvoiceError>> {
+  const source = await tx.query<SourceRow>(
+    `select order_id, order_code, type_code, client_id, client_code, client_name, client_ice, unit_price_ht_centimes::text, vat_rate_bp,
+            delivery_id, bl_no, to_char(load_date, 'YYYY-MM-DD') as load_date, volume_l
+       from public.invoice_source($1)`,
+    [v.orderCode],
+  );
+  if (source.rows.length === 0) return err('NOTHING_TO_INVOICE');
+  const chosen = v.deliveryIds
+    ? source.rows.filter((r) => v.deliveryIds?.includes(r.delivery_id))
+    : source.rows;
+  if (v.deliveryIds && chosen.length !== new Set(v.deliveryIds).size) return err('NOT_FOUND');
+  const head = chosen[0] as SourceRow;
+  const lines = chosen.map((r) => ({
+    volumeL: r.volume_l,
+    unitPriceHtCentimes: Number(r.unit_price_ht_centimes),
+  }));
+  const totals = computeInvoiceTotals(lines, head.vat_rate_bp);
+  if (!totals.ok) return err('INVALID');
+  const lastLoad = chosen.reduce((m, r) => (r.load_date > m ? r.load_date : m), head.load_date);
+
+  const id = randomUUID();
+  const number = await nextDocNumber(tx, 'FA', today);
+  // No RETURNING: office has no SELECT policy on the table (blind entry).
+  await tx.query(
+    `insert into invoice (id, number, order_id, client_id, client_name, client_ice, invoice_date, issue_deadline,
+                          due_date, vat_rate_bp, total_ht_centimes, total_vat_centimes, total_ttc_centimes, created_by)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+    [
+      id,
+      number,
+      head.order_id,
+      head.client_id,
+      head.client_name,
+      head.client_ice,
+      today,
+      invoiceIssueDeadline(lastLoad),
+      due,
+      head.vat_rate_bp,
+      totals.value.totalHt,
+      totals.value.totalVat,
+      totals.value.totalTtc,
+      actor.id,
+    ],
+  );
+  for (const [n, r] of chosen.entries()) {
+    await tx.query(
+      `insert into invoice_line (id, invoice_id, seq, delivery_id, description, volume_l, unit_price_ht_centimes,
+                                 line_ht_centimes, created_by)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [
+        randomUUID(),
+        id,
+        n + 1,
+        r.delivery_id,
+        `Béton ${r.type_code} — BL ${r.bl_no} du ${r.load_date}`,
+        r.volume_l,
+        r.unit_price_ht_centimes,
+        totals.value.lineHt[n],
+        actor.id,
+      ],
+    );
+  }
+  const effects: Effect[] = [
+    { kind: 'document', document: 'invoice', code: number },
+    { kind: 'receivable', clientCode: head.client_code, amountCentimes: totals.value.totalTtc },
+  ];
+  return ok({ id, number, effects: visibleEffects(effects, actor.role) });
 }
 
 export type CancelInvoiceError =
@@ -159,47 +182,69 @@ export async function cancelInvoice(
   const text = typeof reason === 'string' ? reason.trim().replace(/\s+/g, ' ') : '';
   if (text.length < 3 || text.length > 500) return err('REASON_REQUIRED');
   try {
-    return await inRequest(
-      appPool,
-      actor,
-      async (tx): Promise<Result<CreatedInvoice, CancelInvoiceError>> => {
-        const original = await tx.query<{ credit_note_of: string | null; number: string }>(
-          'select credit_note_of, number from invoice where id = $1',
-          [invoiceId],
-        );
-        if (!original.rows[0]) return err('NOT_FOUND');
-        if (original.rows[0].credit_note_of) return err('CANNOT_CREDIT_CREDIT_NOTE');
-        if ((await tx.query('select 1 from invoice where credit_note_of = $1', [invoiceId])).rowCount)
-          return err('ALREADY_CREDITED');
-        const id = randomUUID();
-        const number = await nextDocNumber(tx, 'FA', deps.today);
-        await tx.query(
-          `insert into invoice (id, number, order_id, client_id, client_name, client_ice, invoice_date, issue_deadline,
-                              due_date, vat_rate_bp, total_ht_centimes, total_vat_centimes, total_ttc_centimes,
-                              credit_note_of, reason, created_by)
-         select $1, $2, order_id, client_id, client_name, client_ice, $3, issue_deadline, $3, vat_rate_bp,
-                -total_ht_centimes, -total_vat_centimes, -total_ttc_centimes, id, $4, $5
-           from invoice where id = $6`,
-          [id, number, deps.today, text, actor.id, invoiceId],
-        );
-        await tx.query(
-          `insert into invoice_line (id, invoice_id, seq, delivery_id, description, volume_l, unit_price_ht_centimes, line_ht_centimes, created_by)
-         select gen_random_uuid(), $1, seq, delivery_id, description, -volume_l, unit_price_ht_centimes, -line_ht_centimes, $2
-           from invoice_line where invoice_id = $3`,
-          [id, actor.id, invoiceId],
-        );
-        await tx.query(
-          `select audit.record('reverse', 'invoice', $1, jsonb_build_object('credits', $2::text, 'number', $3::text),
-                             jsonb_build_object('credit_note', $4::text), $5)`,
-          [id, invoiceId, original.rows[0].number, number, text],
-        );
-        return ok({ id, number });
-      },
+    return await inRequest(appPool, actor, (tx) =>
+      insertCreditNoteRows(tx, actor, invoiceId, text, deps.today),
     );
   } catch (error) {
     if ((error as { code?: string }).code === '23505') return err('ALREADY_CREDITED');
     return err(invoiceFailure(error));
   }
+}
+
+/**
+ * The rows of a credit note in the caller's transaction: refused when the invoice is itself a credit note or already
+ * credited. Shared by `cancelInvoice` and the pilot scenario.
+ */
+export async function insertCreditNoteRows(
+  tx: pg.PoolClient,
+  actor: SessionUser,
+  invoiceId: string,
+  text: string,
+  today: string,
+): Promise<Result<CreatedInvoice, CancelInvoiceError>> {
+  const original = await tx.query<{ credit_note_of: string | null; number: string }>(
+    'select credit_note_of, number from invoice where id = $1',
+    [invoiceId],
+  );
+  if (!original.rows[0]) return err('NOT_FOUND');
+  if (original.rows[0].credit_note_of) return err('CANNOT_CREDIT_CREDIT_NOTE');
+  if ((await tx.query('select 1 from invoice where credit_note_of = $1', [invoiceId])).rowCount)
+    return err('ALREADY_CREDITED');
+  const id = randomUUID();
+  const number = await nextDocNumber(tx, 'FA', today);
+  await tx.query(
+    `insert into invoice (id, number, order_id, client_id, client_name, client_ice, invoice_date, issue_deadline,
+                        due_date, vat_rate_bp, total_ht_centimes, total_vat_centimes, total_ttc_centimes,
+                        credit_note_of, reason, created_by)
+   select $1, $2, order_id, client_id, client_name, client_ice, $3, issue_deadline, $3, vat_rate_bp,
+          -total_ht_centimes, -total_vat_centimes, -total_ttc_centimes, id, $4, $5
+     from invoice where id = $6`,
+    [id, number, today, text, actor.id, invoiceId],
+  );
+  await tx.query(
+    `insert into invoice_line (id, invoice_id, seq, delivery_id, description, volume_l, unit_price_ht_centimes, line_ht_centimes, created_by)
+   select gen_random_uuid(), $1, seq, delivery_id, description, -volume_l, unit_price_ht_centimes, -line_ht_centimes, $2
+     from invoice_line where invoice_id = $3`,
+    [id, actor.id, invoiceId],
+  );
+  await tx.query(
+    `select audit.record('reverse', 'invoice', $1, jsonb_build_object('credits', $2::text, 'number', $3::text),
+                       jsonb_build_object('credit_note', $4::text), $5)`,
+    [id, invoiceId, original.rows[0].number, number, text],
+  );
+  const total = await tx.query<{ ttc: string; client_code: string }>(
+    `select i.total_ttc_centimes::text as ttc, c.code as client_code from invoice i join client c on c.id = i.client_id where i.id = $1`,
+    [id],
+  );
+  const effects: Effect[] = [
+    { kind: 'document', document: 'credit_note', code: number },
+    {
+      kind: 'receivable',
+      clientCode: total.rows[0]?.client_code ?? null,
+      amountCentimes: Number(total.rows[0]?.ttc ?? 0),
+    },
+  ];
+  return ok({ id, number, effects: visibleEffects(effects, actor.role) });
 }
 
 export interface InvoiceView {

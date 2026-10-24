@@ -1,3 +1,4 @@
+import { type Effect, visibleEffects } from '../domain/effects';
 import { randomUUID } from 'node:crypto';
 import type pg from 'pg';
 import { centimes, negateCentimes } from '@/lib/money';
@@ -33,6 +34,8 @@ export type InstrumentError =
 /** What a write returns to the caller: the identity, never an amount (office enters blind, DECISIONS 81). */
 export interface InstrumentRef {
   id: string;
+  /** What the entry changed, filtered by role: the money facts only for a role that reads money. */
+  effects?: Effect[];
 }
 
 export function instrumentFailure(error: unknown): InstrumentError {
@@ -101,6 +104,7 @@ async function enter(
   today: string,
 ): Promise<Result<InstrumentRef, InstrumentError>> {
   const id = randomUUID();
+  let coveredCentimes = 0;
   try {
     await inRequest(appPool, actor, async (tx) => {
       await tx.query(
@@ -143,9 +147,33 @@ async function enter(
           v.orderCode,
         ]);
         if (!covered.rows[0]?.n) throw new NothingToAllocate();
+        // What was covered, as the actor can read it (office reads no allocation, and sees no money effect anyway).
+        const sum = await tx.query<{ s: string }>(
+          'select coalesce(sum(amount_centimes), 0)::text as s from allocation where instrument_id = $1',
+          [id],
+        );
+        coveredCentimes = Number(sum.rows[0]?.s ?? 0);
       }
     });
-    return ok({ id });
+    const effects: Effect[] = [
+      { kind: 'document', document: 'payment', code: v.number ?? v.method },
+      direction === 'in'
+        ? {
+            kind: 'payment_in',
+            method: v.method,
+            amountCentimes: v.amountCentimes,
+            cleared: v.method === 'cash',
+          }
+        : {
+            kind: 'payment_out',
+            method: v.method,
+            amountCentimes: v.amountCentimes,
+            cleared: v.method === 'cash',
+          },
+    ];
+    if (v.orderCode && direction === 'in' && coveredCentimes > 0)
+      effects.push({ kind: 'receivable_covered', orderCode: v.orderCode, amountCentimes: coveredCentimes });
+    return ok({ id, effects: visibleEffects(effects, actor.role) });
   } catch (error) {
     if (error instanceof NothingToAllocate) return err('NOTHING_TO_ALLOCATE');
     return err(instrumentFailure(error));

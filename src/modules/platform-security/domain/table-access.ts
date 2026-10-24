@@ -766,6 +766,7 @@ export const TABLE_ACCESS = {
   },
   delivery: {
     kind: 'rls',
+    seed: 'insert',
     read: {
       owner: 'all',
       partner: 'all',
@@ -784,6 +785,7 @@ export const TABLE_ACCESS = {
   },
   delivery_return: {
     kind: 'rls',
+    seed: 'insert',
     read: {
       owner: 'all',
       partner: 'all',
@@ -802,6 +804,7 @@ export const TABLE_ACCESS = {
   },
   stock_movement: {
     kind: 'rls',
+    seed: 'insert',
     read: {
       owner: 'all',
       partner: 'all',

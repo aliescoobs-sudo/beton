@@ -290,7 +290,8 @@ describe('who may allocate', () => {
       },
       { today: TODAY },
     );
-    expect(r.ok && Object.keys(r.value)).toEqual(['id']);
+    expect(r.ok && Object.keys(r.value).sort()).toEqual(['effects', 'id']);
+    expect(JSON.stringify(r.ok && r.value)).not.toMatch(/amountCentimes/); // the effects office may see hold no amount
     expect(await covered(s.id)).toEqual([300_000, 100_000]);
   });
 

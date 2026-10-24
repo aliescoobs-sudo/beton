@@ -41,6 +41,12 @@ test('the plant loads an order, gets a BL number, marks the signed BL back, and 
   const done = page.getByTestId(`load-done-${orderCode}`);
   await expect(done).toContainText(/BL-\d{4}-\d{5}/);
   const blNo = /BL-\d{4}-\d{5}/.exec((await done.textContent()) ?? '')?.[0] as string;
+  // What the load changed: the BL, what is left of the order and the stock going down; no money for the plant.
+  const effects = page.getByTestId(`load-effects-${orderCode}`);
+  await expect(effects).toContainText('Ciment');
+  await expect(effects).toContainText('−2 800 kg');
+  await expect(effects).not.toContainText(/MAD|DH/);
+  await page.getByTestId(`load-continue-${orderCode}`).click();
   await expect(page.getByTestId(`delivery-${blNo}`)).toBeVisible();
   await page.getByTestId(`bl-return-${blNo}`).click();
   await expect(page.getByTestId(`delivery-${blNo}`)).toContainText('Rentré le');
@@ -62,6 +68,8 @@ test('the plant loads an order, gets a BL number, marks the signed BL back, and 
   await expect(page.getByTestId(`purchase-${purchase.code}`)).toBeVisible();
   await expect(page.locator('body')).not.toContainText(/MAD|DH|\d\s?\d{3},\d{2}|F-20/);
   await page.getByTestId(`receive-${purchase.code}`).click();
+  await expect(page.getByTestId(`receipt-effects-${purchase.code}`)).toContainText('+30 000 kg');
+  await page.getByTestId(`receipt-continue-${purchase.code}`).click();
   await expect(page.getByTestId(`purchase-${purchase.code}`)).toContainText('Reçu le');
 
   await goNav(page, 'stock-link');

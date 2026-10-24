@@ -52,6 +52,17 @@ describe('plant views (O4)', () => {
     if (!l.ok) throw new Error(l.error);
     const after = (await listLoadableOrders(app, users.plant, TODAY)).find((o) => o.id === scene.orderId);
     expect(after?.remainingL).toBe((before?.volumeL ?? 0) - 1000);
+    // What the load changed, as the plant sees it: the BL, what is left, the stock of the recette's components. No money.
+    expect(l.value.effects[0]).toEqual({ kind: 'document', document: 'bl', code: l.value.blNo });
+    expect(l.value.effects[1]).toMatchObject({
+      kind: 'remaining',
+      remainingL: (before?.volumeL ?? 0) - 1000,
+    });
+    const stock = l.value.effects.filter((e) => e.kind === 'stock');
+    expect(stock.length).toBeGreaterThanOrEqual(2);
+    expect(stock.find((e) => e.kind === 'stock' && e.componentNameFr === 'Ciment')).toMatchObject({
+      deltaBase: -350_000,
+    });
     const delivery = (await listDeliveries(app, users.plant)).find((d) => d.id === l.value.id);
     expect(delivery).toMatchObject({ blNo: l.value.blNo, volumeL: 1000, cancelled: false, returnedOn: null });
   });

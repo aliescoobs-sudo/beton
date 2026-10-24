@@ -33,3 +33,4 @@ export {
   recordReceipt,
   type ReceivedStock,
 } from './service/receipt-service';
+export { type OpsScenarioResult, seedOperationsScenario } from './service/pilot-ops';

@@ -35,6 +35,12 @@ const GROUPS: GroupDef[] = [
         allowed: 'orders.write',
       },
       {
+        path: '/invoices/new',
+        labelKey: 'ledger.invoices.newLink',
+        testId: 'invoices-new-link',
+        allowed: 'invoices.write',
+      },
+      {
         path: '/payments/new',
         labelKey: 'ledger.payments.link',
         testId: 'payments-new-link',
@@ -68,6 +74,12 @@ const GROUPS: GroupDef[] = [
   {
     id: 'finance',
     items: [
+      {
+        path: '/invoices',
+        labelKey: 'ledger.invoices.link',
+        testId: 'invoices-link',
+        allowed: 'invoices.read',
+      },
       {
         path: '/accounts',
         labelKey: 'ledger.accounts.link',

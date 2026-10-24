@@ -7,6 +7,7 @@ import { existsSync } from 'node:fs';
 import pg from 'pg';
 import { loadSeedUrl } from '../src/lib/env.ts';
 import { seedPilotScenario } from '../src/modules/ledger/service/pilot-scenario.ts';
+import { seedOperationsScenario } from '../src/modules/operations/service/pilot-ops.ts';
 import { handleHelp } from './cli-help';
 
 if (import.meta.main) {
@@ -32,11 +33,20 @@ if (import.meta.main) {
   }
   const pool = new pg.Pool({ connectionString: loadSeedUrl(process.env), max: 1 });
   try {
-    const result = await seedPilotScenario(pool, env, businessDateOf(now));
+    const today = businessDateOf(now);
+    const result = await seedPilotScenario(pool, env, today);
     console.log(
       result.applied
         ? `Pilot scenario seeded: ${result.orders} orders, ${result.instruments} payments, opening ${result.openingDate}, today ${result.today}`
         : 'Pilot scenario already in place (nothing changed)',
+    );
+    // The operations part (loads, stock, purchases, invoices) has its own idempotence: it also completes a scenario that was
+    // seeded before it existed.
+    const ops = await seedOperationsScenario(pool, env, today);
+    console.log(
+      ops.applied
+        ? `Operations scenario seeded: ${ops.loads} loads (${ops.returns} signed BL back), ${ops.purchases} purchases (${ops.receipts} received), ${ops.invoices} invoices, today ${today}`
+        : 'Operations scenario already in place (nothing changed)',
     );
   } finally {
     await pool.end();

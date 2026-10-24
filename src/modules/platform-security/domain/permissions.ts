@@ -103,6 +103,8 @@ export const PERMISSIONS = {
   // Derived figures
   'margins.read': MONEY_READ,
   'cash.read': MONEY_READ,
+  // The money facts of "what did this action change" (ledger L35): the roles that read money
+  'effects.money': MONEY_READ,
   // Security alerts (break-glass) are not money: owner and partner see and acknowledge them (support reads the table).
   'alerts.risk.read': MANAGERS,
   'alerts.reclassify': MONEY_WRITE,

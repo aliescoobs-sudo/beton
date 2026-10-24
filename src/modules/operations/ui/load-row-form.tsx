@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { type FormEvent, useState } from 'react';
+import type { Effect } from '@/modules/ledger';
+import { EffectsPanel } from '@/modules/ledger/ui/effects/effects-panel';
 import { Button, Select } from '@/ui';
 import { formatM3 } from './format';
 
@@ -12,7 +14,8 @@ export interface TruckOption {
   capacityL: number;
 }
 export type LoadActionResult =
-  { ok: true; blNo: string; volumeL: number; warnings: string[] } | { ok: false; error: string };
+  | { ok: true; blNo: string; volumeL: number; warnings: string[]; effects: Effect[] }
+  | { ok: false; error: string };
 
 /** One tap to load: pick the truck (volume is the smaller of what is left and the truck) or type a smaller m³. */
 export function LoadRowForm({
@@ -30,7 +33,7 @@ export function LoadRowForm({
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [done, setDone] = useState<string | null>(null);
+  const [done, setDone] = useState<{ text: string; effects: Effect[] } | null>(null);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -46,10 +49,10 @@ export function LoadRowForm({
     try {
       const result = await createLoad({ orderId, truckId: String(data.get('truck') ?? ''), volumeL });
       if (!result.ok) return setMessage(t(`errors.${result.error}` as never));
-      setDone(
-        `${result.blNo} · ${formatM3(result.volumeL)} m³${result.warnings.includes('LONG_TRIP') ? ` · ${t('longTrip')}` : ''}`,
-      );
-      router.refresh();
+      setDone({
+        text: `${result.blNo} · ${formatM3(result.volumeL)} m³${result.warnings.includes('LONG_TRIP') ? ` · ${t('longTrip')}` : ''}`,
+        effects: result.effects,
+      });
     } catch {
       setMessage(t('errors.INVALID'));
     } finally {
@@ -59,9 +62,19 @@ export function LoadRowForm({
 
   if (done)
     return (
-      <p role="status" data-testid={`load-done-${orderCode}`} className="text-sm">
-        {t('created')} <bdi dir="ltr">{done}</bdi>
-      </p>
+      <div role="status" data-testid={`load-done-${orderCode}`} className="text-sm">
+        {t('created')} <bdi dir="ltr">{done.text}</bdi>
+        <EffectsPanel effects={done.effects} testId={`load-effects-${orderCode}`} />
+        <Button
+          type="button"
+          variant="secondary"
+          small
+          onClick={() => router.refresh()}
+          data-testid={`load-continue-${orderCode}`}
+        >
+          {t('continue')}
+        </Button>
+      </div>
     );
 
   return (

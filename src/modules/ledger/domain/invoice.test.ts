@@ -78,10 +78,13 @@ describe('computeInvoiceTotals', () => {
 
 describe('parseInvoiceInput', () => {
   const id = '0192f3a0-0000-7000-8000-000000000001';
-  it('accepts an order alone, or with loads and a due date; refuses an empty list of loads', () => {
-    expect(parseInvoiceInput({ orderId: id }).ok).toBe(true);
-    expect(parseInvoiceInput({ orderId: id, deliveryIds: [id], dueDate: '2026-05-01' }).ok).toBe(true);
-    expect(parseInvoiceInput({ orderId: id, deliveryIds: [] }).ok).toBe(false);
-    expect(parseInvoiceInput({ orderId: 'x' }).ok).toBe(false);
+  it('accepts an order code alone, or with loads and a due date; refuses an empty list of loads and a bad code', () => {
+    expect(parseInvoiceInput({ orderCode: 'CMD-2026-00012' }).ok).toBe(true);
+    expect(
+      parseInvoiceInput({ orderCode: 'CMD-2026-00012', deliveryIds: [id], dueDate: '2026-05-01' }).ok,
+    ).toBe(true);
+    expect(parseInvoiceInput({ orderCode: 'CMD-2026-00012', deliveryIds: [] }).ok).toBe(false);
+    expect(parseInvoiceInput({ orderCode: 'x' }).ok).toBe(false);
+    expect(parseInvoiceInput({ orderCode: id }).ok).toBe(false);
   });
 });

@@ -7,7 +7,9 @@ import { parseMilliQty } from '@/lib/quantity';
 import { formatPercentBp, parsePercentBp } from '../../domain/percent';
 import { PLAN_METHODS, type PlanMethod } from '../../domain/plan';
 import { PLAN_PRESETS, type PlanPreset } from '../../domain/plan-presets';
+import type { Effect } from '../../domain/effects';
 import type { OrderError, OrderPreview } from '../../service/order-service';
+import { EffectsPanel } from '../effects/effects-panel';
 
 export interface OrderFormClient {
   id: string;
@@ -17,7 +19,8 @@ export interface OrderFormClient {
 }
 
 export type CreateOrderActionResult =
-  { ok: true; code: string } | { ok: false; error: OrderError | 'UNAUTHENTICATED' | 'FORBIDDEN' };
+  | { ok: true; code: string; effects: Effect[] }
+  | { ok: false; error: OrderError | 'UNAUTHENTICATED' | 'FORBIDDEN' };
 export type PreviewOrderActionResult =
   { ok: true; preview: OrderPreview } | { ok: false; error: OrderError | 'UNAUTHENTICATED' | 'FORBIDDEN' };
 
@@ -67,6 +70,7 @@ export function OrderForm({
   ]);
   const [message, setMessage] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
+  const [effects, setEffects] = useState<Effect[]>([]);
   const [preview, setPreview] = useState<OrderPreview | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -145,8 +149,10 @@ export function OrderForm({
     setBusy(true);
     try {
       const result = await createAction(input);
-      if (result.ok) setSaved(result.code);
-      else setMessage(errorText(result.error));
+      if (result.ok) {
+        setSaved(result.code);
+        setEffects(result.effects);
+      } else setMessage(errorText(result.error));
     } finally {
       setBusy(false);
     }
@@ -178,6 +184,7 @@ export function OrderForm({
         <p role="status" className="text-lg font-medium" data-testid="order-saved">
           {t('saved', { code: saved })}
         </p>
+        <EffectsPanel effects={effects} testId="order-effects" />
         <button type="button" onClick={reset} className="btn btn-primary btn-sm" data-testid="order-another">
           {t('another')}
         </button>

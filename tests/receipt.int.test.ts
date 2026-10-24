@@ -57,7 +57,7 @@ describe('recordReceipt (AC-OPS-03)', () => {
     const before = await levelOf();
     const r = await recordReceipt(app, users.plant, { purchaseId: p.id }, { today: TODAY });
     if (!r.ok) throw new Error(r.error);
-    expect(Object.keys(r.value)).toEqual(['receiptId']);
+    expect(Object.keys(r.value).sort()).toEqual(['effects', 'receiptId']);
     expect((await levelOf()) - before).toBe(30_000_000);
     expect(await recordReceipt(app, users.plant, { purchaseId: p.id }, { today: TODAY })).toEqual({
       ok: false,

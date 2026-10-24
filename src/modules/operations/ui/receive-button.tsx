@@ -3,9 +3,11 @@
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
+import type { Effect } from '@/modules/ledger';
+import { EffectsPanel } from '@/modules/ledger/ui/effects/effects-panel';
 import { Button } from '@/ui';
 
-export type ReceiveResult = { ok: true } | { ok: false; error: string };
+export type ReceiveResult = { ok: true; effects: Effect[] } | { ok: false; error: string };
 
 /** Records the receipt of one purchase today: its stocked lines go into the stock. Once only. */
 export function ReceiveButton({
@@ -21,13 +23,14 @@ export function ReceiveButton({
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [effects, setEffects] = useState<Effect[] | null>(null);
 
   async function click() {
     setPending(true);
     setMessage(null);
     try {
       const result = await receive({ purchaseId });
-      if (result.ok) return router.refresh();
+      if (result.ok) return setEffects(result.effects);
       setMessage(t(`errors.${result.error}` as never));
       if (result.error === 'ALREADY_RECEIVED') router.refresh();
     } catch {
@@ -36,6 +39,22 @@ export function ReceiveButton({
       setPending(false);
     }
   }
+
+  if (effects)
+    return (
+      <div data-testid={`receipt-done-${code}`} className="text-sm">
+        <EffectsPanel effects={effects} testId={`receipt-effects-${code}`} />
+        <Button
+          type="button"
+          variant="secondary"
+          small
+          onClick={() => router.refresh()}
+          data-testid={`receipt-continue-${code}`}
+        >
+          {t('continue')}
+        </Button>
+      </div>
+    );
 
   return (
     <span className="inline-flex flex-col gap-1">

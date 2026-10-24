@@ -93,7 +93,8 @@ describe('createOrder (AC-LED-01)', () => {
     expect(made.value.code).toMatch(/^CMD-2026-\d{5,}$/);
     // Office learns the id and the code, nothing monetary.
     expectNoFields(made.value, ['totalHt', 'totalTtc', 'unitPrice', 'amount', 'total_ttc_centimes']);
-    expect(Object.keys(made.value).sort()).toEqual(['code', 'id']);
+    expect(Object.keys(made.value).sort()).toEqual(['code', 'effects', 'id']);
+    expect(JSON.stringify(made.value)).not.toMatch(/amountCentimes|112320|93600/); // office learns no amount
 
     const { order, items } = await orderRows(made.value.id);
     expect(order).toMatchObject({

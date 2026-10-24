@@ -319,7 +319,7 @@ const FIXTURES: Record<
   purchase_receipt: {
     // Only record_receipt() writes it (owner, partner, plant); every writer receives a purchase of its own.
     writers: ['owner', 'partner', 'plant'],
-    seed: async (tx, actor) => {
+    seed: async (tx) => {
       const pm = await purchaseMaster(app, actors.owner, marker);
       const p = await newReceivablePurchase(app, actors.owner, pm, marker);
       return tx.query(`select public.record_receipt($1, '2026-06-02')`, [p.id]);

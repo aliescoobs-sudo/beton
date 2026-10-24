@@ -133,7 +133,8 @@ describe('the lifecycle table in SQL is the one in TypeScript (AC-LED-04)', () =
 describe('receiving and issuing (office enters blind)', () => {
   it('office receives a cheque: it gets an id and nothing else, and cannot read it back', async () => {
     const r = await receiveInstrument(app, users.office, cheque(), { today: TODAY });
-    expect(r.ok && Object.keys(r.value)).toEqual(['id']);
+    expect(r.ok && Object.keys(r.value).sort()).toEqual(['effects', 'id']);
+    expect(JSON.stringify(r.ok && r.value)).not.toMatch(/amountCentimes/); // the effects office may see hold no amount
     const read = await inCtx(users.office, (tx) => tx.query('select * from payment_instrument'));
     expect(read.rows).toEqual([]);
     const events = await inCtx(users.office, (tx) => tx.query('select * from instrument_event'));

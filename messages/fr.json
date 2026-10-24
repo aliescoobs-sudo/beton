@@ -744,6 +744,48 @@
         "regularized": "Régularisé",
         "disputed": "Litige"
       }
+    },
+    "invoices": {
+      "link": "Factures",
+      "newLink": "Facturer une commande",
+      "title": "Factures",
+      "intro": "Factures et avoirs, avec l'ICE du client, la TVA et l'échéance de la loi 69-21 (60 jours par défaut, 120 au plus).",
+      "none": "Aucune facture pour le moment.",
+      "number": "Numéro",
+      "order": "Commande",
+      "client": "Client",
+      "invoiceDate": "Date",
+      "issueDeadline": "À émettre avant le",
+      "dueDate": "Échéance",
+      "totalHt": "Total HT",
+      "totalVat": "TVA",
+      "totalTtc": "Total TTC",
+      "state": "État",
+      "issued": "Émise",
+      "cancelled": "Annulée",
+      "creditNote": "Avoir",
+      "issuedLate": "Émise en retard",
+      "overdue": "Échue",
+      "newTitle": "Facturer une commande",
+      "newIntro": "Saisissez le code de la commande : la facture reprend les chargements pas encore facturés.",
+      "orderCode": "Code de la commande",
+      "dueHint": "Laisser vide : date de facture + 60 jours (maximum 120).",
+      "create": "Créer la facture",
+      "saved": "Facture enregistrée :",
+      "another": "Facturer une autre commande",
+      "invalid": "Saisie invalide.",
+      "notFound": "Commande ou chargement introuvable.",
+      "nothingToInvoice": "Rien à facturer : aucun chargement non facturé pour ce code.",
+      "termTooLong": "Échéance trop lointaine : 120 jours au maximum (loi 69-21).",
+      "dueBefore": "L'échéance précède la facture.",
+      "conflict": "Conflit, réessayez.",
+      "error": "Action impossible.",
+      "cancelButton": "Annuler par un avoir",
+      "confirmCancel": "Émettre l'avoir",
+      "back": "Retour",
+      "reason": "Motif (obligatoire)",
+      "reasonRequired": "Le motif est obligatoire.",
+      "alreadyCredited": "Cette facture est déjà annulée."
     }
   },
   "operations": {
@@ -778,7 +820,8 @@
         "CONFLICT": "Conflit, réessayez.",
         "UNAUTHENTICATED": "Session expirée.",
         "FORBIDDEN": "Action non autorisée."
-      }
+      },
+      "continue": "Continuer"
     },
     "deliveries": {
       "link": "Livraisons",
@@ -856,7 +899,41 @@
         "FUTURE_DATE": "Date dans le futur.",
         "FORBIDDEN": "Action non autorisée.",
         "UNAUTHENTICATED": "Session expirée."
-      }
+      },
+      "continue": "Continuer"
     }
+  },
+  "effects": {
+    "title": "Ce que cette action a changé",
+    "documents": {
+      "order": "Commande",
+      "bl": "Bon de livraison",
+      "invoice": "Facture",
+      "credit_note": "Avoir",
+      "purchase": "Achat",
+      "payment": "Paiement enregistré",
+      "receipt": "Réception"
+    },
+    "scheduled": "Livraison prévue le",
+    "remaining": "Reste à livrer sur {code} :",
+    "stockStatus": {
+      "ok": "correct",
+      "low": "bas",
+      "short": "négatif"
+    },
+    "receivableUp": "À recevoir du client",
+    "receivableDown": "Créance client réduite",
+    "payableUp": "À payer au fournisseur",
+    "paymentIn": "Encaissement",
+    "paymentOut": "Décaissement",
+    "methods": {
+      "cash": "espèces",
+      "cheque": "chèque",
+      "lcn": "LCN",
+      "transfer": "virement"
+    },
+    "cleared": "encaissé",
+    "pending": "pas encore encaissé",
+    "covered": "Commande {code} réglée à hauteur de"
   }
 }

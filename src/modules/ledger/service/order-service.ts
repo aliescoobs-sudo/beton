@@ -9,6 +9,7 @@ import {
   require,
   type SessionUser,
 } from '@/modules/platform-security';
+import { type Effect, visibleEffects } from '../domain/effects';
 import { type OrderInput, parseOrderInput } from '../domain/order';
 import { type PlanItem, type PlanItemInput, splitPlan } from '../domain/plan';
 import { presetItems } from '../domain/plan-presets';
@@ -32,6 +33,8 @@ export type OrderError =
 export interface CreatedOrder {
   id: string;
   code: string;
+  /** What the order changed, filtered by role: money facts only for a role that reads money. */
+  effects?: Effect[];
 }
 
 export const dbFailure = (error: unknown): OrderError => {
@@ -191,7 +194,18 @@ export async function createOrder(
     return await inRequest(appPool, actor, async (tx): Promise<Result<CreatedOrder, OrderError>> => {
       const prepared = await prepareOrder(tx, v, deps.today);
       if (!prepared.ok) return prepared;
-      return ok(await insertOrderRows(tx, actor, v, prepared.value, deps.today));
+      const created = await insertOrderRows(tx, actor, v, prepared.value, deps.today);
+      const client = await tx.query<{ code: string }>('select code from client where id = $1', [v.clientId]);
+      const effects: Effect[] = [
+        { kind: 'document', document: 'order', code: created.code },
+        { kind: 'scheduled', code: created.code, date: v.deliveryDate },
+        {
+          kind: 'receivable',
+          clientCode: client.rows[0]?.code ?? null,
+          amountCentimes: prepared.value.totals.totalTtc,
+        },
+      ];
+      return ok({ ...created, effects: visibleEffects(effects, actor.role) });
     });
   } catch (error) {
     return err(dbFailure(error));

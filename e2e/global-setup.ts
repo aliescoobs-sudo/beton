@@ -80,6 +80,7 @@ export default async function globalSetup() {
       [E2E_MD.loadPlant, 'plant', 'fr'],
       [E2E_MD.loadPlantAr, 'plant', 'ar'],
       [E2E_MD.loadOffice, 'office', 'fr'],
+      [E2E_MD.flowOffice, 'office', 'fr'],
       [E2E_MD.cashSupport, 'support', 'fr'],
       [E2E_MD.cashOffice, 'office', 'fr'],
       [E2E_MD.acctOffice, 'office', 'fr'],

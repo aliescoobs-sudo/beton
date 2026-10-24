@@ -5,7 +5,12 @@ import { err, ok, type Result } from '@/lib/result';
 import { can, inRequest, isMalformedId, require, type SessionUser } from '@/modules/platform-security';
 import { needsOldEntryPermission } from '../domain/reversal';
 import { type PlanItemInput, splitPlan } from '../domain/plan';
-import { computePurchaseTotals, parsePurchaseInput, purchaseDueDate } from '../domain/purchase';
+import {
+  computePurchaseTotals,
+  parsePurchaseInput,
+  type PurchaseInput,
+  purchaseDueDate,
+} from '../domain/purchase';
 import { nextDocNumber } from './doc-number';
 import { ledgerParameter } from './order-service';
 
@@ -56,83 +61,95 @@ export async function createPurchase(
   if (!due.ok) return err(due.error);
 
   try {
-    return await inRequest(appPool, actor, async (tx): Promise<Result<CreatedPurchase, PurchaseError>> => {
-      const supplier = await tx.query<{ status: string }>('select status from supplier where id = $1', [
-        v.supplierId,
-      ]);
-      if (!supplier.rows[0]) return err('NOT_FOUND');
-      if (supplier.rows[0].status !== 'active') return err('SUPPLIER_ARCHIVED');
-
-      const vatRateBp = await ledgerParameter(tx, 'vat_rate_bp');
-      const totals = computePurchaseTotals(v.lines, vatRateBp);
-      if (!totals.ok) return err('INVALID');
-
-      const items: PlanItemInput[] = v.plan
-        ? v.plan.map((i) => ({
-            method: i.method,
-            dueDate: i.dueDate,
-            share:
-              i.percentBp !== undefined
-                ? { percentBp: i.percentBp }
-                : { amount: centimes(i.amountCentimes as number) },
-          }))
-        : [{ method: 'transfer', dueDate: due.value, share: { percentBp: 10_000 } }];
-      const plan = splitPlan(totals.value.totalTtc, items);
-      if (!plan.ok) return err('PLAN_INVALID');
-
-      const id = randomUUID();
-      const code = await nextDocNumber(tx, 'ACH', deps.today);
-      // No RETURNING: office has no SELECT policy on the table (blind entry).
-      await tx.query(
-        `insert into purchase (id, code, supplier_id, order_date, supplier_invoice_no, supplier_invoice_date, due_date,
-                               vat_rate_bp, total_ht_centimes, total_vat_centimes, total_ttc_centimes, created_by)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
-        [
-          id,
-          code,
-          v.supplierId,
-          deps.today,
-          v.supplierInvoiceNo ?? null,
-          v.supplierInvoiceDate ?? null,
-          due.value,
-          vatRateBp,
-          totals.value.totalHt,
-          totals.value.totalVat,
-          totals.value.totalTtc,
-          actor.id,
-        ],
-      );
-      for (const [n, line] of v.lines.entries()) {
-        await tx.query(
-          `insert into purchase_line (id, purchase_id, seq, component_id, purchase_unit_id, description, qty_milli,
-                                      unit_price_ht_centimes, line_ht_centimes, created_by)
-           values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-          [
-            randomUUID(),
-            id,
-            n + 1,
-            'componentId' in line ? line.componentId : null,
-            'purchaseUnitId' in line ? line.purchaseUnitId : null,
-            'description' in line ? line.description : null,
-            line.qtyMilli,
-            line.unitPriceHtCentimes,
-            totals.value.lineHt[n],
-            actor.id,
-          ],
-        );
-      }
-      for (const [n, item] of plan.value.entries()) {
-        await tx.query(
-          `insert into purchase_plan_item (id, purchase_id, seq, method, due_date, amount_centimes, created_by)
-           values ($1, $2, $3, $4, $5, $6, $7)`,
-          [randomUUID(), id, n + 1, item.method, item.dueDate, item.amount, actor.id],
-        );
-      }
-      return ok({ id, code });
-    });
+    return await inRequest(appPool, actor, (tx) => insertPurchaseRows(tx, actor, v, due.value, deps.today));
   } catch (error) {
     return err(purchaseFailure(error));
   }
+}
+
+/**
+ * The rows of a purchase in the caller's transaction: supplier check, totals from the domain function, plan split, the
+ * ACH number, lines and plan items. Shared by `createPurchase` and the pilot scenario (which runs as the system actor).
+ */
+export async function insertPurchaseRows(
+  tx: pg.PoolClient,
+  actor: { id: string },
+  v: PurchaseInput,
+  due: string,
+  today: string,
+): Promise<Result<CreatedPurchase, PurchaseError>> {
+  const supplier = await tx.query<{ status: string }>('select status from supplier where id = $1', [
+    v.supplierId,
+  ]);
+  if (!supplier.rows[0]) return err('NOT_FOUND');
+  if (supplier.rows[0].status !== 'active') return err('SUPPLIER_ARCHIVED');
+
+  const vatRateBp = await ledgerParameter(tx, 'vat_rate_bp');
+  const totals = computePurchaseTotals(v.lines, vatRateBp);
+  if (!totals.ok) return err('INVALID');
+
+  const items: PlanItemInput[] = v.plan
+    ? v.plan.map((i) => ({
+        method: i.method,
+        dueDate: i.dueDate,
+        share:
+          i.percentBp !== undefined
+            ? { percentBp: i.percentBp }
+            : { amount: centimes(i.amountCentimes as number) },
+      }))
+    : [{ method: 'transfer', dueDate: due, share: { percentBp: 10_000 } }];
+  const plan = splitPlan(totals.value.totalTtc, items);
+  if (!plan.ok) return err('PLAN_INVALID');
+
+  const id = randomUUID();
+  const code = await nextDocNumber(tx, 'ACH', today);
+  // No RETURNING: office has no SELECT policy on the table (blind entry).
+  await tx.query(
+    `insert into purchase (id, code, supplier_id, order_date, supplier_invoice_no, supplier_invoice_date, due_date,
+                           vat_rate_bp, total_ht_centimes, total_vat_centimes, total_ttc_centimes, created_by)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+    [
+      id,
+      code,
+      v.supplierId,
+      today,
+      v.supplierInvoiceNo ?? null,
+      v.supplierInvoiceDate ?? null,
+      due,
+      vatRateBp,
+      totals.value.totalHt,
+      totals.value.totalVat,
+      totals.value.totalTtc,
+      actor.id,
+    ],
+  );
+  for (const [n, line] of v.lines.entries()) {
+    await tx.query(
+      `insert into purchase_line (id, purchase_id, seq, component_id, purchase_unit_id, description, qty_milli,
+                                  unit_price_ht_centimes, line_ht_centimes, created_by)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [
+        randomUUID(),
+        id,
+        n + 1,
+        'componentId' in line ? line.componentId : null,
+        'purchaseUnitId' in line ? line.purchaseUnitId : null,
+        'description' in line ? line.description : null,
+        line.qtyMilli,
+        line.unitPriceHtCentimes,
+        totals.value.lineHt[n],
+        actor.id,
+      ],
+    );
+  }
+  for (const [n, item] of plan.value.entries()) {
+    await tx.query(
+      `insert into purchase_plan_item (id, purchase_id, seq, method, due_date, amount_centimes, created_by)
+       values ($1, $2, $3, $4, $5, $6, $7)`,
+      [randomUUID(), id, n + 1, item.method, item.dueDate, item.amount, actor.id],
+    );
+  }
+  return ok({ id, code });
 }
 
 export type CancelPurchaseError =

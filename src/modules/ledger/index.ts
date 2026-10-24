@@ -13,6 +13,7 @@ export {
   type CancelPurchaseError,
   createPurchase,
   type CreatedPurchase,
+  insertPurchaseRows,
   listPurchases,
   type PurchaseError,
   type PurchaseView,
@@ -23,6 +24,8 @@ export {
   createInvoice,
   type CreatedInvoice,
   type InvoiceError,
+  insertCreditNoteRows,
+  insertInvoiceRows,
   type InvoiceView,
   listInvoices,
 } from './service/invoice-service';

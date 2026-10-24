@@ -3,9 +3,11 @@
 import { useTranslations } from 'next-intl';
 import { type FormEvent, useMemo, useState } from 'react';
 import { parseCentimes } from '@/lib/money';
+import type { Effect } from '../../domain/effects';
 import type { InstrumentMethod } from '../../domain/instrument';
+import { EffectsPanel } from '../effects/effects-panel';
 
-type Result = { ok: true } | { ok: false; error: string };
+type Result = { ok: true; effects: Effect[] } | { ok: false; error: string };
 interface Party {
   id: string;
   code: string;
@@ -38,6 +40,7 @@ export function PaymentForm({
   const [method, setMethod] = useState<InstrumentMethod>('cheque');
   const [message, setMessage] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [effects, setEffects] = useState<Effect[]>([]);
   const [busy, setBusy] = useState(false);
 
   const parties = direction === 'in' ? clients : suppliers;
@@ -79,8 +82,10 @@ export function PaymentForm({
     setBusy(true);
     try {
       const result = await (direction === 'in' ? receiveAction(input) : issueAction(input));
-      if (result.ok) setSaved(true);
-      else setMessage(errorText(result.error));
+      if (result.ok) {
+        setSaved(true);
+        setEffects(result.effects);
+      } else setMessage(errorText(result.error));
     } finally {
       setBusy(false);
     }
@@ -92,6 +97,7 @@ export function PaymentForm({
         <p role="status" className="text-lg font-medium" data-testid="payment-saved">
           {t('saved')}
         </p>
+        <EffectsPanel effects={effects} testId="payment-effects" />
         <button
           type="button"
           className="btn btn-primary btn-sm"

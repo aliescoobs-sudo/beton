@@ -2,12 +2,12 @@
 
 import { getRequestClock } from '@/app/request-clock';
 import { getPool } from '@/lib/db/pools';
-import { type InstrumentError, issueInstrument, receiveInstrument } from '@/modules/ledger';
+import { type Effect, type InstrumentError, issueInstrument, receiveInstrument } from '@/modules/ledger';
 import { authorize, ForbiddenError } from '@/modules/platform-security';
 import { currentAuthState } from '@/modules/platform-security/next';
 
 export type PaymentActionResult =
-  { ok: true } | { ok: false; error: InstrumentError | 'UNAUTHENTICATED' | 'FORBIDDEN' };
+  { ok: true; effects: Effect[] } | { ok: false; error: InstrumentError | 'UNAUTHENTICATED' | 'FORBIDDEN' };
 
 async function guarded(
   run: (user: Parameters<typeof receiveInstrument>[1], today: string) => ReturnType<typeof receiveInstrument>,
@@ -19,8 +19,8 @@ async function guarded(
   if (!allowed.ok) return { ok: false, error: allowed.reason };
   try {
     const result = await run(allowed.user, (await getRequestClock()).today());
-    // Blind entry: the answer carries no id and no amount, only the outcome.
-    return result.ok ? { ok: true } : { ok: false, error: result.error };
+    // Blind entry: no id and no amount, only the effects the role may see (the service already filtered them).
+    return result.ok ? { ok: true, effects: result.value.effects ?? [] } : { ok: false, error: result.error };
   } catch (error) {
     if (error instanceof ForbiddenError) return { ok: false, error: 'FORBIDDEN' };
     throw error;

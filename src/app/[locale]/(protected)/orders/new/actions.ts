@@ -3,6 +3,7 @@
 import { getRequestClock } from '@/app/request-clock';
 import { getPool } from '@/lib/db/pools';
 import {
+  type Effect,
   createOrder,
   type CreatedOrder,
   type OrderError,
@@ -32,11 +33,13 @@ async function guarded<T>(
 }
 
 // @permission orders.write (owner, office): blind entry, the result carries the code only
-export async function createOrderAction(input: unknown): Promise<{ ok: true; code: string } | Failure> {
+export async function createOrderAction(
+  input: unknown,
+): Promise<{ ok: true; code: string; effects: Effect[] } | Failure> {
   const result = await guarded<CreatedOrder>('orders.write', (user, today) =>
     createOrder(getPool('app'), user, input, { today }),
   );
-  return result.ok ? { ok: true, code: result.value.code } : result;
+  return result.ok ? { ok: true, code: result.value.code, effects: result.value.effects ?? [] } : result;
 }
 
 // @permission orders.read_money (owner)

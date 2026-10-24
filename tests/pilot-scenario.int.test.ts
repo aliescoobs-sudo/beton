@@ -3,7 +3,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ensureRoles, recreateDatabase, SCENARIO_TEST_DATABASE } from '../scripts/db-bootstrap';
 import { runMigrations } from '../scripts/db-migrate';
 import { withRlsContext } from '../src/lib/db/rls-context';
-import { getCashPosition } from '../src/modules/ledger';
+import { getCashPosition, listInvoices, listPurchases } from '../src/modules/ledger';
+import { getStockLevels, seedOperationsScenario } from '../src/modules/operations';
 import { seedPilotScenario } from '../src/modules/ledger/service/pilot-scenario';
 import { seedPilotMasterData } from '../src/modules/master-data';
 import { testEnv } from './db-env';
@@ -205,5 +206,74 @@ describe('the pilot scenario (L34)', () => {
         ]),
       ),
     ).rejects.toThrow();
+  });
+});
+
+// operations O8: loads, signed delivery notes, stock, thresholds, purchases and receipts, invoices and a credit note.
+describe('the operations part of the pilot scenario (O8)', () => {
+  let ops: Awaited<ReturnType<typeof seedOperationsScenario>>;
+  beforeAll(async () => {
+    ops = await seedOperationsScenario(seed, allowed, TODAY);
+  }, 120_000);
+
+  it('loads every order delivered so far, in truck-sized loads, with most signed delivery notes back', async () => {
+    expect(ops.applied).toBe(true);
+    expect(ops.loads).toBeGreaterThan(100);
+    expect(ops.returns).toBeGreaterThan(ops.loads / 2);
+    // Every order due before today is fully loaded; one due today is half loaded.
+    const undelivered = await one(
+      `select count(*)::text as n from sales_order o
+        where o.reverses_id is null and o.delivery_date < $1::date
+          and coalesce((select sum(d.volume_l) from delivery d where d.order_id = o.id), 0) <> o.volume_l`,
+      [TODAY],
+    );
+    expect(undelivered).toBe(0);
+    expect(await one(`select count(*)::text as n from delivery where load_date > $1::date`, [TODAY])).toBe(0);
+  });
+
+  it('leaves the stock believable: nothing negative, cement low, one component just above its threshold', async () => {
+    const levels = await getStockLevels(app, owner);
+    expect(levels.length).toBeGreaterThanOrEqual(6);
+    for (const l of levels) expect(l.status, l.nameFr).not.toBe('short');
+    expect(levels.find((l) => l.nameFr === 'Ciment')?.status).toBe('low');
+    const gravel = levels.find((l) => l.nameFr === 'Gravette 15/25');
+    expect(gravel?.status).toBe('ok');
+    expect(gravel?.level).toBeLessThan((gravel?.lowThreshold ?? 0) * 1.5);
+  });
+
+  it('buys and receives: payables with their plan, receipts that put the stock in, one purchase still expected', async () => {
+    expect(ops.purchases).toBeGreaterThan(60);
+    expect(ops.receipts).toBeGreaterThan(50);
+    const purchases = await listPurchases(app, owner);
+    const expected = purchases.filter((p) => !p.received && p.totalTtcCentimes > 0);
+    expect(expected.length).toBeGreaterThan(0);
+    expect(purchases.every((p) => p.dueDate >= p.orderDate)).toBe(true);
+    // 'Σ plan = TTC' was checked by the database at commit for every one of them.
+  });
+
+  it('invoices the delivered orders, issues one credit note, and the statement shows them', async () => {
+    expect(ops.invoices).toBeGreaterThan(30);
+    const invoices = await listInvoices(app, owner);
+    expect(invoices.filter((i) => i.creditNoteOf)).toHaveLength(1);
+    expect(invoices.filter((i) => !i.creditNoteOf && i.cancelled)).toHaveLength(1);
+    expect(invoices.some((i) => !i.creditNoteOf && i.invoiceDate > i.issueDeadline)).toBe(true);
+  });
+
+  it('is idempotent and audited as the system actor', async () => {
+    const before = await one('select count(*)::text as n from delivery');
+    expect(await seedOperationsScenario(seed, allowed, TODAY)).toMatchObject({ applied: false });
+    expect(await one('select count(*)::text as n from delivery')).toBe(before);
+    for (const table of ['delivery', 'stock_movement', 'purchase', 'invoice']) {
+      expect(
+        await one(
+          `select count(*)::text as n from audit_event where table_name = $1 and actor_user_id <> '00000000-0000-7000-8000-000000000002'`,
+          [table],
+        ),
+        table,
+      ).toBe(0);
+    }
+    await expect(seedOperationsScenario(seed, { ...allowed, REAL_DATA: true }, TODAY)).rejects.toThrow(
+      /REAL_DATA/,
+    );
   });
 });

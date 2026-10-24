@@ -115,3 +115,5 @@ export {
   type InvoiceTotals,
   parseInvoiceInput,
 } from './invoice';
+export { type Effect, isMoneyEffect, visibleEffects } from './effects';
+export { createRng, type Rng } from './scenario';

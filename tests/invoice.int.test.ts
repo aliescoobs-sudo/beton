@@ -70,10 +70,11 @@ const row = async (id: string) =>
 describe('createInvoice (AC-LED-08, 09, 15)', () => {
   it('invoices the loads of an order: lines at the order price, name and ICE and VAT copied, deadline at month end, due +60', async () => {
     const { order, ice } = await orderWithLoads([6000, 4000]);
-    const r = await createInvoice(app, users.office, { orderId: order.id }, { today: TODAY });
+    const r = await createInvoice(app, users.office, { orderCode: order.code }, { today: TODAY });
     if (!r.ok) throw new Error(r.error);
     expect(r.value.number).toMatch(/^FA-2026-\d{5}$/);
-    expect(Object.keys(r.value).sort()).toEqual(['id', 'number']); // office learns no amount
+    expect(Object.keys(r.value).sort()).toEqual(['effects', 'id', 'number']);
+    expect(JSON.stringify(r.value)).not.toMatch(/amountCentimes|936000/); // office learns no amount
     expect(await row(r.value.id)).toMatchObject({
       client_ice: ice,
       vat_rate_bp: 2000,
@@ -102,13 +103,13 @@ describe('createInvoice (AC-LED-08, 09, 15)', () => {
     const first = await createInvoice(
       app,
       users.owner,
-      { orderId: order.id, deliveryIds: [ids[0]] },
+      { orderCode: order.code, deliveryIds: [ids[0]] },
       { today: TODAY },
     );
     expect(first.ok).toBe(true);
-    const second = await createInvoice(app, users.owner, { orderId: order.id }, { today: TODAY });
+    const second = await createInvoice(app, users.owner, { orderCode: order.code }, { today: TODAY });
     expect(second.ok).toBe(true); // the other load
-    expect(await createInvoice(app, users.owner, { orderId: order.id }, { today: TODAY })).toEqual({
+    expect(await createInvoice(app, users.owner, { orderCode: order.code }, { today: TODAY })).toEqual({
       ok: false,
       error: 'NOTHING_TO_INVOICE',
     });
@@ -116,7 +117,7 @@ describe('createInvoice (AC-LED-08, 09, 15)', () => {
       await createInvoice(
         app,
         users.owner,
-        { orderId: order.id, deliveryIds: [randomUUID()] },
+        { orderCode: order.code, deliveryIds: [randomUUID()] },
         { today: TODAY },
       ),
     ).toMatchObject({ ok: false });
@@ -128,7 +129,7 @@ describe('createInvoice (AC-LED-08, 09, 15)', () => {
       await createInvoice(
         app,
         users.owner,
-        { orderId: order.id, dueDate: '2026-11-01', deliveryIds: undefined },
+        { orderCode: order.code, dueDate: '2026-11-01', deliveryIds: undefined },
         { today: TODAY },
       ),
     ).toEqual({ ok: false, error: 'PAYMENT_TERM_TOO_LONG' });
@@ -136,7 +137,7 @@ describe('createInvoice (AC-LED-08, 09, 15)', () => {
     const ok = await createInvoice(
       app,
       users.owner,
-      { orderId: order.id, dueDate: '2026-10-31' },
+      { orderCode: order.code, dueDate: '2026-10-31' },
       { today: TODAY },
     );
     expect(ok.ok).toBe(true);
@@ -146,7 +147,7 @@ describe('createInvoice (AC-LED-08, 09, 15)', () => {
     const made = await Promise.all(Array.from({ length: 10 }, () => orderWithLoads([500])));
     const results = await Promise.all(
       made.map((m, i) =>
-        createInvoice(app, i % 2 ? users.office : users.owner, { orderId: m.order.id }, { today: TODAY }),
+        createInvoice(app, i % 2 ? users.office : users.owner, { orderCode: m.order.code }, { today: TODAY }),
       ),
     );
     const numbers = results.map((r) => {
@@ -177,7 +178,7 @@ describe('createInvoice (AC-LED-08, 09, 15)', () => {
       ),
     );
     expect(after.rows[0]?.n).toBe(before.rows[0]?.n);
-    const r = await createInvoice(app, users.owner, { orderId: order.id }, { today: TODAY });
+    const r = await createInvoice(app, users.owner, { orderCode: order.code }, { today: TODAY });
     if (!r.ok) throw new Error(r.error);
     expect(Number(r.value.number.slice(-5))).toBe(Number(before.rows[0]?.n) + 1);
   });
@@ -205,7 +206,7 @@ describe('createInvoice (AC-LED-08, 09, 15)', () => {
     const good = await createInvoice(
       app,
       users.owner,
-      { orderId: order.id, deliveryIds: [ids[0]!] },
+      { orderCode: order.code, deliveryIds: [ids[0]!] },
       { today: TODAY },
     );
     expect(good.ok).toBe(true);
@@ -217,7 +218,7 @@ describe('createInvoice (AC-LED-08, 09, 15)', () => {
 describe('cancelInvoice: the credit note (AC-LED-08, AC-LED-03)', () => {
   it('writes a credit note with its own number and negated lines; the invoice keeps its number and its loads can be invoiced again', async () => {
     const { order } = await orderWithLoads([5000]);
-    const inv = await createInvoice(app, users.owner, { orderId: order.id }, { today: TODAY });
+    const inv = await createInvoice(app, users.owner, { orderCode: order.code }, { today: TODAY });
     if (!inv.ok) throw new Error(inv.error);
     const cn = await cancelInvoice(app, users.owner, inv.value.id, 'Erreur de prix', { today: TODAY });
     if (!cn.ok) throw new Error(cn.error);
@@ -246,14 +247,16 @@ describe('cancelInvoice: the credit note (AC-LED-08, AC-LED-03)', () => {
       reason: 'Erreur de prix',
     });
     // the load is free again
-    expect((await createInvoice(app, users.owner, { orderId: order.id }, { today: TODAY })).ok).toBe(true);
+    expect((await createInvoice(app, users.owner, { orderCode: order.code }, { today: TODAY })).ok).toBe(
+      true,
+    );
     const audit = await app.query(`select 1`); // pool alive
     expect(audit.rowCount).toBe(1);
   });
 
   it('needs a reason and the owner; no role can UPDATE, DELETE or TRUNCATE an invoice table', async () => {
     const { order } = await orderWithLoads([900]);
-    const inv = await createInvoice(app, users.owner, { orderId: order.id }, { today: TODAY });
+    const inv = await createInvoice(app, users.owner, { orderCode: order.code }, { today: TODAY });
     if (!inv.ok) throw new Error(inv.error);
     expect(await cancelInvoice(app, users.owner, inv.value.id, '  ', { today: TODAY })).toEqual({
       ok: false,
@@ -286,7 +289,7 @@ describe('the client statement shows the invoice and the credit note (AC-LED-19)
       )
     ).rows[0]?.client_id as string;
     const before = await getClientStatement(app, users.owner, clientId, {}, { today: TODAY });
-    const inv = await createInvoice(app, users.owner, { orderId: order.id }, { today: TODAY });
+    const inv = await createInvoice(app, users.owner, { orderCode: order.code }, { today: TODAY });
     if (!inv.ok) throw new Error(inv.error);
     const mid = await getClientStatement(app, users.owner, clientId, {}, { today: TODAY });
     expect(mid?.statement.closing).toBe(before?.statement.closing);
@@ -305,10 +308,28 @@ describe('the client statement shows the invoice and the credit note (AC-LED-19)
   });
 });
 
+describe('what the action changed, by role (AC-LED-26)', () => {
+  it('the owner sees the receivable the invoice creates; office gets the document number and nothing about money', async () => {
+    const a = await orderWithLoads([5000]);
+    const owner = await createInvoice(app, users.owner, { orderCode: a.order.code }, { today: TODAY });
+    if (!owner.ok) throw new Error(owner.error);
+    expect(owner.value.effects).toEqual([
+      { kind: 'document', document: 'invoice', code: owner.value.number },
+      { kind: 'receivable', clientCode: expect.stringMatching(/^CLT-/), amountCentimes: 468_000 },
+    ]);
+    const b = await orderWithLoads([5000]);
+    const office = await createInvoice(app, users.office, { orderCode: b.order.code }, { today: TODAY });
+    if (!office.ok) throw new Error(office.error);
+    expect(office.value.effects).toEqual([
+      { kind: 'document', document: 'invoice', code: office.value.number },
+    ]);
+  });
+});
+
 describe('visibility (DECISIONS 81)', () => {
   it('office creates blind; partner, plant and office read nothing; owner and support read', async () => {
     const { order } = await orderWithLoads([600]);
-    const inv = await createInvoice(app, users.office, { orderId: order.id }, { today: TODAY });
+    const inv = await createInvoice(app, users.office, { orderCode: order.code }, { today: TODAY });
     if (!inv.ok) throw new Error(inv.error);
     for (const role of ['office', 'partner', 'plant'] as const) {
       expect((await inCtx(users[role], (tx) => tx.query('select 1 from invoice'))).rows, role).toEqual([]);

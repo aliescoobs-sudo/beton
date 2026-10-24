@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type pg from 'pg';
 import { err, ok, type Result } from '@/lib/result';
-import { nextDocNumber } from '@/modules/ledger';
+import { type Effect, nextDocNumber, visibleEffects } from '@/modules/ledger';
 import {
   inRequest,
   isMalformedId,
@@ -14,6 +14,7 @@ import { consumptionForLoad } from '../domain/consumption';
 import { parseBlReturnInput, parseCancelLoadInput, parseLoadInput } from '../domain/load-input';
 import { remainingVolume } from '../domain/stock';
 import { tripExceedsLimit } from '../domain/trip';
+import { stockEffects } from './effects';
 
 export type DeliveryError =
   | 'INVALID'
@@ -49,6 +50,8 @@ export interface CreatedLoad {
   volumeL: number;
   /** `LONG_TRIP`: the trip plus the unloading is more than the concrete's workable time (R4). Not a refusal. */
   warnings: 'LONG_TRIP'[];
+  /** What the load changed: the BL, what is left of the order, the stock of every component. Filtered by role. */
+  effects: Effect[];
 }
 
 /** An operations parameter as the roles that load trucks may read it (the plant cannot read the parameter table). */
@@ -88,11 +91,12 @@ export async function createLoad(
     return await inRequest(appPool, actor, async (tx): Promise<Result<CreatedLoad, DeliveryError>> => {
       const order = await tx.query<{
         concrete_type_id: string;
+        code: string;
         volume_l: number;
         zone_id: string | null;
         is_reversed: boolean;
       }>(
-        `select concrete_type_id, volume_l, zone_id, is_reversed from sales_order_ops where id = $1 and reverses_id is null`,
+        `select concrete_type_id, code, volume_l, zone_id, is_reversed from sales_order_ops where id = $1 and reverses_id is null`,
         [v.orderId],
       );
       const o = order.rows[0];
@@ -132,19 +136,67 @@ export async function createLoad(
         }
       }
 
-      const id = randomUUID();
-      const blNo = await nextDocNumber(tx, 'BL', deps.today);
-      await tx.query(
-        `insert into delivery (id, bl_no, order_id, truck_id, volume_l, load_date, recette_id, created_by)
-         values ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [id, blNo, v.orderId, v.truckId, volumeL, deps.today, recetteId, actor.id],
-      );
-      await writeLoadMovements(tx, actor, { id, recetteId, volumeL, date: deps.today });
-      return ok({ id, blNo, volumeL, warnings });
+      const { id, blNo } = await insertLoadRows(tx, actor, {
+        orderId: v.orderId,
+        truckId: v.truckId,
+        volumeL,
+        date: deps.today,
+        recetteId,
+      });
+      const effects: Effect[] = [
+        { kind: 'document', document: 'bl', code: blNo },
+        { kind: 'remaining', orderCode: o.code, remainingL: left - volumeL },
+        ...(await stockEffects(tx, 'delivery', id)),
+      ];
+      return ok({ id, blNo, volumeL, warnings, effects: visibleEffects(effects, actor.role) });
     });
   } catch (error) {
     return err(deliveryFailure(error));
   }
+}
+
+/**
+ * Writes a load: the delivery row with its BL number and the stock movements of the recette in force, in the caller's
+ * transaction. The guards (live order, truck, what is left, recette) are the database's; the caller checks first to give
+ * a readable error. Shared by the plant's `createLoad` and the pilot scenario.
+ */
+export async function insertLoadRows(
+  tx: pg.PoolClient,
+  actor: { id: string },
+  load: {
+    orderId: string;
+    truckId: string;
+    volumeL: number;
+    date: string;
+    recetteId: string;
+    /** The moment of loading; now() when absent. */
+    loadedAt?: string;
+  },
+): Promise<{ id: string; blNo: string }> {
+  const id = randomUUID();
+  const blNo = await nextDocNumber(tx, 'BL', load.date);
+  await tx.query(
+    `insert into delivery (id, bl_no, order_id, truck_id, volume_l, load_date, loaded_at, recette_id, created_by)
+     values ($1, $2, $3, $4, $5, $6, coalesce($7::timestamptz, now()), $8, $9)`,
+    [
+      id,
+      blNo,
+      load.orderId,
+      load.truckId,
+      load.volumeL,
+      load.date,
+      load.loadedAt ?? null,
+      load.recetteId,
+      actor.id,
+    ],
+  );
+  await writeLoadMovements(tx, actor, {
+    id,
+    recetteId: load.recetteId,
+    volumeL: load.volumeL,
+    date: load.date,
+  });
+  return { id, blNo };
 }
 
 /**
@@ -153,7 +205,7 @@ export async function createLoad(
  */
 async function writeLoadMovements(
   tx: pg.PoolClient,
-  actor: SessionUser,
+  actor: { id: string },
   load: { id: string; recetteId: string; volumeL: number; date: string },
 ): Promise<void> {
   const lines = await tx.query<{ component_id: string; qty_per_m3: string }>(
