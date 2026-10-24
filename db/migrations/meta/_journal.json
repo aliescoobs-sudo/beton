@@ -253,6 +253,13 @@
       "when": 1792591232000,
       "tag": "0035_ledger_exposure",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1792591233000,
+      "tag": "0036_money_account",
+      "breakpoints": true
     }
   ]
 }

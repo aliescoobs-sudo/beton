@@ -14,7 +14,8 @@
       "production": "Production",
       "masterData": "Données de base",
       "administration": "Administration",
-      "sub": "Pages du groupe"
+      "sub": "Pages du groupe",
+      "finance": "Trésorerie"
     },
     "dashboard": {
       "action": "Commencer par les clients",
@@ -511,6 +512,29 @@
       "deliveryBeforeOrder": "La livraison ne peut pas précéder la date du jour.",
       "conflict": "Conflit : réessayez.",
       "error": "Action refusée."
+    },
+    "accounts": {
+      "title": "Caisse et comptes bancaires",
+      "link": "Caisse et banques",
+      "readOnly": "Lecture seule : seul le propriétaire modifie les comptes.",
+      "kind": "Type",
+      "cash": "Caisse",
+      "bank": "Banque",
+      "label": "Nom du compte",
+      "bankName": "Banque",
+      "asOf": "Solde au",
+      "opening": "Solde d'ouverture",
+      "amount": "Montant (MAD, négatif si débiteur)",
+      "note": "Note",
+      "actions": "Actions",
+      "add": "Ajouter un compte",
+      "setOpening": "Saisir le solde d'ouverture",
+      "save": "Enregistrer",
+      "saved": "Enregistré.",
+      "invalid": "Valeur refusée.",
+      "duplicate": "Ce compte ou ce solde existe déjà.",
+      "error": "Action refusée.",
+      "empty": "Aucun compte pour le moment."
     }
   }
 }

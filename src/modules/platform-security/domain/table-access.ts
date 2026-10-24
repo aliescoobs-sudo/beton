@@ -494,6 +494,44 @@ export const TABLE_ACCESS = {
       'ledger L3: insert-only plan items; Σ items = order total is a deferred constraint trigger. Same visibility as ' +
       'sales_order.',
   },
+  money_account: {
+    kind: 'rls',
+
+    read: {
+      owner: 'all',
+      partner: 'none',
+      office: 'none',
+      plant: 'none',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'ledger L8: the caisse and bank accounts; owner inserts, owner and support read, nobody else (a cash position is money, DECISIONS 81). Accounts come from the pilot seed.',
+  },
+  opening_balance: {
+    kind: 'rls',
+    money: true,
+    read: {
+      owner: 'all',
+      partner: 'none',
+      office: 'none',
+      plant: 'none',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'ledger L8: one opening balance per account, insert-only; same visibility as money_account. Its audit rows hold the amount and are hidden from the others.',
+  },
   correction_request: {
     kind: 'rls',
     read: {

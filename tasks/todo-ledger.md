@@ -61,7 +61,7 @@ Order list and detail (office/managers: plan, state of each échéance: `pending
 
 ## Phase 2: Instruments and money
 
-### - [ ] L8: Money accounts and opening balances (S)
+### - [x] L8: Money accounts and opening balances (S)
 Migration `money_account` (caisse/bank), `opening_balance`; owner/partner read and write, office and plant none; nav and screen for owners; accounts come from the pilot seed (L24), not the migration.
 **AC:** AC-SEC-04 for both tables × 4 roles (office: no read); opening balance insert-only; OQ9 values are fake.
 **Verify:** `pnpm test:integration money-account rls` · **Files:** migration, ledger/service/money-account-service.ts, ui, tests · **Deps:** L1
@@ -164,12 +164,12 @@ Purchase entry (lines, plan presets), list/detail, receipt and supplier payment 
 ## Phase 4b: Documents and exports (DECISIONS 82)
 
 ### - [ ] L29: Company legal identity (S)
-Migration `company_profile` (versioned, insert-only): legal name and form, ICE, IF, RC, patente, address, phone, email, RIB; read by every role (printed on delivery notes), written by the owner; screen under the owner's administration; fake values only (pilot seed, L24).
+Migration `company_profile` (versioned, insert-only; the owner edits every field of the identity, a change being a new version): legal name and form, ICE, IF, RC, taxe professionnelle (patente) number, address, phone, email, RIB; read by every role (printed on delivery notes), written by the owner; screen under the owner's administration; fake values only (pilot seed, L24).
 **AC:** AC-SEC-04 for the table; a change is a new row, audited; the current profile is the latest `effective_from ≤ today`.
 **Verify:** `pnpm test:integration company-profile rls` · **Files:** migration, service, screen, matrix, tests · **Deps:** L1
 
 ### - [ ] L30: Document kit, invoice and credit note PDF (L)
-Server-side PDF kit (library chosen and pinned at the start of the task, licence and supply-chain checked, noted in the checkpoint) plus a print stylesheet: header with our legal mentions, parties, lines, VAT rate, HT/VAT/TTC, law 69-21 payment-term mention, page footer with number. Route handlers for invoice and credit note PDF (permission `invoices.read`: owner and support), audited as `export`, `Content-Disposition` download and an inline print view. French first; Arabic header only if the font and shaping pass the RTL check, else recorded as a limit.
+Server-side PDF kit (library chosen and pinned at the start of the task, licence and supply-chain checked, noted in the checkpoint) plus a print stylesheet: header with our legal mentions (ICE, IF, RC, patente), parties, lines, VAT rate, HT/VAT/TTC, law 69-21 payment-term mention, page footer with number. Route handlers for invoice and credit note PDF (permission `invoices.read`: owner and support), audited as `export`, `Content-Disposition` download and an inline print view. French first; Arabic header only if the font and shaping pass the RTL check, else recorded as a limit.
 **AC:** AC-LED-22 (PDF text equals the stored invoice; credit note references the invoice number); AC-LED-21 (office, partner, plant 404); both locales render the print view.
 **Verify:** `pnpm test:integration invoice-pdf` + e2e download · **Files:** ledger/documents/*, route handlers, tests · **Deps:** L18, L29
 

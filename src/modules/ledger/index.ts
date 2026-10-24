@@ -14,3 +14,10 @@ export {
   listCorrectionRequests,
   requestCorrection,
 } from './service/correction-service';
+export {
+  createMoneyAccount,
+  listMoneyAccounts,
+  type MoneyAccount,
+  type MoneyAccountError,
+  setOpeningBalance,
+} from './service/money-account-service';

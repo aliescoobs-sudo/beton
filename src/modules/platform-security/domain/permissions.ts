@@ -59,6 +59,9 @@ export const PERMISSIONS = {
   'orders.read_money': MONEY_READ,
   'orders.write': BLIND_WRITE,
   'orders.price_override': MONEY_WRITE,
+  // Caisse and bank accounts with their opening balances (owner writes; owner and support read)
+  'money_accounts.read': MONEY_READ,
+  'money_accounts.write': MONEY_WRITE,
   // Payment instruments, money account entries
   'instruments.read': MONEY_READ,
   'instruments.write': BLIND_WRITE,

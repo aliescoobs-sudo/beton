@@ -37,3 +37,11 @@ export {
   type InstrumentState,
   type TransitionError,
 } from './instrument';
+export {
+  ACCOUNT_KINDS,
+  type AccountKind,
+  type MoneyAccountInput,
+  type OpeningBalanceInput,
+  parseMoneyAccountInput,
+  parseOpeningBalanceInput,
+} from './money-account';

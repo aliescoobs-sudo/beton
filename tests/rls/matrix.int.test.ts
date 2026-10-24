@@ -142,6 +142,27 @@ const FIXTURES: Record<
       ),
     visible: `select split_part(reason, ':', 2) as owner from correction_request where reason like $1 || ':%'`,
   },
+  money_account: {
+    writers: ['owner'],
+    seed: (tx, actor) =>
+      tx.query(
+        `insert into money_account (id, kind, label, created_by) values (gen_random_uuid(), 'cash', $1, $2)`,
+        [`${marker}:${actor}`, actor],
+      ),
+    visible: `select split_part(label, ':', 2) as owner from money_account where label like $1 || ':%'`,
+  },
+  opening_balance: {
+    writers: ['owner'],
+    seed: (tx, actor) =>
+      tx.query(
+        `with a as (select id from money_account where label = $1)
+         insert into opening_balance (id, account_id, as_of, amount_centimes, created_by)
+         select gen_random_uuid(), id, '2026-01-01', 100, $2 from a`,
+        [`${marker}:${actor}`, actor],
+      ),
+    visible: `select b.created_by::text as owner from opening_balance b join money_account a on a.id = b.account_id
+               where a.label like $1 || ':%'`,
+  },
   sales_order: {
     writers: ['owner', 'office'],
     seed: async (tx, actor) => insertOrder(tx, actor, await orderMaster(app, actors.owner, marker)),

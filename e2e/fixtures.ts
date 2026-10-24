@@ -57,6 +57,9 @@ export const E2E_MD = {
   screensPartnerFr: { email: 'e2e-sc-partner-fr@belgobeton.test', name: 'Associé Écrans' },
   screensPartnerAr: { email: 'e2e-sc-partner-ar@belgobeton.test', name: 'شريك الشاشات' },
   clientPlant: { email: 'e2e-cl-plant@belgobeton.test', name: 'Centrale Clients' },
+  acctSupport: { email: 'e2e-ac-support@belgobeton.test', name: 'Support Comptes' },
+  acctOffice: { email: 'e2e-ac-office@belgobeton.test', name: 'Bureau Comptes' },
+  acctPartner: { email: 'e2e-ac-partner@belgobeton.test', name: 'Associé Comptes' },
 } as const;
 export const E2E_CSP = { email: 'e2e-csp@belgobeton.test', name: 'CSP E2E' } as const;
 
@@ -86,6 +89,7 @@ const NAV_GROUP: Record<string, string> = {
   'purchase-prices-link': 'purchases',
   'recettes-link': 'production',
   'trucks-link': 'production',
+  'accounts-link': 'finance',
   'zones-link': 'masterData',
   'concrete-types-link': 'masterData',
   'components-link': 'masterData',

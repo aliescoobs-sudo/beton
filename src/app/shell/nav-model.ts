@@ -9,7 +9,7 @@ interface NavDef {
   allowed: Permission | ((role: Role) => boolean);
 }
 interface GroupDef {
-  id: 'dashboard' | 'sales' | 'purchases' | 'production' | 'masterData' | 'administration';
+  id: 'dashboard' | 'sales' | 'purchases' | 'finance' | 'production' | 'masterData' | 'administration';
   items: NavDef[];
 }
 
@@ -56,6 +56,17 @@ const GROUPS: GroupDef[] = [
         labelKey: 'masterData.purchasePrices.link',
         testId: 'purchase-prices-link',
         allowed: 'purchase_prices.read',
+      },
+    ],
+  },
+  {
+    id: 'finance',
+    items: [
+      {
+        path: '/accounts',
+        labelKey: 'ledger.accounts.link',
+        testId: 'accounts-link',
+        allowed: 'money_accounts.read',
       },
     ],
   },

@@ -52,6 +52,16 @@ const SEED: Record<MoneyTable, (tx: pg.PoolClient, actor: string) => Promise<unk
   sales_order: async (tx, actor) => insertOrder(tx, actor, await orderMaster(app, actors.owner.id, marker)),
   payment_plan_item: async (tx, actor) =>
     insertOrder(tx, actor, await orderMaster(app, actors.owner.id, marker)),
+  opening_balance: async (tx, actor) => {
+    const account = await tx.query<{ id: string }>(
+      `insert into money_account (id, kind, label, created_by) values (gen_random_uuid(), 'cash', $1, $2) returning id`,
+      [`mv${randomUUID().replace(/-/g, '')}`, actor],
+    );
+    return tx.query(
+      `insert into opening_balance (id, account_id, as_of, amount_centimes, created_by) values (gen_random_uuid(), $1, '2026-01-01', 100, $2)`,
+      [account.rows[0]?.id, actor],
+    );
+  },
   selling_price: async (tx, actor) => {
     const type = await tx.query<{ id: string }>(
       `insert into concrete_type (id, code, label) values (gen_random_uuid(), 'V' || upper(substr(md5(random()::text), 1, 8)), $1) returning id`,

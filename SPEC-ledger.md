@@ -48,7 +48,7 @@ Cancellation of an invoice = credit note (`avoir`) referencing it; the number is
 ### Company identity and quotes (DECISIONS 82)
 | Table | Key columns | Notes |
 |---|---|---|
-| `company_profile` | id, legal_name, legal_form, ice, if_no, rc_no, patente_no, address, phone, email, rib, effective_from, created_by | Our own legal mentions, versioned insert-only (a change is a new row); fake values in the pilot; read by every role (it is printed on delivery notes), written by the owner |
+| `company_profile` | id, legal_name, legal_form, ice, if_no, rc_no, patente_no (taxe professionnelle), address, phone, email, rib, effective_from, created_by | Our own legal mentions, versioned insert-only (a change is a new row, so the owner can edit every identity field and the history stays); fake values in the pilot; read by every role (it is printed on delivery notes), written by the owner |
 | `quote` (`devis`) | id, number `DV-YYYY-nnnnn` (gapless per year), client_id, quote_date, valid_until, concrete_type_id, volume_l, unit_price_ht_centimes, vat_rate_bp, totals HT/VAT/TTC, converted_order_id, reverses_id | A proposal, not a commitment: no payment plan, no ledger effect until it is converted into an order by a human (D65); insert-only |
 
 ### Purchases
@@ -101,7 +101,7 @@ Owner/partner W everything; office W on orders, instruments, invoices, purchases
 - **AC-LED-19** The client statement of a client with an order, an invoice, a credit note, two cheques (one bounced) and a cash advance lists every line in two sections, with a running balance equal to Σ signed lines at every row; the summary shows invoiced, delivered, paid, due, late and cancelled; a reversed document stays listed as cancelled. The supplier statement does the same for purchases, receipts and outgoing instruments.
 - **AC-LED-20** Statement filters (date, type, status) change the lines but not the opening balance carried into the range; the closing balance of an unfiltered statement equals the sum of the client's open plan items.
 - **AC-LED-21** Statements, PDFs and exports return nothing to office, partner or plant (service, RLS and page 404; `expectNoFields`); support reads them and each view, print, download and export is audited.
-- **AC-LED-22** The invoice PDF carries our ICE, IF, RC, address, the client's ICE, the sequential number, dates, due date, VAT rate and amounts, all equal to the stored invoice; a credit note PDF references the cancelled invoice number.
+- **AC-LED-22** The invoice PDF carries our ICE, IF, RC, taxe professionnelle (patente) number, address, the client's ICE, the sequential number, dates, due date, VAT rate and amounts, all equal to the stored invoice; a credit note PDF references the cancelled invoice number.
 - **AC-LED-23** A quote converts into an order only through the order form confirmed by a human; the quote is unchanged and linked (`converted_order_id`); a quote has no payment plan and no ledger effect.
 - **AC-LED-24** The accountant export for a period reconciles: Σ sales journal TTC = Σ invoices minus credit notes of the period, and the file is audited.
 
