@@ -8,6 +8,15 @@ export {
   type OrderPreview,
   previewOrder,
 } from './service/order-service';
+export {
+  cancelPurchase,
+  type CancelPurchaseError,
+  createPurchase,
+  type CreatedPurchase,
+  listPurchases,
+  type PurchaseError,
+  type PurchaseView,
+} from './service/purchase-service';
 export { cancelOrder, type CancelOrderError, type CancelledOrder } from './service/order-reversal';
 export {
   type CorrectionRequest,

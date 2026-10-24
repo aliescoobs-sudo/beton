@@ -387,3 +387,73 @@ export function newDelivery(
     insertDelivery(tx, ownerId, scene, volumeL, year),
   );
 }
+
+/** Master data a purchase needs: an active supplier, a component with a purchase unit (1 t = 1 000 000 g). Once per marker, by the owner. */
+export interface PurchaseMaster {
+  supplierId: string;
+  componentId: string;
+  unitId: string;
+}
+const purchaseCache = new Map<string, Promise<PurchaseMaster>>();
+
+export function purchaseMaster(app: pg.Pool, ownerId: string, marker: string): Promise<PurchaseMaster> {
+  let made = purchaseCache.get(marker);
+  if (!made) {
+    made = withRlsContext(app, { userId: ownerId, role: 'owner', requestId: marker }, async (tx) => {
+      const supplier = await tx.query<{ id: string }>(
+        `insert into supplier (id, code, name, category) values (gen_random_uuid(), public.next_code('FRN', 2), $1, 'cement') returning id`,
+        [`ps${marker}`],
+      );
+      const component = await tx.query<{ id: string }>(
+        `insert into component (id, code, name_fr, name_ar, base_unit) values (gen_random_uuid(), public.next_code('CMP', 2), $1, 'x', 'g') returning id`,
+        [`ps${marker}`],
+      );
+      const unit = await tx.query<{ id: string }>(
+        `insert into purchase_unit (id, component_id, label, factor_to_base) values (gen_random_uuid(), $1, 't', 1000000) returning id`,
+        [component.rows[0]?.id],
+      );
+      return {
+        supplierId: supplier.rows[0]?.id as string,
+        componentId: component.rows[0]?.id as string,
+        unitId: unit.rows[0]?.id as string,
+      };
+    });
+    purchaseCache.set(marker, made);
+  }
+  return made;
+}
+
+/**
+ * Inserts one purchase of 30 t at 1 450,00 per t (HT 43 500,00, VAT 20 % 8 700,00, TTC 52 200,00) with one plan item, the
+ * way the service does: number from next_doc_number, no RETURNING. Run it inside the actor's transaction.
+ */
+export async function insertPurchase(
+  tx: pg.PoolClient,
+  actorId: string,
+  master: PurchaseMaster,
+  opts: { orderDate?: string; dueDate?: string } = {},
+): Promise<{ id: string; code: string }> {
+  const id = randomUUID();
+  const code = (await tx.query<{ n: string }>(`select public.next_doc_number('ACH', 2026, 5) as n`)).rows[0]
+    ?.n as string;
+  const orderDate = opts.orderDate ?? '2026-06-01';
+  const dueDate = opts.dueDate ?? '2026-07-31';
+  await tx.query(
+    `insert into purchase (id, code, supplier_id, order_date, due_date, vat_rate_bp, total_ht_centimes, total_vat_centimes,
+                           total_ttc_centimes, created_by)
+     values ($1, $2, $3, $4, $5, 2000, 4350000, 870000, 5220000, $6)`,
+    [id, code, master.supplierId, orderDate, dueDate, actorId],
+  );
+  await tx.query(
+    `insert into purchase_line (id, purchase_id, seq, component_id, purchase_unit_id, qty_milli, unit_price_ht_centimes,
+                                line_ht_centimes, created_by)
+     values (gen_random_uuid(), $1, 1, $2, $3, 30000, 145000, 4350000, $4)`,
+    [id, master.componentId, master.unitId, actorId],
+  );
+  await tx.query(
+    `insert into purchase_plan_item (id, purchase_id, seq, method, due_date, amount_centimes, created_by)
+     values (gen_random_uuid(), $1, 1, 'transfer', $2, 5220000, $3)`,
+    [id, dueDate, actorId],
+  );
+  return { id, code };
+}

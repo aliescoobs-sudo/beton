@@ -97,3 +97,12 @@ export {
   type StatementSummary,
 } from './statement';
 export { plainAmount, statementToCsv } from './statement-csv';
+export {
+  computePurchaseTotals,
+  parsePurchaseInput,
+  type PurchaseDueError,
+  type PurchaseInput,
+  type PurchaseLineInput,
+  purchaseDueDate,
+  type PurchaseTotals,
+} from './purchase';

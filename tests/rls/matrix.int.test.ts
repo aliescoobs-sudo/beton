@@ -14,9 +14,11 @@ import {
   insertInstrument,
   insertMovementReversal,
   insertOrder,
+  insertPurchase,
   moneyMaster,
   newCashMovement,
   orderMaster,
+  purchaseMaster,
 } from '../helpers/ledger-fixtures';
 import { resetSimClock } from '../helpers/reset-sim-clock';
 import { ANONYMOUS_ACTOR_ID, SYSTEM_ACTOR_ID } from '../../src/modules/platform-security/auth/actors';
@@ -292,6 +294,25 @@ const FIXTURES: Record<
     seed: async () => undefined,
     visible: `select i.created_by::text as owner from payment_plan_item i join sales_order o on o.id = i.order_id
                 join client c on c.id = o.client_id where c.name = 'fx' || $1`,
+  },
+  purchase: {
+    writers: ['owner', 'office'],
+    seed: async (tx, actor) => insertPurchase(tx, actor, await purchaseMaster(app, actors.owner, marker)),
+    visible: `select p.created_by::text as owner from purchase p join supplier s on s.id = p.supplier_id
+                where s.name = 'ps' || $1`,
+  },
+  purchase_line: {
+    // Written together with their purchase by the same actors (seeded by the purchase fixture above).
+    writers: ['owner', 'office'],
+    seed: async () => undefined,
+    visible: `select l.created_by::text as owner from purchase_line l join purchase p on p.id = l.purchase_id
+                join supplier s on s.id = p.supplier_id where s.name = 'ps' || $1`,
+  },
+  purchase_plan_item: {
+    writers: ['owner', 'office'],
+    seed: async () => undefined,
+    visible: `select i.created_by::text as owner from purchase_plan_item i join purchase p on p.id = i.purchase_id
+                join supplier s on s.id = p.supplier_id where s.name = 'ps' || $1`,
   },
   doc_sequence: {
     // Written only through next_doc_number(): owner and office may call it. Persistent by design, like code_sequence.

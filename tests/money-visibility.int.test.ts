@@ -14,9 +14,11 @@ import {
   insertInstrument,
   insertMovementReversal,
   insertOrder,
+  insertPurchase,
   moneyMaster,
   newCashMovement,
   orderMaster,
+  purchaseMaster,
 } from './helpers/ledger-fixtures';
 
 // DECISIONS 81 (provisional): money visibility enforced by the database. Every table flagged `money` in TABLE_ACCESS
@@ -108,6 +110,13 @@ const SEED: Record<MoneyTable, (tx: pg.PoolClient, actor: string) => Promise<unk
       [scene.instrumentId, scene.itemId, actor],
     );
   },
+  purchase: async (tx, actor) =>
+    insertPurchase(tx, actor, await purchaseMaster(app, actors.owner.id, marker)),
+  // Lines and plan items are written together with their purchase, by the same actors.
+  purchase_line: async (tx, actor) =>
+    insertPurchase(tx, actor, await purchaseMaster(app, actors.owner.id, marker)),
+  purchase_plan_item: async (tx, actor) =>
+    insertPurchase(tx, actor, await purchaseMaster(app, actors.owner.id, marker)),
   selling_price: async (tx, actor) => {
     const type = await tx.query<{ id: string }>(
       `insert into concrete_type (id, code, label) values (gen_random_uuid(), 'V' || upper(substr(md5(random()::text), 1, 8)), $1) returning id`,
