@@ -38,6 +38,8 @@ The ledger records every money commitment and movement exactly: orders with deli
 17. **Money documents are generated, not stored as blobs.** Invoice, credit note and quote PDFs are rendered on demand from the stored rows (so the PDF always equals the data), owner and support only, every print/download audited. Our legal identity is a versioned `company_profile` row. The delivery note belongs to `operations` and reuses the kit (AC-OPS-11). (L29–L31.)
 18. **Accountant export** is CSV in the MVP (journals and ageing for a period), owner and support only, audited, with a reconciliation check and formula-injection protection; other formats wait for open question 13. (L32.)
 
+19. **Start in the middle of activity** (owner's brief 2026-10-24). The opening state is the cash and bank opening balances (L8), party opening balances (L33), and the normal documents entered with past dates (instruments in hand, installment plans, orders). The pilot scenario (L34) uses the same tables through the seed role and grows as invoices, purchases and stock land. After each action the person sees its effects, filtered by role (L35).
+
 ## Dependency graph
 ```
 L1 domain (vat, splitPlan, params, request helpers lifted) ─ L2 yearly counters
@@ -98,6 +100,8 @@ Spec ACs 01–13; 14–18 are **proposed additions** (19–24 added 2026-10-24 o
 | AC-LED-23 *(new)* | Quote converts to an order only through a human-confirmed form; no ledger effect | L31 |
 | AC-LED-24 *(new)* | Accountant export reconciles with the invoices and is audited | L32 |
 | AC-OPS-11 *(operations)* | Delivery note without prices, printed by office and plant | operations plan (reuses L30) |
+| AC-LED-25 *(new)* | Opening state entered once, owner only, audited; party opening balances in statements | L33 |
+| AC-LED-26 *(new)* | After an action, the effects shown are filtered by role: office sees no money effect | L35 |
 | AC-SEC-04 (ledger) | RLS matrix per table × role | each table task, L26 |
 | AC-SEC-05 (ledger) | Plant: no price/total/plan/contact; office: no margin, no cash position | L7, L16, L26 |
 

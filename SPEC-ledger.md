@@ -105,5 +105,8 @@ Owner/partner W everything; office W on orders, instruments, invoices, purchases
 - **AC-LED-23** A quote converts into an order only through the order form confirmed by a human; the quote is unchanged and linked (`converted_order_id`); a quote has no payment plan and no ledger effect.
 - **AC-LED-24** The accountant export for a period reconciles: Σ sales journal TTC = Σ invoices minus credit notes of the period, and the file is audited.
 
+- **AC-LED-25** The opening state is entered once, with an opening date, by the owner only and audited: cash and bank opening balances, opening balances of clients and suppliers, and the instruments and plans already running (entered with their real past dates). A second opening is refused.
+- **AC-LED-26** After a recorded action the person sees what changed, filtered by role: office sees no amount, balance or total; owner and support see the money effects as well.
+
 ## 6. Assumptions relied on
 ✅ D4, D5, D9, D14; 🟡 D27 (methods), 🟡 D28 (lifecycle), 🟡 D29 (early presentation), 🟡 D31 (internal invoices), 🟡 D34 (reversals), ✅ A4 (VAT 20% in simulation, configurable), ✅ A9, ✅ A27, 🟡 A26, OQ7 (VAT), OQ9 (opening balances).

@@ -1,6 +1,6 @@
 # Task list: `ledger`
 
-Plan: [tasks/plan-ledger.md](plan-ledger.md) (**approved**; build phase by phase). Standard verification for every task: `pnpm lint && pnpm typecheck && pnpm test` (+ `pnpm test:integration` when it touches the DB, `SIMULATION_ENABLED=false pnpm build` and `pnpm exec playwright test` when it adds a route or screen). One commit per task. Every new table: `TABLE_ACCESS` entry (+ `insertOnly`, `noDelete`), matrix fixture, FORCE RLS, audit trigger, no UPDATE/DELETE grant. Migrations create structure only. Checkpoint review with Ali after L5 (CP-L1) before L8 / L17 / L20 (approved). Build order from CP-L1 (owner's brief 2026-10-24): L8–L11, L16, L12–L13, L14–L15, L27–L28 (CP-L3), L6–L7 (CP-L2), L17–L19, L20–L23 (CP-L4), L29–L32, L24–L26 (CP-L5). Checkpoint notes go to docs/checkpoints/CP-<name>.md.
+Plan: [tasks/plan-ledger.md](plan-ledger.md) (**approved**; build phase by phase). Standard verification for every task: `pnpm lint && pnpm typecheck && pnpm test` (+ `pnpm test:integration` when it touches the DB, `SIMULATION_ENABLED=false pnpm build` and `pnpm exec playwright test` when it adds a route or screen). One commit per task. Every new table: `TABLE_ACCESS` entry (+ `insertOnly`, `noDelete`), matrix fixture, FORCE RLS, audit trigger, no UPDATE/DELETE grant. Migrations create structure only. Checkpoint review with Ali after L5 (CP-L1) before L8 / L17 / L20 (approved). Build order (owner's briefs 2026-10-24, latest first): L8–L11 and L16 done; then the opening state and the pilot scenario (L33, L34, extended as invoices, purchases and stock land), L12–L15, L27–L28 (CP-L3), the operations core (plan in tasks/plan-operations.md; deliveries, delivery-note data, stock from the recette in force, receipts, thresholds) with L17 and L20–L21 pulled in as it needs them, the effects panel (L35), then the rest of the ledger: L6–L7 (CP-L2), L18–L19, L22–L23 (CP-L4), L29–L32, L24–L26 (CP-L5). Checkpoint notes go to docs/checkpoints/CP-<name>.md.
 
 ## Phase 0: Foundations and the financial pattern
 
@@ -58,6 +58,23 @@ Order list and detail (office/managers: plan, state of each échéance: `pending
 
 ### Checkpoint CP-L2: Orders
 - [ ] AC-LED-01, 02, 03 (orders), 10, 12, 13, 17, 18 and AC-SEC-05 order part green; both locales render
+
+## Phase 2a: Opening state and pilot scenario (owner's brief 2026-10-24)
+
+### - [ ] L33: Opening state (M)
+The app starts in the middle of real activity. Already covered: cash and bank opening balances (L8); instruments in hand at go-live and installment plans (the normal services, entered by the owner with explicit past dates: received cheques/LCN not cleared, issued cheques not presented, orders with running plans). New here: `ledger_opening` (singleton, insert-only: the opening date, entered once, owner only, audited) and `opening_party_balance` (insert-only: client or supplier, amount owed to us or by us at the opening date, reference text; owner only, money). Opening stock per component belongs to `operations` (O-tasks). Statements (L27) and the cash position (L16) read these rows.
+**AC (new AC-LED-25):** the opening is entered once (a second is refused); owner only, support reads; a party opening balance is audited and appears in that party's statement; money-visibility and RLS matrix cover both tables; office/partner/plant read nothing.
+**Verify:** `pnpm test:integration opening rls` · **Files:** migration, service, tests · **Deps:** L8, L11
+
+### - [ ] L34: Pilot scenario seed (L)
+Fake data only (decision 79), through `belgobeton_seed` (new grants in db/seed/seed-role.sql, SELECT/INSERT only, simulation only), dated relative to the simulation clock: a mid-size Tetouan plant three months into activity: ~25 clients and 8 suppliers (cement, sand, gravel, admixture, transport, fuel), past orders with plans, partly paid; cheques and LCN in every state (in portfolio, deposited, cleared, bounced inside its window, regularized), installment plans running, caisse and two banks with opening balances, one tight cash day inside the next two weeks. Idempotent, audited as `system/seed`, refuses outside simulation. `pnpm db:scenario` runs it after `db:seed`. Extended by later tasks: invoices and a credit note (L17/L18), purchases and payables due in two weeks (L20/L22), deliveries and stock levels (operations). Supersedes the scope of L24 (L24 keeps the idempotence/audit checks for the final seed).
+**AC:** idempotent; every row audited as `system/seed`; the screens built so far are populated; `belgobeton_system` still cannot insert ledger rows; money-visibility tests still hold on the seeded data.
+**Verify:** `pnpm test:integration pilot-scenario` · **Files:** ledger/service/pilot-scenario.ts, db/seed/seed-role.sql, scripts/seed-scenario.ts, tests · **Deps:** L11, L16, L33
+
+### - [ ] L35: What an action changed (M)
+After a recorded action (order, payment, delivery, receipt...) the person sees what it changed: stock, money, alerts. Effects are computed by the service as a list of typed facts; the action layer filters them by role: office sees only non-money effects (stock down, delivery scheduled, document numbers), owner and support see money effects too (cash, receivable, payable). No effect is invented by AI.
+**AC (new AC-LED-26):** a payment entered by office shows no amount, balance or total; the same payment viewed by the owner shows the cash and receivable change; `expectNoFields` on every office response; fr/ar.
+**Verify:** `pnpm test src/modules/ledger/domain` · e2e · **Deps:** L14, operations core
 
 ## Phase 2: Instruments and money
 
