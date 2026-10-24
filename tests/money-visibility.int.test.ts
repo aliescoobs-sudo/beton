@@ -8,7 +8,14 @@ import { RLS_TABLES, TABLE_ACCESS } from '../src/modules/platform-security/domai
 import { recordMoneyView } from '../src/modules/platform-security';
 import { testEnv } from './db-env';
 import { realActor, realSessionUser, type TestActor } from './helpers/actors';
-import { insertOrder, orderMaster } from './helpers/ledger-fixtures';
+import {
+  insertInstrument,
+  insertMovementReversal,
+  insertOrder,
+  moneyMaster,
+  newCashMovement,
+  orderMaster,
+} from './helpers/ledger-fixtures';
 
 // DECISIONS 81 (provisional): money visibility enforced by the database. Every table flagged `money` in TABLE_ACCESS
 // gives zero rows to partner, office, plant, system and anonymous; the owner and support read; support writes nothing;
@@ -61,6 +68,28 @@ const SEED: Record<MoneyTable, (tx: pg.PoolClient, actor: string) => Promise<unk
       `insert into opening_balance (id, account_id, as_of, amount_centimes, created_by) values (gen_random_uuid(), $1, '2026-01-01', 100, $2)`,
       [account.rows[0]?.id, actor],
     );
+  },
+  payment_instrument: async (tx, actor) => {
+    await moneyMaster(app, actors.owner.id, marker);
+    return insertInstrument(tx, actor, {
+      clientId: (await orderMaster(app, actors.owner.id, marker)).clientId,
+    });
+  },
+  instrument_event: async (tx, actor) => {
+    await moneyMaster(app, actors.owner.id, marker);
+    return insertInstrument(tx, actor, {
+      clientId: (await orderMaster(app, actors.owner.id, marker)).clientId,
+    });
+  },
+  money_movement: async (tx, actor) => {
+    await moneyMaster(app, actors.owner.id, marker);
+    const original = await newCashMovement(
+      app,
+      actors.owner.id,
+      marker,
+      (await orderMaster(app, actors.owner.id, marker)).clientId,
+    );
+    return insertMovementReversal(tx, actor, original, `mv ${marker}`);
   },
   selling_price: async (tx, actor) => {
     const type = await tx.query<{ id: string }>(

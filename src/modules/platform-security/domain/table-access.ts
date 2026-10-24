@@ -532,6 +532,66 @@ export const TABLE_ACCESS = {
     exception:
       'ledger L8: one opening balance per account, insert-only; same visibility as money_account. Its audit rows hold the amount and are hidden from the others.',
   },
+  payment_instrument: {
+    kind: 'rls',
+    money: true,
+    blindWriters: ['office'],
+    read: {
+      owner: 'all',
+      partner: 'none',
+      office: 'none',
+      plant: 'none',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'ledger L10: cash, cheque, LCN and transfer, incoming and outgoing. Insert-only; the current state is the last event (derived). Owner and support read; office inserts and cannot read back (blind entry, DECISIONS 81).',
+  },
+  instrument_event: {
+    kind: 'rls',
+    money: true,
+    blindWriters: ['office'],
+    read: {
+      owner: 'all',
+      partner: 'none',
+      office: 'none',
+      plant: 'none',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'ledger L10: append-only lifecycle events. A guard trigger enforces the legal transitions (L9 table), dates, accounts and who may do what; office may record receipt, issue and a same-day cash clearing only.',
+  },
+  money_movement: {
+    kind: 'rls',
+    money: true,
+
+    read: {
+      owner: 'all',
+      partner: 'none',
+      office: 'none',
+      plant: 'none',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'ledger L10: signed cash movements, written only by the SECURITY DEFINER trigger on a cleared event (exactly one per instrument); the owner may insert a reversing movement (exact negation, once). Nobody else has an INSERT path.',
+  },
   correction_request: {
     kind: 'rls',
     read: {

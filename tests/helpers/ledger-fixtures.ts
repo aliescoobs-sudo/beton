@@ -67,3 +67,123 @@ export async function insertOrder(
   );
   return { id, code };
 }
+
+/** A bank account and a supplier for instrument tests, plus a caisse when the database has none. Created once per marker by the owner. */
+export interface MoneyMaster {
+  bankId: string;
+  supplierId: string;
+}
+const moneyCache = new Map<string, Promise<MoneyMaster>>();
+
+export function moneyMaster(app: pg.Pool, ownerId: string, marker: string): Promise<MoneyMaster> {
+  let made = moneyCache.get(marker);
+  if (!made) {
+    made = withRlsContext(app, { userId: ownerId, role: 'owner', requestId: marker }, async (tx) => {
+      const caisse = await tx.query<{ n: string }>(
+        `select count(*)::text as n from money_account where kind = 'cash'`,
+      );
+      if (caisse.rows[0]?.n === '0') {
+        await tx.query(
+          `insert into money_account (id, kind, label, created_by) values (gen_random_uuid(), 'cash', $1, $2)`,
+          [`Caisse ${randomUUID().replace(/-/g, '').slice(0, 12)}`, ownerId],
+        );
+      }
+      const bank = await tx.query<{ id: string }>(
+        `insert into money_account (id, kind, label, bank_name, created_by) values (gen_random_uuid(), 'bank', $1, 'Banque test', $2) returning id`,
+        [`Banque ${randomUUID().replace(/-/g, '').slice(0, 12)}`, ownerId],
+      );
+      const supplier = await tx.query<{ id: string }>(
+        `insert into supplier (id, code, name, category) values (gen_random_uuid(), public.next_code('FRN', 2), $1, 'other') returning id`,
+        [`fxs${marker}`],
+      );
+      return { bankId: bank.rows[0]?.id as string, supplierId: supplier.rows[0]?.id as string };
+    });
+    moneyCache.set(marker, made);
+  }
+  return made;
+}
+
+/**
+ * Inserts an instrument and its first event as the actor, the way the service does (no RETURNING). `method` defaults to
+ * an incoming cheque of 5 000,00 received and written on 2026-06-01. Cash also gets its same-day clearing into the caisse.
+ */
+export async function insertInstrument(
+  tx: pg.PoolClient,
+  actorId: string,
+  p: {
+    direction?: 'in' | 'out';
+    method?: 'cash' | 'cheque' | 'lcn' | 'transfer';
+    amountCentimes?: number;
+    clientId?: string;
+    supplierId?: string;
+    writtenDate?: string;
+    receivedDate?: string;
+  },
+): Promise<{ id: string }> {
+  const direction = p.direction ?? 'in';
+  const method = p.method ?? 'cheque';
+  const received = p.receivedDate ?? '2026-06-01';
+  const paper = method === 'cheque' || method === 'lcn';
+  const id = randomUUID();
+  await tx.query(
+    `insert into payment_instrument (id, direction, method, amount_centimes, client_id, supplier_id, number, bank, written_date, received_date, created_by)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+    [
+      id,
+      direction,
+      method,
+      p.amountCentimes ?? 500_000,
+      direction === 'in' ? p.clientId : null,
+      direction === 'out' ? p.supplierId : null,
+      paper ? `N${randomUUID().replace(/-/g, '').slice(0, 10)}` : null,
+      method === 'cash' ? null : 'Banque test',
+      paper ? (p.writtenDate ?? received) : null,
+      received,
+      actorId,
+    ],
+  );
+  await tx.query(
+    `insert into instrument_event (id, instrument_id, event, at_date, created_by) values (gen_random_uuid(), $1, $2, $3, $4)`,
+    [id, direction === 'in' ? 'received' : 'issued', received, actorId],
+  );
+  if (method === 'cash') {
+    await tx.query(
+      `insert into instrument_event (id, instrument_id, event, at_date, money_account_id, created_by)
+       values (gen_random_uuid(), $1, 'cleared', $2, public.default_cash_account(), $3)`,
+      [id, received, actorId],
+    );
+  }
+  return { id };
+}
+
+/** A movement written by the owner's cash clearing (through the trigger), for the tests that reverse or read movements. */
+export async function newCashMovement(
+  app: pg.Pool,
+  ownerId: string,
+  marker: string,
+  clientId: string,
+  amountCentimes = 123_400,
+): Promise<{ id: string; accountId: string; amountCentimes: number }> {
+  return withRlsContext(app, { userId: ownerId, role: 'owner', requestId: marker }, async (tx) => {
+    const instrument = await insertInstrument(tx, ownerId, { method: 'cash', clientId, amountCentimes });
+    const { rows } = await tx.query<{ id: string; account_id: string }>(
+      `select id, account_id from money_movement where source = 'instrument' and source_id = $1`,
+      [instrument.id],
+    );
+    return { id: rows[0]?.id as string, accountId: rows[0]?.account_id as string, amountCentimes };
+  });
+}
+
+/** The reversing row of a movement, written directly (only the owner's policy lets it in). */
+export function insertMovementReversal(
+  tx: pg.PoolClient,
+  actorId: string,
+  original: { id: string; accountId: string; amountCentimes: number },
+  reason: string,
+) {
+  return tx.query(
+    `insert into money_movement (id, account_id, amount_centimes, movement_date, source, source_id, reverses_id, reason, created_by)
+     values (gen_random_uuid(), $1, $2, '2026-06-02', 'reversal', $3, $3, $4, $5)`,
+    [original.accountId, -original.amountCentimes, original.id, reason, actorId],
+  );
+}

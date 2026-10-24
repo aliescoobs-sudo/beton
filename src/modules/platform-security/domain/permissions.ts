@@ -65,6 +65,8 @@ export const PERMISSIONS = {
   // Payment instruments, money account entries
   'instruments.read': MONEY_READ,
   'instruments.write': BLIND_WRITE,
+  // Deposit, clear, bounce, regularize, dispute and cancel confirm money: the owner's
+  'instruments.manage': MONEY_WRITE,
   // Invoices
   'invoices.read': MONEY_READ,
   'invoices.write': BLIND_WRITE,

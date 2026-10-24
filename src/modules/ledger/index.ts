@@ -21,3 +21,15 @@ export {
   type MoneyAccountError,
   setOpeningBalance,
 } from './service/money-account-service';
+export {
+  cancelInstrument,
+  clearInstrument,
+  type InstrumentError,
+  type InstrumentEventView,
+  type InstrumentRef,
+  type InstrumentView,
+  issueInstrument,
+  listInstruments,
+  receiveInstrument,
+  reverseMovement,
+} from './service/instrument-service';

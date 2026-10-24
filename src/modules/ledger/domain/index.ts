@@ -45,3 +45,15 @@ export {
   parseMoneyAccountInput,
   parseOpeningBalanceInput,
 } from './money-account';
+export {
+  type CancelInstrumentInput,
+  type ClearInstrumentInput,
+  type IssueInstrumentInput,
+  parseCancelInput,
+  parseClearInput,
+  parseIssueInput,
+  parseReceiveInput,
+  parseReverseInput,
+  type ReceiveInstrumentInput,
+  type ReverseMovementInput,
+} from './instrument-input';

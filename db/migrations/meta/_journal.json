@@ -260,6 +260,13 @@
       "when": 1792591233000,
       "tag": "0036_money_account",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1792591234000,
+      "tag": "0037_payment_instrument",
+      "breakpoints": true
     }
   ]
 }

@@ -5,7 +5,14 @@ import { DB_ROLES, withRlsContext } from '../../src/lib/db/rls-context';
 import { RLS_TABLES, TABLE_ACCESS } from '../../src/modules/platform-security/domain/table-access';
 import { testEnv } from '../db-env';
 import { realActor } from '../helpers/actors';
-import { insertOrder, orderMaster } from '../helpers/ledger-fixtures';
+import {
+  insertInstrument,
+  insertMovementReversal,
+  insertOrder,
+  moneyMaster,
+  newCashMovement,
+  orderMaster,
+} from '../helpers/ledger-fixtures';
 import { resetSimClock } from '../helpers/reset-sim-clock';
 import { ANONYMOUS_ACTOR_ID, SYSTEM_ACTOR_ID } from '../../src/modules/platform-security/auth/actors';
 import { USER_ROLES } from '../../src/modules/platform-security/domain/permissions';
@@ -162,6 +169,39 @@ const FIXTURES: Record<
       ),
     visible: `select b.created_by::text as owner from opening_balance b join money_account a on a.id = b.account_id
                where a.label like $1 || ':%'`,
+  },
+  payment_instrument: {
+    writers: ['owner', 'office'],
+    seed: async (tx, actor) => {
+      await moneyMaster(app, actors.owner, marker);
+      return insertInstrument(tx, actor, {
+        clientId: (await orderMaster(app, actors.owner, marker)).clientId,
+      });
+    },
+    visible: `select i.created_by::text as owner from payment_instrument i join client c on c.id = i.client_id
+               where c.name = 'fx' || $1 and i.method = 'cheque'`,
+  },
+  instrument_event: {
+    // The first event is written with its instrument by the same actors (seeded by the fixture above).
+    writers: ['owner', 'office'],
+    seed: async () => undefined,
+    visible: `select e.created_by::text as owner from instrument_event e join payment_instrument i on i.id = e.instrument_id
+                join client c on c.id = i.client_id where c.name = 'fx' || $1 and i.method = 'cheque'`,
+  },
+  money_movement: {
+    // Rows come from the definer trigger on a clearing; the only direct insert is the owner's reversal.
+    writers: ['owner'],
+    seed: async (tx, actor) => {
+      await moneyMaster(app, actors.owner, marker);
+      const original = await newCashMovement(
+        app,
+        actors.owner,
+        marker,
+        (await orderMaster(app, actors.owner, marker)).clientId,
+      );
+      return insertMovementReversal(tx, actor, original, `${marker}:${actor}`);
+    },
+    visible: `select split_part(reason, ':', 2) as owner from money_movement where source = 'reversal' and reason like $1 || ':%'`,
   },
   sales_order: {
     writers: ['owner', 'office'],

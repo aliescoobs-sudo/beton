@@ -66,6 +66,7 @@ describe('functions the application role can execute', () => {
     'ctx.sim_at()',
     'ctx.sim_now()',
     'ctx.user_id()',
+    'public.default_cash_account()',
     'public.ledger_parameter(p_key text)',
     'public.next_code(p_key text, p_width integer)',
     'public.next_doc_number(p_prefix text, p_year integer, p_width integer)',

@@ -71,7 +71,7 @@ Pure `nextState(direction, method, state, event)`: incoming `received → deposi
 **AC:** AC-LED-04 (domain: `cleared → bounced`, cheque `received → cleared` without deposit rejected).
 **Verify:** `pnpm test src/modules/ledger/domain` · **Files:** ledger/domain/instrument.ts + test · **Deps:** L1
 
-### - [ ] L10: Instruments, events, `cleared` → movement (M)
+### - [x] L10: Instruments, events, `cleared` → movement (M)
 Migration `payment_instrument`, `instrument_event` (append-only), `money_movement` (insert-only, `reverses_id`, `UNIQUE (source, source_id)`). Guard trigger on `instrument_event` enforces the L9 table; `SECURITY DEFINER` trigger on `cleared` writes exactly one signed movement (incoming +, outgoing −) and maintains the cached `status` (no UPDATE grant); office can receive/issue/clear without ever reading `money_movement`. Services: `receiveInstrument` (cash = received + cleared same day into the caisse), `issueInstrument`, `clearInstrument`, `cancelInstrument` (reversing entry, reason, window rule).
 **AC:** AC-LED-04 (illegal transitions rejected by the service and by direct SQL; `cleared` = exactly one movement with the right sign), AC-LED-03 (instruments, events, movements), AC-SEC-04/05 (office reads instruments, not movements).
 **Verify:** `pnpm test:integration instrument rls` · **Files:** migration, ledger/service/instrument-service.ts, tests/instrument.int.test.ts, table-access.ts, matrix · **Deps:** L8, L9
