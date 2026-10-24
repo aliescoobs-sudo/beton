@@ -2,12 +2,13 @@
 
 import { useTranslations } from 'next-intl';
 import { type FormEvent, useState } from 'react';
+import { classifyTwoFactorFailure, type TwoFactorProblem } from './two-factor-problem';
 
 /** Second login step: a TOTP code, or a single-use recovery code. */
 export function TwoFactorStep({ onDone }: { onDone: () => void }) {
   const t = useTranslations('auth.twoFactor');
   const [mode, setMode] = useState<'totp' | 'recovery'>('totp');
-  const [problem, setProblem] = useState<'invalid' | 'locked' | null>(null);
+  const [problem, setProblem] = useState<TwoFactorProblem | null>(null);
   const [pending, setPending] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -23,7 +24,12 @@ export function TwoFactorStep({ onDone }: { onDone: () => void }) {
         body: JSON.stringify({ code }),
       });
       if (res.ok) return onDone();
-      setProblem(res.status === 429 ? 'locked' : 'invalid');
+      const body = (await res.json().catch(() => null)) as { code?: unknown } | null;
+      setProblem(
+        classifyTwoFactorFailure(res.status, typeof body?.code === 'string' ? body.code : undefined),
+      );
+    } catch {
+      setProblem(classifyTwoFactorFailure(undefined, undefined));
     } finally {
       setPending(false);
     }

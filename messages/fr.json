@@ -40,7 +40,9 @@
       "useTotp": "Utiliser l'application d'authentification",
       "submit": "Vérifier",
       "invalid": "Code incorrect ou déjà utilisé.",
-      "locked": "Trop d'essais. Réessayez dans 15 minutes."
+      "expired": "Session de vérification expirée ou trop d'essais. Reconnectez-vous.",
+      "locked": "Trop d'essais. Réessayez dans 15 minutes.",
+      "error": "Vérification impossible pour le moment (erreur du serveur). Réessayez."
     },
     "enrol": {
       "title": "Activer la double authentification",
