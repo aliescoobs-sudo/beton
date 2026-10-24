@@ -330,6 +330,20 @@
       "when": 1792591243000,
       "tag": "0046_invoice",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1792591244000,
+      "tag": "0047_price_override",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1792591245000,
+      "tag": "0048_supplier_payments",
+      "breakpoints": true
     }
   ]
 }

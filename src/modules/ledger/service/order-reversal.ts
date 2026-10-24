@@ -65,7 +65,12 @@ export async function cancelOrder(
       // The replacement is prepared first: if it is not valid, nothing has been written yet.
       let prepared = null;
       if (replacementInput?.ok) {
-        const p = await prepareOrder(tx, replacementInput.value, deps.today);
+        const p = await prepareOrder(
+          tx,
+          replacementInput.value,
+          deps.today,
+          can(actor.role, 'orders.price_override'),
+        );
         if (!p.ok) return p;
         prepared = p.value;
       }

@@ -84,6 +84,12 @@ export function EffectsPanel({
                 {e.cleared ? t('cleared') : t('pending')}
               </>
             )}
+            {e.kind === 'payable_covered' && (
+              <>
+                {t('payableCovered', { code: e.purchaseCode })}{' '}
+                <bdi dir="ltr">{formatCentimes(e.amountCentimes)} MAD</bdi>
+              </>
+            )}
             {e.kind === 'receivable_covered' && (
               <>
                 {t('covered', { code: e.orderCode })}{' '}

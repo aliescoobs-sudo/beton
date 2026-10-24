@@ -14,7 +14,9 @@ export {
   createPurchase,
   type CreatedPurchase,
   insertPurchaseRows,
+  getPurchaseDetail,
   listPurchases,
+  type PurchaseDetail,
   type PurchaseError,
   type PurchaseView,
 } from './service/purchase-service';
@@ -29,6 +31,8 @@ export {
   type InvoiceView,
   listInvoices,
 } from './service/invoice-service';
+export { legalDeadlines } from './service/deadlines-service';
+export { getOrderDetail, listOrders, type OrderDetail, type OrderRow } from './service/order-read';
 export { cancelOrder, type CancelOrderError, type CancelledOrder } from './service/order-reversal';
 export {
   type CorrectionRequest,

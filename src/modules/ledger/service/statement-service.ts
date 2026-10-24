@@ -116,6 +116,52 @@ async function loadParties(tx: Tx, kind: PartyKind, ids: readonly string[]): Pro
       });
     }
   }
+  if (kind === 'supplier') {
+    const purchases = await tx.query<{
+      id: string;
+      supplier_id: string;
+      code: string;
+      total: string;
+      date: string;
+      booked_on: string;
+      reversal: boolean;
+      cancelled: boolean;
+    }>(
+      `select p.id, p.supplier_id, p.code, p.total_ttc_centimes::text as total, to_char(p.order_date, 'YYYY-MM-DD') as date,
+              to_char((p.created_at at time zone $2)::date, 'YYYY-MM-DD') as booked_on,
+              (p.reverses_id is not null) as reversal,
+              exists (select 1 from purchase r where r.reverses_id = p.id) as cancelled
+         from purchase p where p.supplier_id = any($1)`,
+      [ids, BUSINESS_TIME_ZONE],
+    );
+    for (const p of purchases.rows) {
+      data.get(p.supplier_id)?.lines.push({
+        id: `purchase-${p.id}`,
+        section: 'commercial',
+        date: p.reversal ? p.booked_on : p.date,
+        type: p.reversal ? 'purchase_cancelled' : 'purchase',
+        code: p.code,
+        status: p.cancelled ? 'cancelled' : 'booked',
+        amountCentimes: centimes(Number(p.total)),
+        counted: true,
+      });
+    }
+    const pitems = await tx.query<{ supplier_id: string; due: string; amount: string; covered: string }>(
+      `select p.supplier_id, to_char(i.due_date, 'YYYY-MM-DD') as due, i.amount_centimes::text as amount,
+              coalesce((select sum(a.amount_centimes) from allocation a where a.purchase_plan_item_id = i.id), 0)::text as covered
+         from purchase_plan_item i join purchase p on p.id = i.purchase_id
+        where p.supplier_id = any($1) and i.reverses_id is null and p.reverses_id is null
+          and not exists (select 1 from purchase r where r.reverses_id = p.id)`,
+      [ids],
+    );
+    for (const i of pitems.rows) {
+      data.get(i.supplier_id)?.due.push({
+        dueDate: i.due,
+        amountCentimes: centimes(Number(i.amount)),
+        coveredCentimes: centimes(Number(i.covered)),
+      });
+    }
+  }
   const instruments = await tx.query<{
     id: string;
     party: string;

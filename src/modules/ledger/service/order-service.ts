@@ -3,6 +3,7 @@ import type pg from 'pg';
 import { type Centimes, centimes } from '@/lib/money';
 import { err, ok, type Result } from '@/lib/result';
 import {
+  can,
   parameterOrDefault,
   inRequest,
   isMalformedId,
@@ -24,6 +25,7 @@ export type OrderError =
   | 'NO_PRICE'
   | 'PLAN_INVALID'
   | 'DELIVERY_BEFORE_ORDER'
+  | 'FORBIDDEN_OVERRIDE'
   | 'CONFLICT';
 
 /**
@@ -59,6 +61,8 @@ export interface PreparedOrder {
   vatRateBp: number;
   totals: Totals;
   plan: PlanItem[];
+  /** The reason of a price override (L6); null when the price in force was used. */
+  reason: string | null;
 }
 
 /** Everything an order is made of, computed from the database and the domain functions; writes nothing. */
@@ -66,8 +70,10 @@ export async function prepareOrder(
   tx: pg.PoolClient,
   v: OrderInput,
   today: string,
+  mayOverridePrice = false,
 ): Promise<Result<PreparedOrder, OrderError>> {
   if (v.deliveryDate < today) return err('DELIVERY_BEFORE_ORDER');
+  if (v.priceOverride && !mayOverridePrice) return err('FORBIDDEN_OVERRIDE');
   const client = await tx.query<{ status: string; default_zone_id: string | null }>(
     'select status, default_zone_id from client where id = $1',
     [v.clientId],
@@ -97,7 +103,10 @@ export async function prepareOrder(
     [v.concreteTypeId, v.clientId, today],
   );
   if (!price.rows[0]) return err('NO_PRICE');
-  const unitPrice = centimes(Number(price.rows[0].price_ht_per_m3_centimes));
+  // The price in force stays the reference of the order (selling_price_id); an override replaces what is charged.
+  const unitPrice = centimes(
+    v.priceOverride ? v.priceOverride.unitPriceHtCentimes : Number(price.rows[0].price_ht_per_m3_centimes),
+  );
 
   const vatRateBp = await ledgerParameter(tx, 'vat_rate_bp');
   const totals = computeTotals(v.volumeL, unitPrice, vatRateBp);
@@ -124,6 +133,7 @@ export async function prepareOrder(
     vatRateBp,
     totals: totals.value,
     plan: plan.value,
+    reason: v.priceOverride?.reason ?? null,
   });
 }
 
@@ -141,8 +151,8 @@ export async function insertOrderRows(
   await tx.query(
     `insert into sales_order (id, code, client_id, site_id, zone_id, concrete_type_id, volume_l, order_date,
                                   delivery_date, selling_price_id, unit_price_ht_centimes, vat_rate_bp,
-                                  total_ht_centimes, total_vat_centimes, total_ttc_centimes, brought_by_user_id, created_by)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
+                                  total_ht_centimes, total_vat_centimes, total_ttc_centimes, brought_by_user_id, reason, created_by)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
     [
       id,
       code,
@@ -160,6 +170,7 @@ export async function insertOrderRows(
       p.totals.totalVat,
       p.totals.totalTtc,
       v.broughtByUserId,
+      p.reason,
       actor.id,
     ],
   );
@@ -192,7 +203,7 @@ export async function createOrder(
 
   try {
     return await inRequest(appPool, actor, async (tx): Promise<Result<CreatedOrder, OrderError>> => {
-      const prepared = await prepareOrder(tx, v, deps.today);
+      const prepared = await prepareOrder(tx, v, deps.today, can(actor.role, 'orders.price_override'));
       if (!prepared.ok) return prepared;
       const created = await insertOrderRows(tx, actor, v, prepared.value, deps.today);
       const client = await tx.query<{ code: string }>('select code from client where id = $1', [v.clientId]);
@@ -234,7 +245,12 @@ export async function previewOrder(
   if (!parsed.ok) return err('INVALID');
   try {
     return await inRequest(appPool, actor, async (tx): Promise<Result<OrderPreview, OrderError>> => {
-      const prepared = await prepareOrder(tx, parsed.value, deps.today);
+      const prepared = await prepareOrder(
+        tx,
+        parsed.value,
+        deps.today,
+        can(actor.role, 'orders.price_override'),
+      );
       if (!prepared.ok) return prepared;
       const p = prepared.value;
       return ok({

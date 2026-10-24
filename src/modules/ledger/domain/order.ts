@@ -13,6 +13,15 @@ const customItem = z
   })
   .refine((i) => (i.percentBp === undefined) !== (i.amountCentimes === undefined), 'one share per item');
 
+const priceOverride = z.object({
+  /** Centimes HT per m³, different from the price in force; only the owner may send it (orders.price_override). */
+  unitPriceHtCentimes: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),
+  reason: z
+    .string()
+    .transform((v) => v.trim().replace(/\s+/g, ' '))
+    .pipe(z.string().min(3).max(500)),
+});
+
 const orderInputSchema = z.object({
   clientId: z.uuid(),
   siteId: z.uuid().nullable().default(null),
@@ -22,6 +31,7 @@ const orderInputSchema = z.object({
   volumeL: z.number().int().min(1).max(100_000_000),
   deliveryDate: date,
   broughtByUserId: z.uuid().nullable().default(null),
+  priceOverride: priceOverride.nullish(),
   plan: z.discriminatedUnion('preset', [
     z.object({ preset: z.literal('cash') }),
     z.object({ preset: z.literal('advance50') }),

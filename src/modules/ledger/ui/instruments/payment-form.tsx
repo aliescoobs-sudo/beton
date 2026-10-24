@@ -74,7 +74,7 @@ export function PaymentForm({
       amountCentimes: amount,
       ...(direction === 'in'
         ? { clientId: partyId, orderCode: text('orderCode') || null }
-        : { supplierId: partyId }),
+        : { supplierId: partyId, purchaseCode: text('purchaseCode') || null }),
       number: text('number') || null,
       bank: text('bank') || null,
       writtenDate: text('writtenDate') || null,
@@ -224,6 +224,19 @@ export function PaymentForm({
               dir="ltr"
               className={INPUT}
               data-testid="payment-written"
+            />
+          </label>
+        )}
+        {direction === 'out' && (
+          <label className="block">
+            <span className="field-label">{t('purchaseCode')}</span>
+            <input
+              name="purchaseCode"
+              placeholder="ACH-2026-00001"
+              maxLength={20}
+              dir="ltr"
+              className={INPUT}
+              data-testid="payment-purchase"
             />
           </label>
         )}

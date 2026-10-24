@@ -100,6 +100,7 @@ async function enter(
     writtenDate: string | null;
     partyId: string;
     orderCode?: string | null;
+    purchaseCode?: string | null;
   },
   today: string,
 ): Promise<Result<InstrumentRef, InstrumentError>> {
@@ -154,6 +155,19 @@ async function enter(
         );
         coveredCentimes = Number(sum.rows[0]?.s ?? 0);
       }
+      if (v.purchaseCode) {
+        // Same for a supplier payment: the oldest open items of that purchase.
+        const covered = await tx.query<{ n: number }>('select public.allocate_to_purchase($1, $2) as n', [
+          id,
+          v.purchaseCode,
+        ]);
+        if (!covered.rows[0]?.n) throw new NothingToAllocate();
+        const sum = await tx.query<{ s: string }>(
+          'select coalesce(sum(amount_centimes), 0)::text as s from allocation where instrument_id = $1',
+          [id],
+        );
+        coveredCentimes = Number(sum.rows[0]?.s ?? 0);
+      }
     });
     const effects: Effect[] = [
       { kind: 'document', document: 'payment', code: v.number ?? v.method },
@@ -173,6 +187,12 @@ async function enter(
     ];
     if (v.orderCode && direction === 'in' && coveredCentimes > 0)
       effects.push({ kind: 'receivable_covered', orderCode: v.orderCode, amountCentimes: coveredCentimes });
+    if (v.purchaseCode && direction === 'out' && coveredCentimes > 0)
+      effects.push({
+        kind: 'payable_covered',
+        purchaseCode: v.purchaseCode,
+        amountCentimes: coveredCentimes,
+      });
     return ok({ id, effects: visibleEffects(effects, actor.role) });
   } catch (error) {
     if (error instanceof NothingToAllocate) return err('NOTHING_TO_ALLOCATE');

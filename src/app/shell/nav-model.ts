@@ -29,6 +29,12 @@ const GROUPS: GroupDef[] = [
         allowed: 'parties.read',
       },
       {
+        path: '/orders',
+        labelKey: 'ledger.orderList.link',
+        testId: 'orders-link',
+        allowed: 'orders.read_money',
+      },
+      {
         path: '/orders/new',
         labelKey: 'ledger.orders.link',
         testId: 'orders-new-link',
@@ -57,6 +63,18 @@ const GROUPS: GroupDef[] = [
   {
     id: 'purchases',
     items: [
+      {
+        path: '/purchases/new',
+        labelKey: 'ledger.purchases.newLink',
+        testId: 'purchases-new-link',
+        allowed: 'purchases.write',
+      },
+      {
+        path: '/purchases',
+        labelKey: 'ledger.purchases.link',
+        testId: 'purchases-link',
+        allowed: 'purchases.read_money',
+      },
       {
         path: '/master-data/suppliers',
         labelKey: 'masterData.suppliers.link',
@@ -97,6 +115,12 @@ const GROUPS: GroupDef[] = [
         labelKey: 'ledger.instruments.link',
         testId: 'instruments-link',
         allowed: 'instruments.read',
+      },
+      {
+        path: '/deadlines',
+        labelKey: 'ledger.deadlines.link',
+        testId: 'deadlines-link',
+        allowed: 'due_items.read',
       },
       {
         path: '/opening',

@@ -44,7 +44,19 @@ const receiveSchema = paper
   })
   .transform(normalise)
   .refine(complete);
-const issueSchema = paper.extend({ supplierId: z.uuid() }).transform(normalise).refine(complete);
+const PURCHASE_CODE = /^ACH-[0-9]{4}-[0-9]{5,}$/;
+const issueSchema = paper
+  .extend({
+    supplierId: z.uuid(),
+    // The purchase this payment is for: the oldest open items of that purchase are covered (office cannot read items).
+    purchaseCode: z
+      .string()
+      .transform((v) => v.trim().toUpperCase())
+      .pipe(z.string().regex(PURCHASE_CODE))
+      .nullish(),
+  })
+  .transform(normalise)
+  .refine(complete);
 
 export type ReceiveInstrumentInput = z.infer<typeof receiveSchema>;
 export type IssueInstrumentInput = z.infer<typeof issueSchema>;

@@ -67,6 +67,7 @@ describe('functions the application role can execute', () => {
     'ctx.sim_now()',
     'ctx.user_id()',
     'public.allocate_to_order(p_instrument uuid, p_order_code text)',
+    'public.allocate_to_purchase(p_instrument uuid, p_purchase_code text)',
     'public.default_cash_account()',
     'public.delivery_note(p_delivery uuid)',
     'public.invoice_source(p_order_code text)',

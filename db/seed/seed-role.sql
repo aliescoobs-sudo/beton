@@ -41,6 +41,7 @@ GRANT EXECUTE ON FUNCTION public.ledger_parameter(text) TO belgobeton_seed;
 GRANT EXECUTE ON FUNCTION public.default_cash_account() TO belgobeton_seed;
 GRANT EXECUTE ON FUNCTION public.record_receipt(uuid, date) TO belgobeton_seed;
 GRANT EXECUTE ON FUNCTION public.invoice_source(text) TO belgobeton_seed;
+GRANT EXECUTE ON FUNCTION public.allocate_to_purchase(uuid, text) TO belgobeton_seed;
 
 DO $$
 DECLARE

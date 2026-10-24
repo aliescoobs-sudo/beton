@@ -277,6 +277,53 @@ async function seedStockAndPurchases(
   return { purchases, receipts };
 }
 
+/**
+ * The payments to suppliers the scenario already holds (cheques and transfers issued, most of them cleared) are put against
+ * what each supplier is owed, oldest due date first: some purchases end paid, some part-paid, the recent ones open.
+ */
+async function seedSupplierPayments(tx: Tx): Promise<number> {
+  const instruments = (
+    await tx.query<{ id: string; supplier_id: string; amount: string }>(
+      `select i.id, i.supplier_id, i.amount_centimes::text as amount
+         from payment_instrument i
+         cross join lateral (select e.event from instrument_event e where e.instrument_id = i.id order by e.seq desc limit 1) last
+        where i.direction = 'out' and last.event in ('issued', 'cleared') and i.supplier_id is not null
+        order by i.supplier_id, i.received_date, i.id`,
+    )
+  ).rows;
+  let made = 0;
+  const items = new Map<string, { id: string; open: number }[]>();
+  for (const inst of instruments) {
+    let list = items.get(inst.supplier_id);
+    if (!list) {
+      const rows = await tx.query<{ id: string; open: string }>(
+        `select i.id, (i.amount_centimes - coalesce((select sum(a.amount_centimes) from allocation a where a.purchase_plan_item_id = i.id), 0))::text as open
+           from purchase_plan_item i join purchase p on p.id = i.purchase_id
+          where p.supplier_id = $1 and i.reverses_id is null and p.reverses_id is null
+            and not exists (select 1 from purchase r where r.reverses_id = p.id)
+          order by i.due_date, i.id`,
+        [inst.supplier_id],
+      );
+      list = rows.rows.map((r) => ({ id: r.id, open: Number(r.open) }));
+      items.set(inst.supplier_id, list);
+    }
+    let left = Number(inst.amount);
+    for (const item of list) {
+      if (left <= 0) break;
+      if (item.open <= 0) continue;
+      const take = Math.min(left, item.open);
+      await tx.query(
+        `insert into allocation (id, instrument_id, purchase_plan_item_id, amount_centimes, created_by) values ($1, $2, $3, $4, $5)`,
+        [randomUUID(), inst.id, item.id, take, SYSTEM_ACTOR_ID],
+      );
+      item.open -= take;
+      left -= take;
+      made += 1;
+    }
+  }
+  return made;
+}
+
 /** Invoices for the orders whose loads are all out, a few days after the last load; one of them cancelled by a credit note. */
 async function seedInvoices(tx: Tx, today: string, rng: Rng): Promise<number> {
   const orders = (
@@ -345,6 +392,7 @@ export async function seedOperationsScenario(
       const rng = createRng(SEED);
       const { loads, returns } = await seedLoads(tx, today, rng);
       const { purchases, receipts } = await seedStockAndPurchases(tx, today, opening.rows[0].d, rng);
+      await seedSupplierPayments(tx);
       const invoices = await seedInvoices(tx, today, rng);
       return { applied: true, loads, returns, purchases, receipts, invoices };
     },

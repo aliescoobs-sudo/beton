@@ -59,7 +59,8 @@ describe('createPurchase (AC-LED-16, AC-LED-02)', () => {
     const r = await createPurchase(app, users.office, input(), { today: TODAY });
     if (!r.ok) throw new Error(r.error);
     expect(r.value.code).toMatch(/^ACH-2026-\d{5}$/);
-    expect(Object.keys(r.value).sort()).toEqual(['code', 'id']); // office learns no amount
+    expect(Object.keys(r.value).sort()).toEqual(['code', 'effects', 'id']); // office learns no amount
+    expect(JSON.stringify(r.value)).not.toMatch(/amountCentimes|5520000/);
     const p = await row(r.value.id);
     expect(p).toMatchObject({
       vat_rate_bp: 2000,

@@ -117,3 +117,11 @@ export {
 } from './invoice';
 export { type Effect, isMoneyEffect, visibleEffects } from './effects';
 export { createRng, type Rng } from './scenario';
+export {
+  byDeadline,
+  type Deadline,
+  type DeadlineKind,
+  type DeadlineStatus,
+  deadlineStatus,
+  DUE_SOON_DAYS,
+} from './deadlines';

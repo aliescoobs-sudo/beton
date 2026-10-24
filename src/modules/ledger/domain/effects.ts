@@ -30,7 +30,8 @@ export type Effect =
   | { kind: 'payable'; supplierCode: string | null; amountCentimes: number }
   | { kind: 'payment_in'; method: string; amountCentimes: number; cleared: boolean }
   | { kind: 'payment_out'; method: string; amountCentimes: number; cleared: boolean }
-  | { kind: 'receivable_covered'; orderCode: string; amountCentimes: number };
+  | { kind: 'receivable_covered'; orderCode: string; amountCentimes: number }
+  | { kind: 'payable_covered'; purchaseCode: string; amountCentimes: number };
 
 const MONEY_KINDS: ReadonlySet<Effect['kind']> = new Set([
   'receivable',
@@ -38,6 +39,7 @@ const MONEY_KINDS: ReadonlySet<Effect['kind']> = new Set([
   'payment_in',
   'payment_out',
   'receivable_covered',
+  'payable_covered',
 ]);
 
 export const isMoneyEffect = (e: Effect): boolean => MONEY_KINDS.has(e.kind);

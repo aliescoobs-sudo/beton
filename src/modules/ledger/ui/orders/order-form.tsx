@@ -63,6 +63,8 @@ export function OrderForm({
   const [typeId, setTypeId] = useState(types[0]?.id ?? '');
   const [volume, setVolume] = useState('');
   const [delivery, setDelivery] = useState(today);
+  const [overridePrice, setOverridePrice] = useState('');
+  const [overrideReason, setOverrideReason] = useState('');
   const [preset, setPreset] = useState<PlanPreset>('cash');
   const [rows, setRows] = useState<Row[]>([
     { method: 'advance', dueDate: today, kind: 'percent', value: '50' },
@@ -107,6 +109,7 @@ export function OrderForm({
       NO_PRICE: t('noPrice'),
       PLAN_INVALID: t('planInvalid'),
       DELIVERY_BEFORE_ORDER: t('deliveryBeforeOrder'),
+      FORBIDDEN_OVERRIDE: t('forbiddenOverride'),
       CONFLICT: t('conflict'),
     })[error] ?? t('error');
 
@@ -114,6 +117,12 @@ export function OrderForm({
   function build(): unknown | null {
     const litres = parseMilliQty(volume);
     if (!litres.ok || litres.value <= 0) return null;
+    let override: { unitPriceHtCentimes: number; reason: string } | null = null;
+    if (overridePrice.trim() !== '') {
+      const price = parseCentimes(overridePrice);
+      if (price === null || price <= 0 || overrideReason.trim().length < 3) return null;
+      override = { unitPriceHtCentimes: price, reason: overrideReason.trim() };
+    }
     let plan: unknown;
     if (preset === 'custom') {
       const items = [];
@@ -137,6 +146,7 @@ export function OrderForm({
       volumeL: litres.value,
       deliveryDate: delivery,
       plan,
+      ...(override ? { priceOverride: override } : {}),
     };
   }
 
@@ -307,6 +317,33 @@ export function OrderForm({
           </label>
         </div>
       </div>
+
+      {previewAction && (
+        <fieldset className="form-band grid gap-3 sm:grid-cols-2" data-testid="order-override">
+          <legend className="field-label px-1">{t('override')}</legend>
+          <label className="block">
+            <span className="field-label">{t('overridePrice')}</span>
+            <input
+              inputMode="decimal"
+              dir="ltr"
+              value={overridePrice}
+              onChange={(e) => setOverridePrice(e.target.value)}
+              className={INPUT}
+              data-testid="order-override-price"
+            />
+          </label>
+          <label className="block">
+            <span className="field-label">{t('overrideReason')}</span>
+            <input
+              value={overrideReason}
+              onChange={(e) => setOverrideReason(e.target.value)}
+              maxLength={500}
+              className={INPUT}
+              data-testid="order-override-reason"
+            />
+          </label>
+        </fieldset>
+      )}
 
       <fieldset className="form-band space-y-3">
         <legend className="field-label px-1">{t('plan')}</legend>

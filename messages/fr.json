@@ -515,7 +515,11 @@
       "planInvalid": "L'échéancier ne correspond pas au total de la commande.",
       "deliveryBeforeOrder": "La livraison ne peut pas précéder la date du jour.",
       "conflict": "Conflit : réessayez.",
-      "error": "Action refusée."
+      "error": "Action refusée.",
+      "override": "Prix dérogatoire (facultatif)",
+      "overridePrice": "Prix HT par m³ (MAD)",
+      "overrideReason": "Motif (obligatoire si un prix est saisi)",
+      "forbiddenOverride": "Seul le propriétaire peut changer le prix."
     },
     "accounts": {
       "title": "Caisse et comptes bancaires",
@@ -589,7 +593,8 @@
         "cheque": "Chèque",
         "lcn": "LCN",
         "transfer": "Virement"
-      }
+      },
+      "purchaseCode": "Code de l'achat (pour le rattacher)"
     },
     "instruments": {
       "title": "Paiements et titres",
@@ -731,7 +736,9 @@
         "order_cancelled": "Annulation de commande",
         "payment": "Paiement",
         "invoice": "Facture",
-        "credit_note": "Avoir"
+        "credit_note": "Avoir",
+        "purchase": "Achat",
+        "purchase_cancelled": "Annulation d'achat"
       },
       "statuses": {
         "booked": "Enregistré",
@@ -786,6 +793,168 @@
       "reason": "Motif (obligatoire)",
       "reasonRequired": "Le motif est obligatoire.",
       "alreadyCredited": "Cette facture est déjà annulée."
+    },
+    "itemStates": {
+      "pending": "À venir",
+      "partially_covered": "Partiellement réglée",
+      "covered": "Réglée",
+      "overdue": "En retard",
+      "cancelled": "Annulée"
+    },
+    "orderList": {
+      "link": "Commandes",
+      "title": "Commandes",
+      "intro": "Ce qui a été commandé, livré, facturé et réglé, avec ce qui est en retard.",
+      "none": "Aucune commande pour le moment.",
+      "code": "Commande",
+      "client": "Client",
+      "type": "Béton",
+      "delivered": "Livré / commandé",
+      "deliveryDate": "Livraison",
+      "total": "Total TTC",
+      "paid": "Réglé",
+      "state": "État",
+      "cancelled": "Annulée",
+      "late": "En retard",
+      "settled": "Soldée",
+      "open": "En cours",
+      "invoiced": "Facturée"
+    },
+    "orderDetail": {
+      "title": "Commande",
+      "volume": "Volume livré / commandé",
+      "dates": "Commande → livraison",
+      "unitPrice": "Prix HT",
+      "perM3": "/ m³",
+      "totals": "HT + TVA = TTC",
+      "cancelled": "Cette commande est annulée (écriture d'annulation).",
+      "plan": "Échéancier",
+      "method": "Mode",
+      "dueDate": "Date",
+      "amount": "Montant",
+      "covered": "Réglé",
+      "state": "État",
+      "loads": "Chargements",
+      "noLoads": "Aucun chargement pour le moment.",
+      "bl": "BL",
+      "truck": "Camion",
+      "volumeShort": "Volume",
+      "cancelledShort": "annulé",
+      "invoices": "Factures",
+      "noInvoices": "Pas encore facturée.",
+      "creditNote": "Avoir",
+      "payments": "Paiements",
+      "noPayments": "Aucun paiement rattaché.",
+      "onThisOrder": "sur cette commande",
+      "cancelButton": "Annuler la commande",
+      "confirmCancel": "Annuler",
+      "back": "Retour",
+      "reason": "Motif (obligatoire)",
+      "reasonRequired": "Le motif est obligatoire.",
+      "alreadyReversed": "Cette commande est déjà annulée.",
+      "windowClosed": "Délai d'annulation dépassé.",
+      "error": "Action impossible."
+    },
+    "purchases": {
+      "link": "Achats",
+      "newLink": "Nouvel achat",
+      "title": "Achats",
+      "intro": "Achats aux fournisseurs : facture, échéance (loi 69-21), total et réception des marchandises.",
+      "none": "Aucun achat pour le moment.",
+      "code": "Achat",
+      "supplier": "Fournisseur",
+      "invoiceNo": "Facture fournisseur",
+      "orderDate": "Date",
+      "dueDate": "Échéance",
+      "totalTtc": "Total TTC",
+      "state": "État",
+      "overdue": "Échue",
+      "cancelled": "Annulé",
+      "received": "Reçu",
+      "open": "En attente de réception",
+      "newTitle": "Nouvel achat",
+      "newIntro": "Saisissez la facture du fournisseur : lignes de composants (qui entreront en stock à la réception) et lignes de service (transport, gasoil).",
+      "invoiceDate": "Date de la facture",
+      "dueHint": "Laisser vide : date de la facture + 60 jours (maximum 120).",
+      "lines": "Lignes",
+      "kind": "Type",
+      "kindStock": "Composant (stock)",
+      "kindService": "Service",
+      "component": "Composant",
+      "unit": "Unité",
+      "description": "Description",
+      "qty": "Quantité",
+      "price": "Prix HT par unité (MAD)",
+      "addLine": "Ajouter une ligne",
+      "removeLine": "Retirer",
+      "plan": "Règlement",
+      "planTransfer": "Virement à l'échéance",
+      "planCheques": "Deux chèques (30 et 60 jours)",
+      "save": "Enregistrer l'achat",
+      "saved": "Achat enregistré :",
+      "another": "Saisir un autre achat",
+      "invalid": "Saisie invalide.",
+      "notFound": "Fournisseur ou composant introuvable.",
+      "supplierArchived": "Ce fournisseur est archivé.",
+      "termTooLong": "Échéance trop lointaine : 120 jours au maximum (loi 69-21).",
+      "dueBefore": "L'échéance précède l'achat.",
+      "planInvalid": "Le règlement ne correspond pas au total.",
+      "conflict": "Conflit, réessayez.",
+      "error": "Action impossible."
+    },
+    "purchaseDetail": {
+      "title": "Achat",
+      "invoice": "Facture fournisseur",
+      "dates": "Achat → échéance",
+      "totals": "HT + TVA = TTC",
+      "receipt": "Réception",
+      "receivedOn": "Reçu le",
+      "expected": "Attendu",
+      "cancelled": "Cet achat est annulé (écriture d'annulation).",
+      "lines": "Lignes",
+      "label": "Désignation",
+      "qty": "Quantité",
+      "price": "Prix HT",
+      "lineTotal": "Total HT",
+      "plan": "Règlement prévu",
+      "cancelButton": "Annuler l'achat",
+      "confirmCancel": "Annuler",
+      "back": "Retour",
+      "reason": "Motif (obligatoire)",
+      "reasonRequired": "Le motif est obligatoire.",
+      "alreadyReversed": "Cet achat est déjà annulé.",
+      "windowClosed": "Délai d'annulation dépassé.",
+      "error": "Action impossible."
+    },
+    "deadlines": {
+      "link": "Échéances légales",
+      "title": "Échéances légales",
+      "intro": "Les dates qui comptent (loi 69-21) : factures à émettre avant la fin du mois de livraison, factures à encaisser, achats à payer. Calculées à partir des documents, jamais saisies.",
+      "none": "Rien à signaler.",
+      "date": "Date",
+      "document": "Document",
+      "party": "Tiers",
+      "amount": "Montant restant",
+      "state": "État",
+      "statuses": {
+        "overdue": "Dépassée",
+        "due_soon": "Cette semaine",
+        "upcoming": "À venir"
+      },
+      "kinds": {
+        "invoice_to_issue": {
+          "title": "Factures à émettre",
+          "hint": "Commandes livrées et pas encore facturées : la facture doit être émise avant la fin du mois de la livraison."
+        },
+        "receivable_due": {
+          "title": "Factures à encaisser",
+          "hint": "Factures dont la commande n'est pas encore entièrement réglée, à leur échéance."
+        },
+        "payable_due": {
+          "title": "Achats à payer",
+          "hint": "Échéances des achats fournisseurs, après les paiements déjà rattachés (120 jours au plus après la facture)."
+        }
+      }
     }
   },
   "operations": {
@@ -934,6 +1103,7 @@
     },
     "cleared": "encaissé",
     "pending": "pas encore encaissé",
-    "covered": "Commande {code} réglée à hauteur de"
+    "covered": "Commande {code} réglée à hauteur de",
+    "payableCovered": "Achat {code} réglé à hauteur de"
   }
 }

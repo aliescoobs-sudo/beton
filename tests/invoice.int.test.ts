@@ -2,7 +2,13 @@ import { randomUUID } from 'node:crypto';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { withRlsContext } from '../src/lib/db/rls-context';
-import { cancelInvoice, createInvoice, getClientStatement, listInvoices } from '../src/modules/ledger';
+import {
+  cancelInvoice,
+  createInvoice,
+  getClientStatement,
+  legalDeadlines,
+  listInvoices,
+} from '../src/modules/ledger';
 import { createLoad } from '../src/modules/operations';
 import type { SessionUser } from '../src/modules/platform-security/auth/session-gate';
 import { testEnv } from './db-env';
@@ -277,6 +283,42 @@ describe('cancelInvoice: the credit note (AC-LED-08, AC-LED-03)', () => {
     } finally {
       await migrator.end();
     }
+  });
+});
+
+describe('legal deadlines: invoices to issue and to collect (AC-LED-15)', () => {
+  it('a delivered order has an invoice to issue by the end of the month; once invoiced, a receivable on the due date', async () => {
+    const { order } = await orderWithLoads([4000]);
+    const mine = async () =>
+      (await legalDeadlines(app, users.owner, { asOf: TODAY })).filter(
+        (d) => d.documentCode === order.code || d.documentCode.startsWith('FA-'),
+      );
+    const toIssue = (await mine()).find((d) => d.documentCode === order.code);
+    expect(toIssue).toMatchObject({
+      kind: 'invoice_to_issue',
+      date: '2026-06-30',
+      status: 'overdue',
+      amountCentimes: null,
+    });
+    const inv = await createInvoice(app, users.owner, { orderCode: order.code }, { today: TODAY });
+    if (!inv.ok) throw new Error(inv.error);
+    expect((await mine()).find((d) => d.documentCode === order.code)).toBeUndefined();
+    const due = (await legalDeadlines(app, users.owner, { asOf: TODAY })).find(
+      (d) => d.documentCode === inv.value.number,
+    );
+    expect(due).toMatchObject({
+      kind: 'receivable_due',
+      date: '2026-09-01',
+      status: 'upcoming',
+      amountCentimes: 374_400,
+    });
+    // A credit note takes it off the list.
+    await cancelInvoice(app, users.owner, inv.value.id, 'Erreur (test)', { today: TODAY });
+    expect(
+      (await legalDeadlines(app, users.owner, { asOf: TODAY })).find(
+        (d) => d.documentCode === inv.value.number,
+      ),
+    ).toBeUndefined();
   });
 });
 

@@ -6,7 +6,14 @@ import { addCentimes, type Centimes, centimes, sumCentimes } from '@/lib/money';
 
 export type StatementSection = 'commercial' | 'financial';
 export type StatementLineType =
-  'opening' | 'order' | 'order_cancelled' | 'invoice' | 'credit_note' | 'payment';
+  | 'opening'
+  | 'order'
+  | 'order_cancelled'
+  | 'purchase'
+  | 'purchase_cancelled'
+  | 'invoice'
+  | 'credit_note'
+  | 'payment';
 export type LineStatus =
   | 'booked'
   | 'cancelled'
@@ -129,8 +136,8 @@ export function buildStatement(
     carriedIn,
     closing: running,
     summary: {
-      ordered: total((l) => l.type === 'order' && l.status !== 'cancelled'),
-      cancelled: total((l) => l.type === 'order' && l.status === 'cancelled'),
+      ordered: total((l) => (l.type === 'order' || l.type === 'purchase') && l.status !== 'cancelled'),
+      cancelled: total((l) => (l.type === 'order' || l.type === 'purchase') && l.status === 'cancelled'),
       invoiced: total((l) => l.type === 'invoice' || l.type === 'credit_note'),
       paid: negate(total((l) => l.type === 'payment' && l.status === 'cleared')),
       pending: negate(
@@ -149,6 +156,8 @@ const TYPES: readonly StatementLineType[] = [
   'opening',
   'order',
   'order_cancelled',
+  'purchase',
+  'purchase_cancelled',
   'invoice',
   'credit_note',
   'payment',
