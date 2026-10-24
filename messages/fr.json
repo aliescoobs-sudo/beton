@@ -644,6 +644,48 @@
       "partyArchived": "Ce tiers est archivé ou introuvable.",
       "notFound": "Introuvable.",
       "error": "Action refusée."
+    },
+    "lifecycle": {
+      "date": "Date",
+      "account": "Compte",
+      "fee": "Frais bancaires (MAD, facultatif)",
+      "cover": "Titre qui couvre",
+      "reason": "Motif",
+      "confirmButton": "Confirmer",
+      "cancelButton": "Retour",
+      "illegal": "Cette étape n'est pas possible pour ce titre.",
+      "windowClosed": "Le délai de régularisation est dépassé.",
+      "coveringInvalid": "Ce titre ne couvre pas le titre rejeté (même client, montant suffisant, non utilisé).",
+      "accountMismatch": "Ce compte ne convient pas à ce moyen de paiement.",
+      "futureDate": "La date ne peut pas être dans le futur.",
+      "invalid": "Valeur refusée.",
+      "notFound": "Introuvable.",
+      "conflict": "Conflit : réessayez.",
+      "error": "Action refusée.",
+      "clear": {
+        "button": "Encaisser",
+        "confirm": "Confirmer que l'argent est arrivé (ou parti) sur ce compte ?"
+      },
+      "bounce": {
+        "button": "Rejeté",
+        "confirm": "Confirmer le rejet : les échéances couvertes redeviennent à payer et le délai de 30 jours commence."
+      },
+      "regularize": {
+        "button": "Régulariser",
+        "confirm": "Régulariser avec un nouveau titre, dans les 30 jours."
+      },
+      "dispute": {
+        "button": "Litige",
+        "confirm": "Le client conteste : le délai se ferme et le client est signalé."
+      },
+      "cancel": {
+        "button": "Annuler",
+        "confirm": "Annuler ce titre ? Le motif est conservé."
+      },
+      "batch": {
+        "title": "Remise en banque",
+        "deposit": "Remettre {count} titre(s)"
+      }
     }
   }
 }

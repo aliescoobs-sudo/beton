@@ -113,7 +113,7 @@ Receive cash/cheque/LCN/transfer against an order's échéances (amount, number,
 **AC:** receive + allocate in the UI updates the plan-item state; AC-MD-09 style RTL check; office sees no balance or cash total on the screen.
 **Verify:** `pnpm exec playwright test e2e/ledger-instrument.spec.ts` · **Files:** pages, ledger/ui/instruments/*, messages, e2e · **Deps:** L11
 
-### - [ ] L15: Instruments screens: lifecycle actions (M)
+### - [x] L15: Instruments screens: lifecycle actions (M)
 Deposit batch, clear, bounce (with window), regularize, dispute, cancel (reason), each with confirmation and step-up where the permission list requires it; error states for illegal transitions.
 **AC:** AC-LED-05/06 through the UI in fr and ar; reversal window applies to the cancel button.
 **Verify:** `pnpm exec playwright test e2e/ledger-lifecycle.spec.ts` · **Files:** ui/instruments/*, actions.ts, messages, e2e · **Deps:** L12, L13, L14
