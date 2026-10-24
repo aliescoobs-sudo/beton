@@ -68,6 +68,12 @@ const GROUPS: GroupDef[] = [
         testId: 'accounts-link',
         allowed: 'money_accounts.read',
       },
+      {
+        path: '/cash',
+        labelKey: 'ledger.cash.link',
+        testId: 'cash-link',
+        allowed: 'cash.read',
+      },
     ],
   },
   {

@@ -535,6 +535,22 @@
       "duplicate": "Ce compte ou ce solde existe déjà.",
       "error": "Action refusée.",
       "empty": "Aucun compte pour le moment."
+    },
+    "cash": {
+      "title": "Position de trésorerie",
+      "link": "Position de trésorerie",
+      "real": "Encaissé",
+      "realHint": "Argent réellement en caisse et en banque.",
+      "incoming": "À encaisser",
+      "incomingHint": "Chèques et LCN reçus, pas encore encaissés.",
+      "total": "Total avec non encaissé",
+      "totalHint": "Encaissé plus ce qui est à encaisser.",
+      "outgoing": "À décaisser",
+      "outgoingHint": "Chèques et LCN émis, pas encore passés.",
+      "afterOutgoing": "Total après les paiements émis non encore passés :",
+      "movements": "Mouvements",
+      "deposited": "Remis en banque, non encaissé",
+      "empty": "Aucun compte pour le moment."
     }
   }
 }

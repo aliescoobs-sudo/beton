@@ -40,3 +40,4 @@ export {
   orderCoverage,
   unallocate,
 } from './service/allocation-service';
+export { getCashPosition } from './service/cash-service';

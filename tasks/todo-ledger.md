@@ -101,7 +101,7 @@ Deposit batch, clear, bounce (with window), regularize, dispute, cancel (reason)
 **AC:** AC-LED-05/06 through the UI in fr and ar; reversal window applies to the cancel button.
 **Verify:** `pnpm exec playwright test e2e/ledger-lifecycle.spec.ts` · **Files:** ui/instruments/*, actions.ts, messages, e2e · **Deps:** L12, L13, L14
 
-### - [ ] L16: Encaissé vs total view (S)
+### - [x] L16: Encaissé vs total view (S)
 `getCashPosition(accountId?)` (permission `cash.read`, owner/partner): real = Σ cleared movements + opening balance; total incl. uncleared = real + incoming instruments `received`/`deposited`; also outgoing issued not yet cleared; per account and in total; owner screen.
 **AC:** AC-LED-07; AC-SEC-05 (office refused by service, RLS and page 404; `expectNoFields` on office responses).
 **Verify:** `pnpm test:integration cash-position` + e2e · **Files:** ledger/domain/cash-position.ts, service, page, tests · **Deps:** L10
