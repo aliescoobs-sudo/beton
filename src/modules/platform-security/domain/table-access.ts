@@ -453,6 +453,7 @@ export const TABLE_ACCESS = {
   },
   sales_order: {
     kind: 'rls',
+    seed: 'insert',
     money: true,
     blindWriters: ['office'],
     read: {
@@ -475,6 +476,7 @@ export const TABLE_ACCESS = {
   },
   payment_plan_item: {
     kind: 'rls',
+    seed: 'insert',
     money: true,
     blindWriters: ['office'],
     read: {
@@ -496,6 +498,7 @@ export const TABLE_ACCESS = {
   },
   money_account: {
     kind: 'rls',
+    seed: 'insert',
 
     read: {
       owner: 'all',
@@ -515,6 +518,7 @@ export const TABLE_ACCESS = {
   },
   opening_balance: {
     kind: 'rls',
+    seed: 'insert',
     money: true,
     read: {
       owner: 'all',
@@ -534,6 +538,7 @@ export const TABLE_ACCESS = {
   },
   payment_instrument: {
     kind: 'rls',
+    seed: 'insert',
     money: true,
     blindWriters: ['office'],
     read: {
@@ -554,6 +559,7 @@ export const TABLE_ACCESS = {
   },
   instrument_event: {
     kind: 'rls',
+    seed: 'insert',
     money: true,
     blindWriters: ['office'],
     read: {
@@ -574,6 +580,7 @@ export const TABLE_ACCESS = {
   },
   money_movement: {
     kind: 'rls',
+    seed: 'insert',
     money: true,
 
     read: {
@@ -594,6 +601,7 @@ export const TABLE_ACCESS = {
   },
   allocation: {
     kind: 'rls',
+    seed: 'insert',
     money: true,
     read: {
       owner: 'all',
@@ -613,6 +621,7 @@ export const TABLE_ACCESS = {
   },
   ledger_opening: {
     kind: 'rls',
+    seed: 'insert',
 
     read: {
       owner: 'all',
@@ -632,6 +641,7 @@ export const TABLE_ACCESS = {
   },
   opening_party_balance: {
     kind: 'rls',
+    seed: 'insert',
     money: true,
     read: {
       owner: 'all',

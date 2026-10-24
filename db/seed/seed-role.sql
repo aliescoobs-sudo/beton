@@ -31,3 +31,34 @@ BEGIN
       t, CASE WHEN t = ANY (stamped) THEN ' AND created_by = ctx.user_id()' ELSE '' END);
   END LOOP;
 END $$;
+
+-- The pilot scenario (ledger L34): the ledger tables the scenario fills, with the same rules as above (SELECT and INSERT
+-- only, request context 'system', rows stamped with the system actor). The database triggers (price guard, plan balance,
+-- lifecycle guard, allocation sums, the movement written by a clearing) still run for every row.
+GRANT EXECUTE ON FUNCTION public.next_doc_number(text, integer, integer) TO belgobeton_seed;
+GRANT EXECUTE ON FUNCTION public.resolve_selling_price(uuid, uuid, date) TO belgobeton_seed;
+GRANT EXECUTE ON FUNCTION public.ledger_parameter(text) TO belgobeton_seed;
+GRANT EXECUTE ON FUNCTION public.default_cash_account() TO belgobeton_seed;
+
+DO $$
+DECLARE
+  t text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['money_account', 'opening_balance', 'ledger_opening', 'opening_party_balance', 'sales_order',
+                           'payment_plan_item', 'payment_instrument', 'instrument_event', 'allocation'] LOOP
+    EXECUTE format('GRANT SELECT, INSERT ON public.%I TO belgobeton_seed', t);
+    EXECUTE format('DROP POLICY IF EXISTS seed_read ON public.%I', t);
+    EXECUTE format('CREATE POLICY seed_read ON public.%I FOR SELECT TO belgobeton_seed USING (ctx.role() = ''system'')', t);
+    EXECUTE format('DROP POLICY IF EXISTS seed_insert ON public.%I', t);
+    EXECUTE format(
+      'CREATE POLICY seed_insert ON public.%I FOR INSERT TO belgobeton_seed WITH CHECK (ctx.role() = ''system'' AND created_by = ctx.user_id())', t);
+  END LOOP;
+END $$;
+
+-- Movements are written by the clearing trigger; the seed adds only the bank fees of its bounced cheques (expenses).
+GRANT SELECT, INSERT ON public.money_movement TO belgobeton_seed;
+DROP POLICY IF EXISTS seed_read ON public.money_movement;
+CREATE POLICY seed_read ON public.money_movement FOR SELECT TO belgobeton_seed USING (ctx.role() = 'system');
+DROP POLICY IF EXISTS seed_insert_expense ON public.money_movement;
+CREATE POLICY seed_insert_expense ON public.money_movement FOR INSERT TO belgobeton_seed
+  WITH CHECK (ctx.role() = 'system' AND created_by = ctx.user_id() AND source = 'expense' AND reverses_id IS NULL AND amount_centimes < 0);

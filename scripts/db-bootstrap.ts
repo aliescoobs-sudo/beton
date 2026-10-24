@@ -11,12 +11,14 @@ export const TEST_DATABASE = 'belgobeton_test';
 export const E2E_DATABASE = 'belgobeton_e2e';
 export const DDL_SCRATCH_DATABASE = 'belgobeton_ddl_scratch';
 export const RESTORE_TEST_DATABASE = 'belgobeton_restore_test';
+export const SCENARIO_TEST_DATABASE = 'belgobeton_scenario_test';
 /** The only databases scripts may drop: never the dev (or any real) database. */
 const THROWAWAY_DATABASES: readonly string[] = [
   TEST_DATABASE,
   E2E_DATABASE,
   DDL_SCRATCH_DATABASE,
   RESTORE_TEST_DATABASE,
+  SCENARIO_TEST_DATABASE,
 ];
 
 const ROLE_NAMES = {
