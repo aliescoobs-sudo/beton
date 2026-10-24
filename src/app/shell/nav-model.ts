@@ -104,6 +104,18 @@ const GROUPS: GroupDef[] = [
     id: 'production',
     items: [
       {
+        path: '/loads',
+        labelKey: 'operations.loads.link',
+        testId: 'loads-link',
+        allowed: 'deliveries.read',
+      },
+      {
+        path: '/stock',
+        labelKey: 'operations.stock.link',
+        testId: 'stock-link',
+        allowed: 'stock.read',
+      },
+      {
         path: '/master-data/recettes',
         labelKey: 'masterData.recettes.link',
         testId: 'recettes-link',

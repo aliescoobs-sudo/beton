@@ -1,0 +1,14 @@
+/** Litres as m³ text with at most three decimals ("8", "7,5"); the decimal comma of the French catalogue. */
+export function formatM3(litres: number): string {
+  return (litres / 1000).toLocaleString('fr-FR', { maximumFractionDigits: 3, useGrouping: false });
+}
+
+/** A stock quantity in its base unit (g, mL, L) as kg or L with thousands separators, never a fraction of a unit. */
+export function formatStockQty(qtyBase: number, baseUnit: string): { value: string; unit: string } {
+  const big = baseUnit === 'g' || baseUnit === 'mL';
+  const value = big ? qtyBase / 1000 : qtyBase;
+  return {
+    value: value.toLocaleString('fr-FR', { maximumFractionDigits: big ? 1 : 0 }).replace(/[  ]/g, ' '),
+    unit: baseUnit === 'g' ? 'kg' : 'L',
+  };
+}

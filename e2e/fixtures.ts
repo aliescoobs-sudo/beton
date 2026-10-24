@@ -70,6 +70,9 @@ export const E2E_MD = {
   stmSupport: { email: 'e2e-st-support@belgobeton.test', name: 'Support Comptes Tiers' },
   stmOffice: { email: 'e2e-st-office@belgobeton.test', name: 'Bureau Comptes Tiers' },
   acctPartner: { email: 'e2e-ac-partner@belgobeton.test', name: 'Associé Comptes' },
+  loadPlant: { email: 'e2e-ld-plant@belgobeton.test', name: 'Centrale Chargements' },
+  loadPlantAr: { email: 'e2e-ld-plant-ar@belgobeton.test', name: 'مركز التحميل' },
+  loadOffice: { email: 'e2e-ld-office@belgobeton.test', name: 'Bureau Chargements' },
 } as const;
 export const E2E_CSP = { email: 'e2e-csp@belgobeton.test', name: 'CSP E2E' } as const;
 
@@ -99,6 +102,8 @@ const NAV_GROUP: Record<string, string> = {
   'purchase-prices-link': 'purchases',
   'recettes-link': 'production',
   'trucks-link': 'production',
+  'loads-link': 'production',
+  'stock-link': 'production',
   'accounts-link': 'finance',
   'cash-link': 'finance',
   'statements-link': 'finance',

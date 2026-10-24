@@ -16,3 +16,9 @@ export {
   setOpeningStock,
   type StockLevel,
 } from './service/stock-service';
+export {
+  type DeliveryRow,
+  listDeliveries,
+  listLoadableOrders,
+  type LoadableOrder,
+} from './service/plant-views';

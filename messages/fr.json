@@ -743,5 +743,75 @@
         "disputed": "Litige"
       }
     }
+  },
+  "operations": {
+    "loads": {
+      "link": "Chargements",
+      "title": "Chargements du jour",
+      "intro": "Commandes à livrer : cliquez sur Charger pour créer le bon de livraison. Aucun prix n'est affiché ici.",
+      "dueTitle": "À charger",
+      "noneDue": "Aucune commande à charger aujourd'hui.",
+      "order": "Commande",
+      "type": "Béton",
+      "place": "Chantier · zone",
+      "date": "Date",
+      "overdue": "En retard",
+      "remaining": "Reste à livrer",
+      "load": "Chargement",
+      "truck": "Camion",
+      "m3": "m³ (facultatif)",
+      "m3Auto": "auto",
+      "create": "Charger",
+      "created": "Chargement créé :",
+      "longTrip": "trajet long (limite de 90 min)",
+      "errors": {
+        "INVALID": "Saisie invalide.",
+        "NOT_FOUND": "Commande ou camion introuvable.",
+        "ORDER_CANCELLED": "Cette commande est annulée.",
+        "TRUCK_UNAVAILABLE": "Ce camion n'est pas disponible.",
+        "OVER_CAPACITY": "Plus que la capacité du camion.",
+        "OVER_ORDER": "Plus que le reste à livrer de la commande.",
+        "NO_RECETTE": "Aucune recette en vigueur pour ce béton.",
+        "ALREADY_RETURNED": "Bon déjà rentré.",
+        "CONFLICT": "Conflit, réessayez.",
+        "UNAUTHENTICATED": "Session expirée.",
+        "FORBIDDEN": "Action non autorisée."
+      }
+    },
+    "deliveries": {
+      "link": "Livraisons",
+      "title": "Bons de livraison récents",
+      "none": "Aucune livraison enregistrée.",
+      "bl": "BL",
+      "volume": "Volume",
+      "signed": "BL signé",
+      "markReturned": "BL signé rentré",
+      "returned": "Rentré le",
+      "cancelled": "Annulé",
+      "cancelledRow": "Annulation",
+      "errors": {
+        "INVALID": "Saisie invalide.",
+        "NOT_FOUND": "Livraison introuvable.",
+        "ALREADY_RETURNED": "Ce BL est déjà rentré.",
+        "CONFLICT": "Conflit, réessayez.",
+        "UNAUTHENTICATED": "Session expirée.",
+        "FORBIDDEN": "Action non autorisée."
+      }
+    },
+    "stock": {
+      "link": "Stock",
+      "title": "Stock",
+      "intro": "Niveau de chaque composant, calculé à partir des mouvements (chargements, réceptions, ouverture).",
+      "none": "Aucun composant actif.",
+      "component": "Composant",
+      "level": "Niveau",
+      "threshold": "Seuil bas",
+      "status": "État",
+      "statuses": {
+        "ok": "Correct",
+        "low": "Bas",
+        "short": "Négatif"
+      }
+    }
   }
 }
