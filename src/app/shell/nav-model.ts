@@ -35,6 +35,12 @@ const GROUPS: GroupDef[] = [
         allowed: 'orders.write',
       },
       {
+        path: '/payments/new',
+        labelKey: 'ledger.payments.link',
+        testId: 'payments-new-link',
+        allowed: 'instruments.write',
+      },
+      {
         path: '/master-data/selling-prices',
         labelKey: 'masterData.sellingPrices.link',
         testId: 'selling-prices-link',
@@ -67,6 +73,12 @@ const GROUPS: GroupDef[] = [
         labelKey: 'ledger.accounts.link',
         testId: 'accounts-link',
         allowed: 'money_accounts.read',
+      },
+      {
+        path: '/instruments',
+        labelKey: 'ledger.instruments.link',
+        testId: 'instruments-link',
+        allowed: 'instruments.read',
       },
       {
         path: '/cash',

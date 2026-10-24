@@ -91,7 +91,7 @@ Migration `allocation` (insert-only; reversal = negated row). Trigger (advisory 
 **AC:** AC-LED-05 (cheque from CLT-08 bounced on D3 → deadline D3+30, items un-covered, overdue if past due), AC-LED-06 (regularize needs a covering instrument, window closes, history shows both).
 **Verify:** `pnpm test:integration bounce regularize` · **Files:** instrument-service.ts, domain, tests · **Deps:** L11, L12
 
-### - [ ] L14: Instruments screens: receive and list (M)
+### - [x] L14: Instruments screens: receive and list (M)
 Receive cash/cheque/LCN/transfer against an order's échéances (amount, number, bank, issue/written date, allocation), list with status, early/post-dated badges and the regularization countdown; fr/ar, Latin numbers in LTR.
 **AC:** receive + allocate in the UI updates the plan-item state; AC-MD-09 style RTL check; office sees no balance or cash total on the screen.
 **Verify:** `pnpm exec playwright test e2e/ledger-instrument.spec.ts` · **Files:** pages, ledger/ui/instruments/*, messages, e2e · **Deps:** L11

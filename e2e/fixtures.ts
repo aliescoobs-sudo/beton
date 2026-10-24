@@ -61,6 +61,10 @@ export const E2E_MD = {
   acctOffice: { email: 'e2e-ac-office@belgobeton.test', name: 'Bureau Comptes' },
   cashSupport: { email: 'e2e-ca-support@belgobeton.test', name: 'Support Trésorerie' },
   cashOffice: { email: 'e2e-ca-office@belgobeton.test', name: 'Bureau Trésorerie' },
+  payOffice: { email: 'e2e-py-office@belgobeton.test', name: 'Bureau Paiements' },
+  payOfficeAr: { email: 'e2e-py-office-ar@belgobeton.test', name: 'مكتب الدفعات' },
+  paySupport: { email: 'e2e-py-support@belgobeton.test', name: 'Support Paiements' },
+  payPlant: { email: 'e2e-py-plant@belgobeton.test', name: 'Centrale Paiements' },
   acctPartner: { email: 'e2e-ac-partner@belgobeton.test', name: 'Associé Comptes' },
 } as const;
 export const E2E_CSP = { email: 'e2e-csp@belgobeton.test', name: 'CSP E2E' } as const;
@@ -93,6 +97,8 @@ const NAV_GROUP: Record<string, string> = {
   'trucks-link': 'production',
   'accounts-link': 'finance',
   'cash-link': 'finance',
+  'instruments-link': 'finance',
+  'payments-new-link': 'sales',
   'zones-link': 'masterData',
   'concrete-types-link': 'masterData',
   'components-link': 'masterData',
