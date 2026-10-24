@@ -46,6 +46,8 @@ export {
   parseOpeningBalanceInput,
 } from './money-account';
 export {
+  type DepositInput,
+  parseDepositInput,
   type AllocateInput,
   parseAllocateInput,
   parseUnallocateInput,

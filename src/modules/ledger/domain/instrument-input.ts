@@ -95,3 +95,18 @@ export const parseUnallocateInput = (input: unknown): Result<UnallocateInput, 'I
   const p = unallocateSchema.safeParse(input);
   return p.success ? ok(p.data) : err('INVALID');
 };
+
+const depositSchema = z.object({
+  instrumentIds: z
+    .array(z.uuid())
+    .min(1)
+    .max(200)
+    .refine((ids) => new Set(ids).size === ids.length),
+  accountId: z.uuid(),
+  date,
+});
+export type DepositInput = z.infer<typeof depositSchema>;
+export const parseDepositInput = (input: unknown): Result<DepositInput, 'INVALID'> => {
+  const p = depositSchema.safeParse(input);
+  return p.success ? ok(p.data) : err('INVALID');
+};

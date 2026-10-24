@@ -24,6 +24,7 @@ export {
 export {
   cancelInstrument,
   clearInstrument,
+  depositInstruments,
   type InstrumentError,
   type InstrumentEventView,
   type InstrumentRef,

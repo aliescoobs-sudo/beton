@@ -7,6 +7,7 @@ import { isEarly, isPostDated } from '../domain/instrument-dates';
 import {
   parseCancelInput,
   parseClearInput,
+  parseDepositInput,
   parseIssueInput,
   parseReceiveInput,
   parseReverseInput,
@@ -172,6 +173,37 @@ export async function clearInstrument(
       }),
     );
     return ok({ id: v.instrumentId });
+  } catch (error) {
+    return err(instrumentFailure(error));
+  }
+}
+
+/**
+ * "Remise en banque": the owner deposits a selection of received cheques and LCN to a bank account on a date. One event
+ * per instrument, all or nothing. A post-dated cheque may be presented before its written date: accepted, and flagged
+ * `early` when listed (AC-LED-14), never refused.
+ */
+export async function depositInstruments(
+  appPool: pg.Pool,
+  actor: SessionUser,
+  input: unknown,
+): Promise<Result<{ deposited: number }, InstrumentError>> {
+  await require(appPool, actor, 'instruments.manage');
+  const parsed = parseDepositInput(input);
+  if (!parsed.ok) return err('INVALID');
+  const v = parsed.value;
+  try {
+    await inRequest(appPool, actor, async (tx) => {
+      for (const instrumentId of v.instrumentIds) {
+        await insertEvent(tx, actor, {
+          instrumentId,
+          event: 'deposited',
+          date: v.date,
+          accountId: v.accountId,
+        });
+      }
+    });
+    return ok({ deposited: v.instrumentIds.length });
   } catch (error) {
     return err(instrumentFailure(error));
   }

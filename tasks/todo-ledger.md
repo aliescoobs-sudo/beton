@@ -81,7 +81,7 @@ Migration `allocation` (insert-only; reversal = negated row). Trigger (advisory 
 **AC:** property test: Σ allocations never exceed either side under 10 parallel allocations; covered state correct; AC-SEC-04.
 **Verify:** `pnpm test:integration allocation rls` · **Files:** migration, ledger/service/allocation-service.ts, plan-state.ts, tests · **Deps:** L3, L10
 
-### - [ ] L12: Deposit batch and early presentation (S)
+### - [x] L12: Deposit batch and early presentation (S)
 "Remise en banque": deposit a selection of received cheques/LCN to a bank account on a date; allowed before `written_date` (post-dated presented early), event flagged `early` (derived `at_date < written_date`); outgoing post-dated cheques can be cleared before their written date.
 **AC:** AC-LED-14 (early deposit/clearing allowed and flagged; not flagged when on or after the written date), AC-LED-04 (one batch = one event per instrument).
 **Verify:** `pnpm test:integration deposit` · **Files:** instrument-service.ts, domain early flag, tests · **Deps:** L10
