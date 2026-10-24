@@ -1,0 +1,188 @@
+import { randomUUID } from 'node:crypto';
+import type pg from 'pg';
+import { err, ok, type Result } from '@/lib/result';
+import { nextDocNumber } from '@/modules/ledger';
+import {
+  inRequest,
+  isMalformedId,
+  isUniqueViolation,
+  parameterOrDefault,
+  require,
+  type SessionUser,
+} from '@/modules/platform-security';
+import { parseBlReturnInput, parseLoadInput } from '../domain/load-input';
+import { remainingVolume } from '../domain/stock';
+import { tripExceedsLimit } from '../domain/trip';
+
+export type DeliveryError =
+  | 'INVALID'
+  | 'NOT_FOUND'
+  | 'ORDER_CANCELLED'
+  | 'TRUCK_UNAVAILABLE'
+  | 'OVER_CAPACITY'
+  | 'OVER_ORDER'
+  | 'NO_RECETTE'
+  | 'ALREADY_RETURNED'
+  | 'CONFLICT';
+
+export function deliveryFailure(error: unknown): DeliveryError {
+  const e = error as { code?: string; message?: string };
+  const m = e.message ?? '';
+  if (e.code === '23514') {
+    if (/order is cancelled/.test(m)) return 'ORDER_CANCELLED';
+    if (/truck is not available/.test(m)) return 'TRUCK_UNAVAILABLE';
+    if (/more than the truck/.test(m)) return 'OVER_CAPACITY';
+    if (/left to deliver/.test(m)) return 'OVER_ORDER';
+    if (/recette in force/.test(m)) return 'NO_RECETTE';
+    if (/unknown|not a live load/.test(m)) return 'NOT_FOUND';
+    return 'INVALID';
+  }
+  if (e.code === '23503' || isMalformedId(error)) return 'NOT_FOUND';
+  if (isUniqueViolation(error) || e.code === '40001' || e.code === '40P01') return 'CONFLICT';
+  throw error;
+}
+
+export interface CreatedLoad {
+  id: string;
+  blNo: string;
+  volumeL: number;
+  /** `LONG_TRIP`: the trip plus the unloading is more than the concrete's workable time (R4). Not a refusal. */
+  warnings: 'LONG_TRIP'[];
+}
+
+/** An operations parameter as the roles that load trucks may read it (the plant cannot read the parameter table). */
+async function opsParameter(tx: pg.PoolClient, key: 'concrete_limit_min' | 'unloading_min'): Promise<number> {
+  const { rows } = await tx.query<{ value: unknown }>('select public.ops_parameter($1) as value', [key]);
+  return parameterOrDefault(key, rows[0]?.value);
+}
+
+/** The recette in force for a type on a business date (the latest version that has started), or null. */
+export async function recetteInForce(
+  tx: pg.PoolClient,
+  concreteTypeId: string,
+  date: string,
+): Promise<string | null> {
+  const { rows } = await tx.query<{ id: string }>(
+    `select id from recette where concrete_type_id = $1 and effective_from <= $2 order by effective_from desc limit 1`,
+    [concreteTypeId, date],
+  );
+  return rows[0]?.id ?? null;
+}
+
+/**
+ * One truck load for an order (AC-OPS-01): the load is within the truck and within what is left of the order, the recette
+ * in force on `deps.today` is stored on it, it gets its BL number. Plant, owner and partner. No price anywhere.
+ */
+export async function createLoad(
+  appPool: pg.Pool,
+  actor: SessionUser,
+  input: unknown,
+  deps: { today: string },
+): Promise<Result<CreatedLoad, DeliveryError>> {
+  await require(appPool, actor, 'deliveries.write');
+  const parsed = parseLoadInput(input);
+  if (!parsed.ok) return err('INVALID');
+  const v = parsed.value;
+  try {
+    return await inRequest(appPool, actor, async (tx): Promise<Result<CreatedLoad, DeliveryError>> => {
+      const order = await tx.query<{
+        concrete_type_id: string;
+        volume_l: number;
+        zone_id: string | null;
+        is_reversed: boolean;
+      }>(
+        `select concrete_type_id, volume_l, zone_id, is_reversed from sales_order_ops where id = $1 and reverses_id is null`,
+        [v.orderId],
+      );
+      const o = order.rows[0];
+      if (!o) return err('NOT_FOUND');
+      if (o.is_reversed) return err('ORDER_CANCELLED');
+      const truck = await tx.query<{ capacity_l: number; status: string }>(
+        `select capacity_l, status from truck where id = $1`,
+        [v.truckId],
+      );
+      const t = truck.rows[0];
+      if (!t) return err('NOT_FOUND');
+      if (t.status !== 'active') return err('TRUCK_UNAVAILABLE');
+      const loaded = await tx.query<{ v: number }>(
+        `select coalesce(sum(volume_l), 0)::int as v from delivery where order_id = $1`,
+        [v.orderId],
+      );
+      const left = remainingVolume(o.volume_l, [Number(loaded.rows[0]?.v)]);
+      const volumeL = v.volumeL ?? Math.min(left, t.capacity_l);
+      if (volumeL <= 0) return err('OVER_ORDER');
+      if (volumeL > t.capacity_l) return err('OVER_CAPACITY');
+      if (volumeL > left) return err('OVER_ORDER');
+      const recetteId = await recetteInForce(tx, o.concrete_type_id, deps.today);
+      if (!recetteId) return err('NO_RECETTE');
+
+      const warnings: 'LONG_TRIP'[] = [];
+      if (o.zone_id) {
+        const zone = await tx.query<{ one_way_min: number }>('select one_way_min from zone where id = $1', [
+          o.zone_id,
+        ]);
+        const oneWay = zone.rows[0]?.one_way_min;
+        if (oneWay !== undefined) {
+          const [unloading, limit] = [
+            await opsParameter(tx, 'unloading_min'),
+            await opsParameter(tx, 'concrete_limit_min'),
+          ];
+          if (tripExceedsLimit(oneWay, unloading, limit)) warnings.push('LONG_TRIP');
+        }
+      }
+
+      const id = randomUUID();
+      const blNo = await nextDocNumber(tx, 'BL', deps.today);
+      await tx.query(
+        `insert into delivery (id, bl_no, order_id, truck_id, volume_l, load_date, recette_id, created_by)
+         values ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [id, blNo, v.orderId, v.truckId, volumeL, deps.today, recetteId, actor.id],
+      );
+      return ok({ id, blNo, volumeL, warnings });
+    });
+  } catch (error) {
+    return err(deliveryFailure(error));
+  }
+}
+
+export interface BlReturned {
+  id: string;
+}
+export interface FirstReturn {
+  byUserId: string;
+  on: string;
+}
+
+/** Whoever receives the signed BL records its return, once (A11, AC-OPS-10); a second attempt learns who and when. */
+export async function recordBlReturn(
+  appPool: pg.Pool,
+  actor: SessionUser,
+  input: unknown,
+): Promise<Result<BlReturned, DeliveryError> | { ok: false; error: 'ALREADY_RETURNED'; first: FirstReturn }> {
+  await require(appPool, actor, 'deliveries.bl_return');
+  const parsed = parseBlReturnInput(input);
+  if (!parsed.ok) return err('INVALID');
+  const v = parsed.value;
+  const id = randomUUID();
+  try {
+    await inRequest(appPool, actor, (tx) =>
+      tx.query(
+        `insert into delivery_return (id, delivery_id, returned_on, returned_volume_l, created_by) values ($1, $2, $3, $4, $5)`,
+        [id, v.deliveryId, v.returnedOn, v.returnedVolumeL, actor.id],
+      ),
+    );
+    return ok({ id });
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      const first = await inRequest(appPool, actor, (tx) =>
+        tx.query<{ by: string; on: string }>(
+          `select created_by::text as by, to_char(returned_on, 'YYYY-MM-DD') as on from delivery_return where delivery_id = $1`,
+          [v.deliveryId],
+        ),
+      );
+      const row = first.rows[0];
+      if (row) return { ok: false, error: 'ALREADY_RETURNED', first: { byUserId: row.by, on: row.on } };
+    }
+    return err(deliveryFailure(error));
+  }
+}

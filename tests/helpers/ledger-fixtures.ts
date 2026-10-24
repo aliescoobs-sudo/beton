@@ -235,15 +235,26 @@ export async function insertOrderWithItems(
   master: OrderMaster,
   clientId: string,
   items: number[],
+  options: { zoneId?: string; volumeL?: number } = {},
 ): Promise<{ id: string; code: string; itemIds: string[] }> {
   const id = randomUUID();
   const code = (await tx.query<{ n: string }>(`select public.next_doc_number('CMD', 2026, 5) as n`)).rows[0]
     ?.n as string;
   await tx.query(
-    `insert into sales_order (id, code, client_id, concrete_type_id, volume_l, order_date, delivery_date, selling_price_id,
+    `insert into sales_order (id, code, client_id, zone_id, concrete_type_id, volume_l, order_date, delivery_date, selling_price_id,
                               unit_price_ht_centimes, vat_rate_bp, total_ht_centimes, total_vat_centimes, total_ttc_centimes, created_by)
-     values ($1, $2, $3, $4, 10000, '2026-06-01', '2026-06-02', $5, $6, 2000, 780000, 156000, 936000, $7)`,
-    [id, code, clientId, master.typeId, master.sellingPriceId, master.unitPriceCentimes, actorId],
+     values ($1, $2, $3, $8, $4, $9, '2026-06-01', '2026-06-02', $5, $6, 2000, 780000, 156000, 936000, $7)`,
+    [
+      id,
+      code,
+      clientId,
+      master.typeId,
+      master.sellingPriceId,
+      master.unitPriceCentimes,
+      actorId,
+      options.zoneId ?? null,
+      options.volumeL ?? 10000,
+    ],
   );
   const itemIds: string[] = [];
   for (const [n, amount] of items.entries()) {
@@ -265,5 +276,98 @@ export function ensureOpening(app: pg.Pool, ownerId: string, marker: string) {
       `insert into ledger_opening (opening_date, created_by) values ('2026-01-01', $1) on conflict do nothing`,
       [ownerId],
     ),
+  );
+}
+
+/** An order of 10 m³ for a client of its own, a truck (the pilot's T1), and a recette in force from 2000 with cement and sand lines. */
+export interface DeliveryScene {
+  clientId: string;
+  orderId: string;
+  typeId: string;
+  truckId: string;
+  recetteId: string;
+  cementId: string;
+  sandId: string;
+}
+const deliveryCache = new Map<string, Promise<DeliveryScene>>();
+
+export function deliveryScene(app: pg.Pool, ownerId: string, marker: string): Promise<DeliveryScene> {
+  let made = deliveryCache.get(marker);
+  if (!made) {
+    made = (async () => {
+      const master = await orderMaster(app, ownerId, marker);
+      return withRlsContext(app, { userId: ownerId, role: 'owner', requestId: marker }, async (tx) => {
+        const client = await tx.query<{ id: string }>(
+          `insert into client (id, code, name, kind) values (gen_random_uuid(), public.next_code('CLT', 3), $1, 'person') returning id`,
+          [`dl${marker}`],
+        );
+        const clientId = client.rows[0]?.id as string;
+        const order = await insertOrder(tx, ownerId, { ...master, clientId });
+        const truck = await tx.query<{ id: string }>(`select id from truck where code = 'T1'`);
+        const recette = await tx.query<{ id: string }>(
+          `insert into recette (id, concrete_type_id, version, effective_from, created_by)
+           values (gen_random_uuid(), $1, 1, '2000-01-01', $2) returning id`,
+          [master.typeId, ownerId],
+        );
+        const components = await tx.query<{ id: string; name: string }>(
+          `select id, lower(name_fr) as name from component where lower(name_fr) in ('ciment', 'sable')`,
+        );
+        const cementId = components.rows.find((c) => c.name === 'ciment')?.id as string;
+        const sandId = components.rows.find((c) => c.name === 'sable')?.id as string;
+        for (const [componentId, qty] of [
+          [cementId, 350_000],
+          [sandId, 800_000],
+        ] as const) {
+          await tx.query(
+            `insert into recette_line (id, recette_id, component_id, qty_per_m3) values (gen_random_uuid(), $1, $2, $3)`,
+            [recette.rows[0]?.id, componentId, qty],
+          );
+        }
+        return {
+          clientId,
+          orderId: order.id,
+          typeId: master.typeId,
+          truckId: truck.rows[0]?.id as string,
+          recetteId: recette.rows[0]?.id as string,
+          cementId,
+          sandId,
+        };
+      });
+    })();
+    deliveryCache.set(marker, made);
+  }
+  return made;
+}
+
+/** A delivery of `volumeL` litres written directly (the actor must be allowed to load: owner, partner or plant). */
+export async function insertDelivery(
+  tx: pg.PoolClient,
+  actorId: string,
+  scene: Pick<DeliveryScene, 'orderId' | 'truckId' | 'recetteId'>,
+  volumeL = 1000,
+  year = 2026,
+): Promise<{ id: string; blNo: string }> {
+  const id = randomUUID();
+  const blNo = (await tx.query<{ n: string }>(`select public.next_doc_number('BL', $1, 5) as n`, [year]))
+    .rows[0]?.n as string;
+  await tx.query(
+    `insert into delivery (id, bl_no, order_id, truck_id, volume_l, load_date, recette_id, created_by)
+     values ($1, $2, $3, $4, $5, '2026-06-01', $6, $7)`,
+    [id, blNo, scene.orderId, scene.truckId, volumeL, scene.recetteId, actorId],
+  );
+  return { id, blNo };
+}
+
+/** A delivery by the owner in a context of its own (for fixtures that insert the return as someone else). */
+export function newDelivery(
+  app: pg.Pool,
+  ownerId: string,
+  marker: string,
+  scene: DeliveryScene,
+  volumeL = 100,
+  year = 2026,
+) {
+  return withRlsContext(app, { userId: ownerId, role: 'owner', requestId: marker }, (tx) =>
+    insertDelivery(tx, ownerId, scene, volumeL, year),
   );
 }

@@ -61,6 +61,17 @@ export const PARAMETERS = {
     schema: z.number().int().min(0).max(10),
     description: 'Working days before a deposited cheque or LCN clears',
   },
+  // Operations (SPEC-operations R4, AC-OPS-08): a load warns when the trip plus the unloading exceeds the limit.
+  concrete_limit_min: {
+    default: 90,
+    schema: z.number().int().min(30).max(240),
+    description: 'Minutes concrete stays workable after loading (R4)',
+  },
+  unloading_min: {
+    default: 30,
+    schema: z.number().int().min(0).max(120),
+    description: 'Minutes to unload a truck on site',
+  },
 } as const;
 
 export type ParameterKey = keyof typeof PARAMETERS;

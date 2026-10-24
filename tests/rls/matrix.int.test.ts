@@ -7,6 +7,9 @@ import { testEnv } from '../db-env';
 import { realActor } from '../helpers/actors';
 import {
   allocationScene,
+  deliveryScene,
+  insertDelivery,
+  newDelivery,
   ensureOpening,
   insertInstrument,
   insertMovementReversal,
@@ -204,6 +207,33 @@ const FIXTURES: Record<
       return insertMovementReversal(tx, actor, original, `${marker}:${actor}`);
     },
     visible: `select split_part(reason, ':', 2) as owner from money_movement where source = 'reversal' and reason like $1 || ':%'`,
+  },
+  delivery: {
+    // Numbered in the year 2099 so that the rows of this fixture are the only ones the query below finds (office cannot join orders).
+    writers: ['owner', 'partner', 'plant'],
+    seed: async (tx, actor) =>
+      insertDelivery(tx, actor, await deliveryScene(app, actors.owner, marker), 100, 2099),
+    visible: `select created_by::text as owner from delivery where bl_no like 'BL-2099-%' and $1::text is not null`,
+  },
+  delivery_return: {
+    // One return per delivery: each writer gets a delivery of its own (year 2098), made by the owner.
+    writers: ['owner', 'partner', 'office', 'plant'],
+    seed: async (tx, actor) => {
+      const delivery = await newDelivery(
+        app,
+        actors.owner,
+        marker,
+        await deliveryScene(app, actors.owner, marker),
+        50,
+        2098,
+      );
+      return tx.query(
+        `insert into delivery_return (id, delivery_id, returned_on, created_by) values (gen_random_uuid(), $1, '2026-06-01', $2)`,
+        [delivery.id, actor],
+      );
+    },
+    visible: `select r.created_by::text as owner from delivery_return r join delivery d on d.id = r.delivery_id
+                where d.bl_no like 'BL-2098-%' and $1::text is not null`,
   },
   ledger_opening: {
     // A singleton: the first writer enters it, later inserts do nothing. The others are refused by the policy.

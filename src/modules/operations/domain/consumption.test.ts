@@ -68,3 +68,12 @@ describe('stock', () => {
     expect(remainingVolume(8000, [8000, 8000])).toBe(0);
   });
 });
+
+describe('the 90-minute rule (AC-OPS-08)', () => {
+  it('warns only when the trip plus the unloading exceeds the limit', async () => {
+    const { tripExceedsLimit } = await import('./trip');
+    expect(tripExceedsLimit(60, 30, 90)).toBe(false);
+    expect(tripExceedsLimit(60, 30, 85)).toBe(true);
+    expect(tripExceedsLimit(20, 30, 90)).toBe(false);
+  });
+});

@@ -1,5 +1,5 @@
-/** The three numbered ledger documents; the counter is per (prefix, year) and restarts at 1 each year. */
-export const DOC_PREFIXES = ['CMD', 'ACH', 'FA'] as const;
+/** The numbered documents (orders, purchases, invoices, delivery notes); the counter is per (prefix, year) and restarts at 1 each year. */
+export const DOC_PREFIXES = ['CMD', 'ACH', 'FA', 'BL'] as const;
 export type DocPrefix = (typeof DOC_PREFIXES)[number];
 
 /** Digits of the running number (CMD-2026-00001); a wider number is never truncated. */

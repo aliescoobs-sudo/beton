@@ -659,6 +659,42 @@ export const TABLE_ACCESS = {
     exception:
       'ledger L33: what a client owes us or we owe a supplier on the opening date; insert-only, owner writes, owner and support read; its audit rows hold the amount and are hidden from the others.',
   },
+  delivery: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'all',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'operations O2: truck loads with their BL number; quantities only, no money, so every signed-in role of the company reads them. Plant, owner and partner create; owner and partner cancel (a reversing row). Insert-only; guards in the database: live order, truck capacity, what is left to deliver, the recette in force.',
+  },
+  delivery_return: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'all',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'operations O2: the signed-BL return, one row per delivery (A11); plant, office, owner and partner record it, a second attempt is a unique violation.',
+  },
   correction_request: {
     kind: 'rls',
     read: {

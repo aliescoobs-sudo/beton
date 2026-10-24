@@ -70,6 +70,7 @@ describe('functions the application role can execute', () => {
     'public.default_cash_account()',
     'public.ledger_parameter(p_key text)',
     'public.next_code(p_key text, p_width integer)',
+    'public.ops_parameter(p_key text)',
     'public.next_doc_number(p_prefix text, p_year integer, p_width integer)',
     'public.resolve_selling_price(p_type uuid, p_client uuid, p_date date)',
   ];

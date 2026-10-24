@@ -9,7 +9,7 @@ Plan: [tasks/plan-operations.md](plan-operations.md) (proposed). Standard verifi
 **AC:** AC-OPS-02 (8 m³ B25, cement 350 kg/m³ → −2 800 000 g; property: Σ consumption over loads = recette × Σ m³ within ±1 base unit per load); fast-check.
 **Verify:** `pnpm test src/modules/operations` · **Files:** operations/domain/{consumption,stock}.ts + tests · **Deps:** none
 
-### - [ ] O2: Delivery, BL number, createLoad (M)
+### - [x] O2: Delivery, BL number, createLoad (M)
 Migration `delivery` (id, bl_no `BL-YYYY-nnnnn`, order_id, truck_id, volume_l, loaded_at, recette_id, reverses_id, created_by; insert-only) and `delivery_return` (unique per delivery: date, returned_volume_l, by); guard: volume ≤ truck capacity, order live, volume ≤ remaining; `next_doc_number` accepts `plant` for `BL` only. `createLoad` (plant, owner, partner), default volume = min(remaining, capacity), 90-minute warning from the zone (R4), `recordBlReturn` (plant or office, once).
 **AC:** AC-OPS-01, AC-OPS-08, AC-OPS-10 (two concurrent returns → exactly one), plant cannot number CMD/FA/ACH, AC-SEC-04 for both tables.
 **Verify:** `pnpm test:integration delivery rls` · **Files:** migration, operations/service/delivery-service.ts, table-access, matrix, tests · **Deps:** O1, ledger L3
