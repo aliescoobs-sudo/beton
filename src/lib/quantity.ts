@@ -38,3 +38,19 @@ export function toBase(qty: MilliQty, factorToBase: number): Result<BaseQty, Qua
 export function costOf(qty: BaseQty, pricePerUnit: Centimes, factorToBase: number): Centimes {
   return mulDivRound(pricePerUnit, qty, factorToBase);
 }
+
+/**
+ * A base quantity scaled by num/den and rounded once, half away from zero (a recette line of 350 000 g per m³ for a load
+ * of 8 000 L is 350 000 × 8 000 / 1 000). The one place a fraction of a quantity becomes a whole number of base units.
+ */
+export function scaleQty(qty: number, num: number, den: number): BaseQty {
+  if (!Number.isSafeInteger(qty) || !Number.isSafeInteger(num))
+    throw new RangeError('Not integer quantities');
+  if (!Number.isSafeInteger(den) || den <= 0) throw new RangeError(`Not a usable denominator: ${den}`);
+  const n = BigInt(qty) * BigInt(num);
+  const d = BigInt(den);
+  const q = n / d;
+  const r = n % d;
+  const away = (r < 0n ? -r : r) * 2n >= d;
+  return baseQty(Number(away ? q + (n < 0n ? -1n : 1n) : q));
+}

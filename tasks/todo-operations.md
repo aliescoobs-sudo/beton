@@ -4,7 +4,7 @@ Plan: [tasks/plan-operations.md](plan-operations.md) (proposed). Standard verifi
 
 ## Phase A: Deliveries and stock
 
-### - [ ] O1: Stock domain (pure) (S)
+### - [x] O1: Stock domain (pure) (S)
 `consumptionForLoad(recetteLines, volumeL)` (one rounding per line, integer base units, half away from zero), `stockLevel(movements)`, `stockStatus(level, lowThreshold)` (`ok/low/short`), `remainingVolume(orderVolumeL, loadedL[])`.
 **AC:** AC-OPS-02 (8 m³ B25, cement 350 kg/m³ → −2 800 000 g; property: Σ consumption over loads = recette × Σ m³ within ±1 base unit per load); fast-check.
 **Verify:** `pnpm test src/modules/operations` · **Files:** operations/domain/{consumption,stock}.ts + tests · **Deps:** none
