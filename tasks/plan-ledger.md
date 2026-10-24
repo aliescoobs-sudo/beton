@@ -34,6 +34,9 @@ The ledger records every money commitment and movement exactly: orders with deli
 13. **Boundaries**: `ledger` imports `master-data`, `clock` and (transitively) `platform-security`. `inRequest`/`require` currently live inside `master-data/service/request.ts`. L1 lifts them to the `platform-security` public surface instead of copying a security-critical helper (Q6).
 14. **UI**: same kit as master-data; strings in `messages/{fr,ar}.json` under `ledger.*`; financial terms stay French in both locales (D48); logical Tailwind properties only; Latin codes, ICE, cheque/LCN numbers and amounts in `dir="ltr"` / `<bdi>`; screens covered by the T16-style bilingual check (L25).
 15. **What the ledger does not do**: deliveries, stock effects of receipts (operations), forecast, account colours, alerts, option generator (rules-engine), AI-assisted entry (ai-layer; it only prefills the same form). Invoice lines reference `delivery_id` without a foreign key until `operations` adds it (Q2).
+16. **Statements are a read model, not a table.** Client and supplier account statements are derived from the commercial documents (orders, deliveries, invoices, credit notes, purchases, receipts) and the financial ones (instruments and their events, allocations, movements), in two sections, with a running balance computed by a pure function. Owner and support only (DECISIONS 81/82); each view is audited. (Owner's brief 2026-10-24: L27, L28.)
+17. **Money documents are generated, not stored as blobs.** Invoice, credit note and quote PDFs are rendered on demand from the stored rows (so the PDF always equals the data), owner and support only, every print/download audited. Our legal identity is a versioned `company_profile` row. The delivery note belongs to `operations` and reuses the kit (AC-OPS-11). (L29–L31.)
+18. **Accountant export** is CSV in the MVP (journals and ageing for a period), owner and support only, audited, with a reconciliation check and formula-injection protection; other formats wait for open question 13. (L32.)
 
 ## Dependency graph
 ```
@@ -48,6 +51,8 @@ L11,L12,L13 ─ L14 instruments screens (receive, list) ─ L15 lifecycle screen
 L10 ─ L16 encaissé vs total (cash.read)
 L3,L2 ─ L17 invoice + gapless number + 69-21 dates ─ L18 credit note + invoice screen ─ L19 legal deadlines read model
 L1,L2 ─ L20 purchase + plan (out) ─ L21 receipt ─ L22 supplier payments (reuses L10–L13, direction out) ─ L23 purchases screens   ◄── CP-L4
+L10,L11 ─ L27 statement read model ─ L28 statement screens + CSV                                          ◄── CP-L3 (with statements)
+L1 ─ L29 company profile;  L18,L29 ─ L30 PDF kit (invoice, credit note) ─ L31 quotes;  L18,L22,L28 ─ L32 accountant export
 L3,L10,L17,L20 ─ L24 pilot seed ─ L25 bilingual check ─ L26 closure                                       ◄── CP-L5
 ```
 Parallelisable after CP-L1: {L6, L7} ∥ {L8, L9}; after L10: {L11…L15} ∥ {L16}; {L17…L19} ∥ {L20…L23} (shared only through L1/L2).
@@ -57,13 +62,14 @@ Parallelisable after CP-L1: {L6, L7} ∥ {L8, L9}; after L10: {L11…L15} ∥ {L
 |---|---|---|
 | 0 Pattern | L1–L5 | **CP-L1**: the financial pattern (insert-only + reversal + DB invariants + visibility) reviewed with Ali before it is copied to instruments, invoices, purchases |
 | 1 Orders | L6–L7 | CP-L2: AC-LED-01, 02, 03 (orders), 12, 13, AC-MD-05 order part |
-| 2 Instruments | L8–L16 | CP-L3: AC-LED-03 (instruments), 04, 05, 06, 07, 14 |
+| 2 Instruments | L8–L16, L27–L28 | CP-L3: AC-LED-03 (instruments), 04, 05, 06, 07, 14, 19–21 |
 | 3 Invoices | L17–L19 | CP-L4a: AC-LED-08, 09, 15 |
 | 4 Purchases | L20–L23 | CP-L4: AC-LED-16 and supplier payments end to end |
+| 4b Documents | L29–L32 | CP-L4b: AC-LED-22, 23, 24 |
 | 5 Close | L24–L26 | CP-L5: all AC-LED-01…18, AC-SEC-04/05 for these tables, coverage ≥ 90% on `ledger/domain` |
 
 ## AC coverage
-Spec ACs 01–13; 14–18 are **proposed additions** (SPEC-ledger is not edited until you approve them, Q7).
+Spec ACs 01–13; 14–18 are **proposed additions** (19–24 added 2026-10-24 on the owner's brief, DECISIONS 82) (SPEC-ledger is not edited until you approve them, Q7).
 
 | AC | Statement (short) | Tasks |
 |---|---|---|
@@ -85,6 +91,13 @@ Spec ACs 01–13; 14–18 are **proposed additions** (SPEC-ledger is not edited 
 | AC-LED-16 *(new)* | Purchase due date default +60, > 120 refused; supplier payment allocation | L20, L22 |
 | AC-LED-17 *(new)* | Reversal window: office ≤ 2 days ok, older refused, owner/partner ok | L5 |
 | AC-LED-18 *(new)* | Archived client/supplier not selectable on a new order/purchase; existing documents still show it (closes AC-MD-05) | L3, L20 |
+| AC-LED-19 *(new)* | Client and supplier statement: two sections, running balance, summary (invoiced, delivered, paid, due, late, cancelled) | L27, L28 (+ sources in L17, L18, L20–L22) |
+| AC-LED-20 *(new)* | Filters keep the carried-in balance; closing balance = open plan items | L27 |
+| AC-LED-21 *(new)* | Statements, PDFs, exports: nothing for office, partner, plant; support views audited | L27, L28, L30–L32 |
+| AC-LED-22 *(new)* | Invoice/credit note PDF with legal mentions equals the stored document | L29, L30 |
+| AC-LED-23 *(new)* | Quote converts to an order only through a human-confirmed form; no ledger effect | L31 |
+| AC-LED-24 *(new)* | Accountant export reconciles with the invoices and is audited | L32 |
+| AC-OPS-11 *(operations)* | Delivery note without prices, printed by office and plant | operations plan (reuses L30) |
 | AC-SEC-04 (ledger) | RLS matrix per table × role | each table task, L26 |
 | AC-SEC-05 (ledger) | Plant: no price/total/plan/contact; office: no margin, no cash position | L7, L16, L26 |
 

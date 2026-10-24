@@ -16,7 +16,7 @@ The brain's home (🟡 D19): in under a minute on his phone, the owner knows tod
    - Yesterday's reconciliation status.
    - Daily brief (AI text if enabled, else template text from the same facts).
 2. **Alert / black-day report**: target date; causes (each cause = linked document + amount + responsible person); timeline of the day; forecast before/after for each option; ranked options (max 3) with coverage %, counterparties, new risks; actions: "Préparer" (opens prefilled normal form), "Reclasser" (severity + reason), "Plus de détails" (AI Q&A if enabled), history.
-3. **Comptes**: clients/suppliers list with colours (R14), filter by colour, balance and next échéance.
+3. **Comptes**: clients/suppliers list with colours (R14), filter by colour, balance and next échéance; each row opens the account statement (SPEC-ledger AC-LED-19, owner and support only).
 4. **Échéances**: due items next 14 days both directions; 69-21 and 71.24 deadlines.
 5. **Rapprochement**: reconciliation runs and gaps (from `reconciliation`).
 6. **Historique**: audit viewer.

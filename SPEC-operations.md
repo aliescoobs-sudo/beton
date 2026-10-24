@@ -51,5 +51,7 @@ Plant W on deliveries and receipts-as-quantities; office R on deliveries and rec
 - **AC-OPS-09** Plant screen shows no price, total, client phone or payment data (DOM + API assertion).
 - **AC-OPS-10** Plant records a signed-BL return; a subsequent attempt by office (or plant again) is refused with who/when of the first recording; two concurrent attempts result in exactly one recorded return; the audit event names the recorder.
 
+- **AC-OPS-11** (DECISIONS 82) Each delivery has a printable delivery note (bon de livraison, PDF, fr; Arabic header where the font allows): BL number, date, our legal mentions, client code and name, site, concrete type, volume, truck, loaded time, signature boxes. It carries no price, total or payment data and can be printed by office, plant, owner, partner and support; the print is audited. Built on the document kit of ledger L30.
+
 ## 6. Assumptions relied on
 ✅ D7; 🟡 D32 (90 min, 30 min unloading, 8 m³), 🟡 D45 (simple truck check), 🟡 D53 (zones), ✅ A11 (who creates/returns BL), 🟡 A18 (loading 10 min, working 600 min), OQ6.

@@ -45,6 +45,12 @@ any non-final state ──► cancelled (reversing entry)
 
 Cancellation of an invoice = credit note (`avoir`) referencing it; the number is never reused.
 
+### Company identity and quotes (DECISIONS 82)
+| Table | Key columns | Notes |
+|---|---|---|
+| `company_profile` | id, legal_name, legal_form, ice, if_no, rc_no, patente_no, address, phone, email, rib, effective_from, created_by | Our own legal mentions, versioned insert-only (a change is a new row); fake values in the pilot; read by every role (it is printed on delivery notes), written by the owner |
+| `quote` (`devis`) | id, number `DV-YYYY-nnnnn` (gapless per year), client_id, quote_date, valid_until, concrete_type_id, volume_l, unit_price_ht_centimes, vat_rate_bp, totals HT/VAT/TTC, converted_order_id, reverses_id | A proposal, not a commitment: no payment plan, no ledger effect until it is converted into an order by a human (D65); insert-only |
+
 ### Purchases
 | Table | Key columns | Notes |
 |---|---|---|
@@ -62,6 +68,11 @@ Supplier payments are outgoing `payment_instrument`s allocated to purchase `paym
 - **Statuses** of échéances are derived from allocations + dates (via `clock.today()`): `overdue` when due_date < today and not covered.
 - **Cash entry** of a received cash payment = instrument `received` + `cleared` same day into caisse.
 - **Deposit**: a batch action "Remise en banque" deposits selected cheques/LCN to a bank account on a date.
+
+### Statements, documents, exports (DECISIONS 82)
+- **Account statement** per client and per supplier, owner and support only, two separate sections. *Commercial*: orders, deliveries (once `operations` exists), invoices, purchases, receipts, credit notes. *Financial*: payments and instruments with their events (received, deposited, cleared, bounced, regularized, cancelled), cash, transfers, advances, installments, and the allocations that tie them to the commercial lines. Each line has date, type, document code, status, signed amount and the running balance. Summary: invoiced, delivered, paid, due, late (`due_date < today` and not covered) and cancelled (reversed documents stay visible, struck through). Filters: date range, type, status. Export of the filtered view to CSV.
+- **Documents** (PDF, printable, downloadable; fr first, Arabic header where the font supports it): invoice and credit note (our legal mentions, client ICE, number, dates, due date, lines, VAT rate, HT/VAT/TTC, law 69-21 payment-term mention), quote, and the delivery note (BL, in `operations`, no price: printed by office and plant). Invoice, credit note and quote PDFs are owner and support only; every print and download is audited.
+- **Accountant export** for a period: sales journal (invoices and credit notes with HT, VAT, TTC, client ICE), purchases journal, payments and cash/bank movements, receivables and payables ageing. CSV (UTF-8, `;` separator, `,` decimal), owner and support only, audited as `export`.
 
 ## 4. Permissions
 Owner/partner W everything; office W on orders, instruments, invoices, purchases (no margins, no account balances totals beyond what a document shows — 🟡 A9); plant R on order operational fields only. Reversals of entries older than 2 days require owner/partner (🟡 parameter `reversal_window_days` = 2).
@@ -86,6 +97,13 @@ Owner/partner W everything; office W on orders, instruments, invoices, purchases
 - **AC-LED-16** A purchase's due date defaults to supplier invoice date + 60 days and > 120 days is rejected (R24); a supplier payment is an outgoing instrument allocated to the purchase's plan items.
 - **AC-LED-17** Reversal window: an office user can reverse an entry within `reversal_window_days` (2); an older entry is refused to office and accepted for owner/partner with a reason.
 - **AC-LED-18** An archived client or supplier cannot be selected on a new order or purchase; existing documents still show it (completes AC-MD-05).
+
+- **AC-LED-19** The client statement of a client with an order, an invoice, a credit note, two cheques (one bounced) and a cash advance lists every line in two sections, with a running balance equal to Σ signed lines at every row; the summary shows invoiced, delivered, paid, due, late and cancelled; a reversed document stays listed as cancelled. The supplier statement does the same for purchases, receipts and outgoing instruments.
+- **AC-LED-20** Statement filters (date, type, status) change the lines but not the opening balance carried into the range; the closing balance of an unfiltered statement equals the sum of the client's open plan items.
+- **AC-LED-21** Statements, PDFs and exports return nothing to office, partner or plant (service, RLS and page 404; `expectNoFields`); support reads them and each view, print, download and export is audited.
+- **AC-LED-22** The invoice PDF carries our ICE, IF, RC, address, the client's ICE, the sequential number, dates, due date, VAT rate and amounts, all equal to the stored invoice; a credit note PDF references the cancelled invoice number.
+- **AC-LED-23** A quote converts into an order only through the order form confirmed by a human; the quote is unchanged and linked (`converted_order_id`); a quote has no payment plan and no ledger effect.
+- **AC-LED-24** The accountant export for a period reconciles: Σ sales journal TTC = Σ invoices minus credit notes of the period, and the file is audited.
 
 ## 6. Assumptions relied on
 ✅ D4, D5, D9, D14; 🟡 D27 (methods), 🟡 D28 (lifecycle), 🟡 D29 (early presentation), 🟡 D31 (internal invoices), 🟡 D34 (reversals), ✅ A4 (VAT 20% in simulation, configurable), ✅ A9, ✅ A27, 🟡 A26, OQ7 (VAT), OQ9 (opening balances).

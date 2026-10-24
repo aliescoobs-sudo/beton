@@ -1,6 +1,6 @@
 # Task list: `ledger`
 
-Plan: [tasks/plan-ledger.md](plan-ledger.md) (**approved**; build phase by phase). Standard verification for every task: `pnpm lint && pnpm typecheck && pnpm test` (+ `pnpm test:integration` when it touches the DB, `SIMULATION_ENABLED=false pnpm build` and `pnpm exec playwright test` when it adds a route or screen). One commit per task. Every new table: `TABLE_ACCESS` entry (+ `insertOnly`, `noDelete`), matrix fixture, FORCE RLS, audit trigger, no UPDATE/DELETE grant. Migrations create structure only. Checkpoint review with Ali after L5 (CP-L1) before L8 / L17 / L20.
+Plan: [tasks/plan-ledger.md](plan-ledger.md) (**approved**; build phase by phase). Standard verification for every task: `pnpm lint && pnpm typecheck && pnpm test` (+ `pnpm test:integration` when it touches the DB, `SIMULATION_ENABLED=false pnpm build` and `pnpm exec playwright test` when it adds a route or screen). One commit per task. Every new table: `TABLE_ACCESS` entry (+ `insertOnly`, `noDelete`), matrix fixture, FORCE RLS, audit trigger, no UPDATE/DELETE grant. Migrations create structure only. Checkpoint review with Ali after L5 (CP-L1) before L8 / L17 / L20 (approved). Build order from CP-L1 (owner's brief 2026-10-24): L8–L11, L16, L12–L13, L14–L15, L27–L28 (CP-L3), L6–L7 (CP-L2), L17–L19, L20–L23 (CP-L4), L29–L32, L24–L26 (CP-L5). Checkpoint notes go to docs/checkpoints/CP-<name>.md.
 
 ## Phase 0: Foundations and the financial pattern
 
@@ -106,8 +106,18 @@ Deposit batch, clear, bounce (with window), regularize, dispute, cancel (reason)
 **AC:** AC-LED-07; AC-SEC-05 (office refused by service, RLS and page 404; `expectNoFields` on office responses).
 **Verify:** `pnpm test:integration cash-position` + e2e · **Files:** ledger/domain/cash-position.ts, service, page, tests · **Deps:** L10
 
-### Checkpoint CP-L3: Instruments
-- [ ] AC-LED-03 (instruments), 04, 05, 06, 07, 14 green; office cannot read money tables; both locales render
+### - [ ] L27: Account statement: domain and read model (M)
+`buildStatement(lines, filter)` (pure): commercial and financial sections kept apart, signed amounts, running balance per row, summary (invoiced, delivered, paid, due, late, cancelled), filters (date range, type, status) with the carried-in opening balance; reversed documents stay listed as cancelled. Services `clientStatement` / `supplierStatement` (permission `statements.read`, owner and support; support views audited). Sources land with their task: orders and plan items, instruments, allocations, movements now; invoices and credit notes (L17/L18), purchases and receipts (L20/L21), supplier payments (L22), deliveries (`operations`) each add their lines and a statement assertion to their own tests.
+**AC:** AC-LED-19, AC-LED-20, AC-LED-21 (service and RLS: office, partner, plant get nothing; `expectNoFields`); property test: closing balance = Σ signed lines for any filter split.
+**Verify:** `pnpm test src/modules/ledger/domain` · `pnpm test:integration statement` · **Files:** ledger/domain/statement.ts + test, service/statement-service.ts, permissions.ts, tests · **Deps:** L11 (L10)
+
+### - [ ] L28: Account statement screens and CSV (M)
+Statement tab on the client and supplier pages (owner and support; the Comptes list links to it): two sections, filters, running balance, status badges, late and cancelled highlighted, fr/ar with Latin numbers in LTR. Shared pure CSV writer `lib/csv.ts` (UTF-8 BOM, `;`, decimal comma, quotes escaped, cells starting with `= + - @` neutralised) and an audited `export` action for the filtered view.
+**AC:** AC-LED-19 through the UI; CSV test (escaping, formula injection, amounts equal the screen); AC-LED-21 page 404 for office/partner/plant; support view audited; RTL check.
+**Verify:** `pnpm exec playwright test e2e/ledger-statement.spec.ts` · **Files:** pages, ledger/ui/statement/*, lib/csv.ts + test, messages, e2e · **Deps:** L27
+
+### Checkpoint CP-L3: Instruments and statements
+- [ ] AC-LED-03 (instruments), 04, 05, 06, 07, 14, 19, 20, 21 (orders and instruments part) green; office cannot read money tables; both locales render
 
 ## Phase 3: Invoices (law 69-21)
 
@@ -117,7 +127,7 @@ Migration `invoice`, `invoice_line` (insert-only; `delivery_id` nullable, no FK,
 **Verify:** `pnpm test:integration invoice rls` · **Files:** migration, ledger/domain/legal.ts, service/invoice-service.ts, tests · **Deps:** L2, L3
 
 ### - [ ] L18: Credit note and invoice screen (M)
-`cancelInvoice` creates a credit note (`credit_note_of`, negated lines), number never reused, reason mandatory; invoice list/detail/printable view in fr/ar with ICE, VAT rate and amounts; status `issued/paid/partially_paid/cancelled` derived from allocations.
+`cancelInvoice` creates a credit note (`credit_note_of`, negated lines), number never reused, reason mandatory; invoice list/detail in fr/ar with ICE, VAT rate and amounts (the PDF and print view are L30); status `issued/paid/partially_paid/cancelled` derived from allocations.
 **AC:** AC-LED-08 (cancelled invoice keeps its number, credit note issued), AC-LED-03 (invoices), RTL check.
 **Verify:** `pnpm test:integration invoice-credit-note` + e2e · **Files:** invoice-service.ts, pages, ui, messages · **Deps:** L17
 
@@ -151,10 +161,34 @@ Purchase entry (lines, plan presets), list/detail, receipt and supplier payment 
 ### Checkpoint CP-L4: Invoices and purchases
 - [ ] AC-LED-08, 09, 15, 16, 18 green; supplier payment end to end; both locales render
 
+## Phase 4b: Documents and exports (DECISIONS 82)
+
+### - [ ] L29: Company legal identity (S)
+Migration `company_profile` (versioned, insert-only): legal name and form, ICE, IF, RC, patente, address, phone, email, RIB; read by every role (printed on delivery notes), written by the owner; screen under the owner's administration; fake values only (pilot seed, L24).
+**AC:** AC-SEC-04 for the table; a change is a new row, audited; the current profile is the latest `effective_from ≤ today`.
+**Verify:** `pnpm test:integration company-profile rls` · **Files:** migration, service, screen, matrix, tests · **Deps:** L1
+
+### - [ ] L30: Document kit, invoice and credit note PDF (L)
+Server-side PDF kit (library chosen and pinned at the start of the task, licence and supply-chain checked, noted in the checkpoint) plus a print stylesheet: header with our legal mentions, parties, lines, VAT rate, HT/VAT/TTC, law 69-21 payment-term mention, page footer with number. Route handlers for invoice and credit note PDF (permission `invoices.read`: owner and support), audited as `export`, `Content-Disposition` download and an inline print view. French first; Arabic header only if the font and shaping pass the RTL check, else recorded as a limit.
+**AC:** AC-LED-22 (PDF text equals the stored invoice; credit note references the invoice number); AC-LED-21 (office, partner, plant 404); both locales render the print view.
+**Verify:** `pnpm test:integration invoice-pdf` + e2e download · **Files:** ledger/documents/*, route handlers, tests · **Deps:** L18, L29
+
+### - [ ] L31: Quotes (devis) (M)
+Migration `quote` (insert-only, `DV-YYYY-nnnnn`, validity date, price resolved server-side, no payment plan); owner and office create (office blind), owner and support read and print the PDF; "Convert to order" opens the order form prefilled and a human saves (D65); the quote keeps `converted_order_id`.
+**AC:** AC-LED-23, AC-SEC-04/05 for the table, office cannot read or print it, PDF equals the stored quote.
+**Verify:** `pnpm test:integration quote rls` + e2e · **Files:** migration, service, pages, document template, tests · **Deps:** L3, L30
+
+### - [ ] L32: Accountant export (M)
+`exportPeriod(from, to)` (owner and support, audited `export`): sales journal (invoices and credit notes: number, date, client, ICE, HT, VAT, TTC), purchases journal, payments and cash/bank movements, receivables and payables ageing; CSV files using the L28 writer, delivered as one download per file. Reconciliation checks inside the service refuse an export whose journals do not tie out.
+**AC:** AC-LED-24, AC-LED-21, the file contains no free text beyond names and codes, formula injection neutralised.
+**Verify:** `pnpm test:integration accountant-export` + e2e · **Files:** ledger/domain/journals.ts + test, service, page, tests · **Deps:** L18, L22, L28
+
+Delivery note (bon de livraison, AC-OPS-11): belongs to `operations` (deliveries do not exist yet); its plan reuses the L30 kit. Not built in this plan.
+
 ## Phase 5: Close
 
 ### - [ ] L24: Pilot ledger seed (S)
-Fake data through `belgobeton_seed` (extend `db/seed/seed-role.sql` for the new tables, same rules: SELECT/INSERT only, simulation only): a few orders with plans, instruments in each state (including one bounced inside its window and one post-dated), one invoice, two purchases, 1 caisse + 2 bank accounts with opening balances. Idempotent, audited as `system/seed`, refuses outside simulation; the full fixture stays with `simulation`.
+Fake data through `belgobeton_seed` (extend `db/seed/seed-role.sql` for the new tables, same rules: SELECT/INSERT only, simulation only): company profile, a few orders with plans, instruments in each state (including one bounced inside its window and one post-dated), invoices and a credit note, a quote, two purchases, 1 caisse + 2 bank accounts with opening balances. Idempotent, audited as `system/seed`, refuses outside simulation; the full fixture stays with `simulation`.
 **AC:** idempotent; every row audited as `system/seed`; the meta-test still shows `belgobeton_system` cannot insert ledger rows.
 **Verify:** `pnpm test:integration pilot-seed` · **Files:** pilot-seed.ts, db/seed/seed-role.sql, tests · **Deps:** L3, L10, L17, L20
 
@@ -165,7 +199,7 @@ Extend the T16 Playwright spec and the i18n tests to every ledger screen (orders
 
 ### - [ ] L26: Closure (S)
 Fill the AC table with passing tests; `TABLE_ACCESS` covers every new table (`insertOnly` + `noDelete`); AC-SEC-05 ledger part (plant: no price/total/plan/contact; office: no margin, no cash position); AC-LED-03 meta-test over every ledger table; AC-LED-11 and AC-LED-13 checks green; coverage ≥ 90% on `ledger/domain` (`vitest.config.ts` gate); DECISIONS/README update; SPEC-ledger additions (AC-LED-14…18) merged if approved.
-**AC:** all AC-LED-01…18 mapped to a passing test.
+**AC:** all AC-LED-01…24 mapped to a passing test.
 **Verify:** `pnpm test:coverage`, full pipeline · **Files:** tasks/plan-ledger.md, tests/ledger-visibility.int.test.ts, vitest.config.ts, docs · **Deps:** L25
 
 ### Checkpoint CP-L5: Ledger final
