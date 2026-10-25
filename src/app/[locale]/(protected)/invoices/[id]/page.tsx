@@ -116,7 +116,9 @@ export default async function InvoiceDocumentPage({
           <tbody>
             {doc.lines.map((l) => (
               <tr key={l.seq}>
-                <Td>{l.description}</Td>
+                <Td>
+                  <bdi dir="ltr">{l.description}</bdi>
+                </Td>
                 <Td numeric>{formatM3(l.volumeL)} m³</Td>
                 <Td numeric>
                   <Money centimes={l.unitPriceHtCentimes} />
