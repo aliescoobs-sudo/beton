@@ -95,6 +95,8 @@ export const E2E_MD = {
   rdPlant: { email: 'e2e-rd-plant@belgobeton.test', name: 'Centrale Couverture' },
   fuelPlant: { email: 'e2e-fu-plant@belgobeton.test', name: 'Centrale Carburant' },
   fuelPartner: { email: 'e2e-fu-partner@belgobeton.test', name: 'Associé Carburant' },
+  lossPlant: { email: 'e2e-lo-plant@belgobeton.test', name: 'Centrale Pertes' },
+  lossOffice: { email: 'e2e-lo-office@belgobeton.test', name: 'Bureau Pertes' },
 } as const;
 export const E2E_CSP = { email: 'e2e-csp@belgobeton.test', name: 'CSP E2E' } as const;
 

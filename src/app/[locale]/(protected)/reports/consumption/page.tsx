@@ -171,6 +171,73 @@ export default async function ConsumptionReportPage({
         )}
         <p className="mt-2 text-sm text-muted">{t('countNote')}</p>
       </section>
+
+      <section aria-labelledby="loss-title">
+        <h2 id="loss-title" className="mb-1 text-xl">
+          {t('lossTitle')}
+        </h2>
+        <p className="mb-3 text-sm text-muted">{t('lossIntro')}</p>
+        {r.loss.produced.length === 0 ? (
+          <EmptyState title={t('lossNone')} data-testid="loss-none" />
+        ) : (
+          <Table data-testid="loss-table">
+            <thead>
+              <tr>
+                <Th>{t('period')}</Th>
+                <Th>{t('type')}</Th>
+                <Th numeric>{t('lost')}</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {r.loss.produced.map((p) => (
+                <tr key={`${p.period}-${p.typeId}`} data-testid={`loss-${p.period}-${p.typeLabel}`}>
+                  <Td>
+                    <bdi dir="ltr">{p.period}</bdi>
+                  </Td>
+                  <Td>
+                    <bdi dir="ltr">{p.typeLabel}</bdi>
+                  </Td>
+                  <Td numeric>
+                    <bdi dir="ltr">{formatM3(p.volumeL)} m³</bdi>
+                  </Td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        )}
+        {r.loss.components.length > 0 && (
+          <Table data-testid="loss-components">
+            <thead>
+              <tr>
+                <Th>{t('period')}</Th>
+                <Th>{t('component')}</Th>
+                <Th numeric>{t('lostUsed')}</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {r.loss.components.map((c) => {
+                const f = formatStockQty(c.qtyBase, unit(c.componentId));
+                return (
+                  <tr
+                    key={`${c.period}-${c.componentId}`}
+                    data-testid={`loss-component-${c.period}-${c.componentId}`}
+                  >
+                    <Td>
+                      <bdi dir="ltr">{c.period}</bdi>
+                    </Td>
+                    <Td>{name(c.componentId)}</Td>
+                    <Td numeric>
+                      <bdi dir="ltr">
+                        {f.value} {f.unit}
+                      </bdi>
+                    </Td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </Table>
+        )}
+      </section>
     </div>
   );
 }

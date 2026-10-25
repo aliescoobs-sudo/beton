@@ -7,10 +7,11 @@ import { BlReturnButton } from '@/modules/operations/ui/bl-return-button';
 import { CancelLoadButton } from '@/modules/operations/ui/cancel-load-button';
 import { formatM3 } from '@/modules/operations/ui/format';
 import { LoadRowForm } from '@/modules/operations/ui/load-row-form';
+import { LossButton } from '@/modules/operations/ui/loss-button';
 import { can } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/next';
 import { EmptyState, PageHeader, StatusPill, Table, Td, Th } from '@/ui';
-import { blReturnAction, cancelLoadAction, createLoadAction } from './actions';
+import { blReturnAction, cancelLoadAction, createLoadAction, recordLossAction } from './actions';
 
 /** The day's loads: orders due with what is left to deliver, one tap to load, and the recent delivery notes. No price. */
 export default async function LoadsPage({ params }: { params: Promise<{ locale: string }> }) {
@@ -21,6 +22,7 @@ export default async function LoadsPage({ params }: { params: Promise<{ locale: 
   const today = (await getRequestClock()).today();
   const canLoad = can(user.role, 'deliveries.write');
   const canCancel = can(user.role, 'deliveries.cancel');
+  const canLoss = can(user.role, 'deliveries.loss');
   const [orders, deliveries, trucks] = await Promise.all([
     listLoadableOrders(pool, user, today),
     listDeliveries(pool, user),
@@ -107,6 +109,7 @@ export default async function LoadsPage({ params }: { params: Promise<{ locale: 
                 <Th>{t('loads.date')}</Th>
                 <Th numeric>{t('deliveries.volume')}</Th>
                 <Th>{t('deliveries.signed')}</Th>
+                {canLoss && <Th>{t('loss.column')}</Th>}
                 {canCancel && <Th>{t('deliveries.cancelLoad')}</Th>}
               </tr>
             </thead>
@@ -148,6 +151,19 @@ export default async function LoadsPage({ params }: { params: Promise<{ locale: 
                       <BlReturnButton deliveryId={d.id} blNo={d.blNo} today={today} record={blReturnAction} />
                     )}
                   </Td>
+                  {canLoss && (
+                    <Td>
+                      {d.volumeL > 0 && !d.cancelled && (
+                        <LossButton
+                          deliveryId={d.id}
+                          blNo={d.blNo}
+                          loadL={d.volumeL}
+                          loss={d.loss}
+                          record={recordLossAction}
+                        />
+                      )}
+                    </Td>
+                  )}
                   {canCancel && (
                     <Td>
                       {d.volumeL > 0 && !d.cancelled && (

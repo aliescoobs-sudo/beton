@@ -988,6 +988,25 @@ export const TABLE_ACCESS = {
     exception:
       'operations O13: fuel bought (litres and the total paid). Money (DECISIONS 81): the owner writes, the owner and support read, nobody else; its audit rows are hidden from the others. The price per litre and the cost of a truck are computed from it, never stored.',
   },
+  delivery_loss: {
+    kind: 'rls',
+    seed: 'insert',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'all',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'operations O14: concrete that came back or was refused, one row per load with a reason and the litres lost (at most the load). Quantities only; plant, office, owner and partner record. It gives no component back and changes nothing the order bills.',
+  },
   stock_movement: {
     kind: 'rls',
     seed: 'insert',

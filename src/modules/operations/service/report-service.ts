@@ -4,6 +4,8 @@ import { isRealDate } from '@/modules/ledger';
 import { inRequest, require, type SessionUser } from '@/modules/platform-security';
 import {
   consumptionReport,
+  lostComponents,
+  type LostComponentRow,
   type ConsumptionRow,
   type LoadFact,
   type MovementFact,
@@ -12,6 +14,7 @@ import {
   producedByType,
   type ReportPeriod,
 } from '../domain/consumption-report';
+import { consumptionForLoad } from '../domain/consumption';
 import { opsParameter } from './ops-parameters';
 
 export interface ConsumptionComponent {
@@ -30,6 +33,13 @@ export interface ConsumptionReportView {
   produced: ProducedRow[];
   components: ConsumptionComponent[];
   consumption: ConsumptionRow[];
+  /** Concrete lost (rejected or brought back), already part of the production and the theoretical consumption: its own lines. */
+  loss: {
+    /** Litres lost per concrete type and period. */
+    produced: ProducedRow[];
+    /** The components that lost concrete used, per period (base units). */
+    components: LostComponentRow[];
+  };
 }
 
 const MAX_DAYS = 400;
@@ -76,6 +86,36 @@ export async function getConsumptionReport(
             and coalesce(orig.movement_date, m.movement_date) between $1 and $2`,
         [from, to],
       );
+      // Losses of live loads, on the date of the load: litres per type, and the components that volume consumed (the recette
+      // stored on the load times the lost litres).
+      const losses = await tx.query<{
+        date: string;
+        type_id: string;
+        type_label: string;
+        volume_l: number;
+        recette_id: string;
+      }>(
+        `select to_char(d.load_date, 'YYYY-MM-DD') as date, t.id as type_id, t.label as type_label, x.volume_l, d.recette_id
+           from delivery_loss x
+           join delivery d on d.id = x.delivery_id and d.reverses_id is null
+           join sales_order_ops o on o.id = d.order_id
+           join concrete_type t on t.id = o.concrete_type_id
+          where d.load_date between $1 and $2
+            and not exists (select 1 from delivery c where c.reverses_id = d.id)`,
+        [from, to],
+      );
+      const lostFacts: { date: string; componentId: string; qtyBase: number }[] = [];
+      for (const l of losses.rows) {
+        const lines = await tx.query<{ component_id: string; qty_per_m3: string }>(
+          `select component_id, qty_per_m3::text from recette_line where recette_id = $1`,
+          [l.recette_id],
+        );
+        for (const q of consumptionForLoad(
+          lines.rows.map((r) => ({ componentId: r.component_id, qtyPerM3: Number(r.qty_per_m3) })),
+          l.volume_l,
+        ))
+          lostFacts.push({ date: l.date, componentId: q.componentId, qtyBase: q.qtyBase });
+      }
       const components = await tx.query<{ id: string; name_fr: string; name_ar: string; base_unit: string }>(
         `select c.id, c.name_fr, c.name_ar, c.base_unit from component c order by c.name_fr`,
       );
@@ -104,6 +144,18 @@ export async function getConsumptionReport(
           baseUnit: c.base_unit,
         })),
         consumption: consumptionReport(moveFacts, period, toleranceBp),
+        loss: {
+          produced: producedByType(
+            losses.rows.map((l) => ({
+              date: l.date,
+              typeId: l.type_id,
+              typeLabel: l.type_label,
+              volumeL: l.volume_l,
+            })),
+            period,
+          ),
+          components: lostComponents(lostFacts, period),
+        },
       };
     }),
   );

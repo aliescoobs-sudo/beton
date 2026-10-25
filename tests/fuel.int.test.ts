@@ -47,24 +47,36 @@ const report = async (actor: SessionUser) => {
   return r.value;
 };
 
+/** A truck of its own (code T + 3 digits, retried on a clash with another suite's) so the pilot's T1 never mixes in. */
+async function newTruck(): Promise<string> {
+  for (let i = 0; i < 20; i++) {
+    const code = `T${100 + Math.floor(Math.random() * 899)}`;
+    try {
+      return await withRlsContext(
+        app,
+        { userId: users.owner.id, role: 'owner', requestId: marker },
+        async (tx) => {
+          const t = await tx.query<{ id: string }>(
+            `insert into truck (id, code, plate, capacity_l) values (gen_random_uuid(), $1, $2, 8000) returning id`,
+            [code, `${code}-${marker.slice(0, 8)}-${i}`],
+          );
+          return t.rows[0]?.id as string;
+        },
+      );
+    } catch (e) {
+      if ((e as { code?: string }).code !== '23505') throw e;
+    }
+  }
+  throw new Error('no free truck code');
+}
+
 beforeAll(async () => {
   for (const role of ['owner', 'partner', 'plant', 'office', 'support'] as const) {
     users[role] = await realSessionUser(env.DATABASE_URL_MIGRATOR, role);
   }
   scene = await deliveryScene(app, users.owner.id, marker);
   // a second truck of its own so the figures of the pilot's T1 never mix with ours
-  truck2 = await withRlsContext(
-    app,
-    { userId: users.owner.id, role: 'owner', requestId: marker },
-    async (tx) => {
-      const code = `T${100 + Math.floor(Math.random() * 899)}`;
-      const t = await tx.query<{ id: string }>(
-        `insert into truck (id, code, plate, capacity_l) values (gen_random_uuid(), $1, $2, 8000) returning id`,
-        [code, `${code}-${marker.slice(0, 8)}`],
-      );
-      return t.rows[0]?.id as string;
-    },
-  );
+  truck2 = await newTruck();
 });
 
 describe('who records what (AC-OPS-22)', () => {

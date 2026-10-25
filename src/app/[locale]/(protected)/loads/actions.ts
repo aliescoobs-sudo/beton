@@ -3,7 +3,7 @@
 import { getRequestClock } from '@/app/request-clock';
 import { getPool } from '@/lib/db/pools';
 import type { Effect } from '@/modules/ledger';
-import { cancelLoad, createLoad, type DeliveryError, recordBlReturn } from '@/modules/operations';
+import { cancelLoad, createLoad, type DeliveryError, recordBlReturn, recordLoss } from '@/modules/operations';
 import { authorize, ForbiddenError, type Permission, withStepUp } from '@/modules/platform-security';
 import { currentAuthState } from '@/modules/platform-security/next';
 
@@ -70,4 +70,12 @@ export async function cancelLoadAction(input: unknown): Promise<{ ok: true } | F
     if (error instanceof ForbiddenError) return { ok: false, error: 'FORBIDDEN' };
     throw error;
   }
+}
+
+// @permission deliveries.loss (plant, office, owner, partner): concrete that came back or was refused, with a reason
+export async function recordLossAction(input: unknown): Promise<{ ok: true } | Failure> {
+  return guarded('deliveries.loss', async (user) => {
+    const result = await recordLoss(getPool('app'), user, input);
+    return result.ok ? { ok: true as const } : { ok: false as const, error: result.error };
+  });
 }

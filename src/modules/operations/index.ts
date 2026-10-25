@@ -58,6 +58,7 @@ export {
   type SavedRotation,
   saveDispatch,
 } from './service/dispatch-service';
+export { type LossError, recordLoss, type RecordedLoss } from './service/loss-service';
 export {
   listTrips,
   type RecordedStep,

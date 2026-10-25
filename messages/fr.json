@@ -1417,7 +1417,12 @@
       "noCount": "Pas d'inventaire",
       "flagged": "Écart à vérifier",
       "withinTolerance": "Dans la tolérance",
-      "countNote": "Une correction d'inventaire compte dans la période où elle est saisie : elle mesure tout ce qui s'est passé depuis le dernier inventaire. Un écart positif = plus consommé que prévu."
+      "countNote": "Une correction d'inventaire compte dans la période où elle est saisie : elle mesure tout ce qui s'est passé depuis le dernier inventaire. Un écart positif = plus consommé que prévu.",
+      "lossTitle": "Béton perdu (refusé ou rapporté)",
+      "lossIntro": "Déjà compris dans la production et la consommation théorique : le béton a été fait. Il n'est pas rendu au stock.",
+      "lossNone": "Aucune perte enregistrée sur cette période.",
+      "lost": "Perdu",
+      "lostUsed": "Composants qu'il a consommés"
     },
     "fuel": {
       "link": "Carburant",
@@ -1461,6 +1466,32 @@
         "NOT_FOUND": "Camion introuvable.",
         "ODOMETER": "Le compteur est plus bas qu'une lecture précédente.",
         "CONFLICT": "Réessayez.",
+        "FORBIDDEN": "Action non autorisée.",
+        "UNAUTHENTICATED": "Session expirée."
+      }
+    },
+    "loss": {
+      "column": "Béton perdu",
+      "open": "Béton refusé ou rapporté",
+      "reason": "Motif",
+      "m3": "m³ perdus (vide : tout le chargement, max {max})",
+      "note": "Remarque (facultatif)",
+      "save": "Enregistrer",
+      "cancel": "Annuler",
+      "recorded": "Perdu : {m3} m³ · {reason}",
+      "reasons": {
+        "rejected_by_client": "Refusé par le client",
+        "returned_unused": "Rapporté sans être utilisé",
+        "too_old": "Trop vieux (délai dépassé)",
+        "quality": "Qualité",
+        "other": "Autre"
+      },
+      "errors": {
+        "INVALID": "Données invalides.",
+        "NOT_FOUND": "Chargement introuvable.",
+        "ALREADY_RECORDED": "Une perte est déjà enregistrée pour ce chargement.",
+        "OVER_LOAD": "Plus que le chargement.",
+        "NOT_LIVE": "Ce chargement est annulé.",
         "FORBIDDEN": "Action non autorisée.",
         "UNAUTHENTICATED": "Session expirée."
       }
