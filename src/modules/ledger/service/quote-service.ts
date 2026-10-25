@@ -104,6 +104,29 @@ export async function createQuote(
   const parsed = parseQuoteInput(input);
   if (!parsed.ok) return err('INVALID');
   try {
+    // Office (no read of prices) gets its quote made entirely inside the database: the code comes back, nothing else.
+    if (!can(actor.role, 'quotes.read'))
+      return await inRequest(appPool, actor, async (tx): Promise<Result<CreatedQuote, QuoteError>> => {
+        const v = parsed.value;
+        const made = await tx.query<{ code: string; id: string }>(
+          'select code, id from public.create_quote($1, $2, $3, $4, $5, $6)',
+          [
+            v.clientId,
+            v.concreteTypeId,
+            v.volumeL,
+            v.validDays ?? DEFAULT_QUOTE_DAYS,
+            deps.today,
+            parameterOrDefault('vat_rate_bp', undefined),
+          ],
+        );
+        const code = made.rows[0]?.code;
+        if (!code) return err('INVALID');
+        return ok({
+          id: made.rows[0]?.id ?? '',
+          code,
+          effects: visibleEffects([{ kind: 'document', document: 'quote', code }], actor.role),
+        });
+      });
     return await inRequest(appPool, actor, (tx) => insertQuoteRows(tx, actor, parsed.value, deps.today));
   } catch (error) {
     return err(quoteFailure(error));

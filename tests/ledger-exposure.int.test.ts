@@ -67,9 +67,11 @@ describe('functions the application role can execute', () => {
     'ctx.user_id()',
     'public.allocate_to_order(p_instrument uuid, p_order_code text)',
     'public.allocate_to_purchase(p_instrument uuid, p_purchase_code text)',
+    'public.create_invoice(p_order_code text, p_delivery_ids uuid[], p_due date, p_today date)',
+    'public.create_order(p_client uuid, p_site uuid, p_zone uuid, p_type uuid, p_volume_l integer, p_delivery date, p_today date, p_brought_by uuid, p_quote uuid, p_plan jsonb, p_vat_default integer)',
+    'public.create_quote(p_client uuid, p_type uuid, p_volume_l integer, p_valid_days integer, p_today date, p_vat_default integer)',
     'public.default_cash_account()',
     'public.delivery_note(p_delivery uuid)',
-    'public.invoice_source(p_order_code text)',
     'public.ledger_parameter(p_key text)',
     'public.next_code(p_key text, p_width integer)',
     'public.ops_parameter(p_key text)',
@@ -125,8 +127,19 @@ describe('functions the application role can execute', () => {
     expect(anon.code).toBe('42501');
   });
 
-  it('resolve_selling_price is the one deliberate door: office gets the unit price of a type for a client (decision A, server-side price), nothing else', async () => {
-    const { rows, fields } = await as('office', (tx) =>
+  it('resolve_selling_price answers the owner only (and the system): office has no door to a price any more', async () => {
+    const office = await failure(
+      as('office', (tx) =>
+        tx.query('select * from public.resolve_selling_price($1, $2, $3)', [
+          master.typeId,
+          master.clientId,
+          '2026-06-01',
+        ]),
+      ),
+    );
+    expect(office.code).toBe('42501');
+    expect(leaks(office.text)).toBe(false);
+    const { rows } = await as('owner', (tx) =>
       tx.query('select * from public.resolve_selling_price($1, $2, $3)', [
         master.typeId,
         master.clientId,
@@ -422,5 +435,131 @@ describe('security alerts (break-glass), DECISIONS 75 and 81', () => {
     );
     expect(rows.length).toBeGreaterThan(0);
     for (const r of rows) expect(r.detail).toBe(OWNER_2FA_RESET_DETAIL);
+  });
+});
+
+describe('review of CP-L4: an office-context call never receives a price, a total, a client or a load', () => {
+  const FAKE_CODE = 'CMD-2026-99999';
+  const today = '2026-06-10';
+
+  async function ownerOrderWithLoad(): Promise<{ code: string }> {
+    const out = await as('owner', async (tx) => {
+      const order = await insertOrder(tx, actors.owner.id, master);
+      return order;
+    });
+    return { code: out.code };
+  }
+
+  it('create_invoice answers an unknown code, a code with nothing to invoice and a probe alike: NULL, audited', async () => {
+    const order = await ownerOrderWithLoad(); // an order with no load: nothing to invoice
+    const answers = [];
+    for (const code of [FAKE_CODE, order.code]) {
+      const { rows } = await as('office', (tx) =>
+        tx.query<{ n: string | null }>('select public.create_invoice($1, null, null, $2) as n', [
+          code,
+          today,
+        ]),
+      );
+      answers.push(rows[0]?.n ?? null);
+    }
+    expect(answers).toEqual([null, null]);
+    const audited = await migrator.query(
+      `select reason from audit_event where actor_user_id = $1 and table_name = 'invoice_create' and action = 'permission_denied'`,
+      [actors.office.id],
+    );
+    expect(audited.rows.length).toBeGreaterThanOrEqual(2);
+    expect(JSON.stringify(audited.rows)).not.toMatch(AMOUNTS);
+  });
+
+  it('create_invoice locks an actor out after ten failures in ten minutes', async () => {
+    const probe = async (n: number) =>
+      as('office', (tx) =>
+        tx.query('select public.create_invoice($1, null, null, $2) as n', [
+          `CMD-2026-9${String(n).padStart(4, '0')}`,
+          today,
+        ]),
+      );
+    let refused: { code?: string; text: string } | null = null;
+    for (let i = 0; i < 14 && !refused; i++) {
+      try {
+        await probe(i);
+      } catch (error) {
+        refused = { code: (error as { code?: string }).code, text: errorText(error) };
+      }
+    }
+    expect(refused?.code).toBe('42501');
+    expect(refused?.text).toMatch(/too many failed attempts/);
+    expect(leaks(refused?.text)).toBe(false);
+  });
+
+  it('create_invoice, create_order and create_quote return a document code and nothing else a person could read a price from', async () => {
+    const fresh = await realActor(env.DATABASE_URL_MIGRATOR, 'office');
+    const call = <T>(fn: (tx: pg.PoolClient) => Promise<T>) => inCtx('office', fresh.id, fn);
+    const order = await call((tx) =>
+      tx.query<Record<string, unknown>>(
+        `select * from public.create_order($1, null, null, $2, 10000, $3, $4, null, null, $5, 2000)`,
+        [master.clientId, master.typeId, '2026-06-12', today, JSON.stringify({ preset: 'cash' })],
+      ),
+    );
+    expect(Object.keys(order.rows[0] ?? {}).sort()).toEqual(['code', 'id']);
+    expect(order.fields.map((f) => f.name).sort()).toEqual(['code', 'id']);
+    expect(leaks(order.rows)).toBe(false);
+    const quote = await call((tx) =>
+      tx.query(`select * from public.create_quote($1, $2, 10000, 30, $3, 2000)`, [
+        master.clientId,
+        master.typeId,
+        today,
+      ]),
+    );
+    expect(quote.fields.map((f) => f.name).sort()).toEqual(['code', 'id']);
+    expect(leaks(quote.rows)).toBe(false);
+  });
+
+  it('a bad plan, an unknown client or type and a missing price give errors that hold no amount', async () => {
+    const calls: [string, unknown[]][] = [
+      [
+        `select * from public.create_order($1, null, null, $2, 10000, $3, $4, null, null, $5, 2000)`,
+        [
+          master.clientId,
+          master.typeId,
+          '2026-06-12',
+          today,
+          JSON.stringify({
+            preset: 'custom',
+            items: [{ method: 'cash', dueDate: '2026-06-12', amountCentimes: 100 }],
+          }),
+        ],
+      ],
+      [
+        `select * from public.create_order($1, null, null, $2, 10000, $3, $4, null, null, $5, 2000)`,
+        [randomUUID(), master.typeId, '2026-06-12', today, JSON.stringify({ preset: 'cash' })],
+      ],
+      [
+        `select * from public.create_order($1, null, null, $2, 10000, $3, $4, null, null, $5, 2000)`,
+        [master.clientId, randomUUID(), '2026-06-12', today, JSON.stringify({ preset: 'cash' })],
+      ],
+      [
+        `select * from public.create_quote($1, $2, 10000, 30, '1999-01-01', 2000)`,
+        [master.clientId, master.typeId],
+      ],
+    ];
+    for (const [sql, params] of calls) {
+      const f = await failure(as('office', (tx) => tx.query(sql, params)));
+      expect(leaks(f.text)).toBe(false);
+      expect(f.text).not.toMatch(/78000|780000|936000/);
+    }
+  });
+
+  it('partner, plant and support cannot call the creators; anonymous neither', async () => {
+    for (const role of ['partner', 'plant', 'support'] as const) {
+      for (const sql of [
+        `select public.create_invoice('${FAKE_CODE}', null, null, '${today}')`,
+        `select * from public.create_quote('${master.clientId}', '${master.typeId}', 10, 30, '${today}', 2000)`,
+      ]) {
+        expect((await failure(as(role, (tx) => tx.query(sql)))).code, `${role} ${sql.slice(0, 30)}`).toBe(
+          '42501',
+        );
+      }
+    }
   });
 });

@@ -228,6 +228,58 @@ export async function createOrder(
   }
 }
 
+async function createOrderBlind(
+  appPool: pg.Pool,
+  actor: SessionUser,
+  v: OrderInput,
+  today: string,
+): Promise<Result<CreatedOrder, OrderError>> {
+  if (v.deliveryDate < today) return err('DELIVERY_BEFORE_ORDER');
+  if (v.priceOverride) return err('FORBIDDEN_OVERRIDE');
+  const plan =
+    v.plan.preset === 'custom'
+      ? {
+          preset: 'custom',
+          items: v.plan.items.map((i) => ({
+            method: i.method,
+            dueDate: i.dueDate,
+            ...(i.percentBp !== undefined
+              ? { percentBp: i.percentBp }
+              : { amountCentimes: i.amountCentimes }),
+          })),
+        }
+      : { preset: v.plan.preset };
+  try {
+    return await inRequest(appPool, actor, async (tx): Promise<Result<CreatedOrder, OrderError>> => {
+      const made = await tx.query<{ code: string; id: string }>(
+        'select code, id from public.create_order($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
+        [
+          v.clientId,
+          v.siteId,
+          v.zoneId,
+          v.concreteTypeId,
+          v.volumeL,
+          v.deliveryDate,
+          today,
+          v.broughtByUserId,
+          v.quoteId ?? null,
+          JSON.stringify(plan),
+          parameterOrDefault('vat_rate_bp', undefined),
+        ],
+      );
+      const code = made.rows[0]?.code;
+      if (!code) return err('INVALID');
+      const effects: Effect[] = [
+        { kind: 'document', document: 'order', code },
+        { kind: 'scheduled', code, date: v.deliveryDate },
+      ];
+      return ok({ id: made.rows[0]?.id ?? '', code, effects: visibleEffects(effects, actor.role) });
+    });
+  } catch (error) {
+    return err(dbFailure(error));
+  }
+}
+
 /** The amounts an order would get, for the roles that may read money (owner): nothing is written. */
 export interface OrderPreview {
   unitPriceHtCentimes: number;

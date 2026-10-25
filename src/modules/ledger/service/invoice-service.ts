@@ -87,9 +87,11 @@ export async function createInvoice(
 }
 
 /**
- * The rows of an invoice in the caller's transaction: the loads of the order that no live invoice covers (from the
- * reviewed source function), totals from the domain function, the FA number, lines. Shared by `createInvoice` and the
- * pilot scenario (which runs as the system actor).
+ * The invoice, created entirely inside the database from the order code (`public.create_invoice`): the lines, the totals, the
+ * client's name and ICE, the VAT rate, the FA number and the dates are all decided there, and only the number comes back
+ * (DECISIONS 81, review of CP-L4). An unknown order, nothing left to invoice and loads that do not match give the same
+ * answer; each failure is audited and ten in ten minutes lock the actor out. Shared by `createInvoice` and the pilot
+ * scenario (system actor). A role that reads money then learns the invoice id and the receivable; office learns the number only.
  */
 export async function insertInvoiceRows(
   tx: pg.PoolClient,
@@ -98,49 +100,9 @@ export async function insertInvoiceRows(
   due: string,
   today: string,
 ): Promise<Result<CreatedInvoice, InvoiceError>> {
-  const source = await tx.query<SourceRow>(
-    `select order_id, order_code, type_code, client_id, client_code, client_name, client_ice, unit_price_ht_centimes::text, vat_rate_bp,
-            delivery_id, bl_no, to_char(load_date, 'YYYY-MM-DD') as load_date, volume_l
-       from public.invoice_source($1)`,
-    [v.orderCode],
-  );
-  if (source.rows.length === 0) return err('NOTHING_TO_INVOICE');
-  const chosen = v.deliveryIds
-    ? source.rows.filter((r) => v.deliveryIds?.includes(r.delivery_id))
-    : source.rows;
-  if (v.deliveryIds && chosen.length !== new Set(v.deliveryIds).size) return err('NOT_FOUND');
-  const head = chosen[0] as SourceRow;
-  const lines = chosen.map((r) => ({
-    volumeL: r.volume_l,
-    unitPriceHtCentimes: Number(r.unit_price_ht_centimes),
-  }));
-  const totals = computeInvoiceTotals(lines, head.vat_rate_bp);
-  if (!totals.ok) return err('INVALID');
-  const lastLoad = chosen.reduce((m, r) => (r.load_date > m ? r.load_date : m), head.load_date);
-
-  const id = randomUUID();
-  const number = await nextDocNumber(tx, 'FA', today);
-  // No RETURNING: office has no SELECT policy on the table (blind entry).
-  await tx.query(
-    `insert into invoice (id, number, order_id, client_id, client_name, client_ice, invoice_date, issue_deadline,
-                          due_date, vat_rate_bp, total_ht_centimes, total_vat_centimes, total_ttc_centimes, created_by)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
-    [
-      id,
-      number,
-      head.order_id,
-      head.client_id,
-      head.client_name,
-      head.client_ice,
-      today,
-      invoiceIssueDeadline(lastLoad),
-      due,
-      head.vat_rate_bp,
-      totals.value.totalHt,
-      totals.value.totalVat,
-      totals.value.totalTtc,
-      actor.id,
-    ],
+  const made = await tx.query<{ number: string | null }>(
+    'select public.create_invoice($1, $2, $3, $4) as number',
+    [v.orderCode, v.deliveryIds ?? null, due, today],
   );
   for (const [n, r] of chosen.entries()) {
     await tx.query(

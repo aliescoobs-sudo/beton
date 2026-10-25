@@ -471,7 +471,7 @@ export const TABLE_ACCESS = {
     exception:
       'ledger L3: insert-only orders (a correction is a reversing row). Owner and support read; office inserts and ' +
       'cannot read back (no SELECT policy, no RETURNING); partner and plant read the view sales_order_ops, which has ' +
-      'operational fields only (AC-SEC-05). Price guard, plan balance and archived-client trigger live in the database.',
+      'operational fields only (AC-SEC-05). Price guard, plan balance and archived-client trigger live in the database. Review of CP-L4: office no longer inserts here; it creates the document through a SECURITY DEFINER function (create_order, create_quote, create_invoice) that returns only the number.',
   },
   payment_plan_item: {
     kind: 'rls',
@@ -492,7 +492,7 @@ export const TABLE_ACCESS = {
     insertOnly: true,
     exception:
       'ledger L3: insert-only plan items; Σ items = order total is a deferred constraint trigger. Same visibility as ' +
-      'sales_order.',
+      'sales_order. Review of CP-L4: office no longer inserts here; it creates the document through a SECURITY DEFINER function (create_order, create_quote, create_invoice) that returns only the number.',
   },
   purchase: {
     kind: 'rls',
@@ -575,7 +575,7 @@ export const TABLE_ACCESS = {
     noDelete: true,
     insertOnly: true,
     exception:
-      'ledger L17: insert-only invoices (FA numbers from the gapless document counter; a credit note is a reversing row with its own number). Owner and support read; office inserts and cannot read back. The client name and ICE and the VAT rate are copied at creation; due date at most 120 days (law 69-21); the order, client, VAT and a load invoiced once are checked by triggers.',
+      'ledger L17: insert-only invoices (FA numbers from the gapless document counter; a credit note is a reversing row with its own number). Owner and support read; office inserts and cannot read back. The client name and ICE and the VAT rate are copied at creation; due date at most 120 days (law 69-21); the order, client, VAT and a load invoiced once are checked by triggers. Review of CP-L4: office no longer inserts here; it creates the document through a SECURITY DEFINER function (create_order, create_quote, create_invoice) that returns only the number.',
   },
   invoice_line: {
     kind: 'rls',
@@ -595,7 +595,64 @@ export const TABLE_ACCESS = {
     noDelete: true,
     insertOnly: true,
     exception:
-      'ledger L17: insert-only invoice lines, one per load (volume x the order unit price, rounded once, checked by a trigger; the sum equals the invoice total HT at commit). Same visibility as invoice.',
+      'ledger L17: insert-only invoice lines, one per load (volume x the order unit price, rounded once, checked by a trigger; the sum equals the invoice total HT at commit). Same visibility as invoice. Review of CP-L4: office no longer inserts here; it creates the document through a SECURITY DEFINER function (create_order, create_quote, create_invoice) that returns only the number.',
+  },
+  alert: {
+    kind: 'rls',
+    money: true,
+    read: {
+      owner: 'all',
+      partner: 'none',
+      office: 'none',
+      plant: 'none',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'rules-engine R6: the identity of an alert (rule + subject) and the day it was first detected; insert-only and never changed. Owner writes (when he opens the dashboard) and reads; support reads. No money amount, but money-adjacent (risk alerts, DECISIONS 81), so owner and support only.',
+  },
+  alert_event: {
+    kind: 'rls',
+    money: true,
+    read: {
+      owner: 'all',
+      partner: 'none',
+      office: 'none',
+      plant: 'none',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'rules-engine R6: what happened to an alert (detected, severity changed, resolved, reopened, reclassified with a reason); insert-only, the state is the fold of the events. A guard trigger keeps the sequence gapless and the first event the detection.',
+  },
+  cash_decision: {
+    kind: 'rls',
+    money: true,
+    read: {
+      owner: 'all',
+      partner: 'none',
+      office: 'none',
+      plant: 'none',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'rules-engine R6: an option the owner confirmed after a fresh second factor, with the figures the engine computed and the draft message; insert-only. It moves no money; the early deposit goes through the ledger deposit in the same transaction.',
   },
   quote: {
     kind: 'rls',
@@ -616,7 +673,7 @@ export const TABLE_ACCESS = {
     noDelete: true,
     insertOnly: true,
     exception:
-      'ledger L31: insert-only quotes (DV numbers from the document counter), priced at the price in force by the database. Owner and support read and print; office inserts and cannot read back. No ledger effect and no plan; converted when an order points at it (sales_order.quote_id).',
+      'ledger L31: insert-only quotes (DV numbers from the document counter), priced at the price in force by the database. Owner and support read and print; office inserts and cannot read back. No ledger effect and no plan; converted when an order points at it (sales_order.quote_id). Review of CP-L4: office no longer inserts here; it creates the document through a SECURITY DEFINER function (create_order, create_quote, create_invoice) that returns only the number.',
   },
   money_account: {
     kind: 'rls',
