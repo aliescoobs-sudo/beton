@@ -3,8 +3,8 @@
 import { getRequestClock } from '@/app/request-clock';
 import { getPool } from '@/lib/db/pools';
 import type { Effect } from '@/modules/ledger';
-import { createLoad, type DeliveryError, recordBlReturn } from '@/modules/operations';
-import { authorize, ForbiddenError, type Permission } from '@/modules/platform-security';
+import { cancelLoad, createLoad, type DeliveryError, recordBlReturn } from '@/modules/operations';
+import { authorize, ForbiddenError, type Permission, withStepUp } from '@/modules/platform-security';
 import { currentAuthState } from '@/modules/platform-security/next';
 
 type Failure = { ok: false; error: DeliveryError | 'UNAUTHENTICATED' | 'FORBIDDEN' | string };

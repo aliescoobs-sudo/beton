@@ -279,8 +279,6 @@
       "nameFr": "Nom (français)",
       "nameAr": "Nom (arabe)",
       "baseUnit": "Unité de base",
-      "threshold": "Seuil bas ({unit})",
-      "thresholdShort": "Seuil bas (unité de base)",
       "unitLabel": "Unité d'achat",
       "factor": "Contenu ({unit})",
       "addUnit": "Ajouter l'unité",
@@ -792,6 +790,11 @@
       "order": "Commande",
       "client": "Client",
       "invoiceDate": "Date",
+      },
+      "payment": {
+        "unpaid": "Non payée",
+        "partial": "Partiellement payée",
+        "paid": "Payée"
       "issueDeadline": "À émettre avant le",
       "dueDate": "Échéance",
       "totalHt": "Total HT",
@@ -822,7 +825,12 @@
       "back": "Retour",
       "reason": "Motif (obligatoire)",
       "reasonRequired": "Le motif est obligatoire.",
-      "alreadyCredited": "Cette facture est déjà annulée."
+      "alreadyCredited": "Cette facture est déjà annulée.",
+      "payment": {
+        "unpaid": "Non payée",
+        "partial": "Partiellement payée",
+        "paid": "Payée"
+      }
     },
     "itemStates": {
       "pending": "À venir",
@@ -1129,7 +1137,9 @@
         "UNAUTHENTICATED": "Session expirée.",
         "FORBIDDEN": "Action non autorisée."
       },
-      "continue": "Continuer"
+      "continue": "Continuer",
+      "overOrder": "dépasse la commande : le propriétaire doit confirmer l'excédent",
+      "overOrderMinor": "dépasse légèrement la commande (dans la tolérance) : excédent noté pour le propriétaire"
     },
     "deliveries": {
       "link": "Livraisons",
@@ -1161,13 +1171,40 @@
       "threshold": "Seuil bas",
       "status": "État",
       "statuses": {
+      },
+      "cancelLoad": "Annuler le chargement",
+      "cancelReason": "Raison de l'annulation (obligatoire)",
+      "cancelConfirm": "Annuler ce chargement",
+      "cancelBack": "Retour",
+      "cancelErrors": {
+        "INVALID": "Raison invalide.",
+        "NOT_FOUND": "Chargement introuvable.",
+        "ALREADY_CANCELLED": "Ce chargement est déjà annulé.",
+        "other": "Annulation impossible."
         "ok": "Correct",
         "low": "Bas",
         "short": "Négatif"
       },
       "setThreshold": "Définir le seuil (kg ou L)",
       "thresholdSave": "Enregistrer",
-      "thresholdInvalid": "Seuil invalide."
+      "thresholdInvalid": "Seuil invalide.",
+      "projectionLink": "Projection du stock",
+      "count": "Inventaire",
+      "counted": "Quantité comptée ({unit})",
+      "countReason": "Raison de la correction (obligatoire)",
+      "countSave": "Corriger le stock",
+      "countCancel": "Annuler",
+      "countErrors": {
+        "INVALID": "Quantité ou raison invalide.",
+        "NO_DIFFERENCE": "Le comptage est égal au stock : rien à corriger.",
+        "NOT_FOUND": "Composant introuvable.",
+        "other": "Correction impossible."
+      },
+      "adjustmentsTitle": "Corrections après inventaire",
+      "adjustmentsNone": "Aucune correction pour l'instant.",
+      "adjDate": "Date",
+      "adjDifference": "Écart",
+      "adjReason": "Raison"
     },
     "note": {
       "title": "Bon de livraison",
@@ -1206,7 +1243,8 @@
         "FRACTIONAL_QUANTITY": "Quantité qui ne tombe pas sur un nombre entier d'unités de base.",
         "FUTURE_DATE": "Date dans le futur.",
         "FORBIDDEN": "Action non autorisée.",
-        "UNAUTHENTICATED": "Session expirée."
+        "UNAUTHENTICATED": "Session expirée.",
+        "EXCESS_NEEDS_OWNER": "Quantité supérieure à la commande : seul le propriétaire peut la confirmer."
       },
       "continue": "Continuer"
     }

@@ -78,6 +78,64 @@ export type ParameterKey = keyof typeof PARAMETERS;
 export type ParameterValues = {
   [K in ParameterKey]: (typeof PARAMETERS)[K]['default'] extends number ? number : string;
 };
+  // Rules engine and owner dashboard (SPEC-rules-engine §3, §4, §6). Every default is an assumption (🟡) to revisit with
+  // the owner; none is written in the domain code.
+  forecast_horizon_days: {
+    default: 14,
+    schema: z.number().int().min(7).max(30),
+    description: 'Working days of the cash forecast (the screen offers 7 or 14)',
+  },
+  cash_safety_threshold_centimes: {
+    default: 0,
+    schema: z.number().int().min(0).max(100_000_000_000),
+    description: 'Balance below which a day is a deficit day (centimes)',
+  },
+  alert_lead_days: {
+    default: 2,
+    schema: z.number().int().min(1).max(7),
+    description: 'Days ahead that raise a due-date alert',
+  },
+  legal_reminder_days: {
+    default: 7,
+    schema: z.number().int().min(1).max(30),
+    description: 'Days ahead of a legal date (law 69-21) that raise a reminder',
+  },
+  bounce_reminder_days: {
+    default: '20,27',
+    schema: z.string().regex(/^\d{1,2}(,\d{1,2})*$/, 'days, comma separated'),
+    description: 'Days after a bounce at which the 30-day window is reminded',
+  },
+  holidays: {
+    default: '',
+    schema: z.string().regex(/^(\d{4}-\d{2}-\d{2}([,\s]+\d{4}-\d{2}-\d{2})*)?$/, 'YYYY-MM-DD dates'),
+    description: 'Holidays (dates, comma separated): not working days',
+  },
+  purchase_lead_days: {
+    default: 2,
+    schema: z.number().int().min(0).max(30),
+    description: 'Days between ordering and receiving goods (expected receipts)',
+  },
+  postpone_working_days: {
+    default: 4,
+    schema: z.number().int().min(1).max(30),
+    description: 'Working days a supplier payment is pushed back in the "postpone" option',
+  },
+  advance_extra_bp: {
+    default: 3000,
+    schema: z.number().int().min(0).max(10000),
+    description: 'Extra advance asked of a client, as a share of the order (basis points)',
+  },
+  discount_rate_bp: {
+    default: 800,
+    schema: z.number().int().min(0).max(3000),
+    description: 'Yearly bank rate for discounting an LCN (basis points)',
+  },
+  split_delivery_bp: {
+    default: 5000,
+    schema: z.number().int().min(1000).max(9000),
+    description:
+      'Share of an order moved to the next working day in the "split delivery" option (basis points)',
+  },
 
 export const PARAMETER_KEYS = Object.keys(PARAMETERS) as ParameterKey[];
 

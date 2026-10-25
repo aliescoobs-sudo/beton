@@ -156,7 +156,7 @@ describe('a price override on one order (AC-LED-12)', () => {
       );
     };
     await expect(sql('Je veux un prix', users.office)).rejects.toMatchObject({ code: '42501' }); // policy: office has no reason
-    await expect(sql(null, users.office)).rejects.toMatchObject({ code: '23514' }); // guard: not the price in force
+    await expect(sql(null, users.office)).rejects.toMatchObject({ code: '42501' }); // policy: office no longer inserts orders directly (no price oracle)
     await expect(sql(null, users.owner)).rejects.toMatchObject({ code: '23514' }); // the owner needs a reason too
     await expect(sql('Remise', users.owner)).resolves.toBeDefined();
   });

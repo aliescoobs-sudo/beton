@@ -72,6 +72,8 @@ export {
   disputeInstrument,
   regularizeInstrument,
   depositInstruments,
+  depositInstrumentsIn,
+  instrumentFailure,
   type InstrumentError,
   type InstrumentEventView,
   type InstrumentRef,

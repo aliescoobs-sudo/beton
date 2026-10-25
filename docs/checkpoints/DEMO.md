@@ -1,6 +1,6 @@
 # Demo: what is ready to show, and where
 
-Written 2026-10-25 for the demo on this machine. Everything below is on the **dev database**, fake data only (the amber band
+Updated 2026-10-25 (rules engine and owner dashboard added; the demo itself is postponed). Everything below is on the **dev database**, fake data only (the amber band
 says so). It was prepared tonight: all migrations applied (51), `db:seed` re-run, `db:scenario` run, the audit chain verified
 (8 547 events), the single user and its 2FA untouched. A fresh `pnpm dev` is running on http://127.0.0.1:3000 (if it is not,
 stop any old one and run `pnpm dev` again: the stale-server problem was a server started before the last migrations).
@@ -18,7 +18,10 @@ its threshold for cement, our fake legal identity, 3 orders waiting to be loaded
 ## Screens ready, with their path (menu group in brackets)
 | Screen | Path | What to show |
 |---|---|---|
-| Tableau de bord ("Aujourd'hui") | `/fr` | cash (encaissé / total), late items, what to collect and pay, stock to watch, shortcuts to enter |
+| Aujourd'hui (owner, support) | `/fr` | the brief, cash (encaissé / total / cheques to debit), the **14-day forecast chart** (cash above the line, deficit hatched below it, worst case dashed, flows listed under each day, 7 or 14 days), the **black day** and its causes, the alerts by severity with "détecté N jours avant", stock of the next days, loads, late clients (not counted), decisions taken |
+| Rapport d'alerte | `/fr/alerts/<key>` (click an alert) | causes, **ranked options** with computed coverage, what-if forecast before / after, "Préparer" then "Confirmer" (fresh 2FA), the draft message to copy, "Reclasser" with a reason |
+| Projection du stock | `/fr/stock/projection` (Production) | per component, day by day: orders' needs by the recette in force, receipts expected, level; quantities only |
+| Aujourd'hui (office, plant, partner) | `/fr` | no money at all: loads to make and stock alerts |
 | Clients, suppliers, prices, recettes, trucks, zones, components | `/fr/master-data/…` (Données de base, Ventes, Achats, Production) | master data with archive and price history |
 | Devis | `/fr/quotes`, `/fr/quotes/new` (Ventes) | a quote at the price in force, printable, "Convertir en commande" opens the prefilled order form |
 | Commandes | `/fr/orders`, detail `/fr/orders/<id>` (Ventes) | what is delivered / invoiced / paid, state of each échéance, cancel with a reason (step-up) |
@@ -43,9 +46,26 @@ effects) → Stock → Facturer that order → Factures (open, Imprimer) → Sai
 (deposit, clear) → Position de trésorerie → Échéances légales → Export comptable. Then sign in as office or the plant (create
 those users from `/fr/admin/users`; I created none) to show the blind entry and the plant's quantity-only screens.
 
+## The black day on this data (clock on Sunday 1 November 2026)
+The scenario already holds one tight day: a cement cheque of 679 200,00 MAD issued by us, written for Thursday 5 November,
+against about 600 000,00 MAD in the accounts. Open Aujourd'hui: the forecast turns negative on the 5th (hatched bars), the
+black-day box lists the cheque as the cause, the alert "Déficit de trésorerie le jeu. 05/11" is first in the list. Open it:
+the options are ranked (discount of the LCN in portfolio, early deposit of the post-dated cheques in hand, postponing a
+supplier payment…), each with its coverage, the forecast it would give and the counterparties. **Moving the clock with the day strip
+also stores what the engine sees on the new day** (so are your visits to the page): that is the day an alert was first seen ("détecté 3 jours avant"). "Confirmer" on
+the early deposit really deposits the cheques (choose the bank account) and records the decision; the discount, postponement,
+advance and reminder options record the decision and give a draft message you copy and send yourself.
+The dev database keeps whatever you confirm: advance the clock or ignore it, nothing is reset.
+
 ## Not ready, or to say out loud
-- The home page is an interim "Aujourd'hui" built from the existing services; the forecast, black-day alerts and the daily
-  brief belong to the rules-engine and owner-dashboard modules, which are not built.
+- The daily brief is template text from the same facts (the AI layer is not built). No notifications yet.
+- Not wired: the nightly recompute job (the system role cannot read money tables; a decision for you). Alerts are stored
+  when the owner opens the page. Postponements and advances are recorded as decisions but do not move the forecast until the
+  ledger records what really happened (plan items are insert-only, there is no reschedule service).
+- Worst-case-only deficits (post-dated cheques presented early) show as an alert but offer no options yet.
+- Truck over-capacity and the reconciliation gap alerts wait for their modules.
+- Office can no longer enter an order, quote or invoice by direct insert: it goes through database functions that return
+  only the number (security fix, docs/checkpoints/CP-RE-1.md). The dev server needs no restart; the database is migrated.
 - Invoices print through the browser (Imprimer / save as PDF); there is no server-side PDF library yet (needs your approval of
   one). An invoice does not show "paid" by itself: payments cover the order's échéances.
 - Not built: reconciliation with the plant software, notifications, the AI layer, stock counts and load-cancellation screens.

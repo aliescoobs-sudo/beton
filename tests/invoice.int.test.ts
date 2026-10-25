@@ -6,6 +6,8 @@ import {
   cancelInvoice,
   createInvoice,
   getClientStatement,
+  getInvoiceDocument,
+  receiveInstrument,
   legalDeadlines,
   listInvoices,
 } from '../src/modules/ledger';
@@ -73,15 +75,24 @@ const row = async (id: string) =>
     )
   ).rows[0];
 
+/** Office learns the number only; the owner finds the row by it. */
+const idOfInvoice = async (number: string): Promise<string> =>
+  (
+    await inCtx(users.owner, (tx) =>
+      tx.query<{ id: string }>('select id from invoice where number = $1', [number]),
+    )
+  ).rows[0]?.id as string;
+
 describe('createInvoice (AC-LED-08, 09, 15)', () => {
   it('invoices the loads of an order: lines at the order price, name and ICE and VAT copied, deadline at month end, due +60', async () => {
     const { order, ice } = await orderWithLoads([6000, 4000]);
     const r = await createInvoice(app, users.office, { orderCode: order.code }, { today: TODAY });
     if (!r.ok) throw new Error(r.error);
     expect(r.value.number).toMatch(/^FA-2026-\d{5}$/);
-    expect(Object.keys(r.value).sort()).toEqual(['effects', 'id', 'number']);
+    expect(r.value.id).toBe(''); // the database returns the number only
     expect(JSON.stringify(r.value)).not.toMatch(/amountCentimes|936000/); // office learns no amount
-    expect(await row(r.value.id)).toMatchObject({
+    const invoiceId = await idOfInvoice(r.value.number);
+    expect(await row(invoiceId)).toMatchObject({
       client_ice: ice,
       vat_rate_bp: 2000,
       ht: '780000',
@@ -93,7 +104,7 @@ describe('createInvoice (AC-LED-08, 09, 15)', () => {
     const lines = await inCtx(users.owner, (tx) =>
       tx.query(
         `select description, volume_l, line_ht_centimes::text as ht from invoice_line where invoice_id = $1 order by seq`,
-        [r.value.id],
+        [invoiceId],
       ),
     );
     expect(lines.rows).toHaveLength(2);
@@ -269,7 +280,7 @@ describe('cancelInvoice: the credit note (AC-LED-08, AC-LED-03)', () => {
       error: 'REASON_REQUIRED',
     });
     await expect(
-      cancelInvoice(app, users.office, inv.value.id, 'oups', { today: TODAY }),
+      cancelInvoice(app, users.office, await idOfInvoice(inv.value.number), 'oups', { today: TODAY }),
     ).rejects.toBeDefined();
     const migrator = new pg.Pool({ connectionString: env.DATABASE_URL_MIGRATOR, max: 1 });
     try {
@@ -382,7 +393,7 @@ describe('visibility (DECISIONS 81)', () => {
     await expect(listInvoices(app, users.office)).rejects.toBeDefined();
     await expect(listInvoices(app, users.plant)).rejects.toBeDefined();
     const listed = await listInvoices(app, users.support);
-    expect(listed.find((i) => i.id === inv.value.id)?.totalTtcCentimes).toBe(56_160);
+    expect(listed.find((i) => i.number === inv.value.number)?.totalTtcCentimes).toBe(56_160);
     expectNoFields(inv.ok ? inv.value : null, ['totalTtcCentimes', 'totalHtCentimes']);
   });
 });

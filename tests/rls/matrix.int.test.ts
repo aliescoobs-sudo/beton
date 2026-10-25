@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { DB_ROLES, withRlsContext } from '../../src/lib/db/rls-context';
@@ -42,6 +42,16 @@ afterAll(async () => {
 const marker = `matrix_${randomUUID().replace(/-/g, '')}`;
 // One actor per role: real accounts for user roles, the fixed actors otherwise (the database checks roles, DECISIONS 76).
 const actors = {} as Record<DbRole, string>;
+
+/** A loading time computed from the marker, in SQL (`$1`) and in JS, so a fixture can mark the loads it makes. */
+const markedSql = (expression: string) =>
+  `(timestamptz '2001-01-01 00:00:00+00' + (('x' || substr(md5(${expression}), 1, 6))::bit(24)::int) * interval '1 second')`;
+const MARKED_SQL = markedSql('$1');
+const MARKED_C_SQL = markedSql("$1 || 'c'");
+const markedAt = (m: string): string =>
+  new Date(
+    Date.UTC(2001, 0, 1) + parseInt(createHash('md5').update(m).digest('hex').slice(0, 6), 16) * 1000,
+  ).toISOString();
 
 /**
  * Per table: which roles can write seed rows, how to write one for an actor, and a query returning the actor
@@ -286,14 +296,14 @@ const FIXTURES: Record<
                 join client c on c.id = i.client_id where c.name = 'al' || $1`,
   },
   sales_order: {
-    writers: ['owner', 'office'],
+    writers: ['owner'],
     seed: async (tx, actor) => insertOrder(tx, actor, await orderMaster(app, actors.owner, marker)),
     visible: `select o.created_by::text as owner from sales_order o join client c on c.id = o.client_id
                where c.name = 'fx' || $1`,
   },
   payment_plan_item: {
     // The items are written together with their order by the same actors (seeded by the sales_order fixture above).
-    writers: ['owner', 'office'],
+    writers: ['owner'],
     seed: async () => undefined,
     visible: `select i.created_by::text as owner from payment_plan_item i join sales_order o on o.id = i.order_id
                 join client c on c.id = o.client_id where c.name = 'fx' || $1`,
@@ -352,13 +362,13 @@ const FIXTURES: Record<
   },
   invoice_line: {
     // Written together with their invoice by the same actors (seeded by the invoice fixture above).
-    writers: ['owner', 'office'],
+    writers: ['owner'],
     seed: async () => undefined,
     visible: `select l.created_by::text as owner from invoice_line l join invoice i on i.id = l.invoice_id
                 where i.client_name = 'dl' || $1`,
   },
   quote: {
-    writers: ['owner', 'office'],
+    writers: ['owner'],
     seed: async (tx, actor) => insertQuote(tx, actor, await orderMaster(app, actors.owner, marker)),
     visible: `select q.created_by::text as owner from quote q join client c on c.id = q.client_id where c.name = 'fx' || $1`,
   },
@@ -374,7 +384,7 @@ const FIXTURES: Record<
   },
   doc_sequence: {
     // Written only through next_doc_number(): owner and office may call it. Persistent by design, like code_sequence.
-    writers: ['owner', 'office'],
+    writers: ['owner'],
     seed: (tx, actor) => {
       const role = Object.entries(actors).find(([, id]) => id === actor)![0];
       return tx.query(`select public.next_doc_number($1, 2099, 5)`, [
@@ -397,6 +407,42 @@ const FIXTURES: Record<
   },
   client_site: {
     writers: ['owner', 'partner', 'office'],
+  alert: {
+    writers: ['owner'],
+    seed: (tx, actor) =>
+      tx.query(
+        `insert into alert (id, rule_id, subject_key, first_detected_on, created_by)
+         values (gen_random_uuid(), 'CASH-DEFICIT', $1, current_date, $2)`,
+        [`${marker}:${actor}`, actor],
+      ),
+    visible: `select split_part(subject_key, ':', 2) as owner from alert where subject_key like $1 || ':%'`,
+  },
+  alert_event: {
+    writers: ['owner'],
+    seed: async (tx, actor) => {
+      const alert = await tx.query<{ id: string }>(
+        `insert into alert (id, rule_id, subject_key, first_detected_on, created_by)
+         values (gen_random_uuid(), 'PAY-DUE', $1, current_date, $2) returning id`,
+        [`ev${marker}:${actor}`, actor],
+      );
+      await tx.query(
+        `insert into alert_event (id, alert_id, seq, kind, severity, at_date, created_by)
+         values (gen_random_uuid(), $1, 1, 'detected', 'urgent', current_date, $2)`,
+        [alert.rows[0]?.id, actor],
+      );
+    },
+    visible: `select split_part(a.subject_key, ':', 2) as owner from alert_event e join alert a on a.id = e.alert_id where a.subject_key like 'ev' || $1 || ':%'`,
+  },
+  cash_decision: {
+    writers: ['owner'],
+    seed: (tx, actor) =>
+      tx.query(
+        `insert into cash_decision (id, alert_key, option_id, kinds, target_date, coverage_bp, gain_centimes, shortfall_centimes, details, decided_on, created_by)
+         values (gen_random_uuid(), $1, 'DEPOSIT-EARLY:x', array['DEPOSIT-EARLY'], current_date, 10000, 100, 100, '{}', current_date, $2)`,
+        [`CASH-DEFICIT:${marker}`, actor],
+      ),
+    visible: `select created_by::text as owner from cash_decision where alert_key = 'CASH-DEFICIT:' || $1`,
+  },
     seed: (tx, actor) =>
       tx.query(
         `insert into client_site (id, client_id, label)

@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type pg from 'pg';
+import { z } from 'zod';
 import { err, ok, type Result } from '@/lib/result';
 import {
   inRequest,

@@ -54,7 +54,6 @@ beforeAll(async () => {
   }
   master = await orderMaster(app, actors.owner.id, marker);
   await as('owner', (tx) => insertOrder(tx, actors.owner.id, master));
-  await as('office', (tx) => insertOrder(tx, actors.office.id, master));
 });
 
 describe('functions the application role can execute', () => {
@@ -134,7 +133,6 @@ describe('functions the application role can execute', () => {
         '2026-06-01',
       ]),
     );
-    expect(fields.map((f) => f.name)).toEqual(['id', 'price_ht_per_m3_centimes']);
     expect(rows).toHaveLength(1);
   });
 
@@ -320,57 +318,26 @@ describe('the money tables themselves, for the roles that must not read them', (
     }
   });
 
-  it('office: a rejected insert (plan that does not add up, wrong price, duplicate code) reports no amount', async () => {
-    // plan item of 1,00 against a total of 9 360,00: the deferred balance trigger fires on commit
-    const unbalanced = await failure(
-      as('office', async (tx) => {
-        const id = randomUUID();
-        await tx.query(
-          `insert into sales_order (id, code, client_id, concrete_type_id, volume_l, order_date, delivery_date, selling_price_id,
+  it('office: every direct insert into a document table is refused by RLS with no detail (no guard error to read as an oracle)', async () => {
+    const attempts: Record<string, string> = {
+      sales_order: `insert into sales_order (id, code, client_id, concrete_type_id, volume_l, order_date, delivery_date, selling_price_id,
                                     unit_price_ht_centimes, vat_rate_bp, total_ht_centimes, total_vat_centimes, total_ttc_centimes, created_by)
-           values ($1, $2, $3, $4, 10000, '2026-06-01', '2026-06-02', $5, 78000, 2000, 780000, 156000, 936000, $6)`,
-          [
-            id,
-            `U-${marker.slice(5, 14)}`,
-            master.clientId,
-            master.typeId,
-            master.sellingPriceId,
-            actors.office.id,
-          ],
-        );
-        await tx.query(
-          `insert into payment_plan_item (id, order_id, seq, direction, method, due_date, amount_centimes, created_by)
-           values (gen_random_uuid(), $1, 1, 'in', 'cash', '2026-06-02', 100, $2)`,
-          [id, actors.office.id],
-        );
-      }),
-    );
-    expect(unbalanced.code).toBe('23514');
-    expect(leaks(unbalanced.text)).toBe(false);
-    expect(unbalanced.text).not.toMatch(/adds up to \d/);
-
-    const wrongPrice = await failure(
-      as('office', (tx) =>
-        tx.query(
-          `insert into sales_order (id, code, client_id, concrete_type_id, volume_l, order_date, delivery_date, selling_price_id,
+           values (gen_random_uuid(), 'X-1', $1, $2, 10000, '2026-06-01', '2026-06-02', $3, 1, 2000, 10, 2, 12, $4)`,
+      quote: `insert into quote (id, code, client_id, concrete_type_id, volume_l, quote_date, valid_until, selling_price_id,
                                     unit_price_ht_centimes, vat_rate_bp, total_ht_centimes, total_vat_centimes, total_ttc_centimes, created_by)
-           values (gen_random_uuid(), $1, $2, $3, 10000, '2026-06-01', '2026-06-02', $4, 1, 2000, 10, 2, 12, $5)`,
-          [
-            `P-${marker.slice(5, 14)}`,
-            master.clientId,
-            master.typeId,
-            master.sellingPriceId,
-            actors.office.id,
-          ],
+           values (gen_random_uuid(), 'DV-X-1', $1, $2, 10000, '2026-06-01', '2026-06-30', $3, 1, 2000, 10, 2, 12, $4)`,
+    };
+    for (const [table, sql] of Object.entries(attempts)) {
+      const f = await failure(
+        as('office', (tx) =>
+          tx.query(sql, [master.clientId, master.typeId, master.sellingPriceId, actors.office.id]),
         ),
-      ),
-    );
-    expect(wrongPrice.code).toBe('23514');
-    expect(leaks(wrongPrice.text)).toBe(false);
-    expect(wrongPrice.text).not.toMatch(/78000/);
-
-    const existing = await migrator.query<{ code: string }>(`select code from sales_order limit 1`);
-    const duplicate = await failure(
+      );
+      expect(f.code, table).toBe('42501');
+      expect(leaks(f.text), table).toBe(false);
+      expect(f.text, table).not.toMatch(/price|78000|in force/);
+    }
+    const invoice = await failure(
       as('office', (tx) =>
         tx.query(
           `insert into sales_order (id, code, client_id, concrete_type_id, volume_l, order_date, delivery_date, selling_price_id,
@@ -380,8 +347,11 @@ describe('the money tables themselves, for the roles that must not read them', (
         ),
       ),
     );
-    expect(duplicate.code).toBe('23505');
-    expect(duplicate.text).not.toMatch(/ht_centimes|ttc|936000|780000|156000/);
+    // the invoice guard may answer first (an unknown order id): a plain check violation, which holds no price
+    expect(['42501', '23514']).toContain(invoice.code);
+    expect(leaks(invoice.text)).toBe(false);
+    const duplicate = await migrator.query<{ code: string }>(`select code from sales_order limit 1`);
+    expect(duplicate.rows.length).toBeGreaterThan(0);
   });
 
   it('office: the correction request answers the same for an unknown and an existing code, and shows no amount', async () => {

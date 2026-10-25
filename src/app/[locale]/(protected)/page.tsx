@@ -1,27 +1,61 @@
 import Link from 'next/link';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
+import { getEngineParams } from '@/app/engine-params';
+import { getRequestClock } from '@/app/request-clock';
+import { getPool } from '@/lib/db/pools';
+import { OpsToday, OwnerToday } from '@/modules/owner-dashboard';
+import { can, recordMoneyView } from '@/modules/platform-security';
 import { currentAuthState } from '@/modules/platform-security/auth/request-state';
-import { homeShortcuts, HomeTilesView, homeTiles } from './home-tiles';
+import { loadDashboard, loadTodayOps } from '@/modules/rules-engine';
 import { buttonClass, PageHeader } from '@/ui';
+import { confirmExcessAction } from './alerts/actions';
+import { homeShortcuts } from './home-tiles';
 
-// @permission authenticated — any user with password + 2FA (guarded by the (protected) layout)
-export default async function HomePage({ params }: { params: Promise<{ locale: string }> }) {
+// @permission authenticated — any user with password + 2FA (guarded by the (protected) layout); the money view is for cash.read
+export default async function HomePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ locale: string }>;
+  searchParams: Promise<{ h?: string }>;
+}) {
   const { locale } = await params;
+  const { h } = await searchParams;
   setRequestLocale(locale);
   const t = await getTranslations();
   const state = await currentAuthState();
   const name = state.kind === 'authenticated' ? state.user.name : '';
   const reenrol = state.kind === 'authenticated' && state.user.reenrolRequired;
   const user = state.kind === 'authenticated' ? state.user : null;
-  const { tiles, hasData } = user ? await homeTiles(user, locale) : { tiles: [], hasData: false };
   const shortcuts = user
     ? homeShortcuts(user, locale, (key) => t(`shell.home.shortcuts.${key}` as never))
     : [];
 
+  const pool = getPool('app');
+  const today = (await getRequestClock()).today();
+  const horizon = h === '7' ? 7 : h === '14' ? 14 : undefined;
+  const params2 = await getEngineParams(horizon);
+  let money: Awaited<ReturnType<typeof loadDashboard>> | null = null;
+  let ops: Awaited<ReturnType<typeof loadTodayOps>> | null = null;
+  if (user && can(user.role, 'cash.read')) {
+    await recordMoneyView(pool, user, 'screen:dashboard');
+    money = await loadDashboard(pool, user, { today, params: params2 }).catch(() => null);
+  } else if (user) {
+    ops = await loadTodayOps(pool, user, { today, params: params2 }).catch(() => null);
+  }
+  // The owner's page has nothing to project on a brand-new database (the invitation shows instead); the others always get
+  // their "today", empty or not: "nothing to load today" is an answer.
+  const hasData = money
+    ? money.cash.accounts.length > 0 ||
+      money.forecast.some((d) => d.events.length > 0) ||
+      money.stock.components.some((c) => c.level !== 0) ||
+      money.loads.length > 0
+    : ops !== null;
+
   return (
     <div>
       <PageHeader
-        title={t('shell.nav.dashboard')}
+        title={t('dashboard.title')}
         description={<span data-testid="signed-in-as">{t('auth.session.signedInAs', { name })}</span>}
       />
       {reenrol && (
@@ -36,12 +70,15 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           </Link>
         </p>
       )}
-      {tiles.length > 0 && hasData && (
-        <section aria-label={t('shell.home.title')} className="space-y-4">
-          <h2 className="text-xl">{t('shell.home.title')}</h2>
-          <HomeTilesView tiles={tiles} />
-        </section>
+      {hasData && money && (
+        <OwnerToday
+          view={money}
+          locale={locale}
+          horizon={params2.horizonDays}
+          actions={{ confirmExcess: confirmExcessAction }}
+        />
       )}
+      {ops && <OpsToday view={ops} locale={locale} />}
       {shortcuts.length > 0 && (
         <section aria-label={t('shell.home.enter')} className="mt-8" data-testid="home-shortcuts">
           <h2 className="mb-3 text-xl">{t('shell.home.enter')}</h2>

@@ -2,9 +2,16 @@ import { randomUUID } from 'node:crypto';
 import type pg from 'pg';
 import { centimes } from '@/lib/money';
 import { err, ok, type Result } from '@/lib/result';
-import { inRequest, isMalformedId, require, type SessionUser } from '@/modules/platform-security';
+import {
+  can,
+  inRequest,
+  isMalformedId,
+  parameterOrDefault,
+  require,
+  type SessionUser,
+} from '@/modules/platform-security';
 import { type Effect, visibleEffects } from '../domain/effects';
-import { parseQuoteInput, quoteValidUntil } from '../domain/quote';
+import { DEFAULT_QUOTE_DAYS, parseQuoteInput, quoteValidUntil } from '../domain/quote';
 import { computeTotals } from '../domain/totals';
 import { nextDocNumber } from './doc-number';
 import { ledgerParameter } from './order-service';

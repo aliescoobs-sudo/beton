@@ -114,6 +114,30 @@ const SEED: Record<MoneyTable, (tx: pg.PoolClient, actor: string) => Promise<unk
       [scene.instrumentId, scene.itemId, actor],
     );
   },
+  alert: (tx, actor) =>
+    tx.query(
+      `insert into alert (id, rule_id, subject_key, first_detected_on, created_by)
+       values (gen_random_uuid(), 'CASH-DEFICIT', $1, current_date, $2)`,
+      [`mv${marker}:${actor}`, actor],
+    ),
+  alert_event: async (tx, actor) => {
+    const alert = await tx.query<{ id: string }>(
+      `insert into alert (id, rule_id, subject_key, first_detected_on, created_by)
+       values (gen_random_uuid(), 'PAY-DUE', $1, current_date, $2) returning id`,
+      [`mvev${marker}:${actor}`, actor],
+    );
+    return tx.query(
+      `insert into alert_event (id, alert_id, seq, kind, severity, at_date, created_by)
+       values (gen_random_uuid(), $1, 1, 'detected', 'urgent', current_date, $2)`,
+      [alert.rows[0]?.id, actor],
+    );
+  },
+  cash_decision: (tx, actor) =>
+    tx.query(
+      `insert into cash_decision (id, alert_key, option_id, kinds, target_date, coverage_bp, gain_centimes, shortfall_centimes, details, decided_on, created_by)
+       values (gen_random_uuid(), $1, 'DEPOSIT-EARLY:x', array['DEPOSIT-EARLY'], current_date, 10000, 100, 100, '{}', current_date, $2)`,
+      [`CASH-DEFICIT:mv${marker}`, actor],
+    ),
   quote: async (tx, actor) => insertQuote(tx, actor, await orderMaster(app, actors.owner.id, marker)),
   purchase: async (tx, actor) =>
     insertPurchase(tx, actor, await purchaseMaster(app, actors.owner.id, marker)),

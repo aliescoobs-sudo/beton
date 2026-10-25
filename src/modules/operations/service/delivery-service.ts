@@ -130,6 +130,8 @@ export async function createLoad(
         if (oneWay !== undefined) {
           const [unloading, limit] = [
             await opsParameter(tx, 'unloading_min'),
+      // Nothing left and no volume given: ask for a volume. A volume given beyond what is left is allowed (the plant is
+      // never blocked): it is warned about here and recorded by the database for the owner to confirm.
             await opsParameter(tx, 'concrete_limit_min'),
           ];
           if (tripExceedsLimit(oneWay, unloading, limit)) warnings.push('LONG_TRIP');

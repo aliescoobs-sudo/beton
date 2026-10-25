@@ -23,9 +23,11 @@ describe('migrations create structure only (decision 79)', () => {
 
   it.each(files)('%s inserts no business rows and never relaxes RLS or auditing', (file) => {
     const sql = topLevelSql(readFileSync(`${FOLDER}/${file}`, 'utf8'));
-    expect(sql, 'INSERT/COPY/UPDATE/DELETE at migration level').not.toMatch(
-      /\b(insert\s+into|copy\s|delete\s+from|update\s+\S+\s+set)\b/i,
-    );
+    if (!(file in CONVERSIONS))
+      expect(sql, 'INSERT/COPY/UPDATE/DELETE at migration level').not.toMatch(
+        /\b(insert\s+into|copy\s|delete\s+from|update\s+\S+\s+set)\b/i,
+      );
+    else expect(sql, 'a conversion never deletes or copies out').not.toMatch(/\b(copy\s|delete\s+from)\b/i);
     expect(sql, 'RLS or audit switched off').not.toMatch(
       /no\s+force\s+row\s+level|disable\s+row\s+level|disable\s+trigger/i,
     );

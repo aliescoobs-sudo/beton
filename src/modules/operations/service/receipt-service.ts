@@ -19,7 +19,8 @@ export type ReceiptError =
   | 'PURCHASE_CANCELLED'
   | 'NOTHING_TO_RECEIVE'
   | 'FRACTIONAL_QUANTITY'
-  | 'FUTURE_DATE';
+  | 'FUTURE_DATE'
+  | 'EXCESS_NEEDS_OWNER';
 
 export function receiptFailure(error: unknown): ReceiptError {
   const e = error as { code?: string; message?: string };
@@ -27,7 +28,9 @@ export function receiptFailure(error: unknown): ReceiptError {
   if (isUniqueViolation(error)) return 'ALREADY_RECEIVED';
   if (e.code === '23514') {
     if (/cancelled/.test(m)) return 'PURCHASE_CANCELLED';
-    if (/movements are missing/.test(m)) return 'NOTHING_TO_RECEIVE';
+    if (/movements are missing|lines or the stock movements/.test(m)) return 'NOTHING_TO_RECEIVE';
+    if (/more than ordered/.test(m)) return 'EXCESS_NEEDS_OWNER';
+    if (/whole number of base units/.test(m)) return 'FRACTIONAL_QUANTITY';
     if (/unknown purchase/.test(m)) return 'NOT_FOUND';
     return 'INVALID';
   }
@@ -59,13 +62,16 @@ export async function recordReceipt(
   if (date > deps.today) return err('FUTURE_DATE');
   try {
     return await inRequest(appPool, actor, async (tx): Promise<Result<ReceivedStock, ReceiptError>> => {
-      const lines = await tx.query<{ qty_milli: string; factor: number }>(
-        `select o.qty_milli::text, o.factor_to_base as factor from purchase_line_ops o where o.purchase_id = $1`,
+      const lines = await tx.query<{ line_id: string; qty_milli: string; factor: number }>(
+        `select o.line_id, o.qty_milli::text, o.factor_to_base as factor from purchase_line_ops o where o.purchase_id = $1`,
         [parsed.value.purchaseId],
       );
       if (lines.rows.length === 0) return err('NOT_FOUND');
+      const given = parsed.value.lines ?? null;
       for (const l of lines.rows) {
-        if (!toBase(Number(l.qty_milli) as MilliQty, l.factor).ok) return err('FRACTIONAL_QUANTITY');
+        // What is checked is what is received: the ordered quantity when everything is, else the quantities given.
+        const qty = given ? given.find((g) => g.lineId === l.line_id)?.qtyMilli : Number(l.qty_milli);
+        if (qty !== undefined && !toBase(qty as MilliQty, l.factor).ok) return err('FRACTIONAL_QUANTITY');
       }
       const { rows } = await tx.query<{ id: string }>('select public.record_receipt($1, $2) as id', [
         parsed.value.purchaseId,
@@ -93,21 +99,26 @@ export interface ReceivableLine {
   unitLabel: string;
   qtyMilli: number;
 }
+  lineId: string;
 export interface ReceivablePurchase {
   purchaseId: string;
   code: string;
+  /** Ordered. */
   supplierCode: string;
   orderDate: string;
   lines: ReceivableLine[];
-  /** Business date of the receipt; null while the goods are expected. */
+  /** Business date of the last receipt; null while nothing came in. */
   receivedOn: string | null;
   cancelled: boolean;
 }
 
-/** Purchases with stocked lines, newest first: what to receive and what came in. Quantities only (no price). */
+/** Purchases with stocked lines, newest first: what is still to receive and what came in. Quantities only (no price). */
 export async function listReceivable(appPool: pg.Pool, actor: SessionUser): Promise<ReceivablePurchase[]> {
   await require(appPool, actor, 'receipts.read');
   const { rows } = await inRequest(appPool, actor, (tx) =>
+  receipts: number;
+  /** expected: nothing yet; partial: some lines short; complete: every line reached its ordered quantity. */
+  status: 'expected' | 'partial' | 'complete';
     tx.query<{
       purchase_id: string;
       code: string;
@@ -120,12 +131,15 @@ export async function listReceivable(appPool: pg.Pool, actor: SessionUser): Prom
       is_reversed: boolean;
       received_on: string | null;
     }>(
-      `select o.purchase_id, o.code, o.supplier_code, to_char(o.order_date, 'YYYY-MM-DD') as order_date, o.name_fr, o.name_ar,
+      line_id: string;
+      `select o.purchase_id, o.code, o.supplier_code, to_char(o.order_date, 'YYYY-MM-DD') as order_date, o.line_id, o.name_fr, o.name_ar,
               o.unit_label, o.qty_milli::text, o.is_reversed,
               (select to_char(r.received_date, 'YYYY-MM-DD') from purchase_receipt r where r.purchase_id = o.purchase_id) as received_on
          from purchase_line_ops o order by o.order_date desc, o.code desc, o.seq`,
+      received_milli: string;
     ),
   );
+      receipts: string;
   const byPurchase = new Map<string, ReceivablePurchase>();
   for (const r of rows) {
     let p = byPurchase.get(r.purchase_id);
@@ -146,7 +160,10 @@ export async function listReceivable(appPool: pg.Pool, actor: SessionUser): Prom
       nameAr: r.name_ar,
       unitLabel: r.unit_label,
       qtyMilli: Number(r.qty_milli),
+        receipts: Number(r.receipts),
+        status: 'expected',
     });
   }
   return [...byPurchase.values()];
 }
+      lineId: r.line_id,

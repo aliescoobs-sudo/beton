@@ -34,6 +34,14 @@ const receiptSchema = z.object({
   purchaseId: z.uuid(),
   /** Defaults to today in the service. */
   receivedDate: dateText.nullish(),
+  /** What came in, line by line (thousandths of the purchase unit); absent: everything still expected. */
+  lines: z
+    .array(z.object({ lineId: z.uuid(), qtyMilli: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER) }))
+    .min(1)
+    .max(100)
+    .nullish(),
+  /** The owner's confirmation that a line goes past its ordered quantity. */
+  confirmExcess: z.boolean().nullish(),
 });
 const thresholdSchema = z.object({
   componentId: z.uuid(),

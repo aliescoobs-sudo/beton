@@ -124,6 +124,8 @@ export const PERMISSIONS = {
   'audit.read_own': ALL,
   // AI (🟡 A22)
   'ai.qa': MONEY_READ,
+  // Confirming a resolution option of the rules engine (early deposit, postponement…): money, the owner's (DECISIONS 81)
+  'cash.decide': MONEY_WRITE,
   'ai.assisted_entry': OFFICE,
   // Pilot operations
   'simulation.control': ['owner'],

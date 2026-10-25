@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import type pg from 'pg';
+import { centimes } from '@/lib/money';
 import { err, ok, type Result } from '@/lib/result';
-import { inRequest, isMalformedId, require, type SessionUser } from '@/modules/platform-security';
+import { can, inRequest, isMalformedId, require, type SessionUser } from '@/modules/platform-security';
 import { type Effect, visibleEffects } from '../domain/effects';
 import {
   computeInvoiceTotals,
@@ -13,6 +14,7 @@ import {
 import { nextDocNumber } from './doc-number';
 
 export type InvoiceError =
+  | 'TOO_MANY_ATTEMPTS'
   | 'INVALID'
   | 'NOT_FOUND'
   | 'NOTHING_TO_INVOICE'
@@ -31,6 +33,7 @@ export interface CreatedInvoice {
 export const invoiceFailure = (error: unknown): InvoiceError => {
   const { code, message } = error as { code?: string; message?: string };
   if (code === '23514') {
+  if (code === '42501' && /too many failed attempts/.test(message ?? '')) return 'TOO_MANY_ATTEMPTS';
     if (/already invoiced/.test(message ?? '')) return 'NOTHING_TO_INVOICE';
     if (/order is cancelled|unknown order|not a live load/.test(message ?? '')) return 'NOT_FOUND';
     if (/due_date/.test(message ?? '')) return 'PAYMENT_TERM_TOO_LONG';
@@ -297,8 +300,9 @@ export async function listInvoices(appPool: pg.Pool, actor: SessionUser): Promis
               exists (select 1 from invoice c where c.credit_note_of = i.id) as cancelled, i.reason
          from invoice i join sales_order o on o.id = i.order_id
         order by i.invoice_date desc, i.number desc`,
-    ),
-  );
+    );
+    return { rows: result.rows, payments };
+  });
   return rows.map((r) => ({
     id: r.id,
     number: r.number,

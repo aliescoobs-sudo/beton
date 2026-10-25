@@ -202,6 +202,10 @@ export async function createOrder(
   if (!parsed.ok) return err('INVALID');
   const v = parsed.value;
 
+  // A role that cannot read money (office) never sees a price: the database prices, splits and writes the order itself
+  // and returns the code only (review of CP-L4). The owner goes through the preview-and-override path below.
+  if (!can(actor.role, 'orders.read_money')) return createOrderBlind(appPool, actor, v, deps.today);
+
   try {
     return await inRequest(appPool, actor, async (tx): Promise<Result<CreatedOrder, OrderError>> => {
       const prepared = await prepareOrder(tx, v, deps.today, can(actor.role, 'orders.price_override'));

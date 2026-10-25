@@ -32,8 +32,6 @@ const nameField = z
   .transform((value) => value.trim().replace(/\s+/g, ' '))
   .pipe(z.string().min(1).max(80));
 
-const emptyAsUndefined = (v: unknown) => (typeof v === 'string' && v.trim() === '' ? undefined : v);
-
 const componentInputSchema = z.object({
   nameFr: nameField,
   nameAr: nameField,

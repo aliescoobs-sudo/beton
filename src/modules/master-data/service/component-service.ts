@@ -100,7 +100,7 @@ export async function createComponent(
   }
 }
 
-/** Names and threshold; code and base unit are immutable (trigger). `status` archives or restores. */
+/** Names; code and base unit are immutable (trigger). `status` archives or restores. */
 export async function updateComponent(
   appPool: pg.Pool,
   actor: SessionUser,

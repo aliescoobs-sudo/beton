@@ -1,8 +1,3 @@
-import { getTranslations } from 'next-intl/server';
-import { getRequestClock } from '@/app/request-clock';
-import { getPool } from '@/lib/db/pools';
-import { getCashPosition, legalDeadlines } from '@/modules/ledger';
-import { getStockLevels, listLoadableOrders } from '@/modules/operations';
 import { can, type SessionUser } from '@/modules/platform-security';
 import { Card, Money, StatusPill } from '@/ui';
 
@@ -127,29 +122,4 @@ export function homeShortcuts(user: SessionUser, locale: string, label: (key: st
   return all
     .filter(([, permission]) => can(user.role, permission))
     .map(([path, , key]) => ({ href: `/${locale}${path}`, label: label(key) }));
-}
-
-export async function HomeTilesView({ tiles }: { tiles: Tile[] }) {
-  return (
-    <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="home-tiles">
-      {tiles.map((tile) => (
-        <li key={tile.id}>
-          <a href={tile.href} className="block h-full" data-testid={`tile-${tile.id}`}>
-            <Card className="h-full transition-colors hover:bg-band">
-              <p className="field-label">{tile.label}</p>
-              <p className="font-display mt-1 text-3xl font-bold" data-tone={tile.tone}>
-                {tile.value}
-              </p>
-              {tile.hint && <p className="mt-2 text-sm text-muted">{tile.hint}</p>}
-              {tile.tone && tile.tone !== 'neutral' && (
-                <StatusPill status={tile.tone} className="mt-2">
-                  {tile.toneLabel}
-                </StatusPill>
-              )}
-            </Card>
-          </a>
-        </li>
-      ))}
-    </ul>
-  );
 }

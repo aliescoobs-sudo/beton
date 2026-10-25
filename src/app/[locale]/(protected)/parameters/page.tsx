@@ -20,9 +20,8 @@ export default async function ParametersPage({ params }: { params: Promise<{ loc
   const values = await readParameters(getPool('auth'));
   const rows: ParameterRow[] = PARAMETER_KEYS.map((key) => {
     const value = values[key];
-    return typeof value === 'number'
-      ? { key, value, kind: 'number', ...bounds(PARAMETERS[key].schema) }
-      : { key, value, kind: 'time' };
+    if (typeof value === 'number') return { key, value, kind: 'number', ...bounds(PARAMETERS[key].schema) };
+    return { key, value, kind: key.startsWith('clock.job.') ? 'time' : 'text' };
   });
   const t = await getTranslations('parameters');
   return (

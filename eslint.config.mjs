@@ -9,7 +9,7 @@ const config = [
   ...nextVitals,
   ...nextTs,
   {
-    ignores: ['.next/**', 'node_modules/**', 'next-env.d.ts', 'coverage/**'],
+    ignores: ['.next/**', '.next-e2e/**', 'node_modules/**', 'next-env.d.ts', 'coverage/**'],
   },
   {
     // Business time comes only from the clock module (SPEC-clock §4, AC-CLK-07).

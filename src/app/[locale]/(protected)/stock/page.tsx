@@ -6,7 +6,7 @@ import { ThresholdForm } from '@/modules/operations/ui/threshold-form';
 import { can } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/next';
 import { EmptyState, PageHeader, StatusPill, Table, Td, Th } from '@/ui';
-import { thresholdAction } from './actions';
+import { countAction, thresholdAction } from './actions';
 
 /** Stock of every component, summed from its movements, with its status against the low threshold. Quantities only. */
 export default async function StockPage({ params }: { params: Promise<{ locale: string }> }) {
@@ -33,6 +33,7 @@ export default async function StockPage({ params }: { params: Promise<{ locale: 
             </tr>
           </thead>
           <tbody>
+              {canCount && <Th>{t('count')}</Th>}
             {levels.map((l) => {
               const q = formatStockQty(l.level, l.baseUnit);
               const low = l.lowThreshold === null ? null : formatStockQty(l.lowThreshold, l.baseUnit);
@@ -66,3 +67,42 @@ export default async function StockPage({ params }: { params: Promise<{ locale: 
     </div>
   );
 }
+      <section className="mt-10" aria-labelledby="adjustments-title">
+        <h2 id="adjustments-title" className="mb-3 text-xl">
+          {t('adjustmentsTitle')}
+        </h2>
+        {adjustments.length === 0 ? (
+          <p className="text-sm text-muted" data-testid="adjustments-none">
+            {t('adjustmentsNone')}
+          </p>
+        ) : (
+          <Table data-testid="adjustments-list">
+            <thead>
+              <tr>
+                <Th>{t('adjDate')}</Th>
+                <Th>{t('component')}</Th>
+                <Th numeric>{t('adjDifference')}</Th>
+                <Th>{t('adjReason')}</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {adjustments.map((a) => {
+                const q = formatStockQty(Math.abs(a.difference), a.baseUnit);
+                return (
+                  <tr key={a.id} data-testid={`adjustment-${a.id}`}>
+                    <Td>
+                      <bdi dir="ltr">{a.date}</bdi>
+                    </Td>
+                    <Td>{locale === 'ar' ? a.nameAr : a.nameFr}</Td>
+                    <Td numeric>
+                      {a.difference < 0 ? '−' : '+'}
+                      {q.value} {q.unit}
+                    </Td>
+                    <Td>{a.reason}</Td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </Table>
+        )}
+      </section>

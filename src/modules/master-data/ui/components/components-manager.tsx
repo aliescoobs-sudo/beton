@@ -120,7 +120,6 @@ export function ComponentsManager({
             <Th>{t('code')}</Th>
             <Th>{t('name')}</Th>
             <Th>{t('baseUnit')}</Th>
-            <Th numeric>{t('thresholdShort')}</Th>
             {editable && <ActionsTh />}
           </tr>
         </thead>

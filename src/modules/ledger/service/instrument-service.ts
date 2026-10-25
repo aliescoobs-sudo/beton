@@ -6,6 +6,7 @@ import { err, ok, type Result } from '@/lib/result';
 import { inRequest, isMalformedId, require, type SessionUser } from '@/modules/platform-security';
 import { isEarly, isPostDated } from '../domain/instrument-dates';
 import {
+  type DepositInput,
   parseBounceInput,
   parseCancelInput,
   parseDisputeInput,
@@ -264,21 +265,26 @@ export async function depositInstruments(
   await require(appPool, actor, 'instruments.manage');
   const parsed = parseDepositInput(input);
   if (!parsed.ok) return err('INVALID');
-  const v = parsed.value;
   try {
-    await inRequest(appPool, actor, async (tx) => {
-      for (const instrumentId of v.instrumentIds) {
-        await insertEvent(tx, actor, {
-          instrumentId,
-          event: 'deposited',
-          date: v.date,
-          accountId: v.accountId,
-        });
-      }
-    });
-    return ok({ deposited: v.instrumentIds.length });
+    await inRequest(appPool, actor, (tx) => depositInstrumentsIn(tx, actor, parsed.value));
+    return ok({ deposited: parsed.value.instrumentIds.length });
   } catch (error) {
     return err(instrumentFailure(error));
+  }
+}
+
+/**
+ * The deposit itself, inside a transaction the caller owns: the rules engine applies an "early deposit" option and
+ * records the owner's decision in the same transaction, so one cannot exist without the other. The caller has already
+ * checked `instruments.manage` and parsed the input; a failure is thrown for `instrumentFailure` to map.
+ */
+export async function depositInstrumentsIn(
+  tx: pg.PoolClient,
+  actor: SessionUser,
+  v: DepositInput,
+): Promise<void> {
+  for (const instrumentId of v.instrumentIds) {
+    await insertEvent(tx, actor, { instrumentId, event: 'deposited', date: v.date, accountId: v.accountId });
   }
 }
 

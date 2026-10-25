@@ -57,12 +57,10 @@ export default async function ReceiptsPage({ params }: { params: Promise<{ local
                   </ul>
                 </Td>
                 <Td>
-                  {p.receivedOn ? (
+                  {p.status === 'complete' ? (
                     <StatusPill status="paid">
                       {t('receivedOn')} <bdi dir="ltr">{p.receivedOn}</bdi>
                     </StatusPill>
-                  ) : canReceive ? (
-                    <ReceiveButton purchaseId={p.purchaseId} code={p.code} receive={receiveAction} />
                   ) : (
                     <StatusPill status="due">{t('expected')}</StatusPill>
                   )}

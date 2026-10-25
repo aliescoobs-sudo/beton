@@ -279,8 +279,6 @@
       "nameFr": "الاسم (بالفرنسية)",
       "nameAr": "الاسم (بالعربية)",
       "baseUnit": "وحدة الأساس",
-      "threshold": "الحد الأدنى ({unit})",
-      "thresholdShort": "الحد الأدنى (وحدة الأساس)",
       "unitLabel": "وحدة الشراء",
       "factor": "المحتوى ({unit})",
       "addUnit": "إضافة الوحدة",
@@ -792,6 +790,11 @@
       "order": "الطلب",
       "client": "الزبون",
       "invoiceDate": "التاريخ",
+      },
+      "payment": {
+        "unpaid": "غير مؤداة",
+        "partial": "مؤداة جزئياً",
+        "paid": "مؤداة"
       "issueDeadline": "يجب إصدارها قبل",
       "dueDate": "الأجل",
       "totalHt": "المجموع دون ضريبة",
@@ -822,7 +825,12 @@
       "back": "رجوع",
       "reason": "السبب (إجباري)",
       "reasonRequired": "السبب إجباري.",
-      "alreadyCredited": "هذه الفاتورة ملغاة من قبل."
+      "alreadyCredited": "هذه الفاتورة ملغاة من قبل.",
+      "payment": {
+        "unpaid": "غير مؤداة",
+        "partial": "مؤداة جزئياً",
+        "paid": "مؤداة"
+      }
     },
     "itemStates": {
       "pending": "قادمة",
@@ -1129,7 +1137,9 @@
         "UNAUTHENTICATED": "انتهت الجلسة.",
         "FORBIDDEN": "إجراء غير مسموح."
       },
-      "continue": "متابعة"
+      "continue": "متابعة",
+      "overOrder": "يتجاوز الطلبية: على المالك تأكيد الزيادة",
+      "overOrderMinor": "يتجاوز الطلبية قليلاً (ضمن الحد المسموح): سُجلت الزيادة للمالك"
     },
     "deliveries": {
       "link": "التسليمات",
@@ -1161,13 +1171,40 @@
       "threshold": "الحد الأدنى",
       "status": "الحالة",
       "statuses": {
+      },
+      "cancelLoad": "إلغاء الشحنة",
+      "cancelReason": "سبب الإلغاء (إلزامي)",
+      "cancelConfirm": "إلغاء هذه الشحنة",
+      "cancelBack": "رجوع",
+      "cancelErrors": {
+        "INVALID": "سبب غير صالح.",
+        "NOT_FOUND": "شحنة غير موجودة.",
+        "ALREADY_CANCELLED": "هذه الشحنة ملغاة مسبقاً.",
+        "other": "تعذر الإلغاء."
         "ok": "سليم",
         "low": "منخفض",
         "short": "سالب"
       },
       "setThreshold": "تحديد الحد الأدنى (كغ أو ل)",
       "thresholdSave": "حفظ",
-      "thresholdInvalid": "حد غير صالح."
+      "thresholdInvalid": "حد غير صالح.",
+      "projectionLink": "توقع المخزون",
+      "count": "الجرد",
+      "counted": "الكمية المعدودة ({unit})",
+      "countReason": "سبب التصحيح (إلزامي)",
+      "countSave": "تصحيح المخزون",
+      "countCancel": "إلغاء",
+      "countErrors": {
+        "INVALID": "كمية أو سبب غير صالح.",
+        "NO_DIFFERENCE": "الجرد مطابق للمخزون: لا شيء يُصحَّح.",
+        "NOT_FOUND": "مكوّن غير موجود.",
+        "other": "تعذر التصحيح."
+      },
+      "adjustmentsTitle": "تصحيحات بعد الجرد",
+      "adjustmentsNone": "لا توجد تصحيحات بعد.",
+      "adjDate": "التاريخ",
+      "adjDifference": "الفارق",
+      "adjReason": "السبب"
     },
     "note": {
       "title": "سند التسليم",
@@ -1206,7 +1243,8 @@
         "FRACTIONAL_QUANTITY": "كمية لا تعطي عددًا صحيحًا من وحدات الأساس.",
         "FUTURE_DATE": "تاريخ في المستقبل.",
         "FORBIDDEN": "إجراء غير مسموح.",
-        "UNAUTHENTICATED": "انتهت الجلسة."
+        "UNAUTHENTICATED": "انتهت الجلسة.",
+        "EXCESS_NEEDS_OWNER": "كمية تفوق الطلبية: المالك وحده يؤكدها."
       },
       "continue": "متابعة"
     }

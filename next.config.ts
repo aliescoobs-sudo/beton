@@ -4,6 +4,8 @@ import createNextIntlPlugin from 'next-intl/plugin';
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 
 const nextConfig: NextConfig = {
+  // A second build directory for the e2e run, so building never touches the one a running dev server uses.
+  distDir: process.env.NEXT_DIST_DIR ?? '.next',
   poweredByHeader: false,
   reactStrictMode: true,
   // Stop `next dev` from injecting its agent-rules block into CLAUDE.md/AGENTS.md.

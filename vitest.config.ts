@@ -16,6 +16,8 @@ export default defineConfig({
         // ledger L26: the money domain (totals, plans, instruments, statements, journals) stays covered at the same bar.
         'src/modules/ledger/domain/**',
         'src/modules/operations/domain/**',
+        // rules-engine R10: the brain's pure domain (forecast, rules, options, stock risk) at the same bar.
+        'src/modules/rules-engine/domain/**',
       ],
       exclude: ['**/*.test.ts'],
       thresholds: { statements: 90, branches: 90, functions: 90, lines: 90 },

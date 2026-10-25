@@ -455,7 +455,6 @@ export const TABLE_ACCESS = {
     kind: 'rls',
     seed: 'insert',
     money: true,
-    blindWriters: ['office'],
     read: {
       owner: 'all',
       partner: 'none',
@@ -478,7 +477,6 @@ export const TABLE_ACCESS = {
     kind: 'rls',
     seed: 'insert',
     money: true,
-    blindWriters: ['office'],
     read: {
       owner: 'all',
       partner: 'none',
@@ -563,7 +561,6 @@ export const TABLE_ACCESS = {
     kind: 'rls',
     seed: 'insert',
     money: true,
-    blindWriters: ['office'],
     read: {
       owner: 'all',
       partner: 'none',
@@ -584,7 +581,6 @@ export const TABLE_ACCESS = {
     kind: 'rls',
     seed: 'insert',
     money: true,
-    blindWriters: ['office'],
     read: {
       owner: 'all',
       partner: 'none',
@@ -666,7 +662,6 @@ export const TABLE_ACCESS = {
     kind: 'rls',
     seed: 'insert',
     money: true,
-    blindWriters: ['office'],
     read: {
       owner: 'all',
       partner: 'none',

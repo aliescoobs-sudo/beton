@@ -1,16 +1,19 @@
 'use server';
 
+import { getEngineParams } from '@/app/engine-params';
 import { getPool } from '@/lib/db/pools';
 import { getEnv } from '@/lib/server-env';
 import {
   type AdvanceActionResult,
   advanceClock,
   AdvanceRejectedError,
+  businessDateOf,
   getLogger,
   parseAdvanceInput,
   SimulationDisabledError,
   stubJobRegistry,
 } from '@/modules/clock';
+import { computeRun, syncAlerts } from '@/modules/rules-engine';
 import { authorize } from '@/modules/platform-security/auth/guards';
 import { currentAuthState } from '@/modules/platform-security/auth/request-state';
 import { withStepUp } from '@/modules/platform-security/auth/step-up-guard';
@@ -57,6 +60,15 @@ export async function advanceClockAction(input: unknown): Promise<AdvanceActionR
           outcome: failedJob ? 'job_failed' : 'advanced',
           failedJob,
         });
+        // The morning recompute, for the owner: store what the engine sees on the new day, so that "detected N days ahead"
+        // is true even if he does not open the page that day. Best effort: the clock has moved, a failure here changes nothing.
+        try {
+          const day = businessDateOf(advanced.to);
+          const run = await computeRun(appPool, user, day, await getEngineParams());
+          await syncAlerts(appPool, user, run.hits, day);
+        } catch (syncError) {
+          getLogger().error('alert sync after a clock advance failed', { error: String(syncError) });
+        }
         return { failedJob };
       },
       { getState: currentAuthState, parameters: () => readParameters(getPool('auth')) },

@@ -176,6 +176,12 @@ const GROUPS: GroupDef[] = [
         allowed: 'stock.read',
       },
       {
+        path: '/stock/projection',
+        labelKey: 'dashboard.stockRisk.link',
+        testId: 'stock-projection-link',
+        allowed: 'stock.read',
+      },
+      {
         path: '/master-data/recettes',
         labelKey: 'masterData.recettes.link',
         testId: 'recettes-link',

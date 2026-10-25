@@ -10,7 +10,7 @@ import { type ParameterActionResult, setParameterAction } from './actions';
 export interface ParameterRow {
   key: string;
   value: number | string;
-  kind: 'number' | 'time';
+  kind: 'number' | 'time' | 'text';
   min?: number;
   max?: number;
 }
@@ -56,11 +56,11 @@ export function ParametersForm({ rows, editable }: { rows: ParameterRow[]; edita
               <input
                 name="value"
                 defaultValue={row.value}
-                type={row.kind === 'number' ? 'number' : 'time'}
+                type={row.kind === 'number' ? 'number' : row.kind === 'time' ? 'time' : 'text'}
                 min={row.min}
                 max={row.max}
                 dir="ltr"
-                className="input num mt-1 w-40"
+                className={`input num mt-1 ${row.kind === 'text' ? 'w-full max-w-md' : 'w-40'}`}
               />
             ) : (
               <span className="mt-1 block font-mono" dir="ltr" data-testid="value">

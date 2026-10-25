@@ -78,6 +78,10 @@ export const E2E_MD = {
   viewOffice: { email: 'e2e-vw-office@belgobeton.test', name: 'Bureau Vues' },
   flowOffice: { email: 'e2e-fl-office@belgobeton.test', name: 'Bureau Flux' },
   loadOffice: { email: 'e2e-ld-office@belgobeton.test', name: 'Bureau Chargements' },
+  dashSupport: { email: 'e2e-da-support@belgobeton.test', name: 'Support Tableau' },
+  dashOffice: { email: 'e2e-da-office@belgobeton.test', name: 'Bureau Tableau' },
+  dashPlant: { email: 'e2e-da-plant@belgobeton.test', name: 'Centrale Tableau' },
+  dashPartner: { email: 'e2e-da-partner@belgobeton.test', name: 'Associé Tableau' },
 } as const;
 export const E2E_CSP = { email: 'e2e-csp@belgobeton.test', name: 'CSP E2E' } as const;
 

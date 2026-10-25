@@ -3,7 +3,13 @@ import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { withRlsContext } from '../src/lib/db/rls-context';
 import { cancelOrder } from '../src/modules/ledger';
-import { cancelLoad, createLoad, recordBlReturn } from '../src/modules/operations';
+import {
+  cancelLoad,
+  confirmExcess,
+  createLoad,
+  listExcesses,
+  recordBlReturn,
+} from '../src/modules/operations';
 import type { SessionUser } from '../src/modules/platform-security/auth/session-gate';
 import { setParameter } from '../src/modules/platform-security/service/parameter-service';
 import { testEnv } from './db-env';
@@ -84,10 +90,11 @@ describe('createLoad (AC-OPS-01)', () => {
     expect((await load(users.plant, o.id)).ok && 8000).toBe(8000);
     const second = await load(users.plant, o.id);
     expect(second).toMatchObject({ ok: true, value: { volumeL: 2000 } });
+    // nothing left and no volume asked: it asks for a volume
     expect(await load(users.plant, o.id)).toEqual({ ok: false, error: 'OVER_ORDER' });
   });
 
-  it('refuses more than the truck carries and more than what is left, in the service and in the database', async () => {
+  it('refuses more than the truck carries; more than what is left of the order is allowed, warned about and recorded (review point 4)', async () => {
     const o = await order();
     expect(await load(users.plant, o.id, 9000)).toEqual({ ok: false, error: 'OVER_CAPACITY' });
     expect((await load(users.plant, o.id, 8000)).ok).toBe(true);
@@ -155,11 +162,11 @@ describe('createLoad (AC-OPS-01)', () => {
   it('5 loads of 3 m³ at once on a 10 m³ order: exactly 3 succeed', async () => {
     const o = await order();
     const results = await Promise.all(Array.from({ length: 5 }, () => load(users.plant, o.id, 3000)));
-    expect(results.filter((r) => r.ok)).toHaveLength(3);
+    expect(results.filter((r) => r.ok)).toHaveLength(5);
     const sum = await inCtx(users.owner, (tx) =>
       tx.query<{ s: string }>('select sum(volume_l)::text as s from delivery where order_id = $1', [o.id]),
     );
-    expect(sum.rows[0]?.s).toBe('9000');
+    expect(sum.rows[0]).toEqual({ s: '15000', x: '5000' });
   });
 
   it('numbers delivery notes without a gap', async () => {

@@ -50,7 +50,14 @@ export function LoadRowForm({
       const result = await createLoad({ orderId, truckId: String(data.get('truck') ?? ''), volumeL });
       if (!result.ok) return setMessage(t(`errors.${result.error}` as never));
       setDone({
-        text: `${result.blNo} · ${formatM3(result.volumeL)} m³${result.warnings.includes('LONG_TRIP') ? ` · ${t('longTrip')}` : ''}`,
+        text: [
+          `${result.blNo} · ${formatM3(result.volumeL)} m³`,
+          result.warnings.includes('LONG_TRIP') ? t('longTrip') : '',
+          result.warnings.includes('OVER_ORDER') ? t('overOrder') : '',
+          result.warnings.includes('OVER_ORDER_MINOR') ? t('overOrderMinor') : '',
+        ]
+          .filter(Boolean)
+          .join(' · '),
         effects: result.effects,
       });
     } catch {

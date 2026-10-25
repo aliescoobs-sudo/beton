@@ -9,7 +9,7 @@ import { LoadRowForm } from '@/modules/operations/ui/load-row-form';
 import { can } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/next';
 import { EmptyState, PageHeader, StatusPill, Table, Td, Th } from '@/ui';
-import { blReturnAction, createLoadAction } from './actions';
+import { blReturnAction, cancelLoadAction, createLoadAction } from './actions';
 
 /** The day's loads: orders due with what is left to deliver, one tap to load, and the recent delivery notes. No price. */
 export default async function LoadsPage({ params }: { params: Promise<{ locale: string }> }) {
@@ -20,6 +20,7 @@ export default async function LoadsPage({ params }: { params: Promise<{ locale: 
   const today = (await getRequestClock()).today();
   const canLoad = can(user.role, 'deliveries.write');
   const [orders, deliveries, trucks] = await Promise.all([
+  const canCancel = can(user.role, 'deliveries.cancel');
     listLoadableOrders(pool, user, today),
     listDeliveries(pool, user),
     canLoad ? listTrucks(pool, user) : Promise.resolve([]),
@@ -106,6 +107,7 @@ export default async function LoadsPage({ params }: { params: Promise<{ locale: 
                 <Th numeric>{t('deliveries.volume')}</Th>
                 <Th>{t('deliveries.signed')}</Th>
               </tr>
+                {canCancel && <Th>{t('deliveries.cancelLoad')}</Th>}
             </thead>
             <tbody>
               {deliveries.map((d) => (
