@@ -74,7 +74,7 @@ export async function readDispatchParams(tx: pg.PoolClient): Promise<DispatchPar
 }
 
 /** The live orders due on `date` with what is still to load, in code order. */
-async function dayOrders(tx: pg.PoolClient, date: string): Promise<DispatchOrder[]> {
+async function dayOrders(tx: pg.PoolClient, date: string, withOverdue: boolean): Promise<DispatchOrder[]> {
   const { rows } = await tx.query<{
     id: string;
     code: string;
@@ -85,15 +85,17 @@ async function dayOrders(tx: pg.PoolClient, date: string): Promise<DispatchOrder
     one_way_min: number | null;
     volume_l: number;
     loaded_l: string;
+    due: string;
   }>(
-    `select o.id, o.code, o.client_code, t.label as type_label, o.site_label, z.name as zone_name, z.one_way_min,
+    `select o.id, o.code, o.client_code, t.label as type_label, to_char(o.delivery_date, 'YYYY-MM-DD') as due, o.site_label, z.name as zone_name, z.one_way_min,
             o.volume_l, coalesce((select sum(d.volume_l) from delivery d where d.order_id = o.id), 0)::text as loaded_l
        from sales_order_ops o
        join concrete_type t on t.id = o.concrete_type_id
        left join zone z on z.id = o.zone_id
-      where o.reverses_id is null and not o.is_reversed and o.delivery_date = $1
-      order by o.code`,
-    [date],
+      where o.reverses_id is null and not o.is_reversed
+        and (o.delivery_date = $1 or ($2::boolean and o.delivery_date < $1 and o.delivery_date >= $1::date - 14))
+      order by o.delivery_date, o.code`,
+    [date, withOverdue],
   );
   return rows
     .map((r) => ({
@@ -105,6 +107,7 @@ async function dayOrders(tx: pg.PoolClient, date: string): Promise<DispatchOrder
       zoneName: r.zone_name,
       oneWayMin: r.one_way_min,
       remainingL: Math.max(0, r.volume_l - Number(r.loaded_l)),
+      ...(r.due === date ? {} : { dueDate: r.due }),
     }))
     .filter((o) => o.remainingL > 0);
 }
@@ -215,6 +218,8 @@ export async function getDispatchDay(
   appPool: pg.Pool,
   actor: SessionUser,
   date: string,
+  /** The business day: from today on, the orders overdue in the last two weeks and still to load are planned with the day's. */
+  deps: { today?: string } = {},
 ): Promise<Result<DispatchDay, 'INVALID'>> {
   await require(appPool, actor, 'dispatch.read');
   if (!isRealDate(date)) return err('INVALID');
@@ -222,7 +227,7 @@ export async function getDispatchDay(
     await inRequest(appPool, actor, async (tx) => ({
       date,
       params: await readDispatchParams(tx),
-      orders: await dayOrders(tx, date),
+      orders: await dayOrders(tx, date, deps.today !== undefined && date >= deps.today),
       trucks: await dayTrucks(tx, date),
       drivers: await activeDrivers(tx),
       saved: await liveRotations(tx, date),
@@ -247,6 +252,7 @@ export async function saveDispatch(
   appPool: pg.Pool,
   actor: SessionUser,
   input: unknown,
+  deps: { today?: string } = {},
 ): Promise<Result<SavedDispatch, DispatchError>> {
   await require(appPool, actor, 'dispatch.write');
   const parsed = parseDispatchInput(input);
@@ -255,7 +261,7 @@ export async function saveDispatch(
   try {
     return await inRequest(appPool, actor, async (tx): Promise<Result<SavedDispatch, DispatchError>> => {
       const params = await readDispatchParams(tx);
-      const orders = await dayOrders(tx, date);
+      const orders = await dayOrders(tx, date, deps.today !== undefined && date >= deps.today);
       const trucks = await dayTrucks(tx, date);
       const drivers = await activeDrivers(tx);
       const live = await liveRotations(tx, date);

@@ -1,5 +1,6 @@
 'use server';
 
+import { getRequestClock } from '@/app/request-clock';
 import { getPool } from '@/lib/db/pools';
 import { createDriver, saveDispatch } from '@/modules/operations';
 import { authorize, ForbiddenError, type Permission } from '@/modules/platform-security';
@@ -26,7 +27,8 @@ export async function saveDispatchAction(
   input: unknown,
 ): Promise<{ ok: true; rotations: number; conflicts: number } | Failure> {
   return guarded('dispatch.write', async (user) => {
-    const result = await saveDispatch(getPool('app'), user, input);
+    const today = (await getRequestClock()).today();
+    const result = await saveDispatch(getPool('app'), user, input, { today });
     return result.ok
       ? { ok: true as const, rotations: result.value.rotations, conflicts: result.value.conflicts.length }
       : { ok: false as const, error: result.error };

@@ -30,6 +30,8 @@ export interface DispatchOrder {
   oneWayMin: number | null;
   /** Litres still to load (never negative). */
   remainingL: number;
+  /** The order's delivery date when it is not the day planned (an overdue order still to load). */
+  dueDate?: string;
 }
 
 export interface DispatchTruck {

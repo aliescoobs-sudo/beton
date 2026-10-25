@@ -1,6 +1,6 @@
 # Implementation Plan: `operations`, second wave (dispatch, tracking, consumption, cover, fuel, loss, analytics)
 
-Status: **APPROVED BY THE OWNER'S BRIEF 2026-10-25** (operations before any further money screen) · Spec: [SPEC-operations.md §7](../SPEC-operations.md) (AC-OPS-12…25) · Task list: [tasks/todo-operations.md](todo-operations.md) (O9–O15) · Checkpoint note: docs/checkpoints/CP-OPS-PLAN-2.md
+Status: **BUILT 2026-10-25** (notes in docs/checkpoints/CP-OPS-4.md) · approved by the owner's brief (operations before any further money screen) · Spec: [SPEC-operations.md §7](../SPEC-operations.md) (AC-OPS-12…25) · Task list: [tasks/todo-operations.md](todo-operations.md) (O9–O15) · Checkpoint note: docs/checkpoints/CP-OPS-PLAN-2.md
 
 Builds on the operations core (O1–O8: loads, BL, stock movements, receipts, thresholds), the rules engine's stock projection and the master-data trucks, zones and breakdown log. No new module: everything lands in `operations` (dispatch, tracking, report, fuel, loss, analytics) except the reorder draft, which extends `rules-engine`'s existing stock projection and draft purchase.
 
@@ -31,10 +31,10 @@ Built in the order the owner gave: O9, O10, O11, O12, O13, O14, O15, then the sc
 |---|---|---|
 | O9 | Daily dispatch: rotations per truck capacity, times from the zone, breakdown-aware, conflicts shown | migration 0058, `operations/domain/dispatch.ts`, `service/dispatch-service.ts`, `/dispatch` |
 | O10 | Trip tracking, one tap per step on a phone-sized screen | migration 0059, `domain/trip-times.ts`, `service/trip-service.ts`, `/trips` |
-| O11 | Production and consumption report with tolerance flag | `domain/consumption-report.ts`, `service/report-service.ts`, `/reports/consumption` |
-| O12 | Days of cover and reorder suggestion with supplier lead time | migration 0060 (`supplier.lead_time_days`), rules-engine stock domain, stock screens |
-| O13 | Fuel per truck | migration 0061, `domain/fuel.ts`, `service/fuel-service.ts`, `/fuel` |
-| O14 | Returned or rejected concrete | migration 0062, `service/loss-service.ts`, load screens, report line |
+| O11 | Production and consumption report with tolerance flag | migration 0060 (parameters door), `domain/consumption-report.ts`, `service/report-service.ts`, `/reports/consumption` |
+| O12 | Days of cover and reorder suggestion with supplier lead time | migration 0061 (`supplier.lead_time_days`), rules-engine `reorder.ts`, stock projection screen |
+| O13 | Fuel per truck | migration 0062, `domain/fuel.ts`, `service/fuel-service.ts`, `/fuel` |
+| O14 | Returned or rejected concrete | migration 0063, `service/loss-service.ts`, load screens, report line |
 | O15 | Sales volume analytics | `domain/volume-analytics.ts`, `service/analytics-service.ts`, `/analytics` |
 
 Every task: unit tests first for the pure part, integration tests (RLS, matrix, `expectNoFields`, concurrency where a rule is a race), fr and ar messages with key-parity, nav entry by permission, an e2e spec and the screen check, one commit. Standard verification before each commit: `pnpm lint`, `pnpm typecheck`, `pnpm test` (unit and integration), `SIMULATION_ENABLED=false pnpm build`, the new e2e spec plus the screen check; the whole e2e suite runs again at the end of the wave, not after each task (it takes about 19 minutes).

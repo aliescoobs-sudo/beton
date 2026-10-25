@@ -1333,7 +1333,8 @@
         "FORBIDDEN": "Action non autorisée.",
         "UNAUTHENTICATED": "Session expirée."
       },
-      "started": "En cours : ces rotations ont démarré, elles ne sont plus modifiables"
+      "started": "En cours : ces rotations ont démarré, elles ne sont plus modifiables",
+      "overdue": "en retard depuis le {date}"
     },
     "trips": {
       "link": "Suivi des rotations",

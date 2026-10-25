@@ -8,6 +8,7 @@ import pg from 'pg';
 import { loadSeedUrl } from '../src/lib/env.ts';
 import { seedPilotScenario } from '../src/modules/ledger/service/pilot-scenario.ts';
 import { seedOperationsScenario } from '../src/modules/operations/service/pilot-ops.ts';
+import { seedOperationsWave2 } from '../src/modules/operations/service/pilot-ops2.ts';
 import { handleHelp } from './cli-help';
 
 if (import.meta.main) {
@@ -47,6 +48,13 @@ if (import.meta.main) {
       ops.applied
         ? `Operations scenario seeded: ${ops.loads} loads (${ops.returns} signed BL back), ${ops.purchases} purchases (${ops.receipts} received), ${ops.invoices} invoices, today ${today}`
         : 'Operations scenario already in place (nothing changed)',
+    );
+    // The second wave (SPEC-operations §7): drivers, rotations and their tracking, counts, fuel, refused loads.
+    const wave2 = await seedOperationsWave2(pool, env, today);
+    console.log(
+      wave2.applied
+        ? `Operations wave 2 seeded: ${wave2.drivers} drivers, ${wave2.rotations} rotations (${wave2.events} steps), ${wave2.plannedAhead} planned ahead, ${wave2.counts} counts, ${wave2.fills} fuel fills, ${wave2.fuelPurchases} fuel purchases, ${wave2.losses} refused loads`
+        : 'Operations wave 2 already in place (nothing changed)',
     );
   } finally {
     await pool.end();

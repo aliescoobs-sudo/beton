@@ -4,7 +4,16 @@ import { ensureRoles, recreateDatabase, SCENARIO_TEST_DATABASE } from '../script
 import { runMigrations } from '../scripts/db-migrate';
 import { withRlsContext } from '../src/lib/db/rls-context';
 import { getCashPosition, listInvoices, listPurchases } from '../src/modules/ledger';
-import { getStockLevels, seedOperationsScenario } from '../src/modules/operations';
+import {
+  getConsumptionReport,
+  getDispatchDay,
+  getFuelReport,
+  getStockLevels,
+  getVolumeAnalytics,
+  listTrips,
+  seedOperationsScenario,
+  seedOperationsWave2,
+} from '../src/modules/operations';
 import { seedPilotScenario } from '../src/modules/ledger/service/pilot-scenario';
 import { seedPilotMasterData } from '../src/modules/master-data';
 import { testEnv } from './db-env';
@@ -282,5 +291,143 @@ describe('the operations part of the pilot scenario (O8)', () => {
     await expect(seedOperationsScenario(seed, { ...allowed, REAL_DATA: true }, TODAY)).rejects.toThrow(
       /REAL_DATA/,
     );
+  });
+});
+
+// operations second wave (SPEC-operations §7): the screens of O9 to O15 are full on the pilot data.
+describe('the second wave of the operations scenario (O9 to O15)', () => {
+  let wave: Awaited<ReturnType<typeof seedOperationsWave2>>;
+  beforeAll(async () => {
+    wave = await seedOperationsWave2(seed, allowed, TODAY);
+  }, 120_000);
+
+  it('seeds drivers, rotations with their tracking, plans ahead, counts, fuel and refused loads', async () => {
+    expect(wave).toMatchObject({ applied: true });
+    expect(wave.drivers).toBeGreaterThanOrEqual(2);
+    expect(wave.rotations).toBeGreaterThan(20);
+    expect(wave.events).toBeGreaterThan(wave.rotations * 4);
+    expect(wave.counts).toBeGreaterThan(8);
+    expect(wave.fills).toBeGreaterThan(20);
+    expect(wave.fuelPurchases).toBe(3);
+    expect(wave.losses).toBeGreaterThanOrEqual(3);
+    expect(
+      await one('select count(*)::text as n from supplier where lead_time_days is not null'),
+    ).toBeGreaterThanOrEqual(5);
+  });
+
+  it('every rotation links a real load of its own truck, and the steps are in order', async () => {
+    expect(
+      await one(
+        `select count(*)::text as n from trip_event e join trip_plan p on p.id = e.trip_id join delivery d on d.id = e.delivery_id
+          where e.step = 'loaded' and (d.order_id <> p.order_id or d.truck_id <> p.truck_id)`,
+      ),
+    ).toBe(0);
+    expect(
+      await one(
+        `select count(*)::text as n from trip_event e join trip_event n on n.trip_id = e.trip_id and n.step = 'departed'
+          where e.step = 'loaded' and n.at < e.at`,
+      ),
+    ).toBe(0);
+  });
+
+  it('the dispatch screen of a day with rotations shows tracked ones and no blocking conflict; today has a plan ahead', async () => {
+    const today = await getDispatchDay(app, owner, TODAY, { today: TODAY });
+    if (!today.ok) throw new Error('day');
+    expect(today.value.saved.length).toBeGreaterThan(0);
+    // the orders overdue and still to load are planned with the day's
+    expect(today.value.orders.some((o) => o.dueDate !== undefined)).toBe(true);
+    expect(today.value.drivers.length).toBeGreaterThanOrEqual(2);
+    const day = await asOwner((tx) =>
+      tx.query<{ d: string }>(
+        `select to_char(trip_date, 'YYYY-MM-DD') as d from trip_plan where trip_date < $1::date order by trip_date desc limit 1`,
+        [TODAY],
+      ),
+    );
+    const past = await listTrips(app, owner, day.rows[0]?.d as string);
+    if (!past.ok) throw new Error('trips');
+    expect(past.value.length).toBeGreaterThan(0);
+    // finished rotations have a waiting time on site, and some waits are long
+    const waits = past.value.map((t) => t.times.waitingOnSiteMin).filter((m): m is number => m !== null);
+    expect(waits.length).toBeGreaterThan(0);
+    const all = await asOwner((tx) =>
+      tx.query<{ n: string }>(
+        `select count(*)::text as n from trip_event a join trip_event b on b.trip_id = a.trip_id and b.step = 'unloading_started'
+          where a.step = 'arrived' and b.at - a.at > interval '35 minutes'`,
+      ),
+    );
+    expect(Number(all.rows[0]?.n)).toBeGreaterThan(0);
+  });
+
+  it('the consumption report has a component flagged above the tolerance, and the others within it', async () => {
+    const r = await getConsumptionReport(app, owner, { from: '2026-09-20', to: TODAY, period: 'week' });
+    if (!r.ok) throw new Error('report');
+    const counted = r.value.consumption.filter((c) => c.counted);
+    expect(counted.length).toBeGreaterThan(4);
+    expect(counted.some((c) => c.flagged)).toBe(true);
+    expect(counted.some((c) => !c.flagged)).toBe(true);
+    expect(r.value.loss.produced.length).toBeGreaterThan(0);
+  });
+
+  it('fuel per truck: litres, kilometres and a cost for the owner', async () => {
+    const r = await getFuelReport(app, owner, { from: '2026-08-01', to: TODAY });
+    if (!r.ok) throw new Error('fuel');
+    expect(r.value.trucks.length).toBeGreaterThanOrEqual(2);
+    expect(r.value.trucks.every((t) => t.km !== null && t.mlPer100Km !== null)).toBe(true);
+    expect(r.value.money?.price.centimesPerLitre).not.toBeNull();
+    expect(r.value.money?.costs.some((c) => c.costPerM3Centimes !== null)).toBe(true);
+  });
+
+  it('sales volumes per month exist for three months, with amounts for the owner', async () => {
+    const r = await getVolumeAnalytics(app, owner, {
+      from: '2026-07-26',
+      to: TODAY,
+      period: 'month',
+      dimension: 'type',
+    });
+    if (!r.ok) throw new Error('analytics');
+    expect(new Set(r.value.volume.map((v) => v.period)).size).toBeGreaterThanOrEqual(3);
+    expect(r.value.amounts?.length).toBe(r.value.volume.length);
+  });
+
+  it('is idempotent and audited as the system actor', async () => {
+    const total = `select ((select count(*) from driver) + (select count(*) from trip_plan) + (select count(*) from trip_event)
+                           + (select count(*) from fuel_fill) + (select count(*) from fuel_purchase) + (select count(*) from delivery_loss))::text as n`;
+    const before = await one(total);
+    expect(await seedOperationsWave2(seed, allowed, TODAY)).toMatchObject({ applied: false });
+    expect(await one(total)).toBe(before);
+    for (const table of [
+      'driver',
+      'trip_plan',
+      'trip_event',
+      'fuel_fill',
+      'fuel_purchase',
+      'delivery_loss',
+    ]) {
+      expect(
+        await one(
+          `select count(*)::text as n from audit_event where table_name = $1 and actor_user_id <> '00000000-0000-7000-8000-000000000002'`,
+          [table],
+        ),
+        table,
+      ).toBe(0);
+    }
+    await expect(seedOperationsWave2(seed, { ...allowed, REAL_DATA: true }, TODAY)).rejects.toThrow(
+      /REAL_DATA/,
+    );
+  });
+
+  it('keeps fuel purchases and the fuel cost away from the partner and plant on the seeded data', async () => {
+    for (const role of ['partner', 'plant'] as const) {
+      const user = await realSessionUser(env.DATABASE_URL_MIGRATOR, role);
+      const { rows } = await withRlsContext(
+        app,
+        { userId: user.id, role, requestId: 'scenario-test' },
+        (tx) => tx.query('select 1 from fuel_purchase limit 1'),
+      );
+      expect(rows, role).toEqual([]);
+      const r = await getFuelReport(app, user, { from: '2026-08-01', to: TODAY });
+      if (!r.ok) throw new Error('fuel');
+      expect('money' in r.value, role).toBe(false);
+    }
   });
 });

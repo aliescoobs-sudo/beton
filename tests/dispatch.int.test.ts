@@ -134,6 +134,23 @@ describe('who may read and write the plan (AC-OPS-15)', () => {
   });
 });
 
+describe('overdue orders are planned with the day (from today on)', () => {
+  it('on the business day an order due earlier and still to load is listed with its due date; on a past day it is not', async () => {
+    const today = await getDispatchDay(app, users.plant, '2026-06-05', { today: '2026-06-05' });
+    if (!today.ok) throw new Error('day');
+    const late = today.value.orders.find((o) => o.orderId === scene.orderId);
+    expect(late).toMatchObject({ dueDate: DAY });
+    // a day before the business day is history: only the orders due that day
+    const past = await getDispatchDay(app, users.plant, '2026-06-05', { today: '2026-06-09' });
+    if (!past.ok) throw new Error('day');
+    expect(past.value.orders.some((o) => o.orderId === scene.orderId)).toBe(false);
+    // without the business day nothing overdue is added either
+    const bare = await getDispatchDay(app, users.plant, '2026-06-05');
+    if (!bare.ok) throw new Error('day');
+    expect(bare.value.orders.some((o) => o.orderId === scene.orderId)).toBe(false);
+  });
+});
+
 describe('a truck that cannot be planned (AC-OPS-12)', () => {
   it('a truck in the breakdown log on the day is refused by the service and by the database, and is not available in the day', async () => {
     const truckId = await newTruck();

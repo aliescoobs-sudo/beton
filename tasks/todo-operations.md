@@ -70,4 +70,4 @@ Plan: [tasks/plan-operations-2.md](plan-operations-2.md) · Spec: SPEC-operation
 - [x] O13: Fuel per truck (fills, purchases, consumption, cost per m³; money owner and support only) · AC-OPS-22
 - [x] O14: Returned or rejected concrete per load with a reason, counted as loss in the report · AC-OPS-23
 - [x] O15: Sales volume analytics (day, week, month; client, type, zone; amounts owner and support only) · AC-OPS-24
-- [ ] Scenario extended, DEMO.md, screen check for every new screen · AC-OPS-25
+- [x] Scenario extended, DEMO.md, screen check for every new screen · AC-OPS-25

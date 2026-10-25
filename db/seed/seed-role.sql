@@ -51,7 +51,8 @@ BEGIN
   FOREACH t IN ARRAY ARRAY['money_account', 'opening_balance', 'ledger_opening', 'opening_party_balance', 'sales_order',
                            'payment_plan_item', 'payment_instrument', 'instrument_event', 'allocation', 'purchase',
                            'purchase_line', 'purchase_plan_item', 'stock_threshold', 'invoice', 'invoice_line', 'delivery', 'delivery_return', 'stock_movement',
-                           'company_profile', 'quote'] LOOP
+                           'company_profile', 'quote', 'driver', 'trip_plan', 'trip_event', 'fuel_fill', 'fuel_purchase',
+                           'delivery_loss'] LOOP
     EXECUTE format('GRANT SELECT, INSERT ON public.%I TO belgobeton_seed', t);
     EXECUTE format('DROP POLICY IF EXISTS seed_read ON public.%I', t);
     EXECUTE format('CREATE POLICY seed_read ON public.%I FOR SELECT TO belgobeton_seed USING (ctx.role() = ''system'')', t);
@@ -68,3 +69,9 @@ CREATE POLICY seed_read ON public.money_movement FOR SELECT TO belgobeton_seed U
 DROP POLICY IF EXISTS seed_insert_expense ON public.money_movement;
 CREATE POLICY seed_insert_expense ON public.money_movement FOR INSERT TO belgobeton_seed
   WITH CHECK (ctx.role() = 'system' AND created_by = ctx.user_id() AND source = 'expense' AND reverses_id IS NULL AND amount_centimes < 0);
+
+-- Operations second wave: the scenario gives the suppliers a lead time (the only column it updates, system context only).
+GRANT UPDATE (lead_time_days) ON public.supplier TO belgobeton_seed;
+DROP POLICY IF EXISTS seed_update_lead_time ON public.supplier;
+CREATE POLICY seed_update_lead_time ON public.supplier FOR UPDATE TO belgobeton_seed
+  USING (ctx.role() = 'system') WITH CHECK (ctx.role() = 'system');

@@ -6,9 +6,12 @@ import { getDispatchDay, listDrivers } from '@/modules/operations';
 import { DispatchBoard } from '@/modules/operations/ui/dispatch-board';
 import { DriverForm } from '@/modules/operations/ui/driver-form';
 import { formatM3 } from '@/modules/operations/ui/format';
+
+/** 2026-10-23 → 23/10/2026 */
+const formatDate = (iso: string): string => iso.split('-').reverse().join('/');
 import { can } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/next';
-import { Button, EmptyState, Input, PageHeader, Table, Td, Th } from '@/ui';
+import { Button, EmptyState, Input, PageHeader, StatusPill, Table, Td, Th } from '@/ui';
 import { createDriverAction, saveDispatchAction } from './actions';
 
 /** The day's dispatch: each order of the day cut into truck rotations, with truck, driver and times. Quantities and times only. */
@@ -26,7 +29,7 @@ export default async function DispatchPage({
   const today = (await getRequestClock()).today();
   const date = query.date && isRealDate(query.date) ? query.date : today;
   const pool = getPool('app');
-  const day = await getDispatchDay(pool, user, date);
+  const day = await getDispatchDay(pool, user, date, { today });
   const t = await getTranslations('operations');
   if (!day.ok) return <PageHeader title={t('dispatch.title')} description={t('dispatch.errors.INVALID')} />;
   const canWrite = can(user.role, 'dispatch.write');
@@ -72,6 +75,11 @@ export default async function DispatchPage({
                     <bdi dir="ltr" className="text-sm text-muted">
                       {o.clientCode}
                     </bdi>
+                    {o.dueDate && (
+                      <StatusPill status="late">
+                        {t('dispatch.overdue', { date: formatDate(o.dueDate) })}
+                      </StatusPill>
+                    )}
                   </Td>
                   <Td>
                     <bdi dir="ltr">{o.typeLabel}</bdi>
