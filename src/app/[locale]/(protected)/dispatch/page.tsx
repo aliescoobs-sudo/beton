@@ -17,7 +17,7 @@ export default async function DispatchPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ date?: string }>;
+  searchParams: Promise<{ date?: string; saved?: string }>;
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
@@ -87,6 +87,12 @@ export default async function DispatchPage({
           </Table>
         )}
       </section>
+
+      {query.saved && /^\d{1,3}$/.test(query.saved) && (
+        <p role="status" className="text-sm font-semibold" data-testid="dispatch-message">
+          {t('dispatch.saved', { count: Number(query.saved) })}
+        </p>
+      )}
 
       <DispatchBoard
         key={`${date}-${day.value.saved.map((s) => s.key).join(',')}`}

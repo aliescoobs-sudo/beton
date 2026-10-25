@@ -930,6 +930,25 @@ export const TABLE_ACCESS = {
     exception:
       'operations O9: replanning a day cancels its live rotations with a reason, one per rotation. Insert-only.',
   },
+  trip_event: {
+    kind: 'rls',
+    seed: 'insert',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'none',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'operations O10: what really happened on a planned rotation, one row per trip and step (loaded, departed, arrived, unloading started and finished, back), in order and never before the previous step; the first step links the load. Times and quantities only. Insert-only; waiting time and delays are derived. Owner, partner and plant record.',
+  },
   stock_movement: {
     kind: 'rls',
     seed: 'insert',

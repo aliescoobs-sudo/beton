@@ -103,6 +103,9 @@ export const PERMISSIONS = {
   'dispatch.read': PLANT_READ,
   'dispatch.write': PLANT,
   'drivers.write': MANAGERS,
+  // Trip tracking: one tap per step of a rotation (the first one is the load, so the plant's rights); times and quantities only.
+  'trips.read': PLANT_READ,
+  'trips.track': PLANT,
   // Stock movements, physical count, plant import
   'stock.read': PLANT_READ,
   'stock.write': PLANT,

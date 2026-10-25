@@ -1329,6 +1329,59 @@
         "CONFLICT": "Le plan a changé entre-temps, réessayez.",
         "FORBIDDEN": "Action non autorisée.",
         "UNAUTHENTICATED": "Session expirée."
+      },
+      "started": "En cours : ces rotations ont démarré, elles ne sont plus modifiables"
+    },
+    "trips": {
+      "link": "Suivi des rotations",
+      "title": "Suivi des rotations",
+      "intro": "Un geste par étape : chargé, parti, arrivé sur chantier, déchargement commencé, terminé, de retour. Quantités et horaires seulement, aucun prix.",
+      "date": "Jour",
+      "show": "Afficher",
+      "none": "Aucune rotation planifiée ce jour. Le planning se fait dans « Planning du jour ».",
+      "noDriver": "sans chauffeur",
+      "noZone": "Zone inconnue",
+      "planned": "Prévu : chargement {load} · départ {depart} · arrivée {arrive} · retour {back}",
+      "step": {
+        "loaded": "Chargé",
+        "departed": "Parti",
+        "arrived": "Arrivé",
+        "unloading_started": "Déchargement commencé",
+        "unloading_finished": "Déchargement terminé",
+        "back": "De retour"
+      },
+      "do": {
+        "loaded": "Charger (BL)",
+        "departed": "Le camion part",
+        "arrived": "Arrivé sur chantier",
+        "unloading_started": "Début du déchargement",
+        "unloading_finished": "Fin du déchargement",
+        "back": "De retour à la centrale"
+      },
+      "bl": "Bon de livraison",
+      "waiting": "Attente sur chantier :",
+      "unloading": "Déchargement :",
+      "roundTrip": "Rotation (départ → retour) :",
+      "concreteAge": "Âge du béton à la fin du déchargement :",
+      "departDelay": "Écart au départ prévu :",
+      "finished": "Rotation terminée.",
+      "loadedAs": "Chargé : {bl}",
+      "longTrip": "Trajet long : le béton risque d'être trop vieux",
+      "overOrder": "Plus que la commande : à confirmer par le propriétaire",
+      "errors": {
+        "INVALID": "Action invalide.",
+        "NOT_FOUND": "Rotation introuvable.",
+        "OUT_OF_ORDER": "Cette étape n'est pas la suivante.",
+        "ALREADY_RECORDED": "Cette étape est déjà enregistrée.",
+        "CANCELLED": "Cette rotation a été annulée par un nouveau planning.",
+        "ORDER_CANCELLED": "La commande est annulée.",
+        "TRUCK_UNAVAILABLE": "Camion indisponible.",
+        "OVER_CAPACITY": "Plus que le camion ne peut porter.",
+        "OVER_ORDER": "Plus que ce qui reste à livrer.",
+        "NO_RECETTE": "Aucune recette en vigueur pour ce béton.",
+        "CONFLICT": "Réessayez.",
+        "FORBIDDEN": "Action non autorisée.",
+        "UNAUTHENTICATED": "Session expirée."
       }
     }
   },

@@ -272,6 +272,26 @@ const FIXTURES: Record<
     visible: `select c.created_by::text as owner from trip_plan_cancellation c join trip_plan p on p.id = c.trip_id
                 where p.trip_date = '2096-03-02' and $1::text is not null`,
   },
+  trip_event: {
+    // Each writer plans a rotation of its own, loads it (a delivery of year 2095) and records the first step.
+    writers: ['owner', 'partner', 'plant'],
+    seed: async (tx, actor) => {
+      const scene = await deliveryScene(app, actors.owner, marker);
+      const plan = await tx.query<{ id: string }>(
+        `insert into trip_plan (id, batch_id, trip_date, order_id, seq, truck_id, volume_l, load_min, depart_min, arrive_min,
+                                unload_end_min, back_min, created_by)
+         values (gen_random_uuid(), gen_random_uuid(), '2095-03-02', $1, 1, $2, 1000, 420, 430, 455, 485, 520, $3) returning id`,
+        [scene.orderId, scene.truckId, actor],
+      );
+      const delivery = await insertDelivery(tx, actor, scene, 100, 2095);
+      return tx.query(
+        `insert into trip_event (id, trip_id, step, at, delivery_id, created_by) values (gen_random_uuid(), $1, 'loaded', now(), $2, $3)`,
+        [plan.rows[0]?.id, delivery.id, actor],
+      );
+    },
+    visible: `select e.created_by::text as owner from trip_event e join trip_plan p on p.id = e.trip_id
+                where p.trip_date = '2095-03-02' and $1::text is not null`,
+  },
   delivery_return: {
     // One return per delivery: each writer gets a delivery of its own (year 2098), made by the owner.
     writers: ['owner', 'partner', 'office', 'plant'],

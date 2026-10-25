@@ -303,7 +303,13 @@ export interface DeliveryScene {
 }
 const deliveryCache = new Map<string, Promise<DeliveryScene>>();
 
-export function deliveryScene(app: pg.Pool, ownerId: string, marker: string): Promise<DeliveryScene> {
+export function deliveryScene(
+  app: pg.Pool,
+  ownerId: string,
+  marker: string,
+  /** The order's delivery date (default 2026-06-02). */
+  deliveryDate?: string,
+): Promise<DeliveryScene> {
   let made = deliveryCache.get(marker);
   if (!made) {
     made = (async () => {
@@ -314,7 +320,7 @@ export function deliveryScene(app: pg.Pool, ownerId: string, marker: string): Pr
           [`dl${marker}`],
         );
         const clientId = client.rows[0]?.id as string;
-        const order = await insertOrder(tx, ownerId, { ...master, clientId });
+        const order = await insertOrder(tx, ownerId, { ...master, clientId }, deliveryDate);
         const truck = await tx.query<{ id: string }>(`select id from truck where code = 'T1'`);
         const recette = await tx.query<{ id: string }>(
           `insert into recette (id, concrete_type_id, version, effective_from, created_by)

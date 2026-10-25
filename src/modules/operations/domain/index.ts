@@ -36,3 +36,12 @@ export {
   type Rotation,
   rotationTimes,
 } from './dispatch';
+export {
+  minuteOfDay,
+  nextStep,
+  TRIP_STEPS,
+  type TripEvents,
+  type TripStep,
+  type TripTimes,
+  tripTimes,
+} from './trip-times';

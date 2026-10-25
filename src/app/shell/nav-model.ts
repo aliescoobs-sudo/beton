@@ -164,6 +164,12 @@ const GROUPS: GroupDef[] = [
         allowed: 'dispatch.read',
       },
       {
+        path: '/trips',
+        labelKey: 'operations.trips.link',
+        testId: 'trips-link',
+        allowed: 'trips.read',
+      },
+      {
         path: '/loads',
         labelKey: 'operations.loads.link',
         testId: 'loads-link',

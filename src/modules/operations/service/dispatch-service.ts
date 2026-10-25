@@ -47,6 +47,8 @@ export interface SavedRotation extends Rotation {
   clientCode: string;
   truckCode: string;
   driverName: string | null;
+  /** The rotation has an event (it is being driven): it stays as it is when the day is replanned. */
+  started: boolean;
 }
 
 export interface DispatchDay {
@@ -175,9 +177,11 @@ async function liveRotations(tx: pg.PoolClient, date: string): Promise<SavedRota
     client_code: string;
     truck_code: string;
     driver_name: string | null;
+    started: boolean;
   }>(
     `select p.id, p.order_id, p.seq, p.truck_id, p.driver_id, p.volume_l, p.load_min, p.depart_min, p.arrive_min,
-            p.unload_end_min, p.back_min, o.code as order_code, o.client_code, t.code as truck_code, d.name as driver_name
+            p.unload_end_min, p.back_min, o.code as order_code, o.client_code, t.code as truck_code, d.name as driver_name,
+            exists (select 1 from trip_event e where e.trip_id = p.id) as started
        from trip_plan p
        join sales_order_ops o on o.id = p.order_id
        join truck t on t.id = p.truck_id
@@ -202,6 +206,7 @@ async function liveRotations(tx: pg.PoolClient, date: string): Promise<SavedRota
     clientCode: r.client_code,
     truckCode: r.truck_code,
     driverName: r.driver_name,
+    started: r.started,
   }));
 }
 
@@ -253,7 +258,10 @@ export async function saveDispatch(
       const orders = await dayOrders(tx, date);
       const trucks = await dayTrucks(tx, date);
       const drivers = await activeDrivers(tx);
-      const previous = await liveRotations(tx, date);
+      const live = await liveRotations(tx, date);
+      // A rotation that has started stays; the others are replaced by the new plan.
+      const fixed: Rotation[] = live.filter((r) => r.started);
+      const previous = live.filter((r) => !r.started);
       // Orders already fully loaded drop out of `orders`; a plan for one of them is for an order with nothing left.
       const known = new Set(orders.map((o) => o.orderId));
       if (wanted.some((w) => !known.has(w.orderId))) return err('NOT_FOUND');
@@ -276,8 +284,8 @@ export async function saveDispatch(
           backMin: i,
         };
       });
-      const timed = retime(draft, orders, params);
-      const conflicts = checkDispatch(timed, { orders, trucks, drivers, params });
+      const timed = retime(draft, orders, params, fixed);
+      const conflicts = checkDispatch(timed, { orders, trucks, drivers, params, fixed });
       if (conflicts.some(isBlocking)) return err('BLOCKED');
 
       const batchId = randomUUID();

@@ -85,6 +85,9 @@ export const E2E_MD = {
   dispPlant: { email: 'e2e-dp-plant@belgobeton.test', name: 'Centrale Planning' },
   dispPartner: { email: 'e2e-dp-partner@belgobeton.test', name: 'Associé Planning' },
   dispOffice: { email: 'e2e-dp-office@belgobeton.test', name: 'Bureau Planning' },
+  tripPlant: { email: 'e2e-tp-plant@belgobeton.test', name: 'Centrale Rotations' },
+  tripPlantAr: { email: 'e2e-tp-plant-ar@belgobeton.test', name: 'مركز الرحلات' },
+  tripOffice: { email: 'e2e-tp-office@belgobeton.test', name: 'Bureau Rotations' },
 } as const;
 export const E2E_CSP = { email: 'e2e-csp@belgobeton.test', name: 'CSP E2E' } as const;
 

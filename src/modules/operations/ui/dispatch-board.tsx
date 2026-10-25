@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 import { Button, Select, StatusPill } from '@/ui';
@@ -38,14 +38,18 @@ export function DispatchBoard({
 }) {
   const t = useTranslations('operations.dispatch');
   const router = useRouter();
+  const pathname = usePathname();
+  // Rotations being driven stay as they are: they keep their trucks busy and are only judged against the plan.
+  const fixed: Rotation[] = useMemo(() => day.saved.filter((s) => s.started), [day.saved]);
   const proposal = useMemo(
-    () => planDispatch(day.orders, day.trucks, day.drivers, day.params),
-    [day.orders, day.trucks, day.drivers, day.params],
+    () => planDispatch(day.orders, day.trucks, day.drivers, day.params, fixed),
+    [day.orders, day.trucks, day.drivers, day.params, fixed],
   );
-  const hasSaved = day.saved.length > 0;
+  const savedPlanned = day.saved.filter((s) => !s.started);
+  const hasSaved = savedPlanned.length > 0;
   const [rotations, setRotations] = useState<Rotation[]>(() =>
     hasSaved
-      ? day.saved.map((s) => ({
+      ? savedPlanned.map((s) => ({
           key: s.key,
           orderId: s.orderId,
           seq: s.seq,
@@ -65,8 +69,8 @@ export function DispatchBoard({
   const [message, setMessage] = useState<string | null>(null);
 
   const ctx = useMemo(
-    () => ({ orders: day.orders, trucks: day.trucks, drivers: day.drivers, params: day.params }),
-    [day],
+    () => ({ orders: day.orders, trucks: day.trucks, drivers: day.drivers, params: day.params, fixed }),
+    [day, fixed],
   );
   const conflicts: Conflict[] = useMemo(
     () => [
@@ -92,6 +96,7 @@ export function DispatchBoard({
         current.map((r) => (r.key === key ? { ...r, ...patch } : r)),
         day.orders,
         day.params,
+        fixed,
       ),
     );
     setFromProposal(false);
@@ -113,7 +118,8 @@ export function DispatchBoard({
         })),
       });
       if (!result.ok) return setMessage(t(`errors.${result.error}` as never));
-      setMessage(t('saved', { count: result.rotations }));
+      // The confirmation is shown by the page (the board is rebuilt from the saved plan): it travels in the address.
+      router.replace(`${pathname}?date=${day.date}&saved=${result.rotations}`);
       router.refresh();
     } catch {
       setMessage(t('errors.INVALID'));
@@ -165,6 +171,27 @@ export function DispatchBoard({
         </p>
       )}
 
+      {fixed.length > 0 && (
+        <section aria-labelledby="started-title">
+          <h2 id="started-title" className="mb-2 text-xl">
+            {t('started')}
+          </h2>
+          <ul className="space-y-1 text-sm" data-testid="dispatch-started">
+            {day.saved
+              .filter((r) => r.started)
+              .map((r) => (
+                <li key={r.key} data-testid={`started-${r.orderCode}-${r.seq}`}>
+                  <bdi dir="ltr">{r.orderCode}</bdi> · <bdi dir="ltr">{r.truckCode}</bdi> ·{' '}
+                  <bdi dir="ltr">{formatM3(r.volumeL)} m³</bdi> ·{' '}
+                  <bdi dir="ltr">
+                    {clockText(r.loadMin)} → {clockText(r.backMin)}
+                  </bdi>
+                </li>
+              ))}
+          </ul>
+        </section>
+      )}
+
       <section aria-labelledby="timeline-title">
         <h2 id="timeline-title" className="mb-2 text-xl">
           {t('timeline')}
@@ -211,7 +238,7 @@ export function DispatchBoard({
                   {k.code}
                   {k.available ? '' : ` · ${t('unavailable')}`}
                 </text>
-                {rotations
+                {[...fixed, ...rotations]
                   .filter((r) => r.truckId === k.id)
                   .map((r) => (
                     <g key={r.key} data-testid={`bar-${r.key}`}>
@@ -225,7 +252,9 @@ export function DispatchBoard({
                         stroke={
                           conflicts.some((c) => c.rotationKeys.includes(r.key))
                             ? 'var(--color-status-late)'
-                            : 'none'
+                            : fixed.some((f) => f.key === r.key)
+                              ? 'var(--color-ink)'
+                              : 'none'
                         }
                       />
                       <text

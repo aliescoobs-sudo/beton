@@ -58,3 +58,10 @@ export {
   type SavedRotation,
   saveDispatch,
 } from './service/dispatch-service';
+export {
+  listTrips,
+  type RecordedStep,
+  recordTripStep,
+  type TripError,
+  type TripView,
+} from './service/trip-service';
