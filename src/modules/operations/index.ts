@@ -11,6 +11,11 @@ export {
   recordBlReturn,
 } from './service/delivery-service';
 export {
+  adjustStockAfterCount,
+  listStockAdjustments,
+  type StockAdjustment,
+  type StockCountError,
+  type StockCountResult,
   getStockLevels,
   type OpeningStockError,
   setOpeningStock,

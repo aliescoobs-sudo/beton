@@ -4,6 +4,7 @@ import { getPool } from '@/lib/db/pools';
 import { listTrucks } from '@/modules/master-data';
 import { listDeliveries, listLoadableOrders } from '@/modules/operations';
 import { BlReturnButton } from '@/modules/operations/ui/bl-return-button';
+import { CancelLoadButton } from '@/modules/operations/ui/cancel-load-button';
 import { formatM3 } from '@/modules/operations/ui/format';
 import { LoadRowForm } from '@/modules/operations/ui/load-row-form';
 import { can } from '@/modules/platform-security';
@@ -147,6 +148,13 @@ export default async function LoadsPage({ params }: { params: Promise<{ locale: 
                       <BlReturnButton deliveryId={d.id} blNo={d.blNo} today={today} record={blReturnAction} />
                     )}
                   </Td>
+                  {canCancel && (
+                    <Td>
+                      {d.volumeL > 0 && !d.cancelled && (
+                        <CancelLoadButton deliveryId={d.id} blNo={d.blNo} cancel={cancelLoadAction} />
+                      )}
+                    </Td>
+                  )}
                 </tr>
               ))}
             </tbody>

@@ -5,6 +5,10 @@ export const STEP_UP_MAX_AGE_MS = 10 * 60 * 1000;
 export const SENSITIVE_ACTIONS = [
   'ai.confirm_command',
   'alert.reclassify',
+  'cash.apply_option',
+  'load.confirm_excess',
+  'load.cancel',
+  'stock.adjust',
   'ledger.reverse_entry',
   'parameters.change',
   'clock.advance',

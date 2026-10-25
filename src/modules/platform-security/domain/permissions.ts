@@ -103,6 +103,8 @@ export const PERMISSIONS = {
   'stock.read': PLANT_READ,
   'stock.write': PLANT,
   // The opening stock of a component (entered once, with a date), and the low-stock threshold per component
+  // The owner corrects the stock after a physical count (a movement with a reason)
+  'stock.count': ['owner'],
   'stock.opening': MANAGERS,
   'stock.threshold': MANAGERS,
   // Receiving a purchase puts its stocked lines into the stock; quantities only, no amount

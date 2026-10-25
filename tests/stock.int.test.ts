@@ -4,7 +4,14 @@ import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { withRlsContext } from '../src/lib/db/rls-context';
 import { scaleQty } from '../src/lib/quantity';
-import { cancelLoad, createLoad, getStockLevels, setOpeningStock } from '../src/modules/operations';
+import {
+  adjustStockAfterCount,
+  cancelLoad,
+  createLoad,
+  getStockLevels,
+  listStockAdjustments,
+  setOpeningStock,
+} from '../src/modules/operations';
 import type { SessionUser } from '../src/modules/platform-security/auth/session-gate';
 import { testEnv } from './db-env';
 import { realSessionUser } from './helpers/actors';
@@ -289,5 +296,100 @@ describe('the SQL rounding is the TypeScript rounding', () => {
       ),
       { numRuns: 40 },
     );
+  });
+});
+
+describe('stock count correction (review of CP-OPS-1-3, point 7)', () => {
+  const levelOf = async (componentId: string) =>
+    Number((await getStockLevels(app, users.plant)).find((c) => c.componentId === componentId)?.level ?? 0);
+
+  it('the owner corrects a component to the counted quantity with a reason: one signed movement, nothing edited', async () => {
+    // the shared test database may hold any level (even a negative one from earlier loads): count against it
+    const before = await levelOf(scene.cementId);
+    const first = 50_000_000;
+    const up = await adjustStockAfterCount(
+      app,
+      users.owner,
+      { componentId: scene.cementId, countedBase: first, reason: 'sacs retrouvés en réserve' },
+      { today: TODAY },
+    );
+    expect(up).toMatchObject({ ok: true, value: { before, counted: first, difference: first - before } });
+    expect(await levelOf(scene.cementId)).toBe(first);
+    const down = await adjustStockAfterCount(
+      app,
+      users.owner,
+      { componentId: scene.cementId, countedBase: first - 5_000, reason: 'perte constatée' },
+      { today: TODAY },
+    );
+    expect(down).toMatchObject({ ok: true, value: { before: first, difference: -5_000 } });
+    expect(await levelOf(scene.cementId)).toBe(first - 5_000);
+    const listed = (await listStockAdjustments(app, users.plant)).filter(
+      (a) => a.componentId === scene.cementId,
+    );
+    expect(listed.slice(0, 2).map((a) => [a.difference, a.reason])).toEqual([
+      [-5_000, 'perte constatée'],
+      [first - before, 'sacs retrouvés en réserve'],
+    ]);
+  });
+
+  it('refuses a count equal to the stock, a missing reason and an unknown component', async () => {
+    const level = Math.max(0, await levelOf(scene.sandId));
+    await adjustStockAfterCount(
+      app,
+      users.owner,
+      { componentId: scene.sandId, countedBase: level, reason: 'mise à niveau' },
+      { today: TODAY },
+    );
+    const call = (input: Record<string, unknown>) =>
+      adjustStockAfterCount(app, users.owner, input, { today: TODAY });
+    expect(await call({ componentId: scene.sandId, countedBase: level, reason: 'rien' })).toEqual({
+      ok: false,
+      error: 'NO_DIFFERENCE',
+    });
+    expect(await call({ componentId: scene.sandId, countedBase: level + 1, reason: ' ' })).toEqual({
+      ok: false,
+      error: 'INVALID',
+    });
+    expect(await call({ componentId: scene.sandId, countedBase: -1, reason: 'negatif' })).toEqual({
+      ok: false,
+      error: 'INVALID',
+    });
+    expect(await call({ componentId: randomUUID(), countedBase: 5, reason: 'inconnu' })).toEqual({
+      ok: false,
+      error: 'NOT_FOUND',
+    });
+    expect(await levelOf(scene.sandId)).toBe(level);
+  });
+
+  it('only the owner: partner, plant, office and support are refused by the service and by the database', async () => {
+    for (const role of ['partner', 'plant', 'office', 'support'] as const) {
+      await expect(
+        adjustStockAfterCount(
+          app,
+          users[role],
+          { componentId: scene.sandId, countedBase: 7, reason: 'essai' },
+          { today: TODAY },
+        ),
+      ).rejects.toBeDefined();
+      await expect(
+        inCtx(users[role], (tx) =>
+          tx.query(
+            `insert into stock_movement (id, component_id, movement_date, qty_base, source, source_id, reason, created_by)
+             values ($1, $2, '2026-06-01', 5, 'count_adjustment', $1, 'essai', $3)`,
+            [randomUUID(), scene.sandId, users[role].id],
+          ),
+        ),
+      ).rejects.toMatchObject({ code: '42501' });
+    }
+    // even the owner cannot write one without a reason, by direct SQL
+    await expect(
+      inCtx(users.owner, (tx) =>
+        tx.query(
+          `insert into stock_movement (id, component_id, movement_date, qty_base, source, source_id, created_by)
+           values ($1, $2, '2026-06-01', 5, 'count_adjustment', $1, $3)`,
+          [randomUUID(), scene.sandId, users.owner.id],
+        ),
+      ),
+    ).rejects.toMatchObject({ code: '23514' });
   });
 });

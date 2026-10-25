@@ -49,3 +49,25 @@ export async function blReturnAction(input: unknown): Promise<{ ok: true } | Fai
     return result.ok ? { ok: true as const } : { ok: false as const, error: result.error };
   });
 }
+
+// @permission deliveries.cancel (owner, partner) + sensitive action load.cancel: a reversing load and the stock back
+export async function cancelLoadAction(input: unknown): Promise<{ ok: true } | Failure> {
+  const allowed = await authorize('deliveries.cancel', {
+    getState: currentAuthState,
+    appPool: getPool('app'),
+  });
+  if (!allowed.ok) return { ok: false, error: allowed.reason };
+  try {
+    const today = (await getRequestClock()).today();
+    const result = await withStepUp(
+      'load.cancel',
+      (user) => cancelLoad(getPool('app'), user, input, { today }),
+      { getState: currentAuthState },
+    );
+    if (!result.ok) return { ok: false, error: result.error };
+    return result.value.ok ? { ok: true } : { ok: false, error: result.value.error };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, error: 'FORBIDDEN' };
+    throw error;
+  }
+}

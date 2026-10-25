@@ -1,6 +1,7 @@
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { getPool } from '@/lib/db/pools';
-import { getStockLevels } from '@/modules/operations';
+import { getStockLevels, listStockAdjustments } from '@/modules/operations';
+import { CountForm } from '@/modules/operations/ui/count-form';
 import { formatStockQty } from '@/modules/operations/ui/format';
 import { ThresholdForm } from '@/modules/operations/ui/threshold-form';
 import { can } from '@/modules/platform-security';
@@ -15,6 +16,8 @@ export default async function StockPage({ params }: { params: Promise<{ locale: 
   const user = await requirePagePermission(locale, 'stock.read');
   const levels = await getStockLevels(getPool('app'), user);
   const canSet = can(user.role, 'stock.threshold');
+  const canCount = can(user.role, 'stock.count');
+  const adjustments = await listStockAdjustments(getPool('app'), user);
   const t = await getTranslations('operations.stock');
   return (
     <div>
@@ -56,6 +59,11 @@ export default async function StockPage({ params }: { params: Promise<{ locale: 
                         baseUnit={l.baseUnit}
                         save={thresholdAction}
                       />
+                    </Td>
+                  )}
+                  {canCount && (
+                    <Td>
+                      <CountForm componentId={l.componentId} baseUnit={l.baseUnit} count={countAction} />
                     </Td>
                   )}
                 </tr>
