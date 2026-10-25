@@ -44,7 +44,7 @@ export default async function InvoiceDocumentPage({
           </span>
         }
       />
-      <article className="card max-w-4xl space-y-6 p-6" data-testid="invoice-document">
+      <article className="card document max-w-4xl space-y-6 p-6" data-testid="invoice-document">
         <div className="grid gap-6 sm:grid-cols-2">
           <div className="text-sm" data-testid="invoice-company">
             {company ? (

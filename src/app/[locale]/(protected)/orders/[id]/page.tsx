@@ -60,7 +60,9 @@ export default async function OrderDetailPage({
             <dt className="field-label">{t('volume')}</dt>
             <dd>
               {formatM3(o.deliveredL)} / {formatM3(o.volumeL)} m³{' '}
-              <span className="text-muted">({o.typeCode})</span>
+              <span className="text-muted">
+                (<bdi dir="ltr">{o.typeCode}</bdi>)
+              </span>
             </dd>
           </div>
           <div>

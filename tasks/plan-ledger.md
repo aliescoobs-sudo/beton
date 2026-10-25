@@ -1,6 +1,6 @@
 # Implementation Plan: `ledger`
 
-Status: **APPROVED** (Ali, answers below). Not started: built phase by phase in separate sessions · Task list: [tasks/todo-ledger.md](todo-ledger.md)
+Status: **APPROVED** (Ali, answers below). Built through CP-L4b (everything but the closure sign-off L26/CP-L5); notes in docs/checkpoints/ · Task list: [tasks/todo-ledger.md](todo-ledger.md)
 
 Specs: SPEC-ledger.md, CAPABILITY-MAP.md, docs/DOMAIN.md (R6–R12, R24, R25), docs/DECISIONS.md (27–29, 31, 33, 34, 60, 66, 67), SPEC-platform-security §4. Depends on `master-data` (done, CP final) and `clock` (done).
 Written to `tasks/plan-ledger.md` / `todo-ledger.md` because `tasks/plan.md` and `tasks/todo.md` still hold the unchecked platform-security work (same convention as master-data).

@@ -50,7 +50,7 @@ export default async function QuoteDocumentPage({
           </span>
         }
       />
-      <article className="card max-w-4xl space-y-6 p-6" data-testid="quote-document">
+      <article className="card document max-w-4xl space-y-6 p-6" data-testid="quote-document">
         <div className="grid gap-6 sm:grid-cols-2">
           <div className="text-sm">
             {company ? (

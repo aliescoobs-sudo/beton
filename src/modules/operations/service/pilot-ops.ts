@@ -46,8 +46,8 @@ interface ComponentRow {
 }
 
 /**
- * Loads for the orders delivered so far: each order goes out in truck-sized loads on its delivery date (an order due today
- * is half loaded), most signed delivery notes are back. Stock, BL numbers and the recette in force come from the same
+ * Loads for the orders delivered so far: each order goes out in truck-sized loads on its delivery date (those due in the last
+ * three days are half loaded), most signed delivery notes are back. Stock, BL numbers and the recette in force come from the same
  * code as the plant's own action (`insertLoadRows`).
  */
 async function seedLoads(tx: Tx, today: string, rng: Rng): Promise<{ loads: number; returns: number }> {
@@ -84,9 +84,10 @@ async function seedLoads(tx: Tx, today: string, rng: Rng): Promise<{ loads: numb
       left -= size;
       n += 1;
     }
-    // An order due today has only started: its first loads are out, the rest is for the plant to load.
+    // The last three days are still being loaded: a big order has its first half out, a one-truck order is waiting for the
+    // plant (so the loads screen has something to load, and the stock has moved less than it will).
     const todo =
-      o.delivery_date === today ? sizes.slice(0, Math.max(1, Math.floor(sizes.length / 2))) : sizes;
+      o.delivery_date >= addDaysIso(today, -3) ? sizes.slice(0, Math.floor(sizes.length / 2)) : sizes;
     for (const [i, size] of todo.entries()) {
       const slot = perDay.get(o.delivery_date) ?? 0;
       perDay.set(o.delivery_date, slot + 1);
@@ -340,7 +341,7 @@ async function seedInvoices(tx: Tx, today: string, rng: Rng): Promise<number> {
   let made = 0;
   const invoices: string[] = [];
   for (const o of orders) {
-    if (rng.next() < 0.2) continue;
+    if (rng.next() < 0.06) continue;
     // Usually within days, sometimes after the end of the delivery month (issued late: law 69-21 flags it).
     const date = addDaysIso(o.last_load, rng.int(0, 5) + (rng.next() < 0.1 ? 20 : 0));
     const invoiceDate = date > today ? today : date;

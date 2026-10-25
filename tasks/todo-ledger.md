@@ -46,18 +46,18 @@ Office cannot read what it entered, so it cannot reverse or edit it (DECISIONS 8
 
 ## Phase 1: Orders complete
 
-### - [ ] L6: Price override on a single order (S)
+### - [x] L6: Price override on a single order (S)
 Order creation accepts a unit price different from the resolved one only for `orders.price_override` (owner/partner), with a mandatory reason stored on the order; DB `CHECK (unit_price_ht_centimes = resolved OR reason IS NOT NULL)` style guard plus RLS `WITH CHECK`; office can only use the resolved price; UI field shown to managers only.
 **AC:** AC-LED-12 (office refused by service and by direct SQL under RLS; owner/partner without reason refused; with reason saved and audited).
 **Verify:** `pnpm test:integration order-price-override` · **Files:** migration, order-service.ts, order form, tests · **Deps:** L3
 
-### - [ ] L7: Order list/detail, plant projection, plan-item state (M)
+### - [x] L7: Order list/detail, plant projection, plan-item state (M)
 Order list and detail (office/managers: plan, state of each échéance: `pending/covered/partially_covered/overdue/cancelled` derived from allocations + `clock.today()`; covered amounts arrive with L11, until then pending/overdue); plant read path via the column grants: code, type, volume, delivery date, site/zone only. `project()` entry for `order`.
 **AC:** AC-SEC-05 (order part: plant response has no price, total, payment plan or client contact: `expectNoFields` on service output and rendered HTML), AC-SEC-04 matrix, derived-state unit tests (overdue when due_date < today and not covered).
 **Verify:** `pnpm test:integration order-visibility` + e2e · **Files:** ledger/domain/plan-state.ts, order-service.ts (list/get), pages, ui, tests · **Deps:** L3 (L11 later feeds covered)
 
 ### Checkpoint CP-L2: Orders
-- [ ] AC-LED-01, 02, 03 (orders), 10, 12, 13, 17, 18 and AC-SEC-05 order part green; both locales render
+- [x] AC-LED-01, 02, 03 (orders), 10, 12, 13, 17, 18 and AC-SEC-05 order part green; both locales render
 
 ## Phase 2a: Opening state and pilot scenario (owner's brief 2026-10-24)
 
@@ -71,7 +71,7 @@ Fake data only (decision 79), through `belgobeton_seed` (new grants in db/seed/s
 **AC:** idempotent; every row audited as `system/seed`; the screens built so far are populated; `belgobeton_system` still cannot insert ledger rows; money-visibility tests still hold on the seeded data.
 **Verify:** `pnpm test:integration pilot-scenario` · **Files:** ledger/service/pilot-scenario.ts, db/seed/seed-role.sql, scripts/seed-scenario.ts, tests · **Deps:** L11, L16, L33
 
-### - [ ] L35: What an action changed (M)
+### - [x] L35: What an action changed (M)
 After a recorded action (order, payment, delivery, receipt...) the person sees what it changed: stock, money, alerts. Effects are computed by the service as a list of typed facts; the action layer filters them by role: office sees only non-money effects (stock down, delivery scheduled, document numbers), owner and support see money effects too (cash, receivable, payable). No effect is invented by AI.
 **AC (new AC-LED-26):** a payment entered by office shows no amount, balance or total; the same payment viewed by the owner shows the cash and receivable change; `expectNoFields` on every office response; fr/ar.
 **Verify:** `pnpm test src/modules/ledger/domain` · e2e · **Deps:** L14, operations core
@@ -138,64 +138,64 @@ Statement tab on the client and supplier pages (owner and support; the Comptes l
 
 ## Phase 3: Invoices (law 69-21)
 
-### - [ ] L17: Invoice with gapless number and legal dates (M)
+### - [x] L17: Invoice with gapless number and legal dates (M)
 Migration `invoice`, `invoice_line` (insert-only; `delivery_id` nullable, no FK, Q2). `createInvoice` from an order: number `FA-YYYY-nnnnn` via L2, `ice_client` and `vat_rate_bp` copied at creation, due date default invoice date + client terms (60 by default), > 120 refused, issuance deadline = last day of the delivery month (domain `invoiceIssueDeadline`).
 **AC:** AC-LED-08 (10 parallel creations → 10 consecutive numbers), AC-LED-09 (default +60, > 120 rejected), AC-LED-15 (deadline), AC-LED-11 (integer columns), AC-SEC-04.
 **Verify:** `pnpm test:integration invoice rls` · **Files:** migration, ledger/domain/legal.ts, service/invoice-service.ts, tests · **Deps:** L2, L3
 
-### - [ ] L18: Credit note and invoice screen (M)
+### - [x] L18: Credit note and invoice screen (M)
 `cancelInvoice` creates a credit note (`credit_note_of`, negated lines), number never reused, reason mandatory; invoice list/detail in fr/ar with ICE, VAT rate and amounts (the PDF and print view are L30); status `issued/paid/partially_paid/cancelled` derived from allocations.
 **AC:** AC-LED-08 (cancelled invoice keeps its number, credit note issued), AC-LED-03 (invoices), RTL check.
 **Verify:** `pnpm test:integration invoice-credit-note` + e2e · **Files:** invoice-service.ts, pages, ui, messages · **Deps:** L17
 
-### - [ ] L19: Legal deadlines read model (S)
+### - [x] L19: Legal deadlines read model (S)
 Derived (not stored) `legalDeadlines(asOf)` for both directions: receivable due dates and issuance deadlines, payable due dates (purchases come in L20); consumed later by rules-engine alerts.
 **AC:** AC-LED-15 (invoice issuance deadline = last day of the delivery month; due dates both directions); no alert logic here.
 **Verify:** `pnpm test src/modules/ledger/domain` + integration · **Files:** domain/legal.ts, service/deadlines.ts, tests · **Deps:** L17
 
 ## Phase 4: Purchases and supplier payments
 
-### - [ ] L20: Purchase + plan items (out) (M)
+### - [x] L20: Purchase + plan items (out) (M)
 Migration `purchase`, `purchase_line` (insert-only, reversal): code `ACH-YYYY-nnnnn`, supplier, supplier invoice no/date, due date 69-21 (default +60, ≤ 120), VAT rate stored, totals via domain, plan items direction `out` (Σ = TTC), lines may be services (transport, fuel) without component; archived supplier refused. Office W; plant reads receipt lines only.
 **AC:** AC-LED-16 (due date rules), AC-LED-02 (plan Σ = TTC), AC-LED-18 (archived supplier), AC-LED-03 (purchases), AC-SEC-04.
 **Verify:** `pnpm test:integration purchase rls` · **Files:** migration, service/purchase-service.ts, tests · **Deps:** L1, L2
 
-### - [ ] L21: Purchase receipt (S)
+### - [x] L21: Purchase receipt (S)
 Migration `purchase_receipt` (insert-only): `recordReceipt(purchaseId, date)` by plant/office; no price or total visible to plant (`expectNoFields`); emits the fact `operations` will turn into a stock increase (R2); no stock logic here.
 **AC:** plant sees quantities only (AC-SEC-05 purchase part); a receipt cannot be recorded twice for the same lines.
 **Verify:** `pnpm test:integration purchase-receipt` · **Files:** migration, service, tests · **Deps:** L20
 
-### - [ ] L22: Supplier payments (M)
+### - [x] L22: Supplier payments (M)
 Outgoing instruments (`issued`, cheque/LCN/transfer/cash) allocated to `out` plan items, reusing L10–L13 with direction `out`: outgoing post-dated cheques counted as liabilities (stored as facts, early clearing allowed and flagged), bounce on outgoing handled as an event.
 **AC:** AC-LED-16 (supplier payment allocation), AC-LED-14 (outgoing early clearing), AC-LED-04 for direction `out`.
 **Verify:** `pnpm test:integration supplier-payment` · **Files:** instrument-service.ts, allocation-service.ts, tests · **Deps:** L11, L12, L20
 
-### - [ ] L23: Purchases screens (M)
+### - [x] L23: Purchases screens (M)
 Purchase entry (lines, plan presets), list/detail, receipt and supplier payment actions, fr/ar; office sees documents, no cost analysis or margin.
 **AC:** RTL check; plant sees the receipt screen only; AC-SEC-05 purchase part in HTML.
 **Verify:** `pnpm exec playwright test e2e/ledger-purchase.spec.ts` · **Files:** pages, ui, messages, e2e · **Deps:** L21, L22
 
 ### Checkpoint CP-L4: Invoices and purchases
-- [ ] AC-LED-08, 09, 15, 16, 18 green; supplier payment end to end; both locales render
+- [x] AC-LED-08, 09, 15, 16, 18 green; supplier payment end to end; both locales render (docs/checkpoints/CP-L4.md)
 
 ## Phase 4b: Documents and exports (DECISIONS 82)
 
-### - [ ] L29: Company legal identity (S)
+### - [x] L29: Company legal identity (S)
 Migration `company_profile` (versioned, insert-only; the owner edits every field of the identity, a change being a new version): legal name and form, ICE, IF, RC, taxe professionnelle (patente) number, address, phone, email, RIB; read by every role (printed on delivery notes), written by the owner; screen under the owner's administration; fake values only (pilot seed, L24).
 **AC:** AC-SEC-04 for the table; a change is a new row, audited; the current profile is the latest `effective_from ≤ today`.
 **Verify:** `pnpm test:integration company-profile rls` · **Files:** migration, service, screen, matrix, tests · **Deps:** L1
 
-### - [ ] L30: Document kit, invoice and credit note PDF (L)
+### - [x] L30: Document kit, invoice and credit note PDF (L) — built as a printable HTML document (print audited, browser saves the PDF); a server-side PDF library is left to the owner (supply-chain check), see docs/checkpoints/CP-L4.md
 Server-side PDF kit (library chosen and pinned at the start of the task, licence and supply-chain checked, noted in the checkpoint) plus a print stylesheet: header with our legal mentions (ICE, IF, RC, patente), parties, lines, VAT rate, HT/VAT/TTC, law 69-21 payment-term mention, page footer with number. Route handlers for invoice and credit note PDF (permission `invoices.read`: owner and support), audited as `export`, `Content-Disposition` download and an inline print view. French first; Arabic header only if the font and shaping pass the RTL check, else recorded as a limit.
 **AC:** AC-LED-22 (PDF text equals the stored invoice; credit note references the invoice number); AC-LED-21 (office, partner, plant 404); both locales render the print view.
 **Verify:** `pnpm test:integration invoice-pdf` + e2e download · **Files:** ledger/documents/*, route handlers, tests · **Deps:** L18, L29
 
-### - [ ] L31: Quotes (devis) (M)
+### - [x] L31: Quotes (devis) (M)
 Migration `quote` (insert-only, `DV-YYYY-nnnnn`, validity date, price resolved server-side, no payment plan); owner and office create (office blind), owner and support read and print the PDF; "Convert to order" opens the order form prefilled and a human saves (D65); the quote keeps `converted_order_id`.
 **AC:** AC-LED-23, AC-SEC-04/05 for the table, office cannot read or print it, PDF equals the stored quote.
 **Verify:** `pnpm test:integration quote rls` + e2e · **Files:** migration, service, pages, document template, tests · **Deps:** L3, L30
 
-### - [ ] L32: Accountant export (M)
+### - [x] L32: Accountant export (M)
 `exportPeriod(from, to)` (owner and support, audited `export`): sales journal (invoices and credit notes: number, date, client, ICE, HT, VAT, TTC), purchases journal, payments and cash/bank movements, receivables and payables ageing; CSV files using the L28 writer, delivered as one download per file. Reconciliation checks inside the service refuse an export whose journals do not tie out.
 **AC:** AC-LED-24, AC-LED-21, the file contains no free text beyond names and codes, formula injection neutralised.
 **Verify:** `pnpm test:integration accountant-export` + e2e · **Files:** ledger/domain/journals.ts + test, service, page, tests · **Deps:** L18, L22, L28
@@ -204,17 +204,17 @@ Delivery note (bon de livraison, AC-OPS-11): belongs to `operations` (deliveries
 
 ## Phase 5: Close
 
-### - [ ] L24: Pilot ledger seed (S)
+### - [x] L24: Pilot ledger seed (S) — superseded by L34 and operations O8 (`pnpm db:scenario` seeds both; idempotence and audit are checked in tests/pilot-scenario.int.test.ts)
 Fake data through `belgobeton_seed` (extend `db/seed/seed-role.sql` for the new tables, same rules: SELECT/INSERT only, simulation only): company profile, a few orders with plans, instruments in each state (including one bounced inside its window and one post-dated), invoices and a credit note, a quote, two purchases, 1 caisse + 2 bank accounts with opening balances. Idempotent, audited as `system/seed`, refuses outside simulation; the full fixture stays with `simulation`.
 **AC:** idempotent; every row audited as `system/seed`; the meta-test still shows `belgobeton_system` cannot insert ledger rows.
 **Verify:** `pnpm test:integration pilot-seed` · **Files:** pilot-seed.ts, db/seed/seed-role.sql, tests · **Deps:** L3, L10, L17, L20
 
-### - [ ] L25: Bilingual screen check for the ledger (S)
+### - [x] L25: Bilingual screen check for the ledger (S)
 Extend the T16 Playwright spec and the i18n tests to every ledger screen (orders, instruments, cash position, invoices, purchases, accounts): direction, no overflow at 375/1280, no missing key, no CSP violation, amounts/numbers/ICE LTR in Arabic, long client names and cheque numbers.
 **AC:** AC-MD-09 style check green for all ledger screens; key parity and key-usage tests cover `ledger.*`.
 **Verify:** `pnpm exec playwright test e2e/ledger-screens.spec.ts` · **Files:** e2e spec, fixtures · **Deps:** L24
 
-### - [ ] L26: Closure (S)
+### - [ ] L26: Closure (S) — in progress: coverage gate extended, AC map in docs/checkpoints/CP-L4.md; still to do with the owner: SPEC-ledger additions (AC-LED-14…26), DECISIONS/README update
 Fill the AC table with passing tests; `TABLE_ACCESS` covers every new table (`insertOnly` + `noDelete`); AC-SEC-05 ledger part (plant: no price/total/plan/contact; office: no margin, no cash position); AC-LED-03 meta-test over every ledger table; AC-LED-11 and AC-LED-13 checks green; coverage ≥ 90% on `ledger/domain` (`vitest.config.ts` gate); DECISIONS/README update; SPEC-ledger additions (AC-LED-14…18) merged if approved.
 **AC:** all AC-LED-01…24 mapped to a passing test.
 **Verify:** `pnpm test:coverage`, full pipeline · **Files:** tasks/plan-ledger.md, tests/ledger-visibility.int.test.ts, vitest.config.ts, docs · **Deps:** L25

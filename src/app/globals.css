@@ -384,6 +384,12 @@
   }
 }
 
+/* A document (invoice, quote) shows all its lines: no inner scroll on screen, none on paper. */
+.document .table-wrap {
+  max-block-size: none;
+  overflow: visible;
+}
+
 /* A printed page (delivery note) carries the document only: no navigation, no buttons. */
 @media print {
   body > * header,

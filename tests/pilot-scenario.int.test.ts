@@ -220,15 +220,22 @@ describe('the operations part of the pilot scenario (O8)', () => {
     expect(ops.applied).toBe(true);
     expect(ops.loads).toBeGreaterThan(100);
     expect(ops.returns).toBeGreaterThan(ops.loads / 2);
-    // Every order due before today is fully loaded; one due today is half loaded.
+    // Every order due before the last three days is fully loaded; the last three days are still being loaded.
     const undelivered = await one(
       `select count(*)::text as n from sales_order o
-        where o.reverses_id is null and o.delivery_date < $1::date
+        where o.reverses_id is null and o.delivery_date < $1::date - 3
           and coalesce((select sum(d.volume_l) from delivery d where d.order_id = o.id), 0) <> o.volume_l`,
       [TODAY],
     );
     expect(undelivered).toBe(0);
     expect(await one(`select count(*)::text as n from delivery where load_date > $1::date`, [TODAY])).toBe(0);
+    // Something is left to load for the plant's screen.
+    const waiting = await one(
+      `select count(*)::text as n from sales_order o where o.reverses_id is null and o.delivery_date <= $1::date
+          and coalesce((select sum(d.volume_l) from delivery d where d.order_id = o.id), 0) < o.volume_l`,
+      [TODAY],
+    );
+    expect(waiting).toBeGreaterThan(0);
   });
 
   it('leaves the stock believable: nothing negative, cement low, one component just above its threshold', async () => {

@@ -20,6 +20,36 @@
     "dashboard": {
       "action": "Commencer par les clients",
       "sentence": "Aucune commande ni aucun paiement n'est encore enregistré : le tableau de bord se remplira dès les premières saisies."
+    },
+    "home": {
+      "title": "Aujourd'hui",
+      "enter": "Saisir",
+      "loads": "Commandes à charger",
+      "loadsHint": "Dues aujourd'hui ou en retard, avec du volume à livrer.",
+      "stock": "Composants à surveiller",
+      "stockOk": "Tous les stocks sont corrects.",
+      "cash": "Encaissé",
+      "cashTotal": "Total avec le non-encaissé :",
+      "late": "Échéances dépassées",
+      "lateHint": "Factures à émettre, à encaisser et achats à payer.",
+      "collect": "En retard à encaisser",
+      "collectHint": "Factures échues dont la commande n'est pas réglée.",
+      "pay": "À payer sous 7 jours",
+      "payHint": "Achats échus ou à échéance cette semaine.",
+      "tones": {
+        "late": "À traiter",
+        "due": "À suivre",
+        "paid": "En ordre"
+      },
+      "shortcuts": {
+        "newOrder": "Nouvelle commande",
+        "newQuote": "Nouveau devis",
+        "newPayment": "Saisir un paiement",
+        "newInvoice": "Facturer une commande",
+        "newPurchase": "Nouvel achat",
+        "loads": "Chargements",
+        "receipts": "Réceptions"
+      }
     }
   },
   "auth": {

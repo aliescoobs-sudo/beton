@@ -19,43 +19,43 @@ Migration `stock_movement` (id, component_id, movement_date, qty_base signed, so
 **AC:** AC-OPS-02 end to end, AC-OPS-04, a load without a recette in force is refused, rollback leaves no movement, AC-SEC-04.
 **Verify:** `pnpm test:integration stock-movement rls` · **Files:** migration, service, tests · **Deps:** O2
 
-### - [ ] O4: Plant screens (M)
+### - [x] O4: Plant screens (M)
 "Chargements du jour" (orders due today: type, m³ remaining, site/zone, no price; one tap to create a load with truck and m³; BL return), delivery list, stock levels with thresholds. fr/ar, nav entries by permission.
 **AC:** AC-OPS-09 (DOM and API: no price, total, client phone or payment for plant); RTL check.
 **Verify:** `pnpm exec playwright test e2e/operations-loads.spec.ts` · **Files:** pages, operations/ui/*, messages, e2e · **Deps:** O3
 
 ## Phase B: Receipts and thresholds
 
-### - [ ] O5: Supplier receipts add stock, thresholds (M)
+### - [x] O5: Supplier receipts add stock, thresholds (M)
 After ledger L20 (purchase) and L21 (receipt): `recordReceipt` writes `+qty × factor_to_base` per line; `stock_threshold` (owner, partner write) and the derived status on the stock screen.
 **AC:** AC-OPS-03 (30 t cement = +30 000 000 g), a receipt cannot be recorded twice, plant sees quantities only.
 **Verify:** `pnpm test:integration receipt-stock` · **Deps:** O3, ledger L20, L21
 
 ## Phase C: End to end
 
-### - [ ] O6: One action, its effect end to end (M)
+### - [x] O6: One action, its effect end to end (M)
 With ledger L17 (invoice lines from deliveries) and L35 (effects panel): order → load → stock down → invoice → cheque → cash, on the seeded scenario; each step shows what it changed, filtered by role.
 **AC:** e2e `flow.spec.ts` walks the six steps as owner; the same steps as office show no money effect.
 **Verify:** `pnpm exec playwright test e2e/flow.spec.ts` · **Deps:** O3, O4, ledger L17, L35
 
-### - [ ] O7: Delivery note (BL) data and print view (S)
+### - [x] O7: Delivery note (BL) data and print view (S)
 `getDeliveryNote(deliveryId)`: BL number, date, our legal mentions (ledger L29, or placeholders until then), client code and name, site, concrete type, volume, truck, loaded time, signature boxes; no price, total or payment data; printable page for owner, partner, office, plant, support, audited print; PDF through the ledger document kit (L30) later.
 **AC:** AC-OPS-11 (`expectNoFields` on data and HTML).
 **Verify:** `pnpm test:integration delivery-note` + e2e · **Deps:** O2
 
-### - [ ] O8: Opening stock and operations in the pilot scenario (S)
+### - [x] O8: Opening stock and operations in the pilot scenario (S)
 Opening stock per component and three months of loads and receipts in the scenario seed (ledger L34), stock levels near their thresholds for two components.
 **AC:** idempotent; every row audited as `system/seed`; the stock screen shows low and short statuses.
 **Verify:** `pnpm test:integration pilot-scenario` · **Deps:** O3, ledger L34
 
 ### Checkpoint CP-OPS-1 (after O4): deliveries move the stock
-- [ ] AC-OPS-01, 02, 04, 08, 09, 10 green; the plant screens render in both locales
+- [x] (docs/checkpoints/CP-OPS-1-3.md) AC-OPS-01, 02, 04, 08, 09, 10 green; the plant screens render in both locales
 
 ### Checkpoint CP-OPS-2 (after O5): receipts
-- [ ] AC-OPS-03 green
+- [x] (docs/checkpoints/CP-OPS-1-3.md) AC-OPS-03 green
 
 ### Checkpoint CP-OPS-3 (after O8): end to end
-- [ ] the six-step flow runs on the seeded scenario; office sees no money effect
+- [x] (docs/checkpoints/CP-OPS-1-3.md) the six-step flow runs on the seeded scenario; office sees no money effect
 
 ## Later (not in the core)
 Margin per delivery (R13, owner and support), truck capacity check (R22–R23), projected stock (AC-OPS-05), plant import and reconciliation (ARCO GOLD TWO), load cancellation screen.

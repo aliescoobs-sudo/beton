@@ -1,6 +1,6 @@
 # Implementation Plan: `operations` (core first)
 
-Status: **PROPOSED** (written 2026-10-24 on the owner's brief; no code yet) · Task list: [tasks/todo-operations.md](todo-operations.md) · Spec: [SPEC-operations.md](../SPEC-operations.md) (AC-OPS-01…11)
+Status: **BUILT** (core O1–O8, 2026-10-24/25; notes in docs/checkpoints/CP-OPS-1-3.md) · Task list: [tasks/todo-operations.md](todo-operations.md) · Spec: [SPEC-operations.md](../SPEC-operations.md) (AC-OPS-01…11)
 
 Depends on `master-data` (recettes, trucks, zones, components), `ledger` (orders, the document counter, purchases when they land) and `clock`. Reconciliation with the plant software and the margin are later phases of this module, not part of the core.
 
