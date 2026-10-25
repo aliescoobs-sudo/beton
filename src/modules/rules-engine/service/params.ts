@@ -25,6 +25,7 @@ export function engineParams(values: ParameterValues, horizonDays?: number): Eng
     splitBp: values.split_delivery_bp,
     vatRateBp: values.vat_rate_bp,
     purchaseLeadDays: values.purchase_lead_days,
+    reorderMarginDays: values.reorder_margin_days,
     calendar: parseHolidays(values.holidays),
   };
 }

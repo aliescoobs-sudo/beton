@@ -21,6 +21,7 @@ const hint: SupplierHint = {
   factorToBase: 1_000_000,
   lastUnitPriceHt: centimes(100_000),
   termDays: 30,
+  leadTimeDays: null,
 };
 
 const input = (level: number, demands: StockRiskInput['demands']): StockRiskInput => ({

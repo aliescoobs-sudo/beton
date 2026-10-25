@@ -186,6 +186,7 @@
       "day_start_min": "Heure de début de la première rotation (minutes depuis minuit)",
       "default_one_way_min": "Trajet simple d'un chantier sans zone (minutes)",
       "consumption_tolerance_bp": "Écart entre la consommation théorique et les inventaires qui est signalé (points de base : 200 = 2 %)",
+      "reorder_margin_days": "Jours de sécurité ajoutés au délai d'un fournisseur avant de proposer un réapprovisionnement",
       "forecast_horizon_days": "Horizon de la prévision de trésorerie (jours ouvrés)",
       "cash_safety_threshold_centimes": "Seuil de sécurité de trésorerie (centimes) : en dessous, le jour est en déficit",
       "alert_lead_days": "Alerte d'échéance : nombre de jours à l'avance",
@@ -288,7 +289,8 @@
         "fuel": "Carburant",
         "other": "Autre"
       },
-      "code": "Code"
+      "code": "Code",
+      "leadTime": "Délai de livraison (jours, de la commande à la centrale)"
     },
     "components": {
       "title": "Composants",
@@ -1705,7 +1707,22 @@
       "levelOn": "Niveau",
       "missing": "Manque maximal : {qty}",
       "link": "Projection du stock",
-      "details": "Voir la projection"
+      "details": "Voir la projection",
+      "coverTitle": "Jours de couverture et réapprovisionnement",
+      "coverIntro": "Jours avant que le stock tombe à zéro avec les commandes ouvertes. Si c'est plus court que le délai du fournisseur plus la marge, un brouillon d'achat est proposé : rien n'est commandé sans vous.",
+      "coverDays": "Couverture",
+      "coverBeyond": "au-delà de l'horizon",
+      "days": "{count} j",
+      "lead": "Délai fournisseur",
+      "leadSupplier": "fiche fournisseur",
+      "leadParameter": "paramètre",
+      "orderBy": "Commander avant le",
+      "action": "Réapprovisionnement",
+      "toOrder": "À commander",
+      "orderLate": "Déjà en retard",
+      "enough": "Suffisant",
+      "draft": "Brouillon : {qty} {unit} chez {supplier}",
+      "draftNone": "Brouillon réservé au propriétaire (fournisseur et prix)."
     },
     "ops": {
       "loads": "Commandes à charger",

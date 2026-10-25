@@ -21,6 +21,8 @@ export interface Supplier {
   ice: string | null;
   phone: string | null;
   paymentTermsDays: number;
+  /** Calendar days from an order to the goods at the plant; null: unknown (the parameter is used). */
+  leadTimeDays: number | null;
   status: 'active' | 'archived';
 }
 
@@ -32,6 +34,10 @@ const supplierInputSchema = z.object({
   paymentTermsDays: z.preprocess(
     (v) => (typeof v === 'string' && v.trim() === '' ? undefined : v),
     z.number().int().min(0).max(365).default(30),
+  ),
+  leadTimeDays: z.preprocess(
+    (v) => (typeof v === 'string' && v.trim() === '' ? null : v),
+    z.number().int().min(0).max(120).nullish(),
   ),
 });
 

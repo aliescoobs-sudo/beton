@@ -23,3 +23,4 @@ export {
   loadTodayOps,
   type TodayOpsView,
 } from './service/dashboard-service';
+export { loadReorder, type ReorderView } from './service/reorder-service';

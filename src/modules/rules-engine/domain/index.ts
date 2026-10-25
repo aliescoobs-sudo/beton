@@ -9,6 +9,7 @@ export * from './what-if';
 export * from './options';
 export * from './stock-risk';
 export * from './stock-options';
+export * from './reorder';
 export * from './drafts';
 export * from './engine';
 export * from './numeric';

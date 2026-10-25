@@ -20,6 +20,7 @@ export interface SupplierRow {
   ice: string;
   phone: string;
   paymentTermsDays: number;
+  leadTimeDays: number | null;
   status: 'active' | 'archived';
 }
 
@@ -54,6 +55,7 @@ export function SuppliersManager({
       ice: text('ice'),
       phone: text('phone'),
       paymentTermsDays: text('paymentTermsDays') === '' ? undefined : Number(text('paymentTermsDays')),
+      leadTimeDays: text('leadTimeDays') === '' ? null : Number(text('leadTimeDays')),
     });
     if (result.ok) {
       setMessage({ id, text: t('saved'), ok: true });
@@ -114,10 +116,23 @@ export function SuppliersManager({
           className={input}
         />
       </label>
+      <label className="block">
+        <span className="field-label">{t('leadTime')}</span>
+        <input
+          name="leadTimeDays"
+          type="number"
+          min={0}
+          max={120}
+          defaultValue={s?.leadTimeDays ?? ''}
+          dir="ltr"
+          className={input}
+          data-testid="supplier-lead-time"
+        />
+      </label>
     </>
   );
 
-  const columns = 7;
+  const columns = 8;
   return (
     <div className="mt-6 space-y-4">
       <Notice message={message} testId="supplier-message" />
@@ -151,6 +166,7 @@ export function SuppliersManager({
             <Th>{t('ice')}</Th>
             <Th>{t('phone')}</Th>
             <Th numeric>{t('paymentTerms')}</Th>
+            <Th numeric>{t('leadTime')}</Th>
             <ActionsTh />
           </tr>
         </thead>
@@ -202,6 +218,9 @@ export function SuppliersManager({
                   </td>
                   <td className="is-num">
                     <bdi dir="ltr">{s.paymentTermsDays}</bdi>
+                  </td>
+                  <td className="is-num">
+                    <bdi dir="ltr">{s.leadTimeDays ?? '—'}</bdi>
                   </td>
                   <td className="whitespace-nowrap text-end">
                     {s.status === 'active' && (

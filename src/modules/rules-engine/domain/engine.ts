@@ -36,6 +36,8 @@ export interface EngineParams {
   splitBp: number;
   vatRateBp: number;
   purchaseLeadDays: number;
+  /** Safety days added to a supplier's lead time before a reorder is suggested (O12). */
+  reorderMarginDays: number;
   calendar: Calendar;
 }
 

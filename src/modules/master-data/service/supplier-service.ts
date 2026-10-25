@@ -21,10 +21,11 @@ interface SupplierRow {
   ice: string | null;
   phone_enc: string | null;
   payment_terms_days: number;
+  lead_time_days: number | null;
   status: Supplier['status'];
 }
 
-const COLUMNS = 'id, code, name, category, ice, phone_enc, payment_terms_days, status';
+const COLUMNS = 'id, code, name, category, ice, phone_enc, payment_terms_days, lead_time_days, status';
 
 const toSupplier = (row: SupplierRow, cipher: FieldCipher): Supplier => ({
   id: row.id,
@@ -34,6 +35,7 @@ const toSupplier = (row: SupplierRow, cipher: FieldCipher): Supplier => ({
   ice: row.ice,
   phone: cipher.open(row.phone_enc),
   paymentTermsDays: row.payment_terms_days,
+  leadTimeDays: row.lead_time_days,
   status: row.status,
 });
 
@@ -70,8 +72,8 @@ export async function createSupplier(
     return await inRequest(appPool, actor, async (tx) => {
       const { rows: seq } = await tx.query<{ code: string }>(`select public.next_code('FRN', 2) as code`);
       const { rows } = await tx.query<SupplierRow>(
-        `insert into supplier (id, code, name, category, ice, phone_enc, payment_terms_days)
-         values ($1, $2, $3, $4, $5, $6, $7) returning ${COLUMNS}`,
+        `insert into supplier (id, code, name, category, ice, phone_enc, payment_terms_days, lead_time_days)
+         values ($1, $2, $3, $4, $5, $6, $7, $8) returning ${COLUMNS}`,
         [
           uuidv7(realClock.now()),
           seq[0]!.code,
@@ -80,6 +82,7 @@ export async function createSupplier(
           value.ice ?? null,
           cipher.seal(value.phone ?? null),
           value.paymentTermsDays,
+          value.leadTimeDays ?? null,
         ],
       );
       return ok(toSupplier(rows[0]!, cipher));
@@ -112,9 +115,17 @@ export async function updateSupplier(
       const phoneEnc =
         phone === cipher.open(current[0].phone_enc) ? current[0].phone_enc : cipher.seal(phone);
       const { rows } = await tx.query<SupplierRow>(
-        `update supplier set name = $2, category = $3, ice = $4, phone_enc = $5, payment_terms_days = $6
+        `update supplier set name = $2, category = $3, ice = $4, phone_enc = $5, payment_terms_days = $6, lead_time_days = $7
           where id = $1 returning ${COLUMNS}`,
-        [id, value.name, value.category, value.ice ?? null, phoneEnc, value.paymentTermsDays],
+        [
+          id,
+          value.name,
+          value.category,
+          value.ice ?? null,
+          phoneEnc,
+          value.paymentTermsDays,
+          value.leadTimeDays ?? null,
+        ],
       );
       return ok(toSupplier(rows[0]!, cipher));
     });

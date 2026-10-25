@@ -122,10 +122,11 @@ async function loadSupplierHints(appPool: pg.Pool, actor: SessionUser): Promise<
       factor: string;
       price: string;
       term: number;
+      lead_time_days: number | null;
     }>(
       `select distinct on (l.component_id) l.component_id::text, s.id::text as supplier_id, s.code, s.name,
               u.id::text as unit_id, u.label as unit, u.factor_to_base::text as factor,
-              l.unit_price_ht_centimes::text as price, (p.due_date - p.order_date) as term
+              l.unit_price_ht_centimes::text as price, (p.due_date - p.order_date) as term, s.lead_time_days
          from purchase_line l
          join purchase p on p.id = l.purchase_id
          join supplier s on s.id = p.supplier_id
@@ -147,6 +148,7 @@ async function loadSupplierHints(appPool: pg.Pool, actor: SessionUser): Promise<
         factorToBase: Number(r.factor),
         lastUnitPriceHt: centimes(Number(r.price)),
         termDays: r.term,
+        leadTimeDays: r.lead_time_days,
       },
     ]),
   );

@@ -92,6 +92,7 @@ export const E2E_MD = {
   repPlantAr: { email: 'e2e-rp-plant-ar@belgobeton.test', name: 'مركز التقارير' },
   repPartner: { email: 'e2e-rp-partner@belgobeton.test', name: 'Associé Rapports' },
   repOffice: { email: 'e2e-rp-office@belgobeton.test', name: 'Bureau Rapports' },
+  rdPlant: { email: 'e2e-rd-plant@belgobeton.test', name: 'Centrale Couverture' },
 } as const;
 export const E2E_CSP = { email: 'e2e-csp@belgobeton.test', name: 'CSP E2E' } as const;
 

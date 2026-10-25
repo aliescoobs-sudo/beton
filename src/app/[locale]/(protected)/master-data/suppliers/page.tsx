@@ -24,6 +24,7 @@ export default async function SuppliersPage({ params }: { params: Promise<{ loca
           ice: s.ice ?? '',
           phone: s.phone ?? '',
           paymentTermsDays: s.paymentTermsDays,
+          leadTimeDays: s.leadTimeDays,
           status: s.status,
         }))}
         canArchive={can(user.role, 'parties.archive')}

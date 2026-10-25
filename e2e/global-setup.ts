@@ -93,6 +93,7 @@ export default async function globalSetup() {
       [E2E_MD.repPlantAr, 'plant', 'ar'],
       [E2E_MD.repPartner, 'partner', 'fr'],
       [E2E_MD.repOffice, 'office', 'fr'],
+      [E2E_MD.rdPlant, 'plant', 'fr'],
       [E2E_MD.dashPartner, 'partner', 'fr'],
       [E2E_MD.flowOffice, 'office', 'fr'],
       [E2E_MD.viewOffice, 'office', 'fr'],

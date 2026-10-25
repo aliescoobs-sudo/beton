@@ -17,6 +17,7 @@ const params: EngineParams = {
   splitBp: 5_000,
   vatRateBp: 2_000,
   purchaseLeadDays: 2,
+  reorderMarginDays: 2,
   calendar: NO_HOLIDAYS,
 };
 
@@ -85,6 +86,7 @@ const stock = (level: number): StockFacts => ({
         factorToBase: 1_000_000,
         lastUnitPriceHt: centimes(100_000),
         termDays: 30,
+        leadTimeDays: null,
       },
     ],
   ]),

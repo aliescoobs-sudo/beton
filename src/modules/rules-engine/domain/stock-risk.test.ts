@@ -218,6 +218,7 @@ describe('draftPurchase', () => {
     factorToBase: 1_000_000,
     lastUnitPriceHt: centimes(95_000),
     termDays: 30,
+    leadTimeDays: null,
   };
   const short = projectionOf(
     projectStock(input({ demands: [demand({ orderId: '1', volumeL: 12_000 })] })),

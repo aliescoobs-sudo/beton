@@ -228,6 +228,8 @@ export interface SupplierHint {
   lastUnitPriceHt: Centimes | null;
   /** Days between the order and the due date of the last purchase (the supplier's terms); null when unknown. */
   termDays: number | null;
+  /** The supplier's lead time in calendar days (supplier.lead_time_days); null when it has none. */
+  leadTimeDays: number | null;
 }
 
 export interface PurchaseDraft {

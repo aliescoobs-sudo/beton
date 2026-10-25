@@ -109,6 +109,11 @@ export const PARAMETERS = {
     schema: z.number().int().min(0).max(2000),
     description:
       'Gap between the theoretical consumption and the physical counts that is flagged (basis points)',
+  }, // Days of cover and reorder (SPEC-operations §7.1, AC-OPS-20): safety days on top of a supplier's lead time.
+  reorder_margin_days: {
+    default: 2,
+    schema: z.number().int().min(0).max(30),
+    description: "Safety days added to a supplier's lead time before a reorder is suggested",
   },
 
   // Rules engine and owner dashboard (SPEC-rules-engine §3, §4, §6). Every default is an assumption (🟡) to revisit with

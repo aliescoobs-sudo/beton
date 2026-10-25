@@ -4,8 +4,9 @@ import { getRequestClock } from '@/app/request-clock';
 import { getPool } from '@/lib/db/pools';
 import { formatDay, qtyText } from '@/modules/owner-dashboard';
 import { requirePagePermission } from '@/modules/platform-security/next';
-import { loadTodayOps } from '@/modules/rules-engine';
-import { EmptyState, PageHeader, StatusPill, Table, Td, Th } from '@/ui';
+import { can } from '@/modules/platform-security';
+import { loadReorder } from '@/modules/rules-engine';
+import { EmptyState, Money, PageHeader, StatusPill, Table, Td, Th } from '@/ui';
 
 /** Day by day, what the open orders take from each component against the stock and the receipts expected. Quantities only. */
 export default async function StockProjectionPage({ params }: { params: Promise<{ locale: string }> }) {
@@ -13,18 +14,96 @@ export default async function StockProjectionPage({ params }: { params: Promise<
   setRequestLocale(locale);
   const user = await requirePagePermission(locale, 'stock.read');
   const today = (await getRequestClock()).today();
-  const view = await loadTodayOps(getPool('app'), user, { today, params: await getEngineParams() });
+  const view = await loadReorder(getPool('app'), user, { today, params: await getEngineParams() });
   const t = await getTranslations('dashboard.stockRisk');
-  const components = (view.stock?.components ?? []).filter(
-    (c) => c.needs > 0 || c.firstShortage || c.firstLow,
-  );
+  const components = view.risk.components.filter((c) => c.needs > 0 || c.firstShortage || c.firstLow);
+  const name = (id: string) => {
+    const c = view.risk.components.find((x) => x.componentId === id);
+    return c ? (locale === 'ar' ? c.nameAr : c.nameFr) : id;
+  };
+  const showMoney = can(user.role, 'purchase_prices.read');
   return (
     <div>
       <PageHeader title={t('title')} description={t('intro')} />
-      {view.stock && view.stock.missingRecette.length > 0 && (
+      {view.risk.missingRecette.length > 0 && (
         <p className="mb-4 font-semibold" data-testid="stock-missing-recette">
-          {t('missingRecette', { count: view.stock.missingRecette.length })}
+          {t('missingRecette', { count: view.risk.missingRecette.length })}
         </p>
+      )}
+      {view.reorders.length > 0 && (
+        <section aria-labelledby="cover-title" className="mb-8" data-testid="cover">
+          <h2 id="cover-title" className="mb-1 text-xl">
+            {t('coverTitle')}
+          </h2>
+          <p className="mb-3 text-sm text-muted">{t('coverIntro')}</p>
+          <Table>
+            <thead>
+              <tr>
+                <Th>{t('component')}</Th>
+                <Th numeric>{t('coverDays')}</Th>
+                <Th numeric>{t('lead')}</Th>
+                <Th>{t('orderBy')}</Th>
+                <Th>{t('action')}</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {view.reorders.map((r) => (
+                <tr
+                  key={r.componentId}
+                  data-testid={`cover-${r.componentId}`}
+                  data-needs-order={r.needsOrder ? 'true' : 'false'}
+                >
+                  <Td>{name(r.componentId)}</Td>
+                  <Td numeric>
+                    {r.coverDays === null ? (
+                      t('coverBeyond')
+                    ) : (
+                      <bdi dir="ltr">{t('days', { count: r.coverDays })}</bdi>
+                    )}
+                  </Td>
+                  <Td numeric>
+                    <bdi dir="ltr">{t('days', { count: r.leadDays })}</bdi>
+                    <span className="block text-xs text-muted">
+                      {r.leadFrom === 'supplier' ? t('leadSupplier') : t('leadParameter')}
+                    </span>
+                  </Td>
+                  <Td>{r.orderBy === null ? '—' : <bdi dir="ltr">{formatDay(r.orderBy, locale)}</bdi>}</Td>
+                  <Td>
+                    {r.needsOrder ? (
+                      <>
+                        <StatusPill status={r.late ? 'late' : 'due'}>
+                          {r.late ? t('orderLate') : t('toOrder')}
+                        </StatusPill>
+                        {r.draft ? (
+                          <p className="mt-1 text-sm" data-testid={`draft-${r.componentId}`}>
+                            {t('draft', {
+                              qty: (r.draft.qtyMilli / 1000).toLocaleString('fr-FR', {
+                                maximumFractionDigits: 3,
+                                useGrouping: false,
+                              }),
+                              unit: r.draft.unitLabel,
+                              supplier: r.draft.supplierName,
+                            })}
+                            {showMoney && r.draft.estimatedHtCentimes !== null && (
+                              <>
+                                {' · '}
+                                <Money centimes={r.draft.estimatedHtCentimes} />
+                              </>
+                            )}
+                          </p>
+                        ) : (
+                          <p className="mt-1 text-sm text-muted">{t('draftNone')}</p>
+                        )}
+                      </>
+                    ) : (
+                      <StatusPill status="paid">{t('enough')}</StatusPill>
+                    )}
+                  </Td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        </section>
       )}
       {components.length === 0 ? (
         <EmptyState title={t('none')} />
