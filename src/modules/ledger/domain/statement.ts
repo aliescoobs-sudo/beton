@@ -37,6 +37,8 @@ export interface StatementLine {
   amountCentimes: Centimes;
   /** Does it count in the balance? Bounced, disputed, cancelled and regularized-away payments do not. */
   counted: boolean;
+  /** A live invoice only: paid, partly paid or unpaid, derived from what the order's payments cover. */
+  payment?: 'unpaid' | 'partial' | 'paid';
 }
 
 /** An open payment-plan item, to tell what is still due from what is late. */

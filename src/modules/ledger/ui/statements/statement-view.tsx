@@ -51,6 +51,15 @@ function Rows({ rows, testId }: { rows: StatementRow[]; testId: string }) {
             <td>{r.code ? <bdi dir="ltr">{r.code}</bdi> : '—'}</td>
             <td>
               <StatusPill status={PILL[r.status]}>{t(`statuses.${r.status}`)}</StatusPill>
+              {r.payment && (
+                <StatusPill
+                  status={r.payment === 'paid' ? 'paid' : r.payment === 'partial' ? 'due' : 'late'}
+                  className="ms-1"
+                  data-testid={`payment-${r.payment}`}
+                >
+                  {t(`payment.${r.payment}`)}
+                </StatusPill>
+              )}
             </td>
             <td className="is-num">
               <Money centimes={Number(r.amountCentimes)} />

@@ -397,3 +397,77 @@ describe('visibility (DECISIONS 81)', () => {
     expectNoFields(inv.ok ? inv.value : null, ['totalTtcCentimes', 'totalHtCentimes']);
   });
 });
+
+describe('payment state of an invoice (review of CP-L4, point 2): derived, oldest first, owner and support only', () => {
+  it("the order's covered plan items pay the first invoice, then the next; nothing is stored", async () => {
+    const { order, ids } = await orderWithLoads([6000, 4000]);
+    const first = await createInvoice(
+      app,
+      users.owner,
+      { orderCode: order.code, deliveryIds: [ids[0]] },
+      { today: TODAY },
+    );
+    const second = await createInvoice(
+      app,
+      users.owner,
+      { orderCode: order.code, deliveryIds: [ids[1]] },
+      { today: TODAY },
+    );
+    if (!first.ok || !second.ok) throw new Error('setup');
+    const state = async () => {
+      const list = await listInvoices(app, users.owner);
+      const of = (n: string) => list.find((i) => i.number === n);
+      return [of(first.value.number), of(second.value.number)].map((i) => [i?.paymentState, i?.paidCentimes]);
+    };
+    expect(await state()).toEqual([
+      ['unpaid', 0],
+      ['unpaid', 0],
+    ]);
+
+    const clientId = (
+      await inCtx(users.owner, (tx) =>
+        tx.query<{ c: string }>('select client_id as c from sales_order where code = $1', [order.code]),
+      )
+    ).rows[0]?.c as string;
+    const paid = await receiveInstrument(
+      app,
+      users.office,
+      {
+        method: 'cheque',
+        amountCentimes: 600_000,
+        number: `PAY${marker}`,
+        bank: 'B',
+        writtenDate: TODAY,
+        clientId,
+        orderCode: order.code,
+      },
+      { today: TODAY },
+    );
+    expect(paid.ok, JSON.stringify(paid)).toBe(true);
+    // 561 600,00 for the first invoice, then 38 400,00 of the second (374 400,00)
+    expect(await state()).toEqual([
+      ['paid', 561_600],
+      ['partial', 38_400],
+    ]);
+
+    const doc = await getInvoiceDocument(
+      app,
+      users.support,
+      second.ok ? await idOfInvoice(second.value.number) : '',
+    );
+    expect(doc?.invoice.paymentState).toBe('partial');
+    const statement = await getClientStatement(app, users.owner, clientId, {}, { today: TODAY });
+    const lines = [...(statement?.statement.commercial ?? [])].filter((r) => r.type === 'invoice');
+    expect(lines.map((l) => l.payment).sort()).toEqual(['paid', 'partial']);
+    // a credit note has no payment state, and neither has the invoice it cancels
+    const credit = await cancelInvoice(app, users.owner, await idOfInvoice(second.value.number), 'erreur', {
+      today: TODAY,
+    });
+    if (!credit.ok) throw new Error(credit.error);
+    const after = await listInvoices(app, users.owner);
+    expect(after.find((i) => i.number === second.value.number)?.paymentState).toBeNull();
+    expect(after.find((i) => i.number === credit.value.number)?.paymentState).toBeNull();
+    // office, partner and plant read no invoice at all
+    await expect(listInvoices(app, users.office)).rejects.toBeDefined();
+  });
+});

@@ -96,10 +96,30 @@ export default async function InvoicesPage({ params }: { params: Promise<{ local
                     <StatusPill status="cancelled">{t('creditNote')}</StatusPill>
                   ) : i.cancelled ? (
                     <StatusPill status="cancelled">{t('cancelled')}</StatusPill>
-                  ) : canCancel ? (
-                    <CancelInvoice invoiceId={i.id} number={i.number} cancel={cancelInvoiceAction} />
                   ) : (
-                    <StatusPill status="ontrack">{t('issued')}</StatusPill>
+                    <div className="space-y-1">
+                      {i.paymentState && (
+                        <StatusPill
+                          status={
+                            i.paymentState === 'paid' ? 'paid' : i.paymentState === 'partial' ? 'due' : 'late'
+                          }
+                          data-testid={`invoice-payment-${i.number}`}
+                        >
+                          {t(`payment.${i.paymentState}`)}
+                          {i.paymentState === 'partial' && (
+                            <>
+                              {' '}
+                              (<Money centimes={i.paidCentimes} />)
+                            </>
+                          )}
+                        </StatusPill>
+                      )}
+                      {canCancel ? (
+                        <CancelInvoice invoiceId={i.id} number={i.number} cancel={cancelInvoiceAction} />
+                      ) : (
+                        <StatusPill status="ontrack">{t('issued')}</StatusPill>
+                      )}
+                    </div>
                   )}
                 </Td>
               </tr>

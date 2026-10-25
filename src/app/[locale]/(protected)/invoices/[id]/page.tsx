@@ -30,6 +30,7 @@ export default async function InvoiceDocumentPage({
   const { invoice: i } = doc;
   const credit = i.creditNoteOf !== null;
   const t = await getTranslations('ledger.invoiceDocument');
+  const tInvoices = await getTranslations('ledger.invoices');
   return (
     <div>
       <PageHeader
@@ -98,6 +99,20 @@ export default async function InvoiceDocumentPage({
               <bdi dir="ltr">{i.dueDate}</bdi>
             </dd>
           </div>
+          {i.paymentState && (
+            <div className="print:hidden" data-testid="invoice-payment-state">
+              <dt className="field-label">{tInvoices('state')}</dt>
+              <dd>
+                {tInvoices(`payment.${i.paymentState}`)}
+                {i.paymentState === 'partial' && (
+                  <>
+                    {' '}
+                    (<Money centimes={i.paidCentimes} />)
+                  </>
+                )}
+              </dd>
+            </div>
+          )}
         </dl>
         {credit && i.reason && (
           <p data-testid="invoice-reason">

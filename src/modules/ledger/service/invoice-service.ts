@@ -4,13 +4,8 @@ import { centimes } from '@/lib/money';
 import { err, ok, type Result } from '@/lib/result';
 import { can, inRequest, isMalformedId, require, type SessionUser } from '@/modules/platform-security';
 import { type Effect, visibleEffects } from '../domain/effects';
-import {
-  computeInvoiceTotals,
-  invoiceDueDate,
-  invoiceIssueDeadline,
-  type InvoiceInput,
-  parseInvoiceInput,
-} from '../domain/invoice';
+import { invoiceDueDate, type InvoiceInput, parseInvoiceInput } from '../domain/invoice';
+import { type InvoicePayment, type InvoicePaymentState, settleInvoices } from '../domain/invoice-payment';
 import { nextDocNumber } from './doc-number';
 
 export type InvoiceError =
@@ -212,6 +207,50 @@ export interface InvoiceView {
   dueDate: string;
   vatRateBp: number;
   totalHtCentimes: number;
+  /** Derived from the order's covered plan items, oldest invoice first; null for a credit note or a cancelled invoice. */
+  paymentState: InvoicePaymentState | null;
+  paidCentimes: number;
+}
+
+/**
+ * The payment state of every live invoice (not a credit note, not cancelled): what each order's covered plan items pay,
+ * oldest invoice first. Derived on every read, never stored.
+ */
+export async function loadInvoicePayments(tx: pg.PoolClient): Promise<Map<string, InvoicePayment>> {
+  const invoices = await tx.query<{
+    id: string;
+    order_id: string;
+    number: string;
+    date: string;
+    total: string;
+  }>(
+    `select i.id, i.order_id, i.number, to_char(i.invoice_date, 'YYYY-MM-DD') as date, i.total_ttc_centimes::text as total
+       from invoice i
+      where i.credit_note_of is null and not exists (select 1 from invoice c where c.credit_note_of = i.id)`,
+  );
+  const covered = await tx.query<{ order_id: string; covered: string }>(
+    `select p.order_id, coalesce(sum(a.amount_centimes), 0)::text as covered
+       from payment_plan_item p join allocation a on a.payment_plan_item_id = p.id
+      where p.order_id = any($1) group by p.order_id`,
+    [[...new Set(invoices.rows.map((i) => i.order_id))]],
+  );
+  const coveredOf = new Map(covered.rows.map((r) => [r.order_id, Number(r.covered)] as const));
+  const byOrder = new Map<string, typeof invoices.rows>();
+  for (const i of invoices.rows) byOrder.set(i.order_id, [...(byOrder.get(i.order_id) ?? []), i]);
+  const out = new Map<string, InvoicePayment>();
+  for (const [orderId, list] of byOrder) {
+    const settled = settleInvoices(
+      list.map((i) => ({
+        id: i.id,
+        date: i.date,
+        number: i.number,
+        totalTtcCentimes: centimes(Number(i.total)),
+      })),
+      coveredOf.get(orderId) ?? 0,
+    );
+    for (const [id, p] of settled) out.set(id, p);
+  }
+  return out;
   totalVatCentimes: number;
   totalTtcCentimes: number;
   /** The invoice this credit note cancels, else null. */
@@ -224,8 +263,9 @@ export interface InvoiceView {
 /** Invoices and credit notes, newest first. Owner and support only (money). */
 export async function listInvoices(appPool: pg.Pool, actor: SessionUser): Promise<InvoiceView[]> {
   await require(appPool, actor, 'invoices.read');
-  const { rows } = await inRequest(appPool, actor, (tx) =>
-    tx.query<{
+  const { rows, payments } = await inRequest(appPool, actor, async (tx) => {
+    const payments = await loadInvoicePayments(tx);
+    const result = await tx.query<{
       id: string;
       number: string;
       order_code: string;
@@ -263,6 +303,8 @@ export async function listInvoices(appPool: pg.Pool, actor: SessionUser): Promis
     invoiceDate: r.invoice_date,
     issueDeadline: r.issue_deadline,
     dueDate: r.due_date,
+    paymentState: payments.get(r.id)?.state ?? null,
+    paidCentimes: Number(payments.get(r.id)?.paidCentimes ?? 0),
     vatRateBp: r.vat_rate_bp,
     totalHtCentimes: Number(r.total_ht),
     totalVatCentimes: Number(r.total_vat),

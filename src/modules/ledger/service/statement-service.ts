@@ -2,6 +2,7 @@ import type pg from 'pg';
 import { centimes } from '@/lib/money';
 import { BUSINESS_TIME_ZONE } from '@/modules/clock';
 import { inRequest, require, type SessionUser } from '@/modules/platform-security';
+import { loadInvoicePayments } from './invoice-service';
 import {
   buildStatement,
   type DueItem,
@@ -87,6 +88,7 @@ async function loadParties(tx: Tx, kind: PartyKind, ids: readonly string[]): Pro
          from invoice i where i.client_id = any($1)`,
       [ids],
     );
+    const payments = await loadInvoicePayments(tx);
     // An invoice documents what the order already booked: shown in the commercial section, never added to the balance.
     for (const i of invoices.rows) {
       data.get(i.client_id)?.lines.push({
@@ -98,6 +100,7 @@ async function loadParties(tx: Tx, kind: PartyKind, ids: readonly string[]): Pro
         status: i.cancelled ? 'cancelled' : 'booked',
         amountCentimes: centimes(Number(i.total)),
         counted: false,
+        ...(payments.get(i.id) ? { payment: payments.get(i.id)?.state } : {}),
       });
     }
     const items = await tx.query<{ client_id: string; due: string; amount: string; covered: string }>(
