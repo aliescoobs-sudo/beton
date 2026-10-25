@@ -5,7 +5,7 @@ import { getCompanyProfile, legalMentions, listCompanyProfiles } from '@/modules
 import { CompanyForm } from '@/modules/ledger/ui/company/company-form';
 import { can } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/next';
-import { Card, PageHeader, Table, Td, Th } from '@/ui';
+import { Card, PageHeader, Table, Td } from '@/ui';
 import { saveCompanyAction } from './actions';
 
 /** Our legal identity as printed on documents. Everyone reads it; the owner enters a new version. */

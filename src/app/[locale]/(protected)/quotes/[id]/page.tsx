@@ -99,7 +99,9 @@ export default async function QuoteDocumentPage({
           <tbody>
             <tr>
               <Td>
-                {quote.typeLabel} (<bdi dir="ltr">{quote.typeCode}</bdi>)
+                <bdi dir="ltr">
+                  {quote.typeLabel} ({quote.typeCode})
+                </bdi>
               </Td>
               <Td numeric>{formatM3(quote.volumeL)} m³</Td>
               <Td numeric>

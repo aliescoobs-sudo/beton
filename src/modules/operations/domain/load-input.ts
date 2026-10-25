@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import { err, ok, type Result } from '@/lib/result';
+import { isRealDate } from '@/modules/ledger';
 
-const dateText = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/);
+// A real calendar date: 2026-02-30 has the shape of a date and is refused here, not by the database.
+const dateText = z.string().refine(isRealDate, 'date');
 
 const loadSchema = z.object({
   orderId: z.uuid(),

@@ -48,6 +48,7 @@ test('office enters a quote blind: a code and no amount; it has no list', async 
   await goNav(page, 'quotes-new-link');
   await page.getByTestId('quote-client-search').fill('Atlas');
   await page.getByTestId('quote-client').selectOption({ index: 1 });
+  await page.getByTestId('quote-type').selectOption({ label: 'B25 · Béton B25' });
   await page.getByTestId('quote-volume').fill('3,5');
   await page.getByTestId('quote-save').click();
   await expect(page.getByTestId('quote-saved')).toContainText('DV-');

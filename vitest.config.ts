@@ -11,7 +11,12 @@ export default defineConfig({
     // Run with `pnpm test:coverage`.
     coverage: {
       provider: 'v8',
-      include: ['src/modules/master-data/domain/**'],
+      include: [
+        'src/modules/master-data/domain/**',
+        // ledger L26: the money domain (totals, plans, instruments, statements, journals) stays covered at the same bar.
+        'src/modules/ledger/domain/**',
+        'src/modules/operations/domain/**',
+      ],
       exclude: ['**/*.test.ts'],
       thresholds: { statements: 90, branches: 90, functions: 90, lines: 90 },
     },
