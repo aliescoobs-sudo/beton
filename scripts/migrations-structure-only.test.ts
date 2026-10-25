@@ -16,6 +16,18 @@ function topLevelSql(sql: string): string {
 
 const files = readdirSync(FOLDER).filter((f) => f.endsWith('.sql'));
 
+/**
+ * Conversions of rows that already exist when a table changes shape (review of CP-OPS-1-3). They create no seed and no
+ * business fact: each row is derived from rows the application already wrote, they run as the system actor so the audit
+ * trigger records them, and nothing here relaxes RLS or auditing (still checked below). Adding to this list is a decision.
+ */
+const CONVERSIONS: Record<string, string> = {
+  '0053_partial_receipts.sql':
+    'one receipt line per stocked purchase line of each existing receipt (the old receipt took everything)',
+  '0055_thresholds_one_source.sql':
+    'component.low_stock_threshold values copied into stock_threshold before the column is dropped',
+};
+
 describe('migrations create structure only (decision 79)', () => {
   it('finds the migrations', () => {
     expect(files.length).toBeGreaterThan(20);

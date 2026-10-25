@@ -12,8 +12,6 @@ export interface Component {
   nameAr: string;
   /** The unit every quantity of this component is stored in; never changes. */
   baseUnit: BaseUnit;
-  /** Low-stock alert level, in base units. */
-  lowStockThreshold: number;
   status: 'active' | 'archived';
 }
 
@@ -36,7 +34,6 @@ const componentInputSchema = z.object({
   nameFr: nameField,
   nameAr: nameField,
   baseUnit: z.enum(BASE_UNITS),
-  lowStockThreshold: z.preprocess(emptyAsUndefined, z.number().int().min(0).default(0)),
 });
 export type ComponentInput = z.infer<typeof componentInputSchema>;
 

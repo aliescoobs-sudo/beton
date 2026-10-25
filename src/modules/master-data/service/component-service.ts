@@ -19,7 +19,6 @@ interface ComponentRow {
   name_fr: string;
   name_ar: string;
   base_unit: Component['baseUnit'];
-  low_stock_threshold: string;
   status: Component['status'];
 }
 
@@ -31,7 +30,7 @@ interface UnitRow {
   status: PurchaseUnit['status'];
 }
 
-const COMPONENT_COLUMNS = 'id, code, name_fr, name_ar, base_unit, low_stock_threshold, status';
+const COMPONENT_COLUMNS = 'id, code, name_fr, name_ar, base_unit, status';
 const UNIT_COLUMNS = 'id, component_id, label, factor_to_base, status';
 
 const toComponent = (row: ComponentRow): Component => ({
@@ -40,7 +39,6 @@ const toComponent = (row: ComponentRow): Component => ({
   nameFr: row.name_fr,
   nameAr: row.name_ar,
   baseUnit: row.base_unit,
-  lowStockThreshold: Number(row.low_stock_threshold),
   status: row.status,
 });
 
@@ -89,9 +87,9 @@ export async function createComponent(
   try {
     const { rows } = await inRequest(appPool, actor, (tx) =>
       tx.query<ComponentRow>(
-        `insert into component (id, code, name_fr, name_ar, base_unit, low_stock_threshold)
-         values ($1, public.next_code('CMP', 2), $2, $3, $4, $5) returning ${COMPONENT_COLUMNS}`,
-        [uuidv7(realClock.now()), v.nameFr, v.nameAr, v.baseUnit, v.lowStockThreshold],
+        `insert into component (id, code, name_fr, name_ar, base_unit)
+         values ($1, public.next_code('CMP', 2), $2, $3, $4) returning ${COMPONENT_COLUMNS}`,
+        [uuidv7(realClock.now()), v.nameFr, v.nameAr, v.baseUnit],
       ),
     );
     return ok(toComponent(rows[0] as ComponentRow));
@@ -115,10 +113,9 @@ export async function updateComponent(
   try {
     const { rows } = await inRequest(appPool, actor, (tx) =>
       tx.query<ComponentRow>(
-        `update component set name_fr = $2, name_ar = $3, base_unit = $4, low_stock_threshold = $5,
-           status = coalesce($6, status)
+        `update component set name_fr = $2, name_ar = $3, base_unit = $4, status = coalesce($5, status)
          where id = $1 returning ${COMPONENT_COLUMNS}`,
-        [id, v.nameFr, v.nameAr, v.baseUnit, v.lowStockThreshold, status ?? null],
+        [id, v.nameFr, v.nameAr, v.baseUnit, status ?? null],
       ),
     );
     return rows[0] ? ok(toComponent(rows[0])) : err('NOT_FOUND');

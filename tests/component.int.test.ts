@@ -97,9 +97,7 @@ describe('components and purchase units (master-data T6)', () => {
         ),
       ),
     ).rejects.toMatchObject({ code: '42501' });
-    const { rowCount } = await inCtx(users[role], (tx) =>
-      tx.query(`update component set low_stock_threshold = 1`),
-    );
+    const { rowCount } = await inCtx(users[role], (tx) => tx.query(`update component set name_fr = name_fr`));
     expect(rowCount).toBe(0);
   });
 
@@ -139,7 +137,7 @@ describe('components and purchase units (master-data T6)', () => {
   });
 
   it('keeps code, base unit and factor immutable; names, threshold, label and status change', async () => {
-    const c = await create(users.owner, { lowStockThreshold: 10 });
+    const c = await create(users.owner, {});
     const unit = await createPurchaseUnit(app, users.owner, c.id, { label: 'sac', factorToBase: 1000 });
     if (!unit.ok) throw new Error(unit.error);
     for (const sql of [
@@ -159,12 +157,12 @@ describe('components and purchase units (master-data T6)', () => {
       app,
       users.partner,
       c.id,
-      { nameFr: c.nameFr, nameAr: 'اسم جديد', baseUnit: 'g', lowStockThreshold: 99 },
+      { nameFr: c.nameFr, nameAr: 'اسم جديد', baseUnit: 'g' },
       'archived',
     );
     expect(updated).toMatchObject({
       ok: true,
-      value: { nameAr: 'اسم جديد', lowStockThreshold: 99, status: 'archived' },
+      value: { nameAr: 'اسم جديد', status: 'archived' },
     });
     expect(await updatePurchaseUnit(app, users.partner, unit.value.id, 'sac 1 t', 'archived')).toMatchObject({
       ok: true,

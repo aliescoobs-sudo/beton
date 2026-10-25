@@ -38,7 +38,7 @@ export async function getStockLevels(appPool: pg.Pool, actor: SessionUser): Prom
     }>(
       `select c.id, c.name_fr, c.name_ar, c.base_unit, coalesce(sum(m.qty_base), 0)::text as level,
               coalesce((select t.low_qty_base::text from stock_threshold t where t.component_id = c.id
-                order by t.created_at desc, t.id desc limit 1), nullif(c.low_stock_threshold, 0)::text) as low
+                order by t.created_at desc, t.id desc limit 1)) as low
          from component c left join stock_movement m on m.component_id = c.id
         where c.status = 'active' group by c.id order by c.code`,
     ),

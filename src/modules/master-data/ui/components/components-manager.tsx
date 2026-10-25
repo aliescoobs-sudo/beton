@@ -19,7 +19,6 @@ export interface ComponentView {
   nameFr: string;
   nameAr: string;
   baseUnit: 'g' | 'mL' | 'L';
-  lowStockThreshold: number;
   status: 'active' | 'archived';
   units: { id: string; label: string; factorToBase: number; status: 'active' | 'archived' }[];
 }
@@ -70,7 +69,6 @@ export function ComponentsManager({
     nameFr: String(data.get('nameFr') ?? ''),
     nameAr: String(data.get('nameAr') ?? ''),
     baseUnit: String(data.get('baseUnit') ?? ''),
-    lowStockThreshold: String(data.get('lowStockThreshold') ?? ''),
   });
   const columns = 5;
 
@@ -100,10 +98,6 @@ export function ComponentsManager({
                 <option value="mL">mL</option>
                 <option value="L">L</option>
               </select>
-            </label>
-            <label className="block">
-              <span className="field-label">{t('thresholdShort')}</span>
-              <input name="lowStockThreshold" type="number" min={0} dir="ltr" className={`${INPUT} w-36`} />
             </label>
             <button type="submit" className={BUTTON}>
               {t('add')}
@@ -162,17 +156,6 @@ export function ComponentsManager({
                         className={`${INPUT} w-48`}
                       />
                     </label>
-                    <label className="block">
-                      <span className="field-label">{t('threshold', { unit: c.baseUnit })}</span>
-                      <input
-                        name="lowStockThreshold"
-                        type="number"
-                        min={0}
-                        defaultValue={c.lowStockThreshold}
-                        dir="ltr"
-                        className={`${INPUT} w-36`}
-                      />
-                    </label>
                     <label className="flex items-center gap-2 text-sm">
                       <input name="archived" type="checkbox" defaultChecked={c.status === 'archived'} />
                       {t('archivedBadge')}
@@ -197,9 +180,6 @@ export function ComponentsManager({
                   </td>
                   <td>
                     <span dir="ltr">{c.baseUnit}</span>
-                  </td>
-                  <td className="is-num">
-                    <bdi dir="ltr">{c.lowStockThreshold}</bdi>
                   </td>
                   {editable && (
                     <td className="text-end">

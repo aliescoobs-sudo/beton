@@ -22,7 +22,7 @@ export async function stockEffects(
     `select c.name_fr, c.name_ar, c.base_unit, m.qty_base::text as delta,
             (select coalesce(sum(x.qty_base), 0)::text from stock_movement x where x.component_id = c.id) as level,
             coalesce((select t.low_qty_base::text from stock_threshold t where t.component_id = c.id
-              order by t.created_at desc, t.id desc limit 1), nullif(c.low_stock_threshold, 0)::text) as low
+              order by t.created_at desc, t.id desc limit 1)) as low
        from stock_movement m join component c on c.id = m.component_id
       where m.source = $1 and m.source_id = $2 order by c.code`,
     [source, sourceId],
