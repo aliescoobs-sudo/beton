@@ -70,3 +70,14 @@ export {
   type ConsumptionReportView,
   getConsumptionReport,
 } from './service/report-service';
+export {
+  type FuelError,
+  type FuelFillRow,
+  type FuelMoney,
+  type FuelReport,
+  type FuelTruckRow,
+  getFuelReport,
+  listFuelFills,
+  recordFuelFill,
+  recordFuelPurchase,
+} from './service/fuel-service';

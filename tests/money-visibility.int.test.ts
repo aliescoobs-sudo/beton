@@ -138,6 +138,12 @@ const SEED: Record<MoneyTable, (tx: pg.PoolClient, actor: string) => Promise<unk
        values (gen_random_uuid(), $1, 'DEPOSIT-EARLY:x', array['DEPOSIT-EARLY'], current_date, 10000, 100, 100, '{}', current_date, $2)`,
       [`CASH-DEFICIT:mv${marker}`, actor],
     ),
+  fuel_purchase: (tx, actor) =>
+    tx.query(
+      `insert into fuel_purchase (id, purchased_on, litres_ml, total_centimes, created_by)
+       values (gen_random_uuid(), '2094-03-03', 1000000, 1234500, $1)`,
+      [actor],
+    ),
   quote: async (tx, actor) => insertQuote(tx, actor, await orderMaster(app, actors.owner.id, marker)),
   purchase: async (tx, actor) =>
     insertPurchase(tx, actor, await purchaseMaster(app, actors.owner.id, marker)),

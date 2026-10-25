@@ -46,6 +46,17 @@ export {
   tripTimes,
 } from './trip-times';
 export {
+  fuelCosts,
+  type FuelFill,
+  fuelPrice,
+  type FuelPrice,
+  type FuelPurchase,
+  fuelQuantities,
+  type TruckFuelCost,
+  type TruckFuelQuantities,
+  type TruckVolume,
+} from './fuel';
+export {
   consumptionReport,
   type ConsumptionRow,
   type LoadFact,

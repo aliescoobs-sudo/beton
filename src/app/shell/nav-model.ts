@@ -176,6 +176,12 @@ const GROUPS: GroupDef[] = [
         allowed: 'reports.consumption',
       },
       {
+        path: '/fuel',
+        labelKey: 'operations.fuel.link',
+        testId: 'fuel-link',
+        allowed: 'fuel.read',
+      },
+      {
         path: '/loads',
         labelKey: 'operations.loads.link',
         testId: 'loads-link',

@@ -949,6 +949,45 @@ export const TABLE_ACCESS = {
     exception:
       'operations O10: what really happened on a planned rotation, one row per trip and step (loaded, departed, arrived, unloading started and finished, back), in order and never before the previous step; the first step links the load. Times and quantities only. Insert-only; waiting time and delays are derived. Owner, partner and plant record.',
   },
+  fuel_fill: {
+    kind: 'rls',
+    seed: 'insert',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'none',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'operations O13: litres put in a truck (tank or station) with the odometer when read. Quantities only; the plant, owner and partner record and read; the database refuses an odometer lower than an earlier reading. Insert-only: a correction is a new row.',
+  },
+  fuel_purchase: {
+    kind: 'rls',
+    seed: 'insert',
+    money: true,
+    read: {
+      owner: 'all',
+      partner: 'none',
+      office: 'none',
+      plant: 'none',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'operations O13: fuel bought (litres and the total paid). Money (DECISIONS 81): the owner writes, the owner and support read, nobody else; its audit rows are hidden from the others. The price per litre and the cost of a truck are computed from it, never stored.',
+  },
   stock_movement: {
     kind: 'rls',
     seed: 'insert',

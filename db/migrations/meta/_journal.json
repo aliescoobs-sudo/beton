@@ -435,6 +435,13 @@
       "when": 1792591247011,
       "tag": "0061_supplier_lead_time",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1792591247012,
+      "tag": "0062_fuel",
+      "breakpoints": true
     }
   ]
 }

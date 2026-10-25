@@ -1418,6 +1418,52 @@
       "flagged": "Écart à vérifier",
       "withinTolerance": "Dans la tolérance",
       "countNote": "Une correction d'inventaire compte dans la période où elle est saisie : elle mesure tout ce qui s'est passé depuis le dernier inventaire. Un écart positif = plus consommé que prévu."
+    },
+    "fuel": {
+      "link": "Carburant",
+      "title": "Carburant par camion",
+      "intro": "Pleins et consommation de chaque camion : litres, kilomètres, litres aux 100 km et par m³ livré. Le coût est réservé au propriétaire.",
+      "from": "Du",
+      "to": "Au",
+      "show": "Afficher",
+      "truck": "Camion",
+      "date": "Jour",
+      "litres": "Litres",
+      "odometer": "Compteur (km)",
+      "source": "Origine",
+      "sources": {
+        "tank": "Cuve",
+        "station": "Station"
+      },
+      "fillTitle": "Enregistrer un plein",
+      "record": "Enregistrer",
+      "fillSaved": "Plein enregistré.",
+      "perTruck": "Par camion",
+      "none": "Aucun plein sur cette période.",
+      "fills": "Pleins",
+      "litresCol": "Litres",
+      "km": "Distance",
+      "per100": "Aux 100 km",
+      "delivered": "Livré",
+      "perM3": "Par m³ livré",
+      "cost": "Coût",
+      "costPerM3": "Coût par m³",
+      "averagePrice": "Prix moyen du carburant acheté :",
+      "noPrice": "Aucun achat de carburant sur la période : pas de coût.",
+      "note": "Distance = écart entre le premier et le dernier compteur lus ; la consommation aux 100 km compte les pleins après le premier. Un plein en station est valorisé au prix moyen des achats.",
+      "purchaseTitle": "Enregistrer un achat de carburant (propriétaire)",
+      "totalPaid": "Total payé (MAD)",
+      "recordPurchase": "Enregistrer l'achat",
+      "purchaseSaved": "Achat enregistré.",
+      "recent": "Derniers pleins",
+      "errors": {
+        "INVALID": "Données invalides.",
+        "NOT_FOUND": "Camion introuvable.",
+        "ODOMETER": "Le compteur est plus bas qu'une lecture précédente.",
+        "CONFLICT": "Réessayez.",
+        "FORBIDDEN": "Action non autorisée.",
+        "UNAUTHENTICATED": "Session expirée."
+      }
     }
   },
   "effects": {

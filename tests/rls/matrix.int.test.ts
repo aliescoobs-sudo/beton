@@ -292,6 +292,28 @@ const FIXTURES: Record<
     visible: `select e.created_by::text as owner from trip_event e join trip_plan p on p.id = e.trip_id
                 where p.trip_date = '2095-03-02' and $1::text is not null`,
   },
+  fuel_fill: {
+    writers: ['owner', 'partner', 'plant'],
+    seed: async (tx, actor) => {
+      const scene = await deliveryScene(app, actors.owner, marker);
+      return tx.query(
+        `insert into fuel_fill (id, truck_id, filled_on, litres_ml, odometer_km, source, created_by)
+         values (gen_random_uuid(), $1, '2094-03-02', 180000, null, 'tank', $2)`,
+        [scene.truckId, actor],
+      );
+    },
+    visible: `select created_by::text as owner from fuel_fill where filled_on = '2094-03-02' and $1::text is not null`,
+  },
+  fuel_purchase: {
+    writers: ['owner'],
+    seed: (tx, actor) =>
+      tx.query(
+        `insert into fuel_purchase (id, purchased_on, litres_ml, total_centimes, created_by)
+         values (gen_random_uuid(), '2094-03-02', 1000000, 1234500, $1)`,
+        [actor],
+      ),
+    visible: `select created_by::text as owner from fuel_purchase where purchased_on = '2094-03-02' and $1::text is not null`,
+  },
   delivery_return: {
     // One return per delivery: each writer gets a delivery of its own (year 2098), made by the owner.
     writers: ['owner', 'partner', 'office', 'plant'],

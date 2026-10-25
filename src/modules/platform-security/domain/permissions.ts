@@ -108,6 +108,12 @@ export const PERMISSIONS = {
   'trips.track': PLANT,
   // Production and consumption report: quantities only (litres, grams), so the plant and the partner read it
   'reports.consumption': PLANT_READ,
+  // Fuel per truck: litres and kilometres are quantities (plant, owner, partner record; support reads); the purchases and
+  // the cost per litre and per m³ are money (the owner enters the purchases, the owner and support read the costs).
+  'fuel.read': PLANT_READ,
+  'fuel.write': PLANT,
+  'fuel.money': MONEY_READ,
+  'fuel.purchase': MONEY_WRITE,
   // Stock movements, physical count, plant import
   'stock.read': PLANT_READ,
   'stock.write': PLANT,
