@@ -1246,7 +1246,12 @@
         "UNAUTHENTICATED": "انتهت الجلسة.",
         "EXCESS_NEEDS_OWNER": "كمية تفوق الطلبية: المالك وحده يؤكدها."
       },
-      "continue": "متابعة"
+      "continue": "متابعة",
+      "partial": "استلام جزئي",
+      "remaining": "المتبقي {qty}",
+      "confirmExcess": "تأكيد كمية تفوق الطلبية (المالك)",
+      "receivePartial": "تسجيل هذا الاستلام",
+      "partialState": "جزئي: {count} استلام"
     }
   },
   "effects": {

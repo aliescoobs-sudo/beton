@@ -372,6 +372,13 @@
       "when": 1792591247002,
       "tag": "0052_office_doors",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1792591247003,
+      "tag": "0053_partial_receipts",
+      "breakpoints": true
     }
   ]
 }

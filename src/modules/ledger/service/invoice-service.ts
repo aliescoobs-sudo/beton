@@ -93,6 +93,14 @@ export async function createInvoice(
  * answer; each failure is audited and ten in ten minutes lock the actor out. Shared by `createInvoice` and the pilot
  * scenario (system actor). A role that reads money then learns the invoice id and the receivable; office learns the number only.
  */
+    if (row.rows[0]) {
+      id = row.rows[0].id;
+      effects.push({
+        kind: 'receivable',
+        clientCode: row.rows[0].client_code,
+        amountCentimes: Number(row.rows[0].total),
+      });
+    }
 export async function insertInvoiceRows(
   tx: pg.PoolClient,
   actor: SessionUser,
@@ -122,11 +130,7 @@ export async function insertInvoiceRows(
       ],
     );
   }
-  const effects: Effect[] = [
-    { kind: 'document', document: 'invoice', code: number },
-    { kind: 'receivable', clientCode: head.client_code, amountCentimes: totals.value.totalTtc },
-  ];
-  return ok({ id, number, effects: visibleEffects(effects, actor.role) });
+  return ok({ id, number, effects: actor.role ? visibleEffects(effects, actor.role) : effects });
 }
 
 export type CancelInvoiceError =

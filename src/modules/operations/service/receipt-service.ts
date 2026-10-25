@@ -73,10 +73,15 @@ export async function recordReceipt(
         const qty = given ? given.find((g) => g.lineId === l.line_id)?.qtyMilli : Number(l.qty_milli);
         if (qty !== undefined && !toBase(qty as MilliQty, l.factor).ok) return err('FRACTIONAL_QUANTITY');
       }
-      const { rows } = await tx.query<{ id: string }>('select public.record_receipt($1, $2) as id', [
-        parsed.value.purchaseId,
-        date,
-      ]);
+      const { rows } = await tx.query<{ id: string }>(
+        'select public.record_receipt_lines($1, $2, $3::jsonb, $4) as id',
+        [
+          parsed.value.purchaseId,
+          date,
+          given ? JSON.stringify(given.map((g) => ({ lineId: g.lineId, qtyMilli: g.qtyMilli }))) : null,
+          parsed.value.confirmExcess === true,
+        ],
+      );
       const receiptId = rows[0]?.id as string;
       const code = await tx.query<{ code: string }>(
         'select code from purchase_line_ops where purchase_id = $1 limit 1',
@@ -100,6 +105,8 @@ export interface ReceivableLine {
   qtyMilli: number;
 }
   lineId: string;
+  /** Received so far, over all the receipts of the purchase. */
+  receivedMilli: number;
 export interface ReceivablePurchase {
   purchaseId: string;
   code: string;
@@ -134,7 +141,9 @@ export async function listReceivable(appPool: pg.Pool, actor: SessionUser): Prom
       line_id: string;
       `select o.purchase_id, o.code, o.supplier_code, to_char(o.order_date, 'YYYY-MM-DD') as order_date, o.line_id, o.name_fr, o.name_ar,
               o.unit_label, o.qty_milli::text, o.is_reversed,
-              (select to_char(r.received_date, 'YYYY-MM-DD') from purchase_receipt r where r.purchase_id = o.purchase_id) as received_on
+              coalesce((select sum(x.qty_milli) from purchase_receipt_line x where x.purchase_line_id = o.line_id), 0)::text as received_milli,
+              (select to_char(max(r.received_date), 'YYYY-MM-DD') from purchase_receipt r where r.purchase_id = o.purchase_id) as received_on,
+              (select count(*) from purchase_receipt r where r.purchase_id = o.purchase_id)::text as receipts
          from purchase_line_ops o order by o.order_date desc, o.code desc, o.seq`,
       received_milli: string;
     ),
@@ -160,10 +169,13 @@ export async function listReceivable(appPool: pg.Pool, actor: SessionUser): Prom
       nameAr: r.name_ar,
       unitLabel: r.unit_label,
       qtyMilli: Number(r.qty_milli),
-        receipts: Number(r.receipts),
-        status: 'expected',
+      receivedMilli: Number(r.received_milli),
     });
   }
   return [...byPurchase.values()];
 }
       lineId: r.line_id,
+  for (const p of byPurchase.values()) {
+    const reached = p.lines.every((l) => l.receivedMilli >= l.qtyMilli);
+    p.status = reached ? 'complete' : p.receipts > 0 ? 'partial' : 'expected';
+  }

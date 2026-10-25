@@ -1246,7 +1246,12 @@
         "UNAUTHENTICATED": "Session expirée.",
         "EXCESS_NEEDS_OWNER": "Quantité supérieure à la commande : seul le propriétaire peut la confirmer."
       },
-      "continue": "Continuer"
+      "continue": "Continuer",
+      "partial": "Réception partielle",
+      "remaining": "reste {qty}",
+      "confirmExcess": "Confirmer une quantité supérieure à la commande (propriétaire)",
+      "receivePartial": "Enregistrer cette réception",
+      "partialState": "Partiel : {count} réception(s)"
     }
   },
   "effects": {

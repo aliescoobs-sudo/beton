@@ -186,7 +186,17 @@ describe('plant sees quantities only', () => {
     for (const role of ['plant', 'partner', 'owner', 'support'] as const) {
       const list = await listReceivable(app, users[role]);
       const mine = list.find((x) => x.purchaseId === p.id);
-      expect(mine?.lines).toEqual([{ nameFr: `ps${marker}`, nameAr: 'x', unitLabel: 't', qtyMilli: 30_000 }]);
+      expect(mine?.lines).toEqual([
+        {
+          lineId: expect.any(String),
+          nameFr: `ps${marker}`,
+          nameAr: 'x',
+          unitLabel: 't',
+          qtyMilli: 30_000,
+          receivedMilli: 0,
+        },
+      ]);
+      expect(mine?.status).toBe('expected');
       expect(mine?.receivedOn).toBeNull();
       expectNoFields(list, [
         'unitPriceHtCentimes',
@@ -197,6 +207,113 @@ describe('plant sees quantities only', () => {
       ]);
     }
     await expect(listReceivable(app, users.office)).rejects.toBeDefined();
+  });
+});
+
+describe('partial receipts and over-receipts (review of CP-OPS-1-3, point 3)', () => {
+  const lineOf = async (purchaseId: string) =>
+    (await listReceivable(app, users.owner)).find((x) => x.purchaseId === purchaseId)?.lines[0];
+
+  it('several receipts until the ordered quantity is reached, each adding its stock', async () => {
+    const p = await buy([cement(30_000)]);
+    const line = await lineOf(p.id);
+    if (!line) throw new Error('no line');
+    const before = await levelOf();
+    const first = await recordReceipt(
+      app,
+      users.plant,
+      { purchaseId: p.id, lines: [{ lineId: line.lineId, qtyMilli: 12_000 }] },
+      { today: TODAY },
+    );
+    expect(first.ok, JSON.stringify(first)).toBe(true);
+    expect((await levelOf()) - before).toBe(12_000_000);
+    expect((await listReceivable(app, users.plant)).find((x) => x.purchaseId === p.id)).toMatchObject({
+      status: 'partial',
+      receipts: 1,
+    });
+    // everything still expected: the remaining 18 t, once
+    const rest = await recordReceipt(app, users.plant, { purchaseId: p.id }, { today: TODAY });
+    expect(rest.ok, JSON.stringify(rest)).toBe(true);
+    expect((await levelOf()) - before).toBe(30_000_000);
+    expect((await listReceivable(app, users.plant)).find((x) => x.purchaseId === p.id)).toMatchObject({
+      status: 'complete',
+      receipts: 2,
+    });
+    expect(await recordReceipt(app, users.plant, { purchaseId: p.id }, { today: TODAY })).toEqual({
+      ok: false,
+      error: 'ALREADY_RECEIVED',
+    });
+  });
+
+  it('more than ordered needs the owner and his confirmation; the receipt is flagged', async () => {
+    const p = await buy([cement(10_000)]);
+    const line = await lineOf(p.id);
+    if (!line) throw new Error('no line');
+    const over = { purchaseId: p.id, lines: [{ lineId: line.lineId, qtyMilli: 10_500 }] };
+    const before = await levelOf();
+    for (const user of [users.plant, users.partner]) {
+      expect(await recordReceipt(app, user, { ...over, confirmExcess: true }, { today: TODAY })).toEqual({
+        ok: false,
+        error: 'EXCESS_NEEDS_OWNER',
+      });
+    }
+    expect(await recordReceipt(app, users.owner, over, { today: TODAY })).toEqual({
+      ok: false,
+      error: 'EXCESS_NEEDS_OWNER',
+    });
+    expect(await levelOf()).toBe(before);
+    const ok = await recordReceipt(app, users.owner, { ...over, confirmExcess: true }, { today: TODAY });
+    expect(ok.ok, JSON.stringify(ok)).toBe(true);
+    expect((await levelOf()) - before).toBe(10_500_000);
+    const flagged = await inCtx(users.owner, (tx) =>
+      tx.query<{ over_receipt: boolean }>(
+        'select over_receipt from purchase_receipt where purchase_id = $1',
+        [p.id],
+      ),
+    );
+    expect(flagged.rows).toEqual([{ over_receipt: true }]);
+  });
+
+  it('refuses a line of another purchase, a zero quantity and a fraction of a base unit', async () => {
+    const p = await buy([cement(10_000)]);
+    const other = await buy([cement(10_000)]);
+    const foreign = await lineOf(other.id);
+    const line = await lineOf(p.id);
+    if (!foreign || !line) throw new Error('no line');
+    const call = (lines: unknown[]) =>
+      recordReceipt(app, users.plant, { purchaseId: p.id, lines }, { today: TODAY });
+    expect((await call([{ lineId: foreign.lineId, qtyMilli: 1_000 }])).ok).toBe(false);
+    expect((await call([{ lineId: line.lineId, qtyMilli: 0 }])).ok).toBe(false);
+    expect(
+      (
+        await call([
+          { lineId: line.lineId, qtyMilli: 1_000 },
+          { lineId: line.lineId, qtyMilli: 1_000 },
+        ])
+      ).ok,
+    ).toBe(false);
+    expect(await levelOf()).toBeGreaterThanOrEqual(0);
+  });
+
+  it('the receipt lines are quantities only: plant and partner read them, office does not, nobody writes them directly', async () => {
+    const p = await buy([cement(10_000)]);
+    await recordReceipt(app, users.plant, { purchaseId: p.id }, { today: TODAY });
+    for (const role of ['plant', 'partner', 'owner', 'support'] as const) {
+      expect(
+        (await inCtx(users[role], (tx) => tx.query('select 1 from purchase_receipt_line'))).rows.length,
+        role,
+      ).toBeGreaterThan(0);
+    }
+    expect((await inCtx(users.office, (tx) => tx.query('select 1 from purchase_receipt_line'))).rows).toEqual(
+      [],
+    );
+    await expect(
+      inCtx(users.owner, (tx) =>
+        tx.query(
+          `insert into purchase_receipt_line (id, receipt_id, purchase_line_id, qty_milli) values (gen_random_uuid(), gen_random_uuid(), gen_random_uuid(), 1)`,
+        ),
+      ),
+    ).rejects.toMatchObject({ code: '42501' });
   });
 });
 

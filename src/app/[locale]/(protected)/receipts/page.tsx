@@ -50,7 +50,7 @@ export default async function ReceiptsPage({ params }: { params: Promise<{ local
                       <li key={i}>
                         {locale === 'ar' ? l.nameAr : l.nameFr} ·{' '}
                         <bdi dir="ltr">
-                          {formatM3(l.qtyMilli)} {l.unitLabel}
+                          {formatM3(l.receivedMilli)} / {formatM3(l.qtyMilli)} {l.unitLabel}
                         </bdi>
                       </li>
                     ))}
@@ -62,7 +62,30 @@ export default async function ReceiptsPage({ params }: { params: Promise<{ local
                       {t('receivedOn')} <bdi dir="ltr">{p.receivedOn}</bdi>
                     </StatusPill>
                   ) : (
-                    <StatusPill status="due">{t('expected')}</StatusPill>
+                    <div className="space-y-2">
+                      {p.status === 'partial' && (
+                        <StatusPill status="due" data-testid={`partial-${p.code}`}>
+                          {t('partialState', { count: p.receipts })}
+                        </StatusPill>
+                      )}
+                      {canReceive ? (
+                        <ReceiveButton
+                          purchaseId={p.purchaseId}
+                          code={p.code}
+                          canConfirmExcess={can(user.role, 'ledger.reverse')}
+                          lines={p.lines.map((l) => ({
+                            lineId: l.lineId,
+                            name: locale === 'ar' ? l.nameAr : l.nameFr,
+                            unit: l.unitLabel,
+                            ordered: l.qtyMilli,
+                            received: l.receivedMilli,
+                          }))}
+                          receive={receiveAction}
+                        />
+                      ) : p.status === 'expected' ? (
+                        <StatusPill status="due">{t('expected')}</StatusPill>
+                      ) : null}
+                    </div>
                   )}
                 </Td>
               </tr>
