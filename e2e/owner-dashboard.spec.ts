@@ -38,6 +38,13 @@ const asOwner = async <T>(fn: (tx: pg.PoolClient) => Promise<T>): Promise<T> => 
   return withRlsContext(app, { userId: owner.id, role: 'owner', requestId: 'e2e-dashboard' }, fn);
 };
 
+/** The list shows the first alerts of each severity and the rest behind a "more" summary: other specs leave alerts of their own. */
+const expandAlerts = (page: import('@playwright/test').Page) =>
+  page
+    .getByTestId('alerts-list')
+    .locator('details > summary')
+    .evaluateAll((els) => els.forEach((e) => (e as HTMLElement).click()));
+
 test('data: a bank, a cheque we issued for a few days from now, a post-dated cheque in hand', async () => {
   const owner = await realSessionUser(env.DATABASE_URL_MIGRATOR, 'owner');
   const office = await realSessionUser(env.DATABASE_URL_MIGRATOR, 'office');
@@ -108,7 +115,8 @@ test("the owner sees the black day, its causes, the forecast and the alerts; the
   await expect(page.getByTestId('black-causes')).toContainText(topCause.code);
   await expect(page.getByTestId('forecast-chart')).toBeVisible();
   await expect(page.getByTestId('alerts-list')).toBeVisible();
-  await expect(page.getByTestId('alert-CASH-DEFICIT')).toBeVisible();
+  await expandAlerts(page);
+  await expect(page.getByTestId('alert-CASH-DEFICIT').first()).toBeVisible();
   await expect(page.getByTestId('brief')).toContainText('Encaissé');
 
   // AC-DASH-06: the first day shows the engine's balance to the centime.
@@ -135,7 +143,8 @@ test('a second visit stores nothing new; the report ranks the early deposit firs
   await expect(page.getByTestId('owner-today')).toBeVisible();
   expect(await events()).toBe(before); // AC-RE-07
 
-  await page.getByTestId('alert-CASH-DEFICIT').locator('a').click();
+  await expandAlerts(page);
+  await page.getByTestId('alert-CASH-DEFICIT').locator('a').first().click();
   await expect(page.getByTestId('alert-report')).toBeVisible();
   await expect(page.getByTestId('report-first')).toContainText('Première détection');
   const first = page.getByTestId('option-1');
@@ -182,6 +191,7 @@ test('a second visit stores nothing new; the report ranks the early deposit firs
 
 test('reclassifying needs a reason and is kept with the computed severity', async ({ page }) => {
   await loginOwner(page, 'fr');
+  await expandAlerts(page);
   await page
     .getByTestId('alert-CASH-DEFICIT-WORST')
     .locator('a')

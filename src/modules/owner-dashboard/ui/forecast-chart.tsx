@@ -114,7 +114,7 @@ export async function ForecastChart({
         </p>
       )}
 
-      <div className="max-w-full overflow-x-auto" dir="ltr">
+      <div className="relative max-w-full overflow-x-auto" dir="ltr">
         <div className={n > 8 ? 'min-w-[1380px]' : 'min-w-[736px]'}>
           <svg
             viewBox={`0 0 ${n * W} ${H}`}
