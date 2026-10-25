@@ -1495,6 +1495,33 @@
         "FORBIDDEN": "Action non autorisée.",
         "UNAUTHENTICATED": "Session expirée."
       }
+    },
+    "analytics": {
+      "link": "Volumes vendus",
+      "title": "Volumes vendus",
+      "intro": "Les m³ livrés par jour, semaine ou mois, par type de béton, par client ou par zone, à partir des chargements.",
+      "from": "Du",
+      "to": "Au",
+      "period": "Période",
+      "periods": {
+        "day": "Jour",
+        "week": "Semaine",
+        "month": "Mois"
+      },
+      "by": "Par",
+      "dimensions": {
+        "type": "Type de béton",
+        "client": "Client",
+        "zone": "Zone"
+      },
+      "show": "Afficher",
+      "invalid": "Paramètres invalides.",
+      "none": "Aucune livraison sur cette période.",
+      "volume": "Volume",
+      "amount": "Montant HT",
+      "total": "Total livré :",
+      "note": "Quantités seulement : les montants sont réservés au propriétaire.",
+      "noteMoney": "Montant HT = m³ × prix unitaire de la commande, arrondi une fois par chargement ; un chargement annulé retire son montant."
     }
   },
   "effects": {

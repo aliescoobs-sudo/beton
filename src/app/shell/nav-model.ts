@@ -70,6 +70,12 @@ const GROUPS: GroupDef[] = [
         testId: 'selling-prices-link',
         allowed: 'selling_prices.read',
       },
+      {
+        path: '/analytics',
+        labelKey: 'operations.analytics.link',
+        testId: 'analytics-link',
+        allowed: 'analytics.read',
+      },
     ],
   },
   {

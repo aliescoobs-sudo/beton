@@ -98,6 +98,8 @@ export default async function globalSetup() {
       [E2E_MD.fuelPartner, 'partner', 'fr'],
       [E2E_MD.lossPlant, 'plant', 'fr'],
       [E2E_MD.lossOffice, 'office', 'fr'],
+      [E2E_MD.anPartner, 'partner', 'fr'],
+      [E2E_MD.anPlant, 'plant', 'fr'],
       [E2E_MD.dashPartner, 'partner', 'fr'],
       [E2E_MD.flowOffice, 'office', 'fr'],
       [E2E_MD.viewOffice, 'office', 'fr'],

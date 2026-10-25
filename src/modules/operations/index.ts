@@ -82,3 +82,4 @@ export {
   recordFuelFill,
   recordFuelPurchase,
 } from './service/fuel-service';
+export { getVolumeAnalytics, type VolumeAnalytics } from './service/analytics-service';

@@ -49,6 +49,15 @@ export {
   tripTimes,
 } from './trip-times';
 export {
+  amountBy,
+  type AmountRow,
+  type Dimension,
+  type PricedLoad,
+  type SoldLoad,
+  volumeBy,
+  type VolumeRow,
+} from './volume-analytics';
+export {
   fuelCosts,
   type FuelFill,
   fuelPrice,

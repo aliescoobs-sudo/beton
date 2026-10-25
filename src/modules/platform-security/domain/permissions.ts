@@ -116,6 +116,10 @@ export const PERMISSIONS = {
   'fuel.write': PLANT,
   'fuel.money': MONEY_READ,
   'fuel.purchase': MONEY_WRITE,
+  // Sales volume analytics: m³ delivered per day, week, month and per client, type, zone (owner, partner, support);
+  // the amounts (m³ × the order's price) are money: owner and support only.
+  'analytics.read': MANAGERS_READ,
+  'analytics.money': MONEY_READ,
   // Stock movements, physical count, plant import
   'stock.read': PLANT_READ,
   'stock.write': PLANT,
