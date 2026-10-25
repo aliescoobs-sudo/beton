@@ -34,3 +34,10 @@ export {
   type ReceivedStock,
 } from './service/receipt-service';
 export { type OpsScenarioResult, seedOperationsScenario } from './service/pilot-ops';
+export {
+  confirmExcess,
+  type ConfirmExcessError,
+  type ExcessView,
+  listExcesses,
+} from './service/excess-service';
+export { withinTolerance } from './service/delivery-service';

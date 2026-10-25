@@ -95,6 +95,9 @@ export const PERMISSIONS = {
   'deliveries.write': PLANT,
   // Cancelling a load writes a reversing row and reversing stock movements: managers
   'deliveries.cancel': MANAGERS,
+  // A load beyond the order volume is recorded; the owner confirms it (it will be billed at the order's price)
+  'deliveries.excess_read': ['owner', 'partner', 'support'],
+  'deliveries.excess_confirm': MONEY_WRITE,
   'deliveries.bl_return': ['owner', 'partner', 'office', 'plant'],
   // Stock movements, physical count, plant import
   'stock.read': PLANT_READ,

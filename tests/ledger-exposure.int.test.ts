@@ -77,6 +77,7 @@ describe('functions the application role can execute', () => {
     'public.ops_parameter(p_key text)',
     'public.next_doc_number(p_prefix text, p_year integer, p_width integer)',
     'public.record_receipt(p_purchase uuid, p_date date)',
+    'public.record_receipt_lines(p_purchase uuid, p_date date, p_lines jsonb, p_confirm_excess boolean)',
     'public.resolve_selling_price(p_type uuid, p_client uuid, p_date date)',
   ];
 

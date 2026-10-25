@@ -67,6 +67,12 @@ export const PARAMETERS = {
     schema: z.number().int().min(30).max(240),
     description: 'Minutes concrete stays workable after loading (R4)',
   },
+  load_excess_tolerance_bp: {
+    default: 500,
+    schema: z.number().int().min(0).max(5000),
+    description:
+      'Load beyond the order volume that is only a minor excess, as a share of the order (basis points)',
+  },
   unloading_min: {
     default: 30,
     schema: z.number().int().min(0).max(120),

@@ -910,7 +910,61 @@ export const TABLE_ACCESS = {
     noDelete: true,
     insertOnly: true,
     exception:
-      'ledger L21 / operations O5: the receipt of a purchase, once (unique per purchase). No INSERT grant for the application: only public.record_receipt() writes it (owner, partner, plant; a reviewed SECURITY DEFINER function that returns the id and no amount), together with the stock movements, which the database checks against the purchase lines and for completeness at commit. Quantities only, so no money flag; office reads nothing.',
+      'ledger L21 / operations O5: a receipt of a purchase (several per purchase until each line reaches its ordered quantity). No INSERT grant for the application: only public.record_receipt() writes it (owner, partner, plant; a reviewed SECURITY DEFINER function that returns the id and no amount), together with the stock movements, which the database checks against the purchase lines and for completeness at commit. Quantities only, so no money flag; office reads nothing.',
+  },
+  delivery_excess: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'all',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'Review of CP-OPS-1-3, point 4: the litres of a load that go past the order volume, written by the AFTER INSERT trigger of delivery (no INSERT grant for the application), so no path can load past an order without the record. Volumes only; derived from the facts, never edited.',
+  },
+  delivery_excess_confirmation: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'none',
+      plant: 'none',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      "Review of CP-OPS-1-3, point 4: the owner's confirmation that an excess load is billed at the order's price (once per excess, with an optional note; step-up). Owner writes, owner, partner and support read.",
+  },
+  purchase_receipt_line: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'none',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'Review of CP-OPS-1-3, point 3: what a receipt took in, line by line (thousandths of the purchase unit), so a purchase can be received in several parts. No INSERT grant for the application: only public.record_receipt_lines() writes it, with the stock movements; more than ordered is flagged on the receipt and needs the owner. Quantities only, no money; office reads nothing.',
   },
   stock_threshold: {
     kind: 'rls',

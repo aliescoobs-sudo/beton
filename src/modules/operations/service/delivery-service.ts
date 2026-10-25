@@ -48,16 +48,31 @@ export interface CreatedLoad {
   id: string;
   blNo: string;
   volumeL: number;
-  /** `LONG_TRIP`: the trip plus the unloading is more than the concrete's workable time (R4). Not a refusal. */
-  warnings: 'LONG_TRIP'[];
+  /**
+   * `LONG_TRIP`: the trip plus the unloading is more than the concrete's workable time (R4). `OVER_ORDER`: the order is now
+   * loaded past its volume, `OVER_ORDER_MINOR` when the excess is within the tolerance. Warnings, never a refusal.
+   */
+  warnings: ('LONG_TRIP' | 'OVER_ORDER' | 'OVER_ORDER_MINOR')[];
+  /** Litres of this load that go past the order volume (0 when none): recorded for the owner to confirm. */
+  excessL: number;
   /** What the load changed: the BL, what is left of the order, the stock of every component. Filtered by role. */
   effects: Effect[];
 }
 
 /** An operations parameter as the roles that load trucks may read it (the plant cannot read the parameter table). */
-async function opsParameter(tx: pg.PoolClient, key: 'concrete_limit_min' | 'unloading_min'): Promise<number> {
+async function opsParameter(
+  tx: pg.PoolClient,
+  key: 'concrete_limit_min' | 'unloading_min' | 'load_excess_tolerance_bp',
+): Promise<number> {
   const { rows } = await tx.query<{ value: unknown }>('select public.ops_parameter($1) as value', [key]);
   return parameterOrDefault(key, rows[0]?.value);
+}
+
+const loadedNow = (before: number | undefined, volumeL: number): number => Number(before ?? 0) + volumeL;
+
+/** The excess over the order volume is "minor" when it is within `toleranceBp` of that volume (parameter). */
+export function withinTolerance(orderVolumeL: number, loadedL: number, toleranceBp: number): boolean {
+  return (loadedL - orderVolumeL) * 10_000 <= toleranceBp * orderVolumeL;
 }
 
 /** The recette in force for a type on a business date (the latest version that has started), or null. */
@@ -117,11 +132,19 @@ export async function createLoad(
       const volumeL = v.volumeL ?? Math.min(left, t.capacity_l);
       if (volumeL <= 0) return err('OVER_ORDER');
       if (volumeL > t.capacity_l) return err('OVER_CAPACITY');
-      if (volumeL > left) return err('OVER_ORDER');
+      const excessL = Math.max(0, volumeL - left);
       const recetteId = await recetteInForce(tx, o.concrete_type_id, deps.today);
       if (!recetteId) return err('NO_RECETTE');
 
-      const warnings: 'LONG_TRIP'[] = [];
+      const warnings: CreatedLoad['warnings'] = [];
+      if (excessL > 0) {
+        const tolerance = await opsParameter(tx, 'load_excess_tolerance_bp');
+        warnings.push(
+          withinTolerance(o.volume_l, loadedNow(loaded.rows[0]?.v, volumeL), tolerance)
+            ? 'OVER_ORDER_MINOR'
+            : 'OVER_ORDER',
+        );
+      }
       if (o.zone_id) {
         const zone = await tx.query<{ one_way_min: number }>('select one_way_min from zone where id = $1', [
           o.zone_id,
@@ -150,7 +173,7 @@ export async function createLoad(
         { kind: 'remaining', orderCode: o.code, remainingL: left - volumeL },
         ...(await stockEffects(tx, 'delivery', id)),
       ];
-      return ok({ id, blNo, volumeL, warnings, effects: visibleEffects(effects, actor.role) });
+      return ok({ id, blNo, volumeL, warnings, excessL, effects: visibleEffects(effects, actor.role) });
     });
   } catch (error) {
     return err(deliveryFailure(error));

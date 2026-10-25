@@ -58,6 +58,21 @@ export function ReceiveButton({
     }
   }
 
+  function submitPartial(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const picked: { lineId: string; qtyMilli: number }[] = [];
+    for (const l of lines) {
+      const text = String(data.get(`qty-${l.lineId}`) ?? '').trim();
+      if (text === '' || text === '0') continue;
+      const parsed = parseMilliQty(text);
+      if (!parsed.ok) return setMessage(t('errors.INVALID'));
+      picked.push({ lineId: l.lineId, qtyMilli: parsed.value });
+    }
+    if (picked.length === 0) return setMessage(t('errors.INVALID'));
+    void send({ lines: picked, confirmExcess: data.get('excess') === 'on' });
+  }
+
   if (effects)
     return (
       <div data-testid={`receipt-done-${code}`} className="text-sm">
@@ -80,10 +95,57 @@ export function ReceiveButton({
     );
 
   return (
-    <span className="inline-flex flex-col gap-1">
-      <Button type="button" disabled={pending} onClick={click} data-testid={`receive-${code}`}>
-        {t('receive')}
-      </Button>
+    <span className="inline-flex flex-col gap-2">
+      <span className="inline-flex flex-wrap gap-2">
+        <Button
+          type="button"
+          disabled={pending}
+          onClick={() => void send({})}
+          data-testid={`receive-${code}`}
+        >
+          {t('receive')}
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          disabled={pending}
+          onClick={() => setPartial((v) => !v)}
+          data-testid={`receive-partial-${code}`}
+        >
+          {t('partial')}
+        </Button>
+      </span>
+      {partial && (
+        <form onSubmit={submitPartial} className="form-band space-y-2" data-testid={`receive-form-${code}`}>
+          {lines.map((l) => {
+            const remaining = Math.max(0, l.ordered - l.received);
+            return (
+              <label key={l.lineId} className="block text-sm">
+                <span className="field-label">
+                  {l.name} · {t('remaining', { qty: `${formatM3(remaining)} ${l.unit}` })}
+                </span>
+                <input
+                  name={`qty-${l.lineId}`}
+                  inputMode="decimal"
+                  dir="ltr"
+                  defaultValue={remaining > 0 ? formatM3(remaining) : ''}
+                  className="input num mt-1 w-32"
+                  data-testid={`receive-qty-${code}-${l.lineId}`}
+                />
+              </label>
+            );
+          })}
+          {canConfirmExcess && (
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" name="excess" data-testid={`receive-excess-${code}`} />
+              {t('confirmExcess')}
+            </label>
+          )}
+          <Button type="submit" disabled={pending} data-testid={`receive-submit-${code}`}>
+            {t('receivePartial')}
+          </Button>
+        </form>
+      )}
       {message && (
         <span role="alert" className="text-sm text-signal" data-testid={`receive-error-${code}`}>
           {message}

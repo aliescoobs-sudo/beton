@@ -339,6 +339,46 @@ const FIXTURES: Record<
     visible: `select r.created_by::text as owner from purchase_receipt r join purchase_line_ops o on o.purchase_id = r.purchase_id
                 where o.name_fr = 'ps' || $1`,
   },
+  delivery_excess: {
+    // Written by the AFTER INSERT trigger of delivery: every writer loads an order of its own past its volume (8 m³ twice, 10 ordered).
+    // The loads carry a loading time derived from the marker, which is how the rows are found again (the partner and the plant
+    // read no order or client).
+    writers: ['owner', 'partner', 'plant'],
+    seed: async (tx, actor) => {
+      const scene = await deliveryScene(app, actors.owner, `${marker}x${actor.replace(/-/g, '').slice(-8)}`);
+      await insertDelivery(tx, actor, scene, 8_000, 2026, markedAt(marker));
+      return insertDelivery(tx, actor, scene, 8_000, 2026, markedAt(marker));
+    },
+    visible: `select x.created_by::text as owner from delivery_excess x join delivery d on d.id = x.delivery_id
+                where d.loaded_at = ${MARKED_SQL}`,
+  },
+  delivery_excess_confirmation: {
+    writers: ['owner'],
+    seed: async (tx, actor) => {
+      const scene = await deliveryScene(app, actors.owner, `${marker}y`);
+      await insertDelivery(tx, actor, scene, 8_000, 2026, markedAt(`${marker}c`));
+      await insertDelivery(tx, actor, scene, 8_000, 2026, markedAt(`${marker}c`));
+      return tx.query(
+        `insert into delivery_excess_confirmation (id, excess_id, created_by)
+         select gen_random_uuid(), x.id, $2 from delivery_excess x join delivery d on d.id = x.delivery_id
+          where d.loaded_at = ${MARKED_C_SQL} and d.order_id = $3 limit 1`,
+        [marker, actor, scene.orderId],
+      );
+    },
+    visible: `select cf.created_by::text as owner from delivery_excess_confirmation cf join delivery_excess x on x.id = cf.excess_id
+                join delivery d on d.id = x.delivery_id where d.loaded_at = ${MARKED_C_SQL}`,
+  },
+  purchase_receipt_line: {
+    // Written with its receipt by record_receipt() (owner, partner, plant); every writer receives a purchase of its own.
+    writers: ['owner', 'partner', 'plant'],
+    seed: async (tx) => {
+      const pm = await purchaseMaster(app, actors.owner, `${marker}l`);
+      const p = await newReceivablePurchase(app, actors.owner, pm, `${marker}l`);
+      return tx.query(`select public.record_receipt($1, '2026-06-02')`, [p.id]);
+    },
+    visible: `select r.created_by::text as owner from purchase_receipt_line rl join purchase_receipt r on r.id = rl.receipt_id
+                join purchase_line_ops o on o.purchase_id = r.purchase_id where o.name_fr = 'ps' || $1 || 'l'`,
+  },
   stock_threshold: {
     writers: ['owner', 'partner'],
     seed: async (tx, actor) => {

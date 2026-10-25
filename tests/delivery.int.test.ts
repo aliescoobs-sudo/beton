@@ -98,17 +98,90 @@ describe('createLoad (AC-OPS-01)', () => {
     const o = await order();
     expect(await load(users.plant, o.id, 9000)).toEqual({ ok: false, error: 'OVER_CAPACITY' });
     expect((await load(users.plant, o.id, 8000)).ok).toBe(true);
-    expect(await load(users.plant, o.id, 3000)).toEqual({ ok: false, error: 'OVER_ORDER' });
+    // 2 m³ left: 3 m³ goes 1 m³ past the order, more than the 5 % tolerance (0,5 m³)
+    const over = await load(users.plant, o.id, 3000);
+    expect(over).toMatchObject({
+      ok: true,
+      value: { volumeL: 3000, excessL: 1000, warnings: ['OVER_ORDER'] },
+    });
     await expect(
       inCtx(users.plant, (tx) =>
         insertDelivery(tx, users.plant.id, { orderId: o.id, truckId, recetteId }, 9000),
       ),
     ).rejects.toMatchObject({ code: '23514' });
+  });
+
+  it('a small excess within the tolerance is only a minor warning; the database records both, nothing else writes the record', async () => {
+    const o = await order();
+    expect((await load(users.plant, o.id, 8000)).ok).toBe(true);
+    const minor = await load(users.plant, o.id, 2400); // 400 L past 10 000: within 5 %
+    expect(minor).toMatchObject({ ok: true, value: { excessL: 400, warnings: ['OVER_ORDER_MINOR'] } });
+    const rows = await inCtx(users.owner, (tx) =>
+      tx.query<{ excess_l: number }>(
+        'select x.excess_l from delivery_excess x join delivery d on d.id = x.delivery_id where d.order_id = $1',
+        [o.id],
+      ),
+    );
+    expect(rows.rows).toEqual([{ excess_l: 400 }]);
     await expect(
       inCtx(users.plant, (tx) =>
-        insertDelivery(tx, users.plant.id, { orderId: o.id, truckId, recetteId }, 3000),
+        tx.query(
+          `insert into delivery_excess (id, delivery_id, excess_l, created_by) values (gen_random_uuid(), gen_random_uuid(), 1, $1)`,
+          [users.plant.id],
+        ),
       ),
-    ).rejects.toMatchObject({ code: '23514' });
+    ).rejects.toMatchObject({ code: '42501' });
+  });
+
+  it('the owner confirms an excess once, with a note; partner reads, plant and office do not confirm', async () => {
+    const o = await order();
+    await load(users.plant, o.id, 8000);
+    await load(users.plant, o.id, 4000); // 2 000 L past the order
+    const list = async (u: SessionUser) => (await listExcesses(app, u)).filter((x) => x.orderCode === o.code);
+    const [first] = await list(users.owner);
+    expect(first).toMatchObject({
+      excessL: 2000,
+      minor: false,
+      confirmed: false,
+      orderL: 10_000,
+      loadedL: 12_000,
+    });
+    expect((await list(users.partner)).length).toBe(1);
+    expect((await list(users.support)).length).toBe(1);
+    await expect(listExcesses(app, users.plant)).rejects.toBeDefined();
+    for (const u of [users.plant, users.office, users.partner, users.support])
+      await expect(confirmExcess(app, u, { excessId: first?.id })).rejects.toBeDefined();
+    expect(
+      await confirmExcess(app, users.owner, { excessId: first?.id, note: 'accord verbal du client' }),
+    ).toMatchObject({ ok: true });
+    expect(await confirmExcess(app, users.owner, { excessId: first?.id })).toEqual({
+      ok: false,
+      error: 'ALREADY_CONFIRMED',
+    });
+    expect((await list(users.owner))[0]).toMatchObject({
+      confirmed: true,
+      confirmedNote: 'accord verbal du client',
+    });
+    expect(await confirmExcess(app, users.owner, { excessId: randomUUID() })).toEqual({
+      ok: false,
+      error: 'NOT_FOUND',
+    });
+  });
+
+  it('an excess load that is cancelled no longer counts', async () => {
+    const o = await order();
+    await load(users.plant, o.id, 8000);
+    const over = await load(users.plant, o.id, 4000);
+    if (!over.ok) throw new Error(over.error);
+    expect((await listExcesses(app, users.owner)).filter((x) => x.orderCode === o.code)).toHaveLength(1);
+    const cancelled = await cancelLoad(
+      app,
+      users.owner,
+      { deliveryId: over.value.id, reason: 'erreur de saisie' },
+      { today: TODAY },
+    );
+    expect(cancelled.ok, JSON.stringify(cancelled)).toBe(true);
+    expect((await listExcesses(app, users.owner)).filter((x) => x.orderCode === o.code)).toHaveLength(0);
   });
 
   it('refuses a cancelled order, an unknown order or truck, and a type with no recette in force', async () => {
@@ -159,12 +232,16 @@ describe('createLoad (AC-OPS-01)', () => {
     ).rejects.toMatchObject({ code: '23514' });
   });
 
-  it('5 loads of 3 m³ at once on a 10 m³ order: exactly 3 succeed', async () => {
+  it('5 loads of 3 m³ at once on a 10 m³ order: none is refused, and the excess recorded adds up to exactly 5 m³ (no race)', async () => {
     const o = await order();
     const results = await Promise.all(Array.from({ length: 5 }, () => load(users.plant, o.id, 3000)));
     expect(results.filter((r) => r.ok)).toHaveLength(5);
     const sum = await inCtx(users.owner, (tx) =>
-      tx.query<{ s: string }>('select sum(volume_l)::text as s from delivery where order_id = $1', [o.id]),
+      tx.query<{ s: string; x: string }>(
+        `select (select sum(volume_l) from delivery where order_id = $1)::text as s,
+                (select coalesce(sum(x.excess_l), 0) from delivery_excess x join delivery d on d.id = x.delivery_id where d.order_id = $1)::text as x`,
+        [o.id],
+      ),
     );
     expect(sum.rows[0]).toEqual({ s: '15000', x: '5000' });
   });
