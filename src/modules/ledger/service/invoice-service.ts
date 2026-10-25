@@ -44,22 +44,6 @@ export const invoiceFailure = (error: unknown): InvoiceError => {
   throw error;
 };
 
-interface SourceRow {
-  order_id: string;
-  order_code: string;
-  type_code: string;
-  client_id: string;
-  client_code: string;
-  client_name: string;
-  client_ice: string | null;
-  unit_price_ht_centimes: string;
-  vat_rate_bp: number;
-  delivery_id: string;
-  bl_no: string;
-  load_date: string;
-  volume_l: number;
-}
-
 /**
  * Invoices the loads of an order (AC-LED-08, 09, 15): one line per load at the order's unit price, the client's name and
  * ICE and the order's VAT rate copied onto the invoice, the number FA-YYYY-nnnnn from the gapless counter, the due date

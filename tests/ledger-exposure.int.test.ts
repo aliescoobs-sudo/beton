@@ -354,10 +354,10 @@ describe('the money tables themselves, for the roles that must not read them', (
     const invoice = await failure(
       as('office', (tx) =>
         tx.query(
-          `insert into sales_order (id, code, client_id, concrete_type_id, volume_l, order_date, delivery_date, selling_price_id,
-                                    unit_price_ht_centimes, vat_rate_bp, total_ht_centimes, total_vat_centimes, total_ttc_centimes, created_by)
-           values (gen_random_uuid(), $1, $2, $3, 10000, '2026-06-01', '2026-06-02', $4, 78000, 2000, 780000, 156000, 936000, $5)`,
-          [existing.rows[0]?.code, master.clientId, master.typeId, master.sellingPriceId, actors.office.id],
+          `insert into invoice (id, number, order_id, client_id, client_name, invoice_date, issue_deadline, due_date, vat_rate_bp,
+                                total_ht_centimes, total_vat_centimes, total_ttc_centimes, created_by)
+           values (gen_random_uuid(), 'FA-X', gen_random_uuid(), $1, 'x', '2026-06-01', '2026-06-30', '2026-07-30', 2000, 1, 0, 1, $2)`,
+          [master.clientId, actors.office.id],
         ),
       ),
     );

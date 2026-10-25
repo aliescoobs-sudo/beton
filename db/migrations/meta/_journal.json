@@ -393,6 +393,13 @@
       "when": 1792591247005,
       "tag": "0055_thresholds_one_source",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1792591247006,
+      "tag": "0056_delivery_note_client_name",
+      "breakpoints": true
     }
   ]
 }

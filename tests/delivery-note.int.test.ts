@@ -52,7 +52,7 @@ describe('delivery note (AC-OPS-11)', () => {
   it('the client name is on the note for every role that prints it, the plant included (DECISIONS 83)', async () => {
     expect((await getDeliveryNote(app, users.office, deliveryId))?.clientName).toBe(`dl${marker}`);
     expect((await getDeliveryNote(app, users.owner, deliveryId))?.clientName).toBe(`dl${marker}`);
-    expect((await getDeliveryNote(app, users.plant, deliveryId))?.clientName).toBeNull();
+    expect((await getDeliveryNote(app, users.plant, deliveryId))?.clientName).toBe(`dl${marker}`);
   });
 
   it('carries no price, total, plan, payment or client contact, for any role', async () => {
