@@ -49,7 +49,8 @@ DECLARE
 BEGIN
   FOREACH t IN ARRAY ARRAY['money_account', 'opening_balance', 'ledger_opening', 'opening_party_balance', 'sales_order',
                            'payment_plan_item', 'payment_instrument', 'instrument_event', 'allocation', 'purchase',
-                           'purchase_line', 'purchase_plan_item', 'stock_threshold', 'invoice', 'invoice_line', 'delivery', 'delivery_return', 'stock_movement'] LOOP
+                           'purchase_line', 'purchase_plan_item', 'stock_threshold', 'invoice', 'invoice_line', 'delivery', 'delivery_return', 'stock_movement',
+                           'company_profile'] LOOP
     EXECUTE format('GRANT SELECT, INSERT ON public.%I TO belgobeton_seed', t);
     EXECUTE format('DROP POLICY IF EXISTS seed_read ON public.%I', t);
     EXECUTE format('CREATE POLICY seed_read ON public.%I FOR SELECT TO belgobeton_seed USING (ctx.role() = ''system'')', t);

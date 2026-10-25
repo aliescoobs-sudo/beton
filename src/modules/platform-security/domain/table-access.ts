@@ -858,6 +858,25 @@ export const TABLE_ACCESS = {
     exception:
       'operations O5: low-stock threshold per component in base units (insert-only, the latest row is in force). Owner and partner write; owner, partner, plant and support read; no money.',
   },
+  company_profile: {
+    kind: 'rls',
+    seed: 'insert',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'all',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'ledger L29: our own legal identity (ICE, IF, RC, patente, address, RIB), versioned and insert-only: a change is a new row, the profile in force is the latest that has started. No money: every signed-in role reads it (delivery notes carry it); only the owner writes.',
+  },
   correction_request: {
     kind: 'rls',
     read: {

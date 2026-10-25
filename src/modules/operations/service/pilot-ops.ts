@@ -385,6 +385,17 @@ export async function seedOperationsScenario(
         `select to_char(opening_date, 'YYYY-MM-DD') as d from ledger_opening`,
       );
       if (!opening.rows[0]) throw new Error('Run the ledger scenario first (corepack pnpm db:scenario)');
+      // Our own (fake) legal identity, so that the documents print with their mentions. Independent of the rest.
+      const hasCompany = await tx.query('select 1 from company_profile limit 1');
+      if (hasCompany.rows.length === 0) {
+        await tx.query(
+          `insert into company_profile (id, effective_from, legal_name, legal_form, ice, if_number, rc_number, patente, address,
+                                        phone, email, rib, created_by)
+           values ($1, $2, 'BELGOBETON PILOTE (fictif)', 'SARL', '001234567000089', '12345678', 'TET-45678', '98765432',
+                   'Zone industrielle, Tétouan (fictif)', '+212 5 39 00 00 00', 'contact@belgobeton.test', '181780000012345678901234', $3)`,
+          [randomUUID(), opening.rows[0].d, SYSTEM_ACTOR_ID],
+        );
+      }
       const done = await tx.query(
         `select 1 from delivery union all select 1 from stock_movement where source = 'opening' limit 1`,
       );

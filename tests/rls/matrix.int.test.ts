@@ -356,6 +356,16 @@ const FIXTURES: Record<
     visible: `select l.created_by::text as owner from invoice_line l join invoice i on i.id = l.invoice_id
                 where i.client_name = 'dl' || $1`,
   },
+  company_profile: {
+    writers: ['owner'],
+    seed: (tx, actor) =>
+      tx.query(
+        `insert into company_profile (id, effective_from, legal_name, legal_form, ice, if_number, rc_number, patente, address, created_by)
+         values (gen_random_uuid(), '2000-01-01', $1, 'SARL', '001234567000089', '1', '2', '3', 'Tétouan', $2)`,
+        [`cp ${marker}`, actor],
+      ),
+    visible: `select created_by::text as owner from company_profile where legal_name = 'cp ' || $1`,
+  },
   doc_sequence: {
     // Written only through next_doc_number(): owner and office may call it. Persistent by design, like code_sequence.
     writers: ['owner', 'office'],

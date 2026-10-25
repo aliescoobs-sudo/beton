@@ -344,6 +344,13 @@
       "when": 1792591245000,
       "tag": "0048_supplier_payments",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1792591246000,
+      "tag": "0049_company_profile",
+      "breakpoints": true
     }
   ]
 }

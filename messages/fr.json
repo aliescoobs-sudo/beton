@@ -955,6 +955,71 @@
           "hint": "Échéances des achats fournisseurs, après les paiements déjà rattachés (120 jours au plus après la facture)."
         }
       }
+    },
+    "company": {
+      "link": "Entreprise",
+      "title": "Identité légale de l'entreprise",
+      "intro": "Ces mentions sont imprimées sur les bons de livraison, les factures et les avoirs. Un changement est une nouvelle version, jamais une modification.",
+      "none": "L'identité légale n'est pas encore saisie.",
+      "legalName": "Raison sociale",
+      "legalForm": "Forme juridique",
+      "ice": "ICE (15 chiffres)",
+      "ifNumber": "Identifiant fiscal (IF)",
+      "rcNumber": "Registre de commerce (RC)",
+      "patente": "Taxe professionnelle (patente)",
+      "address": "Adresse",
+      "phone": "Téléphone",
+      "email": "E-mail",
+      "rib": "RIB (24 chiffres)",
+      "effectiveFrom": "Valable à partir du",
+      "effectiveHint": "Laisser vide : aujourd'hui.",
+      "save": "Enregistrer une nouvelle version",
+      "saved": "Version enregistrée.",
+      "invalid": "Saisie invalide : vérifiez l'ICE (15 chiffres) et le RIB (24 chiffres).",
+      "history": "Versions précédentes"
+    },
+    "invoiceDocument": {
+      "invoice": "Facture",
+      "creditNote": "Avoir",
+      "print": "Imprimer / PDF",
+      "noCompany": "Identité légale de l'entreprise à renseigner (menu Entreprise).",
+      "billedTo": "Facturé à",
+      "number": "Numéro",
+      "creditsInvoice": "annule la facture",
+      "order": "Commande",
+      "date": "Date",
+      "dueDate": "Échéance",
+      "reason": "Motif",
+      "description": "Désignation",
+      "volume": "Volume",
+      "unitPrice": "Prix HT / m³",
+      "lineTotal": "Total HT",
+      "totalHt": "Total HT",
+      "vat": "TVA",
+      "totalTtc": "Total TTC",
+      "terms": "Conditions de paiement : {days, plural, one {# jour} other {# jours}} à compter de la date de facture, conformément à la loi n° 69-21 (60 jours par défaut, 120 jours au plus)."
+    },
+    "accounting": {
+      "link": "Export comptable",
+      "title": "Export pour l'expert-comptable",
+      "intro": "Journal des ventes, journal des achats, règlements et mouvements de caisse et de banque, balance âgée. Fichiers CSV (UTF-8, séparateur point-virgule, virgule décimale). Chaque téléchargement est enregistré.",
+      "from": "Du",
+      "to": "Au",
+      "apply": "Afficher la période",
+      "reconciled": "Les journaux sont rapprochés des lignes de factures : tout concorde.",
+      "invoices": "Factures et avoirs : {n}",
+      "purchases": "Achats : {n}",
+      "files": {
+        "sales": "Journal des ventes (CSV)",
+        "purchases": "Journal des achats (CSV)",
+        "payments": "Règlements et mouvements (CSV)",
+        "ageing": "Balance âgée (CSV)"
+      },
+      "errors": {
+        "INVALID_PERIOD": "Période invalide.",
+        "TOTALS_DO_NOT_ADD_UP": "Export refusé : une ligne dont HT + TVA n'est pas égal au TTC.",
+        "LINES_DO_NOT_MATCH_INVOICES": "Export refusé : le journal des ventes ne correspond pas aux lignes de factures."
+      }
     }
   },
   "operations": {

@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
+import { getRequestClock } from '@/app/request-clock';
 import { getPool } from '@/lib/db/pools';
+import { getCompanyProfile, legalMentions } from '@/modules/ledger';
 import { getDeliveryNote } from '@/modules/operations';
 import { formatM3 } from '@/modules/operations/ui/format';
 import { PrintNoteButton } from '@/modules/operations/ui/print-note-button';
@@ -19,6 +21,7 @@ export default async function DeliveryNotePage({
   const user = await requirePagePermission(locale, 'deliveries.read');
   const note = await getDeliveryNote(getPool('app'), user, id);
   if (!note) notFound();
+  const company = await getCompanyProfile(getPool('app'), user, { today: (await getRequestClock()).today() });
   const t = await getTranslations('operations.note');
   const rows: [string, React.ReactNode][] = [
     [
@@ -59,7 +62,17 @@ export default async function DeliveryNotePage({
         }
       />
       <article className="card max-w-3xl space-y-6 p-6" data-testid="delivery-note">
-        <p className="text-sm text-muted">{t('company')}</p>
+        {company ? (
+          <div className="text-sm" data-testid="note-company">
+            {legalMentions(company).map((line) => (
+              <p key={line}>
+                <bdi dir="ltr">{line}</bdi>
+              </p>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted">{t('company')}</p>
+        )}
         {note.cancelled && (
           <p role="status" className="font-bold text-signal" data-testid="note-cancelled">
             {t('cancelled')}

@@ -26,11 +26,21 @@ export {
   createInvoice,
   type CreatedInvoice,
   type InvoiceError,
+  getInvoiceDocument,
   insertCreditNoteRows,
+  type InvoiceDocument,
   insertInvoiceRows,
   type InvoiceView,
   listInvoices,
 } from './service/invoice-service';
+export { getCompanyProfile, listCompanyProfiles, saveCompanyProfile } from './service/company-service';
+export {
+  type AccountingExport,
+  buildAccountingExport,
+  EXPORT_FILES,
+  type ExportError,
+  type ExportFile,
+} from './service/accounting-export';
 export { legalDeadlines } from './service/deadlines-service';
 export { getOrderDetail, listOrders, type OrderDetail, type OrderRow } from './service/order-read';
 export { cancelOrder, type CancelOrderError, type CancelledOrder } from './service/order-reversal';

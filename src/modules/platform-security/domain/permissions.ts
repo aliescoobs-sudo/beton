@@ -84,6 +84,9 @@ export const PERMISSIONS = {
   'ledger.reverse_old': MONEY_WRITE,
   'corrections.request': BLIND_WRITE,
   'corrections.read': ['owner', 'support'],
+  // Our legal identity: printed on every document, so everyone reads it; the owner changes it
+  'company.read': ALL,
+  'company.write': MONEY_WRITE,
   // Deliveries / BL (✅ A11)
   'deliveries.read': ALL,
   'deliveries.write': PLANT,
@@ -103,6 +106,8 @@ export const PERMISSIONS = {
   // Derived figures
   'margins.read': MONEY_READ,
   'cash.read': MONEY_READ,
+  // The accountant's files for a period (owner and support; every download is audited as an export)
+  'accounting.export': MONEY_READ,
   // The money facts of "what did this action change" (ledger L35): the roles that read money
   'effects.money': MONEY_READ,
   // Security alerts (break-glass) are not money: owner and partner see and acknowledge them (support reads the table).

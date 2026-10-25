@@ -44,7 +44,13 @@ export default async function InvoicesPage({ params }: { params: Promise<{ local
             {invoices.map((i) => (
               <tr key={i.id} data-testid={`invoice-${i.number}`}>
                 <Td>
-                  <bdi dir="ltr">{i.number}</bdi>
+                  <a
+                    href={`/${locale}/invoices/${i.id}`}
+                    className="underline"
+                    data-testid={`invoice-open-${i.number}`}
+                  >
+                    <bdi dir="ltr">{i.number}</bdi>
+                  </a>
                 </Td>
                 <Td>
                   <bdi dir="ltr">{i.orderCode}</bdi>

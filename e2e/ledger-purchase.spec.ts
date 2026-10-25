@@ -14,6 +14,7 @@ async function enter(page: Page, invoiceNo: string) {
   await page.getByTestId('purchase-supplier').selectOption({ index: 1 });
   await page.getByTestId('purchase-invoice-no').fill(invoiceNo);
   await page.getByTestId('purchase-line-component').selectOption({ label: 'Ciment' });
+  await page.getByTestId('purchase-line-unit').selectOption({ label: 't' });
   await page.getByTestId('purchase-line-qty').fill('30');
   await page.getByTestId('purchase-line-price').fill('1 450,00');
   await page.getByTestId('purchase-add-line').click();

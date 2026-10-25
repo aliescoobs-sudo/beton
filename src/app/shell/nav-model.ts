@@ -123,6 +123,12 @@ const GROUPS: GroupDef[] = [
         allowed: 'due_items.read',
       },
       {
+        path: '/accounting',
+        labelKey: 'ledger.accounting.link',
+        testId: 'accounting-link',
+        allowed: 'accounting.export',
+      },
+      {
         path: '/opening',
         labelKey: 'ledger.opening.link',
         testId: 'opening-link',
@@ -208,6 +214,12 @@ const GROUPS: GroupDef[] = [
         labelKey: 'parameters.link',
         testId: 'parameters-link',
         allowed: 'parameters.read',
+      },
+      {
+        path: '/company',
+        labelKey: 'ledger.company.link',
+        testId: 'company-link',
+        allowed: 'company.read',
       },
       {
         path: '/checklist',

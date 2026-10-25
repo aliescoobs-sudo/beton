@@ -125,3 +125,10 @@ export {
   deadlineStatus,
   DUE_SOON_DAYS,
 } from './deadlines';
+export {
+  type CompanyProfile,
+  type CompanyProfileInput,
+  formatRib,
+  legalMentions,
+  parseCompanyProfileInput,
+} from './company';

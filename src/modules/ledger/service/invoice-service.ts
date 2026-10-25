@@ -318,3 +318,67 @@ export async function listInvoices(appPool: pg.Pool, actor: SessionUser): Promis
     reason: r.reason,
   }));
 }
+
+export interface InvoiceDocument {
+  invoice: InvoiceView;
+  /** The number of the invoice a credit note cancels. */
+  creditNoteOfNumber: string | null;
+  lines: {
+    seq: number;
+    description: string;
+    volumeL: number;
+    unitPriceHtCentimes: number;
+    lineHtCentimes: number;
+  }[];
+  /** Whole days from the invoice date to the due date (the law 69-21 term printed on the document). */
+  termDays: number;
+}
+
+/**
+ * The invoice or credit note as it is printed: every figure comes from the stored rows, nothing is recomputed, so the
+ * printed document equals the data (AC-LED-22). Owner and support (`invoices.read`).
+ */
+export async function getInvoiceDocument(
+  appPool: pg.Pool,
+  actor: SessionUser,
+  invoiceId: string,
+): Promise<InvoiceDocument | null> {
+  await require(appPool, actor, 'invoices.read');
+  try {
+    const invoice = (await listInvoices(appPool, actor)).find((i) => i.id === invoiceId);
+    if (!invoice) return null;
+    return await inRequest(appPool, actor, async (tx): Promise<InvoiceDocument> => {
+      const lines = await tx.query<{
+        seq: number;
+        description: string;
+        volume_l: number;
+        price: string;
+        total: string;
+      }>(
+        `select seq, description, volume_l, unit_price_ht_centimes::text as price, line_ht_centimes::text as total
+           from invoice_line where invoice_id = $1 order by seq`,
+        [invoiceId],
+      );
+      const meta = await tx.query<{ credited: string | null; term: number }>(
+        `select (select o.number from invoice o where o.id = i.credit_note_of) as credited, (i.due_date - i.invoice_date) as term
+           from invoice i where i.id = $1`,
+        [invoiceId],
+      );
+      return {
+        invoice,
+        creditNoteOfNumber: meta.rows[0]?.credited ?? null,
+        termDays: Number(meta.rows[0]?.term ?? 0),
+        lines: lines.rows.map((l) => ({
+          seq: l.seq,
+          description: l.description,
+          volumeL: l.volume_l,
+          unitPriceHtCentimes: Number(l.price),
+          lineHtCentimes: Number(l.total),
+        })),
+      };
+    });
+  } catch (error) {
+    if (isMalformedId(error)) return null;
+    throw error;
+  }
+}
