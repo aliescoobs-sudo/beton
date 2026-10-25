@@ -875,6 +875,61 @@ export const TABLE_ACCESS = {
     exception:
       'operations O2: the signed-BL return, one row per delivery (A11); plant, office, owner and partner record it, a second attempt is a unique violation.',
   },
+  driver: {
+    kind: 'rls',
+    seed: 'insert',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'none',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    exception:
+      'operations O9: the drivers (name only, law 09-08). Owner and partner write and archive (name and status only, the code never changes); owner, partner, plant and support read; office does not.',
+  },
+  trip_plan: {
+    kind: 'rls',
+    seed: 'insert',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'none',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'operations O9: a planned rotation (order, truck, driver, volume, the five milestones in minutes). Quantities and times only, no money. Insert-only; guards in the database: live order, truck available that day by the breakdown log, rotation within the truck, active driver. Owner, partner and plant plan; office is blind to orders.',
+  },
+  trip_plan_cancellation: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'none',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'operations O9: replanning a day cancels its live rotations with a reason, one per rotation. Insert-only.',
+  },
   stock_movement: {
     kind: 'rls',
     seed: 'insert',

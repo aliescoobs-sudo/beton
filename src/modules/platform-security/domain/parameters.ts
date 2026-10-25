@@ -78,6 +78,32 @@ export const PARAMETERS = {
     schema: z.number().int().min(0).max(120),
     description: 'Minutes to unload a truck on site',
   },
+  // Daily dispatch (SPEC-operations §7.1, AC-OPS-12…14): the timeline of one truck rotation. Every default is an assumption (🟡).
+  loading_min: {
+    default: 10,
+    schema: z.number().int().min(0).max(60),
+    description: 'Minutes to load a truck at the plant',
+  },
+  return_extra_min: {
+    default: 10,
+    schema: z.number().int().min(0).max(60),
+    description: 'Minutes added to the way back (washing the drum, handing back at the plant)',
+  },
+  working_min: {
+    default: 600,
+    schema: z.number().int().min(240).max(1080),
+    description: 'Minutes in a truck working day',
+  },
+  day_start_min: {
+    default: 420,
+    schema: z.number().int().min(0).max(1200),
+    description: 'Minute of the day (from midnight) when the first rotation starts loading',
+  },
+  default_one_way_min: {
+    default: 30,
+    schema: z.number().int().min(5).max(180),
+    description: 'One-way minutes used for an order whose site has no zone',
+  },
   // Rules engine and owner dashboard (SPEC-rules-engine §3, §4, §6). Every default is an assumption (🟡) to revisit with
   // the owner; none is written in the domain code.
   forecast_horizon_days: {

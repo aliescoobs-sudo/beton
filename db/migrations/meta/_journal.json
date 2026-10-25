@@ -407,6 +407,13 @@
       "when": 1792591247007,
       "tag": "0057_stock_count",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1792591247008,
+      "tag": "0058_dispatch",
+      "breakpoints": true
     }
   ]
 }

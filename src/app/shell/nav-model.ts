@@ -158,6 +158,12 @@ const GROUPS: GroupDef[] = [
     id: 'production',
     items: [
       {
+        path: '/dispatch',
+        labelKey: 'operations.dispatch.link',
+        testId: 'dispatch-link',
+        allowed: 'dispatch.read',
+      },
+      {
         path: '/loads',
         labelKey: 'operations.loads.link',
         testId: 'loads-link',

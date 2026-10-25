@@ -51,6 +51,8 @@ export async function insertOrder(
   tx: pg.PoolClient,
   actorId: string,
   master: OrderMaster,
+  /** The delivery date (default 2026-06-02); the order date stays 2026-06-01. */
+  deliveryDate = '2026-06-02',
 ): Promise<{ id: string; code: string }> {
   const id = randomUUID();
   const code = (await tx.query<{ n: string }>(`select public.next_doc_number('CMD', 2026, 5) as n`)).rows[0]
@@ -58,8 +60,17 @@ export async function insertOrder(
   await tx.query(
     `insert into sales_order (id, code, client_id, concrete_type_id, volume_l, order_date, delivery_date, selling_price_id,
                               unit_price_ht_centimes, vat_rate_bp, total_ht_centimes, total_vat_centimes, total_ttc_centimes, created_by)
-     values ($1, $2, $3, $4, 10000, '2026-06-01', '2026-06-02', $5, $6, 2000, 780000, 156000, 936000, $7)`,
-    [id, code, master.clientId, master.typeId, master.sellingPriceId, master.unitPriceCentimes, actorId],
+     values ($1, $2, $3, $4, 10000, '2026-06-01', $8, $5, $6, 2000, 780000, 156000, 936000, $7)`,
+    [
+      id,
+      code,
+      master.clientId,
+      master.typeId,
+      master.sellingPriceId,
+      master.unitPriceCentimes,
+      actorId,
+      deliveryDate,
+    ],
   );
   await tx.query(
     `insert into payment_plan_item (id, order_id, seq, direction, method, due_date, amount_centimes, created_by)

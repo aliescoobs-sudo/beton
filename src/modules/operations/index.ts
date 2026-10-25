@@ -46,3 +46,15 @@ export {
   listExcesses,
 } from './service/excess-service';
 export { withinTolerance } from './service/delivery-service';
+export {
+  archiveDriver,
+  createDriver,
+  type DispatchDay,
+  type DispatchError,
+  type DriverRow,
+  getDispatchDay,
+  listDrivers,
+  type SavedDispatch,
+  type SavedRotation,
+  saveDispatch,
+} from './service/dispatch-service';

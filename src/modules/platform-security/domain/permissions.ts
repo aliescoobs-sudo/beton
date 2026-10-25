@@ -99,6 +99,10 @@ export const PERMISSIONS = {
   'deliveries.excess_read': ['owner', 'partner', 'support'],
   'deliveries.excess_confirm': MONEY_WRITE,
   'deliveries.bl_return': ['owner', 'partner', 'office', 'plant'],
+  // Daily dispatch: the plan of the day's rotations (truck, driver, times); quantities and times only. Office is blind to orders.
+  'dispatch.read': PLANT_READ,
+  'dispatch.write': PLANT,
+  'drivers.write': MANAGERS,
   // Stock movements, physical count, plant import
   'stock.read': PLANT_READ,
   'stock.write': PLANT,

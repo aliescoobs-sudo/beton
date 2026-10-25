@@ -24,6 +24,7 @@ const SCREENS = [
   'statements',
   'opening',
   'loads',
+  'dispatch?date=2099-03-02',
   'stock',
   'receipts',
 ] as const;

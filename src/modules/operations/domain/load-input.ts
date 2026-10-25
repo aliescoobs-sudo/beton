@@ -24,6 +24,27 @@ const cancelSchema = z.object({
     .pipe(z.string().min(3).max(500)),
 });
 
+const dispatchSchema = z.object({
+  date: dateText,
+  rotations: z
+    .array(
+      z.object({
+        orderId: z.uuid(),
+        truckId: z.uuid(),
+        driverId: z.uuid().nullish(),
+        volumeL: z.number().int().min(1).max(30_000),
+      }),
+    )
+    .min(1)
+    .max(200),
+});
+const driverSchema = z.object({
+  name: z
+    .string()
+    .transform((v) => v.trim().replace(/\s+/g, ' '))
+    .pipe(z.string().min(1).max(80)),
+});
+
 const openingSchema = z.object({
   componentId: z.uuid(),
   // Integer base units (g, mL or L), positive: a component with nothing in stock needs no opening row.
@@ -50,6 +71,8 @@ const thresholdSchema = z.object({
 export type ReceiptInput = z.infer<typeof receiptSchema>;
 export type ThresholdInput = z.infer<typeof thresholdSchema>;
 export type OpeningStockInput = z.infer<typeof openingSchema>;
+export type DispatchInput = z.infer<typeof dispatchSchema>;
+export type DriverInput = z.infer<typeof driverSchema>;
 export type LoadInput = z.infer<typeof loadSchema>;
 export type BlReturnInput = z.infer<typeof returnSchema>;
 export type CancelLoadInput = z.infer<typeof cancelSchema>;
@@ -60,9 +83,51 @@ const parse =
     const p = schema.safeParse(input);
     return p.success ? ok(p.data) : err('INVALID');
   };
+export const parseDispatchInput = parse(dispatchSchema);
+export const parseDriverInput = parse(driverSchema);
 export const parseLoadInput = parse(loadSchema);
 export const parseBlReturnInput = parse(returnSchema);
 export const parseCancelLoadInput = parse(cancelSchema);
 export const parseOpeningStockInput = parse(openingSchema);
 export const parseReceiptInput = parse(receiptSchema);
 export const parseThresholdInput = parse(thresholdSchema);
+
+const fuelFillSchema = z.object({
+  truckId: z.uuid(),
+  filledOn: dateText,
+  /** Litres typed by a person ("180", "180,5"): at most three decimals, converted to millilitres by the parser. */
+  litres: z.string().regex(/^\d{1,4}(?:[.,]\d{1,3})?$/),
+  odometerKm: z.number().int().min(0).max(5_000_000).nullish(),
+  source: z.enum(['tank', 'station']).default('tank'),
+});
+const fuelPurchaseSchema = z.object({
+  purchasedOn: dateText,
+  litres: z.string().regex(/^\d{1,6}(?:[.,]\d{1,3})?$/),
+  /** The total paid in MAD, typed by a person ("1 250,50"). */
+  totalMad: z.string().min(1).max(20),
+  supplierId: z.uuid().nullish(),
+});
+const lossSchema = z.object({
+  deliveryId: z.uuid(),
+  /** Litres of concrete lost; absent: the whole load. */
+  volumeL: z.number().int().min(1).max(30_000).nullish(),
+  reason: z.enum(['rejected_by_client', 'returned_unused', 'too_old', 'quality', 'other']),
+  note: z
+    .string()
+    .transform((v) => v.trim().replace(/\s+/g, ' '))
+    .pipe(z.string().max(300))
+    .nullish(),
+});
+export type FuelFillInput = z.infer<typeof fuelFillSchema>;
+export type FuelPurchaseInput = z.infer<typeof fuelPurchaseSchema>;
+export type LossInput = z.infer<typeof lossSchema>;
+export const LOSS_REASONS = ['rejected_by_client', 'returned_unused', 'too_old', 'quality', 'other'] as const;
+export const parseFuelFillInput = parse(fuelFillSchema);
+export const parseFuelPurchaseInput = parse(fuelPurchaseSchema);
+export const parseLossInput = parse(lossSchema);
+
+/** "180,5" → 180 500 (millilitres): exact on the text, never a float. */
+export function litresToMl(text: string): number {
+  const [whole, frac = ''] = text.trim().replace(',', '.').split('.');
+  return Number(whole) * 1000 + Number(frac.padEnd(3, '0'));
+}

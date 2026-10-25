@@ -63,7 +63,7 @@ Margin per delivery (R13, owner and support), truck capacity check (R22–R23), 
 ## Second wave (2026-10-25): dispatch, tracking, consumption, cover, fuel, loss, analytics
 Plan: [tasks/plan-operations-2.md](plan-operations-2.md) · Spec: SPEC-operations §7 (AC-OPS-12…25) · Checkpoint: docs/checkpoints/CP-OPS-PLAN-2.md. One commit per task; verification as in the plan.
 
-- [ ] O9: Daily dispatch (rotations per truck capacity, times from the zone, breakdown-aware, conflicts shown) · AC-OPS-12…15
+- [x] O9: Daily dispatch (rotations per truck capacity, times from the zone, breakdown-aware, conflicts shown) · AC-OPS-12…15
 - [ ] O10: Trip tracking (one tap per step on a phone-sized screen, waiting time on site) · AC-OPS-16, 17
 - [ ] O11: Production and consumption report (variance per component and period, tolerance flag) · AC-OPS-18, 19
 - [ ] O12: Days of cover per component and reorder suggestion from the supplier's lead time · AC-OPS-20, 21

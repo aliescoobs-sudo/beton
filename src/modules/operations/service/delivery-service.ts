@@ -6,15 +6,20 @@ import {
   inRequest,
   isMalformedId,
   isUniqueViolation,
-  parameterOrDefault,
   require,
   type SessionUser,
 } from '@/modules/platform-security';
 import { consumptionForLoad } from '../domain/consumption';
-import { parseBlReturnInput, parseCancelLoadInput, parseLoadInput } from '../domain/load-input';
+import {
+  type LoadInput,
+  parseBlReturnInput,
+  parseCancelLoadInput,
+  parseLoadInput,
+} from '../domain/load-input';
 import { remainingVolume } from '../domain/stock';
 import { tripExceedsLimit } from '../domain/trip';
 import { stockEffects } from './effects';
+import { opsParameter } from './ops-parameters';
 
 export type DeliveryError =
   | 'INVALID'
@@ -59,15 +64,6 @@ export interface CreatedLoad {
   effects: Effect[];
 }
 
-/** An operations parameter as the roles that load trucks may read it (the plant cannot read the parameter table). */
-async function opsParameter(
-  tx: pg.PoolClient,
-  key: 'concrete_limit_min' | 'unloading_min' | 'load_excess_tolerance_bp',
-): Promise<number> {
-  const { rows } = await tx.query<{ value: unknown }>('select public.ops_parameter($1) as value', [key]);
-  return parameterOrDefault(key, rows[0]?.value);
-}
-
 const loadedNow = (before: number | undefined, volumeL: number): number => Number(before ?? 0) + volumeL;
 
 /** The excess over the order volume is "minor" when it is within `toleranceBp` of that volume (parameter). */
@@ -96,88 +92,100 @@ export async function createLoad(
   appPool: pg.Pool,
   actor: SessionUser,
   input: unknown,
-  deps: { today: string },
+  deps: { today: string; now?: string },
 ): Promise<Result<CreatedLoad, DeliveryError>> {
   await require(appPool, actor, 'deliveries.write');
   const parsed = parseLoadInput(input);
   if (!parsed.ok) return err('INVALID');
-  const v = parsed.value;
   try {
-    return await inRequest(appPool, actor, async (tx): Promise<Result<CreatedLoad, DeliveryError>> => {
-      const order = await tx.query<{
-        concrete_type_id: string;
-        code: string;
-        volume_l: number;
-        zone_id: string | null;
-        is_reversed: boolean;
-      }>(
-        `select concrete_type_id, code, volume_l, zone_id, is_reversed from sales_order_ops where id = $1 and reverses_id is null`,
-        [v.orderId],
-      );
-      const o = order.rows[0];
-      if (!o) return err('NOT_FOUND');
-      if (o.is_reversed) return err('ORDER_CANCELLED');
-      const truck = await tx.query<{ capacity_l: number; status: string }>(
-        `select capacity_l, status from truck where id = $1`,
-        [v.truckId],
-      );
-      const t = truck.rows[0];
-      if (!t) return err('NOT_FOUND');
-      if (t.status !== 'active') return err('TRUCK_UNAVAILABLE');
-      const loaded = await tx.query<{ v: number }>(
-        `select coalesce(sum(volume_l), 0)::int as v from delivery where order_id = $1`,
-        [v.orderId],
-      );
-      const left = remainingVolume(o.volume_l, [Number(loaded.rows[0]?.v)]);
-      const volumeL = v.volumeL ?? Math.min(left, t.capacity_l);
-      // Nothing left and no volume given: ask for a volume. A volume given beyond what is left is allowed (the plant is
-      // never blocked): it is warned about here and recorded by the database for the owner to confirm.
-      if (volumeL <= 0) return err('OVER_ORDER');
-      if (volumeL > t.capacity_l) return err('OVER_CAPACITY');
-      const excessL = Math.max(0, volumeL - left);
-      const recetteId = await recetteInForce(tx, o.concrete_type_id, deps.today);
-      if (!recetteId) return err('NO_RECETTE');
-
-      const warnings: CreatedLoad['warnings'] = [];
-      if (excessL > 0) {
-        const tolerance = await opsParameter(tx, 'load_excess_tolerance_bp');
-        warnings.push(
-          withinTolerance(o.volume_l, loadedNow(loaded.rows[0]?.v, volumeL), tolerance)
-            ? 'OVER_ORDER_MINOR'
-            : 'OVER_ORDER',
-        );
-      }
-      if (o.zone_id) {
-        const zone = await tx.query<{ one_way_min: number }>('select one_way_min from zone where id = $1', [
-          o.zone_id,
-        ]);
-        const oneWay = zone.rows[0]?.one_way_min;
-        if (oneWay !== undefined) {
-          const [unloading, limit] = [
-            await opsParameter(tx, 'unloading_min'),
-            await opsParameter(tx, 'concrete_limit_min'),
-          ];
-          if (tripExceedsLimit(oneWay, unloading, limit)) warnings.push('LONG_TRIP');
-        }
-      }
-
-      const { id, blNo } = await insertLoadRows(tx, actor, {
-        orderId: v.orderId,
-        truckId: v.truckId,
-        volumeL,
-        date: deps.today,
-        recetteId,
-      });
-      const effects: Effect[] = [
-        { kind: 'document', document: 'bl', code: blNo },
-        { kind: 'remaining', orderCode: o.code, remainingL: left - volumeL },
-        ...(await stockEffects(tx, 'delivery', id)),
-      ];
-      return ok({ id, blNo, volumeL, warnings, excessL, effects: visibleEffects(effects, actor.role) });
-    });
+    return await inRequest(appPool, actor, (tx) => createLoadInTx(tx, actor, parsed.value, deps));
   } catch (error) {
     return err(deliveryFailure(error));
   }
+}
+
+/**
+ * The load itself, in the caller's transaction (the caller checked the permission and parsed the input): the plant's
+ * `createLoad` and the trip tracking's first step share it, so no second path writes a delivery. `deps.now` is the clock's
+ * instant of the loading (the database's now() when absent).
+ */
+export async function createLoadInTx(
+  tx: pg.PoolClient,
+  actor: SessionUser,
+  v: LoadInput,
+  deps: { today: string; now?: string },
+): Promise<Result<CreatedLoad, DeliveryError>> {
+  const order = await tx.query<{
+    concrete_type_id: string;
+    code: string;
+    volume_l: number;
+    zone_id: string | null;
+    is_reversed: boolean;
+  }>(
+    `select concrete_type_id, code, volume_l, zone_id, is_reversed from sales_order_ops where id = $1 and reverses_id is null`,
+    [v.orderId],
+  );
+  const o = order.rows[0];
+  if (!o) return err('NOT_FOUND');
+  if (o.is_reversed) return err('ORDER_CANCELLED');
+  const truck = await tx.query<{ capacity_l: number; status: string }>(
+    `select capacity_l, status from truck where id = $1`,
+    [v.truckId],
+  );
+  const t = truck.rows[0];
+  if (!t) return err('NOT_FOUND');
+  if (t.status !== 'active') return err('TRUCK_UNAVAILABLE');
+  const loaded = await tx.query<{ v: number }>(
+    `select coalesce(sum(volume_l), 0)::int as v from delivery where order_id = $1`,
+    [v.orderId],
+  );
+  const left = remainingVolume(o.volume_l, [Number(loaded.rows[0]?.v)]);
+  const volumeL = v.volumeL ?? Math.min(left, t.capacity_l);
+  // Nothing left and no volume given: ask for a volume. A volume given beyond what is left is allowed (the plant is
+  // never blocked): it is warned about here and recorded by the database for the owner to confirm.
+  if (volumeL <= 0) return err('OVER_ORDER');
+  if (volumeL > t.capacity_l) return err('OVER_CAPACITY');
+  const excessL = Math.max(0, volumeL - left);
+  const recetteId = await recetteInForce(tx, o.concrete_type_id, deps.today);
+  if (!recetteId) return err('NO_RECETTE');
+
+  const warnings: CreatedLoad['warnings'] = [];
+  if (excessL > 0) {
+    const tolerance = await opsParameter(tx, 'load_excess_tolerance_bp');
+    warnings.push(
+      withinTolerance(o.volume_l, loadedNow(loaded.rows[0]?.v, volumeL), tolerance)
+        ? 'OVER_ORDER_MINOR'
+        : 'OVER_ORDER',
+    );
+  }
+  if (o.zone_id) {
+    const zone = await tx.query<{ one_way_min: number }>('select one_way_min from zone where id = $1', [
+      o.zone_id,
+    ]);
+    const oneWay = zone.rows[0]?.one_way_min;
+    if (oneWay !== undefined) {
+      const [unloading, limit] = [
+        await opsParameter(tx, 'unloading_min'),
+        await opsParameter(tx, 'concrete_limit_min'),
+      ];
+      if (tripExceedsLimit(oneWay, unloading, limit)) warnings.push('LONG_TRIP');
+    }
+  }
+
+  const { id, blNo } = await insertLoadRows(tx, actor, {
+    orderId: v.orderId,
+    truckId: v.truckId,
+    volumeL,
+    date: deps.today,
+    recetteId,
+    loadedAt: deps.now,
+  });
+  const effects: Effect[] = [
+    { kind: 'document', document: 'bl', code: blNo },
+    { kind: 'remaining', orderCode: o.code, remainingL: left - volumeL },
+    ...(await stockEffects(tx, 'delivery', id)),
+  ];
+  return ok({ id, blNo, volumeL, warnings, excessL, effects: visibleEffects(effects, actor.role) });
 }
 
 /**

@@ -82,6 +82,9 @@ export const E2E_MD = {
   dashOffice: { email: 'e2e-da-office@belgobeton.test', name: 'Bureau Tableau' },
   dashPlant: { email: 'e2e-da-plant@belgobeton.test', name: 'Centrale Tableau' },
   dashPartner: { email: 'e2e-da-partner@belgobeton.test', name: 'Associé Tableau' },
+  dispPlant: { email: 'e2e-dp-plant@belgobeton.test', name: 'Centrale Planning' },
+  dispPartner: { email: 'e2e-dp-partner@belgobeton.test', name: 'Associé Planning' },
+  dispOffice: { email: 'e2e-dp-office@belgobeton.test', name: 'Bureau Planning' },
 } as const;
 export const E2E_CSP = { email: 'e2e-csp@belgobeton.test', name: 'CSP E2E' } as const;
 
@@ -117,6 +120,8 @@ const NAV_GROUP: Record<string, string> = {
   'recettes-link': 'production',
   'trucks-link': 'production',
   'loads-link': 'production',
+  'dispatch-link': 'production',
+  'trips-link': 'production',
   'stock-link': 'production',
   'receipts-link': 'production',
   'accounts-link': 'finance',

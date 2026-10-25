@@ -230,6 +230,48 @@ const FIXTURES: Record<
       insertDelivery(tx, actor, await deliveryScene(app, actors.owner, marker), 100, 2099),
     visible: `select created_by::text as owner from delivery where bl_no like 'BL-2099-%' and $1::text is not null`,
   },
+  driver: {
+    writers: ['owner', 'partner'],
+    seed: (tx, actor) =>
+      tx.query(
+        `insert into driver (id, code, name, created_by)
+         values (gen_random_uuid(), 'CH-' || (1000 + (('x' || substr(md5($1::text || $2::text), 1, 4))::bit(16)::int % 8999)), $1::text, $2::uuid)`,
+        [marker, actor],
+      ),
+    visible: `select created_by::text as owner from driver where name = $1`,
+  },
+  trip_plan: {
+    // A far-away date no other suite plans on; the order is a live one of the delivery scene, the truck the pilot's T1.
+    writers: ['owner', 'partner', 'plant'],
+    seed: async (tx, actor) => {
+      const scene = await deliveryScene(app, actors.owner, marker);
+      return tx.query(
+        `insert into trip_plan (id, batch_id, trip_date, order_id, seq, truck_id, volume_l, load_min, depart_min, arrive_min,
+                                unload_end_min, back_min, created_by)
+         values (gen_random_uuid(), gen_random_uuid(), '2097-03-02', $1, 1, $2, 1000, 420, 430, 455, 485, 520, $3)`,
+        [scene.orderId, scene.truckId, actor],
+      );
+    },
+    visible: `select created_by::text as owner from trip_plan where trip_date = '2097-03-02' and $1::text is not null`,
+  },
+  trip_plan_cancellation: {
+    writers: ['owner', 'partner', 'plant'],
+    seed: async (tx, actor) => {
+      const scene = await deliveryScene(app, actors.owner, marker);
+      const plan = await tx.query<{ id: string }>(
+        `insert into trip_plan (id, batch_id, trip_date, order_id, seq, truck_id, volume_l, load_min, depart_min, arrive_min,
+                                unload_end_min, back_min, created_by)
+         values (gen_random_uuid(), gen_random_uuid(), '2096-03-02', $1, 1, $2, 1000, 420, 430, 455, 485, 520, $3) returning id`,
+        [scene.orderId, scene.truckId, actor],
+      );
+      return tx.query(
+        `insert into trip_plan_cancellation (id, trip_id, reason, created_by) values (gen_random_uuid(), $1, 'replanned', $2)`,
+        [plan.rows[0]?.id, actor],
+      );
+    },
+    visible: `select c.created_by::text as owner from trip_plan_cancellation c join trip_plan p on p.id = c.trip_id
+                where p.trip_date = '2096-03-02' and $1::text is not null`,
+  },
   delivery_return: {
     // One return per delivery: each writer gets a delivery of its own (year 2098), made by the owner.
     writers: ['owner', 'partner', 'office', 'plant'],
