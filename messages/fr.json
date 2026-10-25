@@ -185,6 +185,7 @@
       "working_min": "Durée de la journée de travail d'un camion (minutes)",
       "day_start_min": "Heure de début de la première rotation (minutes depuis minuit)",
       "default_one_way_min": "Trajet simple d'un chantier sans zone (minutes)",
+      "consumption_tolerance_bp": "Écart entre la consommation théorique et les inventaires qui est signalé (points de base : 200 = 2 %)",
       "forecast_horizon_days": "Horizon de la prévision de trésorerie (jours ouvrés)",
       "cash_safety_threshold_centimes": "Seuil de sécurité de trésorerie (centimes) : en dessous, le jour est en déficit",
       "alert_lead_days": "Alerte d'échéance : nombre de jours à l'avance",
@@ -1383,6 +1384,38 @@
         "FORBIDDEN": "Action non autorisée.",
         "UNAUTHENTICATED": "Session expirée."
       }
+    },
+    "report": {
+      "link": "Production et consommation",
+      "title": "Production et consommation",
+      "intro": "Ce que la centrale a produit, par type de béton, et ce que les recettes disent avoir été consommé, face aux inventaires. Quantités seulement, aucun prix.",
+      "from": "Du",
+      "to": "Au",
+      "period": "Période",
+      "periods": {
+        "day": "Jour",
+        "week": "Semaine",
+        "month": "Mois"
+      },
+      "show": "Afficher",
+      "invalid": "Dates invalides.",
+      "producedTitle": "Production (m³ par type de béton)",
+      "producedNone": "Aucun chargement sur cette période.",
+      "type": "Type",
+      "produced": "Produit",
+      "consumptionTitle": "Consommation par composant",
+      "consumptionIntro": "Théorique = recette en vigueur au jour de chaque chargement × m³. Écart signalé au-delà de {tolerance}.",
+      "consumptionNone": "Aucun mouvement sur cette période.",
+      "component": "Composant",
+      "theoretical": "Théorique",
+      "adjustments": "Correction d'inventaire",
+      "actual": "Réel",
+      "variance": "Écart",
+      "status": "État",
+      "noCount": "Pas d'inventaire",
+      "flagged": "Écart à vérifier",
+      "withinTolerance": "Dans la tolérance",
+      "countNote": "Une correction d'inventaire compte dans la période où elle est saisie : elle mesure tout ce qui s'est passé depuis le dernier inventaire. Un écart positif = plus consommé que prévu."
     }
   },
   "effects": {

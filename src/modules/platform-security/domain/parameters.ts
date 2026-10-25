@@ -103,7 +103,14 @@ export const PARAMETERS = {
     default: 30,
     schema: z.number().int().min(5).max(180),
     description: 'One-way minutes used for an order whose site has no zone',
+  }, // Production and consumption report (SPEC-operations §7.1, AC-OPS-19): a gap between the recettes and the counts above this is flagged.
+  consumption_tolerance_bp: {
+    default: 200,
+    schema: z.number().int().min(0).max(2000),
+    description:
+      'Gap between the theoretical consumption and the physical counts that is flagged (basis points)',
   },
+
   // Rules engine and owner dashboard (SPEC-rules-engine §3, §4, §6). Every default is an assumption (🟡) to revisit with
   // the owner; none is written in the domain code.
   forecast_horizon_days: {

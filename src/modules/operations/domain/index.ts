@@ -45,3 +45,17 @@ export {
   type TripTimes,
   tripTimes,
 } from './trip-times';
+export {
+  consumptionReport,
+  type ConsumptionRow,
+  type LoadFact,
+  lostComponents,
+  type LostComponentFact,
+  type LostComponentRow,
+  type MovementFact,
+  type MovementSource,
+  periodKey,
+  type ProducedRow,
+  producedByType,
+  type ReportPeriod,
+} from './consumption-report';

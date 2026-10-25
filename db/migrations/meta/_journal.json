@@ -421,6 +421,13 @@
       "when": 1792591247009,
       "tag": "0059_trip_tracking",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1792591247010,
+      "tag": "0060_consumption_params",
+      "breakpoints": true
     }
   ]
 }

@@ -65,3 +65,8 @@ export {
   type TripError,
   type TripView,
 } from './service/trip-service';
+export {
+  type ConsumptionComponent,
+  type ConsumptionReportView,
+  getConsumptionReport,
+} from './service/report-service';

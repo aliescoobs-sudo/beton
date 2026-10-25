@@ -65,7 +65,7 @@ Plan: [tasks/plan-operations-2.md](plan-operations-2.md) · Spec: SPEC-operation
 
 - [x] O9: Daily dispatch (rotations per truck capacity, times from the zone, breakdown-aware, conflicts shown) · AC-OPS-12…15
 - [x] O10: Trip tracking (one tap per step on a phone-sized screen, waiting time on site) · AC-OPS-16, 17
-- [ ] O11: Production and consumption report (variance per component and period, tolerance flag) · AC-OPS-18, 19
+- [x] O11: Production and consumption report (variance per component and period, tolerance flag) · AC-OPS-18, 19
 - [ ] O12: Days of cover per component and reorder suggestion from the supplier's lead time · AC-OPS-20, 21
 - [ ] O13: Fuel per truck (fills, purchases, consumption, cost per m³; money owner and support only) · AC-OPS-22
 - [ ] O14: Returned or rejected concrete per load with a reason, counted as loss in the report · AC-OPS-23

@@ -88,6 +88,10 @@ export const E2E_MD = {
   tripPlant: { email: 'e2e-tp-plant@belgobeton.test', name: 'Centrale Rotations' },
   tripPlantAr: { email: 'e2e-tp-plant-ar@belgobeton.test', name: 'مركز الرحلات' },
   tripOffice: { email: 'e2e-tp-office@belgobeton.test', name: 'Bureau Rotations' },
+  repPlant: { email: 'e2e-rp-plant@belgobeton.test', name: 'Centrale Rapports' },
+  repPlantAr: { email: 'e2e-rp-plant-ar@belgobeton.test', name: 'مركز التقارير' },
+  repPartner: { email: 'e2e-rp-partner@belgobeton.test', name: 'Associé Rapports' },
+  repOffice: { email: 'e2e-rp-office@belgobeton.test', name: 'Bureau Rapports' },
 } as const;
 export const E2E_CSP = { email: 'e2e-csp@belgobeton.test', name: 'CSP E2E' } as const;
 
@@ -125,6 +129,7 @@ const NAV_GROUP: Record<string, string> = {
   'loads-link': 'production',
   'dispatch-link': 'production',
   'trips-link': 'production',
+  'consumption-report-link': 'production',
   'stock-link': 'production',
   'receipts-link': 'production',
   'accounts-link': 'finance',
