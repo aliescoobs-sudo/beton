@@ -45,6 +45,7 @@ export function OrderForm({
   today,
   createAction,
   previewAction,
+  initial,
 }: {
   clients: OrderFormClient[];
   sites: { id: string; clientId: string; label: string; zoneId: string | null }[];
@@ -54,14 +55,16 @@ export function OrderForm({
   createAction: (input: unknown) => Promise<CreateOrderActionResult>;
   /** Present only for a role that may read money. */
   previewAction?: (input: unknown) => Promise<PreviewOrderActionResult>;
+  /** An order made from a quote starts with the quote's client, type and volume; the person still reviews and saves. */
+  initial?: { clientId: string; typeId: string; volumeM3: string; quoteId: string } | null;
 }) {
   const t = useTranslations('ledger.orders');
   const [search, setSearch] = useState('');
-  const [clientId, setClientId] = useState('');
+  const [clientId, setClientId] = useState(initial?.clientId ?? '');
   const [siteId, setSiteId] = useState('');
   const [zoneId, setZoneId] = useState('');
-  const [typeId, setTypeId] = useState(types[0]?.id ?? '');
-  const [volume, setVolume] = useState('');
+  const [typeId, setTypeId] = useState(initial?.typeId ?? types[0]?.id ?? '');
+  const [volume, setVolume] = useState(initial?.volumeM3 ?? '');
   const [delivery, setDelivery] = useState(today);
   const [overridePrice, setOverridePrice] = useState('');
   const [overrideReason, setOverrideReason] = useState('');
@@ -147,6 +150,7 @@ export function OrderForm({
       deliveryDate: delivery,
       plan,
       ...(override ? { priceOverride: override } : {}),
+      ...(initial ? { quoteId: initial.quoteId } : {}),
     };
   }
 

@@ -16,6 +16,7 @@ import {
   insertInvoice,
   insertOrder,
   insertPurchase,
+  insertQuote,
   moneyMaster,
   newReceivablePurchase,
   newCashMovement,
@@ -355,6 +356,11 @@ const FIXTURES: Record<
     seed: async () => undefined,
     visible: `select l.created_by::text as owner from invoice_line l join invoice i on i.id = l.invoice_id
                 where i.client_name = 'dl' || $1`,
+  },
+  quote: {
+    writers: ['owner', 'office'],
+    seed: async (tx, actor) => insertQuote(tx, actor, await orderMaster(app, actors.owner, marker)),
+    visible: `select q.created_by::text as owner from quote q join client c on c.id = q.client_id where c.name = 'fx' || $1`,
   },
   company_profile: {
     writers: ['owner'],

@@ -601,6 +601,27 @@ export const TABLE_ACCESS = {
     exception:
       'ledger L17: insert-only invoice lines, one per load (volume x the order unit price, rounded once, checked by a trigger; the sum equals the invoice total HT at commit). Same visibility as invoice.',
   },
+  quote: {
+    kind: 'rls',
+    seed: 'insert',
+    money: true,
+    blindWriters: ['office'],
+    read: {
+      owner: 'all',
+      partner: 'none',
+      office: 'none',
+      plant: 'none',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'ledger L31: insert-only quotes (DV numbers from the document counter), priced at the price in force by the database. Owner and support read and print; office inserts and cannot read back. No ledger effect and no plan; converted when an order points at it (sales_order.quote_id).',
+  },
   money_account: {
     kind: 'rls',
     seed: 'insert',

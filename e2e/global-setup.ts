@@ -83,6 +83,7 @@ export default async function globalSetup() {
       [E2E_MD.flowOffice, 'office', 'fr'],
       [E2E_MD.viewOffice, 'office', 'fr'],
       [E2E_MD.purOffice, 'office', 'fr'],
+      [E2E_MD.quoteOffice, 'office', 'fr'],
       [E2E_MD.purPlant, 'plant', 'fr'],
       [E2E_MD.cashSupport, 'support', 'fr'],
       [E2E_MD.cashOffice, 'office', 'fr'],

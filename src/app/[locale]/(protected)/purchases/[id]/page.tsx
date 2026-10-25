@@ -32,7 +32,11 @@ export default async function PurchaseDetailPage({
             {t('title')} <bdi dir="ltr">{p.code}</bdi>
           </>
         }
-        description={`${p.supplierCode} · ${p.supplierName}`}
+        description={
+          <>
+            <bdi dir="ltr">{p.supplierCode}</bdi> · {p.supplierName}
+          </>
+        }
         actions={
           can(user.role, 'ledger.reverse') && !p.reversed ? (
             <CancelPurchase purchaseId={p.id} cancel={cancelPurchaseAction} />

@@ -5,6 +5,8 @@ import { checkScreen, watch } from './screen-check';
 // ledger L25 (AC-MD-09 style): every ledger and operations screen, in fr (ltr) and ar (rtl), on a phone and a desktop width:
 // right direction, no horizontal overflow, no missing translation, no CSP violation, Latin codes and numbers left-to-right.
 const SCREENS = [
+  'quotes',
+  'quotes/new',
   'orders',
   'orders/new',
   'invoices',
@@ -38,6 +40,7 @@ for (const locale of ['fr', 'ar'] as const) {
 
     // The detail pages: the first order, invoice, purchase and delivery note of the day.
     for (const [list, link] of [
+      ['quotes', 'a[href*="/quotes/"]'],
       ['orders', 'a[href*="/orders/"]'],
       ['invoices', 'a[href*="/invoices/"]'],
       ['purchases', 'a[href*="/purchases/"]'],

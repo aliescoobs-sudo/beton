@@ -151,8 +151,8 @@ export async function insertOrderRows(
   await tx.query(
     `insert into sales_order (id, code, client_id, site_id, zone_id, concrete_type_id, volume_l, order_date,
                                   delivery_date, selling_price_id, unit_price_ht_centimes, vat_rate_bp,
-                                  total_ht_centimes, total_vat_centimes, total_ttc_centimes, brought_by_user_id, reason, created_by)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
+                                  total_ht_centimes, total_vat_centimes, total_ttc_centimes, brought_by_user_id, reason, quote_id, created_by)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)`,
     [
       id,
       code,
@@ -171,6 +171,7 @@ export async function insertOrderRows(
       p.totals.totalTtc,
       v.broughtByUserId,
       p.reason,
+      v.quoteId ?? null,
       actor.id,
     ],
   );

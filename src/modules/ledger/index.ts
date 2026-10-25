@@ -41,6 +41,15 @@ export {
   type ExportError,
   type ExportFile,
 } from './service/accounting-export';
+export {
+  createQuote,
+  type CreatedQuote,
+  getQuote,
+  insertQuoteRows,
+  listQuotes,
+  type QuoteError,
+  type QuoteView,
+} from './service/quote-service';
 export { legalDeadlines } from './service/deadlines-service';
 export { getOrderDetail, listOrders, type OrderDetail, type OrderRow } from './service/order-read';
 export { cancelOrder, type CancelOrderError, type CancelledOrder } from './service/order-reversal';

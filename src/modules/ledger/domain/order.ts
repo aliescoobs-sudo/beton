@@ -32,6 +32,8 @@ const orderInputSchema = z.object({
   deliveryDate: date,
   broughtByUserId: z.uuid().nullable().default(null),
   priceOverride: priceOverride.nullish(),
+  /** The quote this order is made from (the owner converts a quote through the order form). */
+  quoteId: z.uuid().nullish(),
   plan: z.discriminatedUnion('preset', [
     z.object({ preset: z.literal('cash') }),
     z.object({ preset: z.literal('advance50') }),

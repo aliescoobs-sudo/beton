@@ -43,7 +43,11 @@ export default async function OrderDetailPage({
             {t('title')} <bdi dir="ltr">{o.code}</bdi>
           </>
         }
-        description={`${o.clientCode} · ${o.clientName}`}
+        description={
+          <>
+            <bdi dir="ltr">{o.clientCode}</bdi> · {o.clientName}
+          </>
+        }
         actions={
           can(user.role, 'ledger.reverse') && !o.cancelled ? (
             <CancelOrder orderId={o.id} cancel={cancelOrderAction} />

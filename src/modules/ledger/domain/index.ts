@@ -132,3 +132,4 @@ export {
   legalMentions,
   parseCompanyProfileInput,
 } from './company';
+export { DEFAULT_QUOTE_DAYS, parseQuoteInput, type QuoteInput, quoteIsOpen, quoteValidUntil } from './quote';

@@ -72,6 +72,9 @@ export const PERMISSIONS = {
   'instruments.write': BLIND_WRITE,
   // Deposit, clear, bounce, regularize, dispute and cancel confirm money: the owner's
   'instruments.manage': MONEY_WRITE,
+  // Quotes: office and the owner write (office blind), the owner and support read and print
+  'quotes.read': MONEY_READ,
+  'quotes.write': BLIND_WRITE,
   // Invoices
   'invoices.read': MONEY_READ,
   'invoices.write': BLIND_WRITE,

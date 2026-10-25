@@ -29,6 +29,18 @@ const GROUPS: GroupDef[] = [
         allowed: 'parties.read',
       },
       {
+        path: '/quotes/new',
+        labelKey: 'ledger.quotes.newLink',
+        testId: 'quotes-new-link',
+        allowed: 'quotes.write',
+      },
+      {
+        path: '/quotes',
+        labelKey: 'ledger.quotes.link',
+        testId: 'quotes-link',
+        allowed: 'quotes.read',
+      },
+      {
         path: '/orders',
         labelKey: 'ledger.orderList.link',
         testId: 'orders-link',

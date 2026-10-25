@@ -18,6 +18,7 @@ import {
   insertInvoice,
   insertOrder,
   insertPurchase,
+  insertQuote,
   moneyMaster,
   newCashMovement,
   orderMaster,
@@ -113,6 +114,7 @@ const SEED: Record<MoneyTable, (tx: pg.PoolClient, actor: string) => Promise<unk
       [scene.instrumentId, scene.itemId, actor],
     );
   },
+  quote: async (tx, actor) => insertQuote(tx, actor, await orderMaster(app, actors.owner.id, marker)),
   purchase: async (tx, actor) =>
     insertPurchase(tx, actor, await purchaseMaster(app, actors.owner.id, marker)),
   // Lines and plan items are written together with their purchase, by the same actors.
