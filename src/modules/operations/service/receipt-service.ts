@@ -99,23 +99,26 @@ export async function recordReceipt(
 }
 
 export interface ReceivableLine {
+  lineId: string;
   nameFr: string;
   nameAr: string;
   unitLabel: string;
+  /** Ordered. */
   qtyMilli: number;
-}
-  lineId: string;
   /** Received so far, over all the receipts of the purchase. */
   receivedMilli: number;
+}
 export interface ReceivablePurchase {
   purchaseId: string;
   code: string;
-  /** Ordered. */
   supplierCode: string;
   orderDate: string;
   lines: ReceivableLine[];
   /** Business date of the last receipt; null while nothing came in. */
   receivedOn: string | null;
+  receipts: number;
+  /** expected: nothing yet; partial: some lines short; complete: every line reached its ordered quantity. */
+  status: 'expected' | 'partial' | 'complete';
   cancelled: boolean;
 }
 
@@ -123,32 +126,29 @@ export interface ReceivablePurchase {
 export async function listReceivable(appPool: pg.Pool, actor: SessionUser): Promise<ReceivablePurchase[]> {
   await require(appPool, actor, 'receipts.read');
   const { rows } = await inRequest(appPool, actor, (tx) =>
-  receipts: number;
-  /** expected: nothing yet; partial: some lines short; complete: every line reached its ordered quantity. */
-  status: 'expected' | 'partial' | 'complete';
     tx.query<{
       purchase_id: string;
       code: string;
       supplier_code: string;
       order_date: string;
+      line_id: string;
       name_fr: string;
       name_ar: string;
       unit_label: string;
       qty_milli: string;
+      received_milli: string;
       is_reversed: boolean;
       received_on: string | null;
+      receipts: string;
     }>(
-      line_id: string;
       `select o.purchase_id, o.code, o.supplier_code, to_char(o.order_date, 'YYYY-MM-DD') as order_date, o.line_id, o.name_fr, o.name_ar,
               o.unit_label, o.qty_milli::text, o.is_reversed,
               coalesce((select sum(x.qty_milli) from purchase_receipt_line x where x.purchase_line_id = o.line_id), 0)::text as received_milli,
               (select to_char(max(r.received_date), 'YYYY-MM-DD') from purchase_receipt r where r.purchase_id = o.purchase_id) as received_on,
               (select count(*) from purchase_receipt r where r.purchase_id = o.purchase_id)::text as receipts
          from purchase_line_ops o order by o.order_date desc, o.code desc, o.seq`,
-      received_milli: string;
     ),
   );
-      receipts: string;
   const byPurchase = new Map<string, ReceivablePurchase>();
   for (const r of rows) {
     let p = byPurchase.get(r.purchase_id);
@@ -160,11 +160,14 @@ export async function listReceivable(appPool: pg.Pool, actor: SessionUser): Prom
         orderDate: r.order_date,
         lines: [],
         receivedOn: r.received_on,
+        receipts: Number(r.receipts),
+        status: 'expected',
         cancelled: r.is_reversed,
       };
       byPurchase.set(r.purchase_id, p);
     }
     p.lines.push({
+      lineId: r.line_id,
       nameFr: r.name_fr,
       nameAr: r.name_ar,
       unitLabel: r.unit_label,
@@ -172,10 +175,9 @@ export async function listReceivable(appPool: pg.Pool, actor: SessionUser): Prom
       receivedMilli: Number(r.received_milli),
     });
   }
-  return [...byPurchase.values()];
-}
-      lineId: r.line_id,
   for (const p of byPurchase.values()) {
     const reached = p.lines.every((l) => l.receivedMilli >= l.qtyMilli);
     p.status = reached ? 'complete' : p.receipts > 0 ? 'partial' : 'expected';
   }
+  return [...byPurchase.values()];
+}

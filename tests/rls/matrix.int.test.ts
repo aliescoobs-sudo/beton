@@ -392,7 +392,7 @@ const FIXTURES: Record<
                 where c.name_fr = 'ps' || $1`,
   },
   invoice: {
-    writers: ['owner', 'office'],
+    writers: ['owner'],
     seed: async (tx, actor) => {
       const scene = await deliveryScene(app, actors.owner, marker);
       const delivery = await newDelivery(app, actors.owner, marker, scene, 50, 2098);
@@ -407,46 +407,6 @@ const FIXTURES: Record<
     visible: `select l.created_by::text as owner from invoice_line l join invoice i on i.id = l.invoice_id
                 where i.client_name = 'dl' || $1`,
   },
-  quote: {
-    writers: ['owner'],
-    seed: async (tx, actor) => insertQuote(tx, actor, await orderMaster(app, actors.owner, marker)),
-    visible: `select q.created_by::text as owner from quote q join client c on c.id = q.client_id where c.name = 'fx' || $1`,
-  },
-  company_profile: {
-    writers: ['owner'],
-    seed: (tx, actor) =>
-      tx.query(
-        `insert into company_profile (id, effective_from, legal_name, legal_form, ice, if_number, rc_number, patente, address, created_by)
-         values (gen_random_uuid(), '2000-01-01', $1, 'SARL', '001234567000089', '1', '2', '3', 'Tétouan', $2)`,
-        [`cp ${marker}`, actor],
-      ),
-    visible: `select created_by::text as owner from company_profile where legal_name = 'cp ' || $1`,
-  },
-  doc_sequence: {
-    // Written only through next_doc_number(): owner and office may call it. Persistent by design, like code_sequence.
-    writers: ['owner'],
-    seed: (tx, actor) => {
-      const role = Object.entries(actors).find(([, id]) => id === actor)![0];
-      return tx.query(`select public.next_doc_number($1, 2099, 5)`, [
-        { owner: 'MXO', office: 'MXF' }[role as 'owner' | 'office'],
-      ]);
-    },
-    get visible() {
-      return `select case prefix when 'MXO' then '${actors.owner}' when 'MXF' then '${actors.office}' end as owner
-                from doc_sequence where prefix in ('MXO', 'MXF') and year = 2099 and $1::text is not null`;
-    },
-  },
-  client: {
-    writers: ['owner', 'partner', 'office'],
-    seed: (tx, actor) =>
-      tx.query(
-        `insert into client (id, code, name, kind) values (gen_random_uuid(), public.next_code('CLT', 3), $1, 'person')`,
-        [`${marker}:${actor}`],
-      ),
-    visible: `select split_part(name, ':', 2) as owner from client where name like $1 || ':%'`,
-  },
-  client_site: {
-    writers: ['owner', 'partner', 'office'],
   alert: {
     writers: ['owner'],
     seed: (tx, actor) =>
@@ -483,6 +443,46 @@ const FIXTURES: Record<
       ),
     visible: `select created_by::text as owner from cash_decision where alert_key = 'CASH-DEFICIT:' || $1`,
   },
+  quote: {
+    writers: ['owner'],
+    seed: async (tx, actor) => insertQuote(tx, actor, await orderMaster(app, actors.owner, marker)),
+    visible: `select q.created_by::text as owner from quote q join client c on c.id = q.client_id where c.name = 'fx' || $1`,
+  },
+  company_profile: {
+    writers: ['owner'],
+    seed: (tx, actor) =>
+      tx.query(
+        `insert into company_profile (id, effective_from, legal_name, legal_form, ice, if_number, rc_number, patente, address, created_by)
+         values (gen_random_uuid(), '2000-01-01', $1, 'SARL', '001234567000089', '1', '2', '3', 'Tétouan', $2)`,
+        [`cp ${marker}`, actor],
+      ),
+    visible: `select created_by::text as owner from company_profile where legal_name = 'cp ' || $1`,
+  },
+  doc_sequence: {
+    // Written only through next_doc_number(): owner and office may call it. Persistent by design, like code_sequence.
+    writers: ['owner', 'office'],
+    seed: (tx, actor) => {
+      const role = Object.entries(actors).find(([, id]) => id === actor)![0];
+      return tx.query(`select public.next_doc_number($1, 2099, 5)`, [
+        { owner: 'MXO', office: 'MXF' }[role as 'owner' | 'office'],
+      ]);
+    },
+    get visible() {
+      return `select case prefix when 'MXO' then '${actors.owner}' when 'MXF' then '${actors.office}' end as owner
+                from doc_sequence where prefix in ('MXO', 'MXF') and year = 2099 and $1::text is not null`;
+    },
+  },
+  client: {
+    writers: ['owner', 'partner', 'office'],
+    seed: (tx, actor) =>
+      tx.query(
+        `insert into client (id, code, name, kind) values (gen_random_uuid(), public.next_code('CLT', 3), $1, 'person')`,
+        [`${marker}:${actor}`],
+      ),
+    visible: `select split_part(name, ':', 2) as owner from client where name like $1 || ':%'`,
+  },
+  client_site: {
+    writers: ['owner', 'partner', 'office'],
     seed: (tx, actor) =>
       tx.query(
         `insert into client_site (id, client_id, label)

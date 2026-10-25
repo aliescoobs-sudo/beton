@@ -33,10 +33,10 @@ export default async function StockPage({ params }: { params: Promise<{ locale: 
               <Th numeric>{t('threshold')}</Th>
               <Th>{t('status')}</Th>
               {canSet && <Th>{t('setThreshold')}</Th>}
+              {canCount && <Th>{t('count')}</Th>}
             </tr>
           </thead>
           <tbody>
-              {canCount && <Th>{t('count')}</Th>}
             {levels.map((l) => {
               const q = formatStockQty(l.level, l.baseUnit);
               const low = l.lowThreshold === null ? null : formatStockQty(l.lowThreshold, l.baseUnit);
@@ -72,9 +72,6 @@ export default async function StockPage({ params }: { params: Promise<{ locale: 
           </tbody>
         </Table>
       )}
-    </div>
-  );
-}
       <section className="mt-10" aria-labelledby="adjustments-title">
         <h2 id="adjustments-title" className="mb-3 text-xl">
           {t('adjustmentsTitle')}
@@ -114,3 +111,6 @@ export default async function StockPage({ params }: { params: Promise<{ locale: 
           </Table>
         )}
       </section>
+    </div>
+  );
+}

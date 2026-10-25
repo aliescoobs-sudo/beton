@@ -9,12 +9,12 @@ import { type InvoicePayment, type InvoicePaymentState, settleInvoices } from '.
 import { nextDocNumber } from './doc-number';
 
 export type InvoiceError =
-  | 'TOO_MANY_ATTEMPTS'
   | 'INVALID'
   | 'NOT_FOUND'
   | 'NOTHING_TO_INVOICE'
   | 'PAYMENT_TERM_TOO_LONG'
   | 'DUE_BEFORE_INVOICE'
+  | 'TOO_MANY_ATTEMPTS'
   | 'CONFLICT';
 
 /** What an invoice creation returns: identity and number, never an amount (office creates blind). */
@@ -28,12 +28,12 @@ export interface CreatedInvoice {
 export const invoiceFailure = (error: unknown): InvoiceError => {
   const { code, message } = error as { code?: string; message?: string };
   if (code === '23514') {
-  if (code === '42501' && /too many failed attempts/.test(message ?? '')) return 'TOO_MANY_ATTEMPTS';
     if (/already invoiced/.test(message ?? '')) return 'NOTHING_TO_INVOICE';
     if (/order is cancelled|unknown order|not a live load/.test(message ?? '')) return 'NOT_FOUND';
     if (/due_date/.test(message ?? '')) return 'PAYMENT_TERM_TOO_LONG';
     return 'INVALID';
   }
+  if (code === '42501' && /too many failed attempts/.test(message ?? '')) return 'TOO_MANY_ATTEMPTS';
   if (code === '23503' || isMalformedId(error)) return 'NOT_FOUND';
   if (code === '40001' || code === '40P01' || code === '23505') return 'CONFLICT';
   throw error;
@@ -72,14 +72,6 @@ export async function createInvoice(
  * answer; each failure is audited and ten in ten minutes lock the actor out. Shared by `createInvoice` and the pilot
  * scenario (system actor). A role that reads money then learns the invoice id and the receivable; office learns the number only.
  */
-    if (row.rows[0]) {
-      id = row.rows[0].id;
-      effects.push({
-        kind: 'receivable',
-        clientCode: row.rows[0].client_code,
-        amountCentimes: Number(row.rows[0].total),
-      });
-    }
 export async function insertInvoiceRows(
   tx: pg.PoolClient,
   actor: SessionUser,
@@ -91,23 +83,24 @@ export async function insertInvoiceRows(
     'select public.create_invoice($1, $2, $3, $4) as number',
     [v.orderCode, v.deliveryIds ?? null, due, today],
   );
-  for (const [n, r] of chosen.entries()) {
-    await tx.query(
-      `insert into invoice_line (id, invoice_id, seq, delivery_id, description, volume_l, unit_price_ht_centimes,
-                                 line_ht_centimes, created_by)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-      [
-        randomUUID(),
-        id,
-        n + 1,
-        r.delivery_id,
-        `Béton ${r.type_code} — BL ${r.bl_no} du ${r.load_date}`,
-        r.volume_l,
-        r.unit_price_ht_centimes,
-        totals.value.lineHt[n],
-        actor.id,
-      ],
+  const number = made.rows[0]?.number;
+  if (!number) return err('NOTHING_TO_INVOICE');
+  const effects: Effect[] = [{ kind: 'document', document: 'invoice', code: number }];
+  let id = '';
+  if (!actor.role || can(actor.role, 'invoices.read')) {
+    const row = await tx.query<{ id: string; total: string; client_code: string }>(
+      `select i.id, i.total_ttc_centimes::text as total, c.code as client_code
+         from invoice i join client c on c.id = i.client_id where i.number = $1 and i.credit_note_of is null`,
+      [number],
     );
+    if (row.rows[0]) {
+      id = row.rows[0].id;
+      effects.push({
+        kind: 'receivable',
+        clientCode: row.rows[0].client_code,
+        amountCentimes: Number(row.rows[0].total),
+      });
+    }
   }
   return ok({ id, number, effects: actor.role ? visibleEffects(effects, actor.role) : effects });
 }
@@ -207,6 +200,13 @@ export interface InvoiceView {
   dueDate: string;
   vatRateBp: number;
   totalHtCentimes: number;
+  totalVatCentimes: number;
+  totalTtcCentimes: number;
+  /** The invoice this credit note cancels, else null. */
+  creditNoteOf: string | null;
+  /** An invoice that a credit note cancels. */
+  cancelled: boolean;
+  reason: string | null;
   /** Derived from the order's covered plan items, oldest invoice first; null for a credit note or a cancelled invoice. */
   paymentState: InvoicePaymentState | null;
   paidCentimes: number;
@@ -251,13 +251,6 @@ export async function loadInvoicePayments(tx: pg.PoolClient): Promise<Map<string
     for (const [id, p] of settled) out.set(id, p);
   }
   return out;
-  totalVatCentimes: number;
-  totalTtcCentimes: number;
-  /** The invoice this credit note cancels, else null. */
-  creditNoteOf: string | null;
-  /** An invoice that a credit note cancels. */
-  cancelled: boolean;
-  reason: string | null;
 }
 
 /** Invoices and credit notes, newest first. Owner and support only (money). */
@@ -303,8 +296,6 @@ export async function listInvoices(appPool: pg.Pool, actor: SessionUser): Promis
     invoiceDate: r.invoice_date,
     issueDeadline: r.issue_deadline,
     dueDate: r.due_date,
-    paymentState: payments.get(r.id)?.state ?? null,
-    paidCentimes: Number(payments.get(r.id)?.paidCentimes ?? 0),
     vatRateBp: r.vat_rate_bp,
     totalHtCentimes: Number(r.total_ht),
     totalVatCentimes: Number(r.total_vat),
@@ -312,6 +303,8 @@ export async function listInvoices(appPool: pg.Pool, actor: SessionUser): Promis
     creditNoteOf: r.credit_note_of,
     cancelled: r.cancelled,
     reason: r.reason,
+    paymentState: payments.get(r.id)?.state ?? null,
+    paidCentimes: Number(payments.get(r.id)?.paidCentimes ?? 0),
   }));
 }
 

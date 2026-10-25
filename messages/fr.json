@@ -790,6 +790,11 @@
         "bounced": "Rejeté",
         "regularized": "Régularisé",
         "disputed": "Litige"
+      },
+      "payment": {
+        "unpaid": "Non payée",
+        "partial": "Partiellement payée",
+        "paid": "Payée"
       }
     },
     "invoices": {
@@ -802,11 +807,6 @@
       "order": "Commande",
       "client": "Client",
       "invoiceDate": "Date",
-      },
-      "payment": {
-        "unpaid": "Non payée",
-        "partial": "Partiellement payée",
-        "paid": "Payée"
       "issueDeadline": "À émettre avant le",
       "dueDate": "Échéance",
       "totalHt": "Total HT",
@@ -1171,6 +1171,16 @@
         "CONFLICT": "Conflit, réessayez.",
         "UNAUTHENTICATED": "Session expirée.",
         "FORBIDDEN": "Action non autorisée."
+      },
+      "cancelLoad": "Annuler le chargement",
+      "cancelReason": "Raison de l'annulation (obligatoire)",
+      "cancelConfirm": "Annuler ce chargement",
+      "cancelBack": "Retour",
+      "cancelErrors": {
+        "INVALID": "Raison invalide.",
+        "NOT_FOUND": "Chargement introuvable.",
+        "ALREADY_CANCELLED": "Ce chargement est déjà annulé.",
+        "other": "Annulation impossible."
       }
     },
     "stock": {
@@ -1183,16 +1193,6 @@
       "threshold": "Seuil bas",
       "status": "État",
       "statuses": {
-      },
-      "cancelLoad": "Annuler le chargement",
-      "cancelReason": "Raison de l'annulation (obligatoire)",
-      "cancelConfirm": "Annuler ce chargement",
-      "cancelBack": "Retour",
-      "cancelErrors": {
-        "INVALID": "Raison invalide.",
-        "NOT_FOUND": "Chargement introuvable.",
-        "ALREADY_CANCELLED": "Ce chargement est déjà annulé.",
-        "other": "Annulation impossible."
         "ok": "Correct",
         "low": "Bas",
         "short": "Négatif"

@@ -790,6 +790,11 @@
         "bounced": "مرفوض",
         "regularized": "مسوّى",
         "disputed": "نزاع"
+      },
+      "payment": {
+        "unpaid": "غير مؤداة",
+        "partial": "مؤداة جزئياً",
+        "paid": "مؤداة"
       }
     },
     "invoices": {
@@ -802,11 +807,6 @@
       "order": "الطلب",
       "client": "الزبون",
       "invoiceDate": "التاريخ",
-      },
-      "payment": {
-        "unpaid": "غير مؤداة",
-        "partial": "مؤداة جزئياً",
-        "paid": "مؤداة"
       "issueDeadline": "يجب إصدارها قبل",
       "dueDate": "الأجل",
       "totalHt": "المجموع دون ضريبة",
@@ -1171,6 +1171,16 @@
         "CONFLICT": "تعارض، أعد المحاولة.",
         "UNAUTHENTICATED": "انتهت الجلسة.",
         "FORBIDDEN": "إجراء غير مسموح."
+      },
+      "cancelLoad": "إلغاء الشحنة",
+      "cancelReason": "سبب الإلغاء (إلزامي)",
+      "cancelConfirm": "إلغاء هذه الشحنة",
+      "cancelBack": "رجوع",
+      "cancelErrors": {
+        "INVALID": "سبب غير صالح.",
+        "NOT_FOUND": "شحنة غير موجودة.",
+        "ALREADY_CANCELLED": "هذه الشحنة ملغاة مسبقاً.",
+        "other": "تعذر الإلغاء."
       }
     },
     "stock": {
@@ -1183,16 +1193,6 @@
       "threshold": "الحد الأدنى",
       "status": "الحالة",
       "statuses": {
-      },
-      "cancelLoad": "إلغاء الشحنة",
-      "cancelReason": "سبب الإلغاء (إلزامي)",
-      "cancelConfirm": "إلغاء هذه الشحنة",
-      "cancelBack": "رجوع",
-      "cancelErrors": {
-        "INVALID": "سبب غير صالح.",
-        "NOT_FOUND": "شحنة غير موجودة.",
-        "ALREADY_CANCELLED": "هذه الشحنة ملغاة مسبقاً.",
-        "other": "تعذر الإلغاء."
         "ok": "سليم",
         "low": "منخفض",
         "short": "سالب"

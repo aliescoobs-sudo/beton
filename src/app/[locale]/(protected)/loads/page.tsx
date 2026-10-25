@@ -20,8 +20,8 @@ export default async function LoadsPage({ params }: { params: Promise<{ locale: 
   const pool = getPool('app');
   const today = (await getRequestClock()).today();
   const canLoad = can(user.role, 'deliveries.write');
-  const [orders, deliveries, trucks] = await Promise.all([
   const canCancel = can(user.role, 'deliveries.cancel');
+  const [orders, deliveries, trucks] = await Promise.all([
     listLoadableOrders(pool, user, today),
     listDeliveries(pool, user),
     canLoad ? listTrucks(pool, user) : Promise.resolve([]),
@@ -107,8 +107,8 @@ export default async function LoadsPage({ params }: { params: Promise<{ locale: 
                 <Th>{t('loads.date')}</Th>
                 <Th numeric>{t('deliveries.volume')}</Th>
                 <Th>{t('deliveries.signed')}</Th>
-              </tr>
                 {canCancel && <Th>{t('deliveries.cancelLoad')}</Th>}
+              </tr>
             </thead>
             <tbody>
               {deliveries.map((d) => (

@@ -124,13 +124,13 @@ export const PERMISSIONS = {
   'due_items.read': MONEY_READ,
   'alerts.stock.read': PLANT_READ,
   'accounts.colour.read': MONEY_READ,
+  // Confirming a resolution option of the rules engine (early deposit, postponement…): money, the owner's (DECISIONS 81)
+  'cash.decide': MONEY_WRITE,
   // Audit log viewer
   'audit.read_all': MANAGERS_READ,
   'audit.read_own': ALL,
   // AI (🟡 A22)
   'ai.qa': MONEY_READ,
-  // Confirming a resolution option of the rules engine (early deposit, postponement…): money, the owner's (DECISIONS 81)
-  'cash.decide': MONEY_WRITE,
   'ai.assisted_entry': OFFICE,
   // Pilot operations
   'simulation.control': ['owner'],

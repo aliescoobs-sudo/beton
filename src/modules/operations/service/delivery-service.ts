@@ -130,6 +130,8 @@ export async function createLoad(
       );
       const left = remainingVolume(o.volume_l, [Number(loaded.rows[0]?.v)]);
       const volumeL = v.volumeL ?? Math.min(left, t.capacity_l);
+      // Nothing left and no volume given: ask for a volume. A volume given beyond what is left is allowed (the plant is
+      // never blocked): it is warned about here and recorded by the database for the owner to confirm.
       if (volumeL <= 0) return err('OVER_ORDER');
       if (volumeL > t.capacity_l) return err('OVER_CAPACITY');
       const excessL = Math.max(0, volumeL - left);
@@ -153,8 +155,6 @@ export async function createLoad(
         if (oneWay !== undefined) {
           const [unloading, limit] = [
             await opsParameter(tx, 'unloading_min'),
-      // Nothing left and no volume given: ask for a volume. A volume given beyond what is left is allowed (the plant is
-      // never blocked): it is warned about here and recorded by the database for the owner to confirm.
             await opsParameter(tx, 'concrete_limit_min'),
           ];
           if (tripExceedsLimit(oneWay, unloading, limit)) warnings.push('LONG_TRIP');

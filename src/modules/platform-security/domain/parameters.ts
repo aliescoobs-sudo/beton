@@ -78,12 +78,6 @@ export const PARAMETERS = {
     schema: z.number().int().min(0).max(120),
     description: 'Minutes to unload a truck on site',
   },
-} as const;
-
-export type ParameterKey = keyof typeof PARAMETERS;
-export type ParameterValues = {
-  [K in ParameterKey]: (typeof PARAMETERS)[K]['default'] extends number ? number : string;
-};
   // Rules engine and owner dashboard (SPEC-rules-engine §3, §4, §6). Every default is an assumption (🟡) to revisit with
   // the owner; none is written in the domain code.
   forecast_horizon_days: {
@@ -142,6 +136,12 @@ export type ParameterValues = {
     description:
       'Share of an order moved to the next working day in the "split delivery" option (basis points)',
   },
+} as const;
+
+export type ParameterKey = keyof typeof PARAMETERS;
+export type ParameterValues = {
+  [K in ParameterKey]: (typeof PARAMETERS)[K]['default'] extends number ? number : string;
+};
 
 export const PARAMETER_KEYS = Object.keys(PARAMETERS) as ParameterKey[];
 
