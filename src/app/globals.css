@@ -387,7 +387,11 @@
 /* A document (invoice, quote) shows all its lines: no inner scroll on screen, none on paper. */
 .document .table-wrap {
   max-block-size: none;
-  overflow: visible;
+}
+@media print {
+  .document .table-wrap {
+    overflow: visible;
+  }
 }
 
 /* A printed page (delivery note) carries the document only: no navigation, no buttons. */

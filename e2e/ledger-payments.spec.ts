@@ -39,7 +39,10 @@ test('office enters a cash payment and a post-dated cheque for an order, blind',
   // A cheque against the latest Atlas order, written far in the future.
   const order = (
     await migrator.query<{ code: string }>(
-      `select o.code from sales_order o join client c on c.id = o.client_id where c.name ilike '%atlas%' and o.reverses_id is null order by o.created_at desc limit 1`,
+      `select o.code from sales_order o join client c on c.id = o.client_id where c.name ilike '%atlas%' and o.reverses_id is null
+          and not exists (select 1 from sales_order r where r.reverses_id = o.id)
+          and (select coalesce(sum(a.amount_centimes), 0) from allocation a join payment_plan_item i on i.id = a.payment_plan_item_id where i.order_id = o.id) < o.total_ttc_centimes - 200000
+        order by o.created_at desc limit 1`,
     )
   ).rows[0];
   expect(order?.code).toMatch(/^CMD-/);
