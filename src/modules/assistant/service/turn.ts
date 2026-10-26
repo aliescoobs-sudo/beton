@@ -10,12 +10,17 @@ import { type LeakIndex, scanForLeaks } from '../domain/leak-scan';
 import { allowedFrom, checkNumbers } from '../domain/numbers-check';
 import { MAX_RESULT_CHARS_PER_TURN, MAX_TOOL_CALLS_PER_TURN, type Outcome } from '../domain/outcome';
 import { Pseudonymizer } from '../domain/pseudonymizer';
+import { PROPOSAL_TTL_HOURS, type ProposalCard } from '../domain/drafts';
 import { buildSystemPrompt, NUMBERS_REMINDER, SCHEMA_REMINDER } from '../domain/system-prompt';
 import type { ToolContext } from '../domain/tool-types';
 import type { PayloadCipher } from './cipher';
 import { visibleEntities } from './entities';
-import { newInteractionId, recordTurn, type ToolCallRecord } from './interaction-store';
-import { passGate } from './limits';
+import { runDraft } from './draft-runner';
+import type { Prepared } from './drafts/types';
+import { newInteractionId, type ProposalRecord, recordTurn, type ToolCallRecord } from './interaction-store';
+import { uuidv7 } from '@/lib/uuidv7';
+import { type GateResult, passGate } from './limits';
+import { findDraftTool } from './drafts/registry';
 import { toolSpecsFor } from './tool-registry';
 import { runTool, type ToolOutcome } from './tool-runner';
 
@@ -32,6 +37,8 @@ export interface TurnDeps {
   engine: EngineParams;
   /** Every name and number the leak scan looks for. A failure to build it stops the turn. */
   leakIndex: () => Promise<LeakIndex>;
+  /** The gate before anything else (kill switches, rate limit, budget); `passGate` unless a test brings its own. */
+  gate?: (actor: SessionUser) => Promise<GateResult>;
 }
 
 export interface TurnInput {
@@ -63,13 +70,18 @@ export interface TurnResult {
   fallback: boolean;
   /** Why nothing was answered, for a message in the person's language. */
   refusal: Refusal | null;
+  /** What the leak scan found when it stopped the turn: kinds only (name, number, long_number…), never a value. */
+  leakKinds: string[];
   chips: ToolChip[];
   /** The results the person may read, as they would see them on a screen, for the fallback and the detail. */
   results: { tool: string; data: unknown }[];
   sent: SentPayload | null;
+  /** The drafts this turn made, as cards for the person to check and confirm. */
+  proposals: ProposalCard[];
   budgetPercent: number;
 }
 
+const MAX_DRAFTS_PER_TURN = 3;
 const MAX_ROUNDS = 10;
 const MAX_HISTORY = 10;
 const MAX_HISTORY_CHARS = 600;
@@ -80,9 +92,11 @@ const empty = (over: Partial<TurnResult>): TurnResult => ({
   answer: null,
   fallback: false,
   refusal: null,
+  leakKinds: [],
   chips: [],
   results: [],
   sent: null,
+  proposals: [],
   budgetPercent: 0,
   ...over,
 });
@@ -117,6 +131,7 @@ export async function runTurn(deps: TurnDeps, actor: SessionUser, input: TurnInp
         output: r.output,
         outcome: r.outcome,
         toolCalls: r.toolCalls,
+        proposals: r.proposals,
         tokensIn: r.tokensIn,
         tokensOut: r.tokensOut,
         costMicroUsd: costMicroUsd(r.provider, r.tokensIn, r.tokensOut),
@@ -125,7 +140,7 @@ export async function runTurn(deps: TurnDeps, actor: SessionUser, input: TurnInp
       { cipher: deps.cipher, hmacKey: deps.hmacKey },
     );
 
-  const gate = await passGate(deps, actor);
+  const gate = await (deps.gate ?? ((a: SessionUser) => passGate(deps, a)))(actor);
   if (gate.refusal) {
     await store({
       provider: 'none',
@@ -187,6 +202,7 @@ export async function runTurn(deps: TurnDeps, actor: SessionUser, input: TurnInp
   const chips: ToolChip[] = [];
   const runs: { tool: string; data: unknown }[] = [];
   const prepared: unknown[] = [];
+  const drafts: { id: string; prepared: Prepared; expiresAt: Date }[] = [];
   let toolCalls = 0;
   let resultChars = 0;
   let retries = 0;
@@ -195,6 +211,25 @@ export async function runTurn(deps: TurnDeps, actor: SessionUser, input: TurnInp
   let sent: SentPayload | null = null;
   let outcome: Outcome = 'fallback';
   let answer: string | null = null;
+  let leakKinds: string[] = [];
+
+  const draftRun = async (name: string, args: unknown) => {
+    // A turn makes at most a few drafts; the rest are refused like any call beyond a limit.
+    if (drafts.length >= MAX_DRAFTS_PER_TURN)
+      return {
+        outcome: 'invalid_args' as const,
+        result: { error: 'Too many drafts in this turn.' },
+        rowCount: 0,
+      };
+    const r = await runDraft({ ...ctx, ps, authPool: deps.authPool }, name, args);
+    if (r.prepared)
+      drafts.push({
+        id: uuidv7(realClock.now()),
+        prepared: r.prepared,
+        expiresAt: new Date(realClock.now().getTime() + PROPOSAL_TTL_HOURS * 3_600_000),
+      });
+    return { outcome: r.outcome, result: r.result, rowCount: r.prepared ? 1 : 0, args: r.args };
+  };
 
   const finish = async (): Promise<TurnResult> => {
     const fallback = answer === null;
@@ -204,6 +239,12 @@ export async function runTurn(deps: TurnDeps, actor: SessionUser, input: TurnInp
       output: answer ?? '',
       outcome,
       toolCalls: toolRecords,
+      proposals: drafts.map((d) => ({
+        id: d.id,
+        action: d.prepared.stored.action,
+        expiresAt: d.expiresAt,
+        payload: { stored: d.prepared.stored, card: d.prepared.card },
+      })),
       tokensIn,
       tokensOut,
     });
@@ -213,11 +254,19 @@ export async function runTurn(deps: TurnDeps, actor: SessionUser, input: TurnInp
       answer,
       fallback,
       refusal: outcome === 'blocked_leak' ? 'blocked_leak' : null,
+      leakKinds,
       chips,
       results: fallback
         ? runs.map((r) => ({ tool: r.tool, data: displayResult(r.data, (t) => ps.showNames(t)) }))
         : [],
       sent,
+      proposals: drafts.map((d) => ({
+        ...d.prepared.card,
+        id: d.id,
+        status: 'pending' as const,
+        expiresAt: d.expiresAt.toISOString(),
+        resultRef: null,
+      })),
       budgetPercent: gate.budgetPercent,
     };
   };
@@ -225,7 +274,9 @@ export async function runTurn(deps: TurnDeps, actor: SessionUser, input: TurnInp
   for (let round = 0; round < MAX_ROUNDS; round += 1) {
     const request: LlmRequest = { tier: 'analysis', system, messages, tools };
     // Every outbound payload is scanned: the question, the history, the tool results as the model will read them.
-    if (scanForLeaks(JSON.stringify({ system, messages }), index).length > 0) {
+    const hits = scanForLeaks(JSON.stringify({ system, messages }), index);
+    if (hits.length > 0) {
+      leakKinds = [...new Set(hits.map((h) => h.kind))];
       outcome = 'blocked_leak';
       return finish();
     }
@@ -253,7 +304,10 @@ export async function runTurn(deps: TurnDeps, actor: SessionUser, input: TurnInp
           continue;
         }
         toolCalls += 1;
-        const run = await runTool(ctx, call.name, call.args);
+        const draft = findDraftTool(call.name);
+        const run: { outcome: ToolOutcome; result: unknown; rowCount: number; args?: unknown } = draft
+          ? await draftRun(call.name, call.args)
+          : await runTool(ctx, call.name, call.args);
         const prep = prepareForModel(run.result, ps);
         let block = toDataBlock(call.name, prep).text;
         resultChars += block.length;
@@ -305,6 +359,7 @@ interface TurnRecordInput {
   output: string;
   outcome: Outcome;
   toolCalls: ToolCallRecord[];
+  proposals?: ProposalRecord[];
   tokensIn: number;
   tokensOut: number;
 }

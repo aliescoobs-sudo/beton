@@ -221,7 +221,7 @@ describe('the gate: kill switches, rate limits and budget (AC-ASSIST-15)', () =>
   it('refuses everyone with the global switch and one role with the role switch', async () => {
     await setParameter(app, users.owner, 'assistant.disabled_roles', 'plant,office');
     expect((await gate(users.plant)).refusal).toBe('disabled');
-    expect((await gate(users.owner)).refusal).toBeNull();
+    expect((await gate(await realSessionUser(env.DATABASE_URL_MIGRATOR, 'partner'))).refusal).toBeNull();
     await setParameter(app, users.owner, 'assistant.global_off', 1);
     expect((await gate(users.owner)).refusal).toBe('disabled');
   });

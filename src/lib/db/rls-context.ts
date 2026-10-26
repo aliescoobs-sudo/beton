@@ -16,6 +16,8 @@ const contextSchema = z.object({
   simAt: z.date().optional(),
   /** A draft of the assistant being confirmed by its human: the audit trail then says `ai_confirmed` and names the proposal. */
   aiProposalId: z.uuid().optional(),
+  /** Run as usual, then roll everything back: what a draft's preview shows is what the service would do, and none of it stays. */
+  rollback: z.boolean().optional(),
 });
 
 export type RlsContext = z.infer<typeof contextSchema>;
@@ -53,7 +55,7 @@ export async function withRlsContext<T>(
       `select set_config('app.sim_at', coalesce(nullif(current_setting('app.sim_at', true), ''), ctx.sim_now()::text, ''), true)`,
     );
     const result = await fn(client);
-    await client.query('COMMIT');
+    await client.query(ctx.rollback ? 'ROLLBACK' : 'COMMIT');
     return result;
   } catch (error) {
     await client.query('ROLLBACK').catch(() => undefined);

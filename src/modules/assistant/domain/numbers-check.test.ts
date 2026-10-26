@@ -75,6 +75,13 @@ describe('the numbers post-check (AC-ASSIST-07)', () => {
     expect(checkNumbers('٩٩ م³', allowed).ok).toBe(false);
   });
 
+  it('accepts a truck, a type or a product as the data or the question named it, and no other', () => {
+    const named = allowedFrom([{ rows: [{ truck: 'T1', product: 'B25' }] }], 'et le B30 ?');
+    expect(checkNumbers('Le camion T1 charge du B25, puis du B30.', named).ok).toBe(true);
+    expect(checkNumbers('Le camion T2 charge du B25.', named).ok).toBe(false);
+    expect(checkNumbers('Du B40.', named).ok).toBe(false);
+  });
+
   it('never reports the rejected values', () => {
     expect(JSON.stringify(checkNumbers('987654 m³', allowed))).not.toContain('987654');
   });

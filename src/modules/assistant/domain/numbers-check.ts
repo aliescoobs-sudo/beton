@@ -6,6 +6,8 @@ import { latinDigits } from './normalize';
  */
 
 const CODE = /\b[A-Z]{2,6}(?:-[A-Z0-9]+)+\b/g;
+// A name that carries digits (T1, B25, CPJ45): a truck, a concrete type, a product. Allowed only as the data or the question wrote it.
+const TOKEN = /\b[A-Za-z]{1,6}\d+[A-Za-z0-9]*\b/g;
 const PLACEHOLDER = /\{\{(?:AMT|NUM)_\d+\}\}/g;
 const DATE_ISO = /\b(\d{4})-(\d{2})-(\d{2})\b/g;
 const DATE_SLASH = /\b(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})\b/g;
@@ -47,6 +49,7 @@ function visit(value: unknown, into: Allowed, key?: string): void {
   }
   if (typeof value === 'string') {
     for (const m of value.matchAll(CODE)) into.codes.add(m[0]);
+    for (const m of value.matchAll(TOKEN)) into.codes.add(m[0].toUpperCase());
     const text = value.replace(CODE, ' ').replace(PLACEHOLDER, ' ');
     for (const m of text.matchAll(DATE_ISO)) into.dates.add(m[0]);
     for (const m of text.matchAll(TIME)) into.times.add(`${Number(m[1])}:${m[2]}`);
@@ -67,6 +70,7 @@ export function allowedFrom(toolResults: readonly unknown[], questionText: strin
   const allowed: Allowed = { quantities: new Set(), dates: new Set(), times: new Set(), codes: new Set() };
   for (const r of toolResults) visit(r, allowed);
   for (const m of questionText.matchAll(CODE)) allowed.codes.add(m[0]);
+  for (const m of questionText.matchAll(TOKEN)) allowed.codes.add(m[0].toUpperCase());
   return allowed;
 }
 
@@ -86,6 +90,10 @@ export function checkNumbers(answer: string, allowed: Allowed): NumbersVerdict {
   text = text.replace(PLACEHOLDER, ' ');
   text = text.replace(CODE, (code) => {
     if (!allowed.codes.has(code)) rejected += 1;
+    return ' ';
+  });
+  text = text.replace(TOKEN, (token) => {
+    if (!allowed.codes.has(token.toUpperCase())) rejected += 1;
     return ' ';
   });
   text = text.replace(DATE_ISO, (all) => {

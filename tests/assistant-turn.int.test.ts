@@ -9,6 +9,7 @@ import { withRlsContext } from '../src/lib/db/rls-context';
 import { scanForLeaks } from '../src/modules/assistant';
 import { cipherFrom } from '../src/modules/assistant/service/cipher';
 import { forgetLeakIndex, loadLeakIndex } from '../src/modules/assistant/service/leak-index';
+import { draftToolsFor } from '../src/modules/assistant/service/drafts/registry';
 import { toolsFor } from '../src/modules/assistant/service/tool-registry';
 import { runTurn, type TurnDeps } from '../src/modules/assistant/service/turn';
 import { createInvoice } from '../src/modules/ledger';
@@ -55,7 +56,10 @@ const deps = (provider: FakeProvider, today = ROT_DAY): TurnDeps => ({
   today,
   engine: engineParams(defaultParameters()),
   leakIndex: () => loadLeakIndex(system, cipher),
+  // The real gate is tested below with its own users: the owner is one person with twenty questions in ten minutes.
+  gate: async () => ({ refusal: null, budgetPercent: 0 }),
 });
+const withGate = (d: TurnDeps): TurnDeps => ({ ...d, gate: undefined });
 
 const tool = (id: string, name: string, args: unknown = {}) => ({ id, name, args });
 const reply = (over: Partial<LlmResponse>): LlmResponse => ({
@@ -151,9 +155,7 @@ describe('a turn that goes well (AC-ASSIST-03, 14)', () => {
       const provider = scripted([], () => 'Rien à signaler.');
       await runTurn(deps(provider), users[role], { question: 'Quoi de neuf ?' });
       expect(provider.requests[0]?.tools.map((t) => t.name).sort(), role).toEqual(
-        toolsFor(role)
-          .map((t) => t.name)
-          .sort(),
+        [...toolsFor(role), ...draftToolsFor(role)].map((t) => t.name).sort(),
       );
     }
     const provider = scripted([tool('c1', 'deliveries_today', { date: ROT_DAY })], (r) => {
@@ -324,9 +326,10 @@ describe('what leaves, and what a model may be told to do (AC-ASSIST-05, 06, 09)
     const index = await loadLeakIndex(system, cipher);
     for (const role of ROLES) {
       // The tools whose answer is about this suite's own data: the others list what every suite put in the shared database
-      // (random component names) and are leak-scanned with their own fixtures in the tool tests.
+      // (random component names, random type codes) and are leak-scanned with their own fixtures in the tool tests.
       const own = toolsFor(role).filter(
-        (t) => !['stock_and_cover', 'purchase_status', 'consumption_variance'].includes(t.name),
+        (t) =>
+          !['stock_and_cover', 'purchase_status', 'consumption_variance', 'order_chain'].includes(t.name),
       );
       const calls = own.map((t, i) => {
         const args: Record<string, unknown> =
@@ -344,7 +347,7 @@ describe('what leaves, and what a model may be told to do (AC-ASSIST-05, 06, 09)
       // The plant reads no client: a client's name typed by it is blocked (tested above), so it asks without one.
       const question = role === 'plant' ? 'Un point ?' : `Un point pour ${sold.name} ?`;
       const out = await runTurn(deps(provider), users[role], { question });
-      expect(out.outcome, role).not.toBe('blocked_leak');
+      expect(out.outcome, `${role}: ${out.leakKinds.join()}`).not.toBe('blocked_leak');
       for (const request of provider.requests)
         expect(scanForLeaks(blankLabels(JSON.stringify(request)), index), role).toEqual([]);
     }
@@ -424,7 +427,7 @@ describe('limits, kill switches and a provider that fails (AC-ASSIST-15)', () =>
     const provider = scripted([], () => 'Ok.');
     const outs = [];
     for (let i = 0; i < 4; i += 1)
-      outs.push(await runTurn(deps(provider), user, { question: `Question ${i}` }));
+      outs.push(await runTurn(withGate(deps(provider)), user, { question: `Question ${i}` }));
     expect(outs.map((o) => o.outcome)).toEqual(['ok', 'ok', 'rate_limited', 'rate_limited']);
     expect(outs[2]).toMatchObject({ refusal: 'rate_limited', answer: null });
     expect(provider.calls).toBe(2);
@@ -433,20 +436,22 @@ describe('limits, kill switches and a provider that fails (AC-ASSIST-15)', () =>
   it('makes no provider call when the kill switch is on, for everyone or for one role', async () => {
     const provider = scripted([], () => 'Ok.');
     await setParameter(app, users.owner, 'assistant.disabled_roles', 'office');
-    expect(await runTurn(deps(provider), users.office, { question: 'Bonjour' })).toMatchObject({
+    expect(await runTurn(withGate(deps(provider)), users.office, { question: 'Bonjour' })).toMatchObject({
       outcome: 'disabled',
       refusal: 'disabled',
     });
     expect(provider.calls).toBe(0);
     await setParameter(app, users.owner, 'assistant.global_off', 1);
-    expect((await runTurn(deps(provider), users.owner, { question: 'Bonjour' })).outcome).toBe('disabled');
+    expect((await runTurn(withGate(deps(provider)), users.owner, { question: 'Bonjour' })).outcome).toBe(
+      'disabled',
+    );
     expect(provider.calls).toBe(0);
   });
 
   it('makes no provider call once the monthly budget is spent', async () => {
     const provider = scripted([], () => 'Ok.');
     await setParameter(app, users.owner, 'assistant.budget_usd_month', 0);
-    expect(await runTurn(deps(provider), users.support, { question: 'Bonjour' })).toMatchObject({
+    expect(await runTurn(withGate(deps(provider)), users.support, { question: 'Bonjour' })).toMatchObject({
       outcome: 'budget_stop',
       refusal: 'budget_stop',
     });

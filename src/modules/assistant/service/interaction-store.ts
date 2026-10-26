@@ -2,7 +2,7 @@ import type pg from 'pg';
 import { keyedHash } from '@/lib/crypto/hmac';
 import { uuidv7 } from '@/lib/uuidv7';
 import { realClock } from '@/modules/clock';
-import { inRequest, type SessionUser } from '@/modules/platform-security';
+import { inRequest, recordAuditEvent, type SessionUser } from '@/modules/platform-security';
 import type { Outcome } from '../domain/outcome';
 import type { PayloadCipher } from './cipher';
 
@@ -12,6 +12,14 @@ export interface ToolCallRecord {
   args: unknown;
   outcome: 'ok' | 'permission_denied' | 'invalid_args' | 'error' | 'blocked_leak';
   rowCount: number;
+}
+
+/** A draft made in this turn, to be stored with it: the sealed payload holds the resolved parameters and the card. */
+export interface ProposalRecord {
+  id: string;
+  action: string;
+  expiresAt: Date;
+  payload: unknown;
 }
 
 export interface TurnRecord {
@@ -30,6 +38,7 @@ export interface TurnRecord {
   tokensOut: number;
   costMicroUsd: number;
   latencyMs: number;
+  proposals?: ProposalRecord[];
 }
 
 export const newInteractionId = () => uuidv7(realClock.now());
@@ -69,6 +78,27 @@ export async function recordTurn(
         turn.latencyMs,
       ],
     );
+    for (const p of turn.proposals ?? []) {
+      await tx.query(
+        `insert into ai_proposal (id, interaction_id, user_id, role, action, params_enc, expires_at)
+         values ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          p.id,
+          turn.id,
+          actor.id,
+          actor.role,
+          p.action,
+          deps.cipher.seal(JSON.stringify(p.payload)),
+          p.expiresAt.toISOString(),
+        ],
+      );
+      await recordAuditEvent(tx, {
+        action: 'ai_proposal',
+        table: 'ai_proposal',
+        rowId: p.id,
+        after: { action: p.action },
+      });
+    }
     let seq = 0;
     for (const call of turn.toolCalls) {
       seq += 1;

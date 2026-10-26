@@ -12,9 +12,12 @@ export class FakeProvider implements LlmProvider {
   /** Every request received, in order (what a real provider would have been sent). */
   readonly requests: LlmRequest[] = [];
 
-  constructor(
-    private readonly script: (request: LlmRequest, call: number) => LlmResponse | Promise<LlmResponse>,
-  ) {}
+  private readonly script: (request: LlmRequest, call: number) => LlmResponse | Promise<LlmResponse>;
+
+  // No parameter property: this file also loads under plain node (the CLI scripts), which only strips types.
+  constructor(script: (request: LlmRequest, call: number) => LlmResponse | Promise<LlmResponse>) {
+    this.script = script;
+  }
 
   async generate(request: LlmRequest): Promise<LlmResponse> {
     this.calls += 1;

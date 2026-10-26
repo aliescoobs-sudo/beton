@@ -3,6 +3,7 @@ import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { withRlsContext } from '../src/lib/db/rls-context';
 import { Pseudonymizer, prepareForModel, scanForLeaks } from '../src/modules/assistant';
+import { draftToolsFor } from '../src/modules/assistant/service/drafts/registry';
 import { findTool, TOOLS, toolSpecsFor, toolsFor } from '../src/modules/assistant/service/tool-registry';
 import { runTool } from '../src/modules/assistant/service/tool-runner';
 import type { ToolContext } from '../src/modules/assistant/domain/tool-types';
@@ -112,9 +113,7 @@ describe('the matrix (AC-ASSIST-03)', () => {
     for (const role of ROLES) {
       const specs = toolSpecsFor(role);
       expect(specs.map((s) => s.name).sort()).toEqual(
-        toolsFor(role)
-          .map((t) => t.name)
-          .sort(),
+        [...toolsFor(role), ...draftToolsFor(role)].map((t) => t.name).sort(),
       );
       for (const s of specs)
         expect(s.parameters).toMatchObject({ type: 'object', additionalProperties: false });

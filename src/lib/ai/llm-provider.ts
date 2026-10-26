@@ -42,11 +42,12 @@ export interface LlmProvider {
 
 /** Why a provider could not answer: never carries a payload, a key or a response body. */
 export class ProviderError extends Error {
-  constructor(
-    readonly kind: 'refused' | 'timeout' | 'http' | 'invalid_response',
-    message: string,
-  ) {
+  readonly kind: 'refused' | 'timeout' | 'http' | 'invalid_response';
+
+  // No parameter property: this file also loads under plain node (the CLI scripts), which only strips types.
+  constructor(kind: 'refused' | 'timeout' | 'http' | 'invalid_response', message: string) {
     super(message);
     this.name = 'ProviderError';
+    this.kind = kind;
   }
 }

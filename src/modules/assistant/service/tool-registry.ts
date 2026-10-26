@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { LlmToolSpec } from '@/lib/ai/llm-provider';
 import type { Role } from '@/modules/platform-security';
+import { draftToolsFor } from './drafts/registry';
 import type { AssistantTool } from '../domain/tool-types';
 import { consumptionVariance } from './tools/consumption-variance';
 import { deliveriesToday } from './tools/deliveries-today';
@@ -32,8 +33,9 @@ export const findTool = (name: string): AssistantTool | undefined => TOOLS.find(
 /** The tools a role may be offered: not in the list sent to the model means not callable (defence in depth at call time). */
 export const toolsFor = (role: Role): AssistantTool[] => TOOLS.filter((t) => t.roles.includes(role));
 
+/** What the model is offered: the read tools and the draft tools of the role, each with a closed schema. */
 export function toolSpecsFor(role: Role): LlmToolSpec[] {
-  return toolsFor(role).map((t) => ({
+  return [...toolsFor(role), ...draftToolsFor(role)].map((t) => ({
     name: t.name,
     description: t.description,
     parameters: z.toJSONSchema(t.params) as Record<string, unknown>,
