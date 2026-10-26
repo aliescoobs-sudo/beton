@@ -29,7 +29,7 @@ Status: `[ ]` to do, `[x]` done (commit), `[~]` partial.
 - [x] I3.4 Server-side PDF (AC-INT-19)
 
 ### Wave I4: decisions 91 to 96
-- [ ] I4.1 Default driver per truck, audited override (AC-INT-20)
+- [x] I4.1 Default driver per truck, audited override (AC-INT-20)
 - [ ] I4.2 Office read-only dispatch view (AC-INT-21)
 - [ ] I4.3 Overdue orders flagged (AC-INT-22)
 

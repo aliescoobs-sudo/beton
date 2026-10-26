@@ -2,7 +2,7 @@
 
 import { getRequestClock } from '@/app/request-clock';
 import { getPool } from '@/lib/db/pools';
-import { createDriver, saveDispatch } from '@/modules/operations';
+import { createDriver, saveDispatch, setTruckDefaultDriver } from '@/modules/operations';
 import { authorize, ForbiddenError, type Permission } from '@/modules/platform-security';
 import { currentAuthState } from '@/modules/platform-security/next';
 
@@ -39,6 +39,17 @@ export async function saveDispatchAction(
 export async function createDriverAction(input: unknown): Promise<{ ok: true } | Failure> {
   return guarded('drivers.write', async (user) => {
     const result = await createDriver(getPool('app'), user, input);
+    return result.ok ? { ok: true as const } : { ok: false as const, error: result.error };
+  });
+}
+
+// @permission drivers.write (owner, partner): the default driver of a truck, audited by the truck's own audit trigger
+export async function setTruckDefaultDriverAction(input: {
+  truckId: string;
+  driverId: string | null;
+}): Promise<{ ok: true } | Failure> {
+  return guarded('drivers.write', async (user) => {
+    const result = await setTruckDefaultDriver(getPool('app'), user, input);
     return result.ok ? { ok: true as const } : { ok: false as const, error: result.error };
   });
 }

@@ -63,9 +63,12 @@ export {
   type DriverRow,
   getDispatchDay,
   listDrivers,
+  listTruckDefaultDrivers,
   type SavedDispatch,
   type SavedRotation,
   saveDispatch,
+  setTruckDefaultDriver,
+  type TruckDefaultDriver,
 } from './service/dispatch-service';
 export { type LossError, recordLoss, type RecordedLoss } from './service/loss-service';
 export {

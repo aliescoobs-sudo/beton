@@ -19,13 +19,20 @@ import {
   type DispatchTruck,
   isBlocking,
   retime,
+  isDriverOverride,
   type Rotation,
 } from '../domain/dispatch';
 import { parseDispatchInput, parseDriverInput } from '../domain/load-input';
 import { opsParameter } from './ops-parameters';
 
 export type DispatchError =
-  'INVALID' | 'NOT_FOUND' | 'BLOCKED' | 'TRUCK_UNAVAILABLE' | 'OVER_CAPACITY' | 'CONFLICT';
+  | 'INVALID'
+  | 'NOT_FOUND'
+  | 'BLOCKED'
+  | 'TRUCK_UNAVAILABLE'
+  | 'OVER_CAPACITY'
+  | 'CONFLICT'
+  | 'OVERRIDE_REASON';
 
 export function dispatchFailure(error: unknown): DispatchError {
   const e = error as { code?: string; message?: string };
@@ -33,6 +40,7 @@ export function dispatchFailure(error: unknown): DispatchError {
   if (e.code === '23514') {
     if (/truck is not available/.test(m)) return 'TRUCK_UNAVAILABLE';
     if (/more than the truck/.test(m)) return 'OVER_CAPACITY';
+    if (/needs a reason/.test(m)) return 'OVERRIDE_REASON';
     if (/not a live order|driver is not active/.test(m)) return 'NOT_FOUND';
     return 'INVALID';
   }
@@ -47,6 +55,8 @@ export interface SavedRotation extends Rotation {
   clientCode: string;
   truckCode: string;
   driverName: string | null;
+  /** Why the rotation's driver is not the truck's default (D91); null on the default. */
+  overrideReason: string | null;
   /** The rotation has an event (it is being driven): it stays as it is when the day is replanned. */
   started: boolean;
 }
@@ -118,7 +128,8 @@ async function dayTrucks(tx: pg.PoolClient, date: string): Promise<DispatchTruck
     code: string;
     capacity_l: number;
     status: 'active' | 'archived';
-  }>(`select id, code, capacity_l, status from truck order by code`);
+    default_driver_id: string | null;
+  }>(`select id, code, capacity_l, status, default_driver_id from truck order by code`);
   const log = await tx.query<{
     id: string;
     truck_id: string;
@@ -137,6 +148,7 @@ async function dayTrucks(tx: pg.PoolClient, date: string): Promise<DispatchTruck
       id: t.id,
       code: t.code,
       capacityL: t.capacity_l,
+      defaultDriverId: t.default_driver_id,
       available: isTruckAvailable(
         { status: t.status },
         date,
@@ -180,10 +192,11 @@ async function liveRotations(tx: pg.PoolClient, date: string): Promise<SavedRota
     client_code: string;
     truck_code: string;
     driver_name: string | null;
+    override_reason: string | null;
     started: boolean;
   }>(
     `select p.id, p.order_id, p.seq, p.truck_id, p.driver_id, p.volume_l, p.load_min, p.depart_min, p.arrive_min,
-            p.unload_end_min, p.back_min, o.code as order_code, o.client_code, t.code as truck_code, d.name as driver_name,
+            p.unload_end_min, p.back_min, o.code as order_code, o.client_code, t.code as truck_code, d.name as driver_name, p.driver_override_reason as override_reason,
             exists (select 1 from trip_event e where e.trip_id = p.id) as started
        from trip_plan p
        join sales_order_ops o on o.id = p.order_id
@@ -209,6 +222,7 @@ async function liveRotations(tx: pg.PoolClient, date: string): Promise<SavedRota
     clientCode: r.client_code,
     truckCode: r.truck_code,
     driverName: r.driver_name,
+    overrideReason: r.override_reason,
     started: r.started,
   }));
 }
@@ -294,6 +308,18 @@ export async function saveDispatch(
       const conflicts = checkDispatch(timed, { orders, trucks, drivers, params, fixed });
       if (conflicts.some(isBlocking)) return err('BLOCKED');
 
+      // A driver other than the truck's default needs a reason (the database refuses it too); a rotation on the default has none.
+      const truckOf = new Map(trucks.map((k) => [k.id, k]));
+      const reasons = wanted.map((w) =>
+        isDriverOverride(truckOf.get(w.truckId), w.driverId ?? null) ? (w.overrideReason ?? null) : null,
+      );
+      if (
+        wanted.some(
+          (w, i) => isDriverOverride(truckOf.get(w.truckId), w.driverId ?? null) && reasons[i] === null,
+        )
+      )
+        return err('OVERRIDE_REASON');
+
       const batchId = randomUUID();
       for (const p of previous) {
         await tx.query(
@@ -301,11 +327,11 @@ export async function saveDispatch(
           [randomUUID(), p.key, actor.id],
         );
       }
-      for (const r of timed) {
+      for (const [i, r] of timed.entries()) {
         await tx.query(
           `insert into trip_plan (id, batch_id, trip_date, order_id, seq, truck_id, driver_id, volume_l, load_min,
-                                  depart_min, arrive_min, unload_end_min, back_min, created_by)
-           values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+                                  depart_min, arrive_min, unload_end_min, back_min, created_by, driver_override_reason)
+           values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
           [
             randomUUID(),
             batchId,
@@ -321,6 +347,7 @@ export async function saveDispatch(
             r.unloadEndMin,
             r.backMin,
             actor.id,
+            reasons[i] ?? null,
           ],
         );
       }
@@ -389,6 +416,49 @@ export async function archiveDriver(
     return rowCount ? ok(true as const) : err('NOT_FOUND');
   } catch (error) {
     if (isMalformedId(error)) return err('NOT_FOUND');
+    throw error;
+  }
+}
+
+export interface TruckDefaultDriver {
+  truckId: string;
+  truckCode: string;
+  truckStatus: 'active' | 'archived';
+  driverId: string | null;
+}
+
+/** Every truck with its default driver (D91): the page where a manager sets it. */
+export async function listTruckDefaultDrivers(
+  appPool: pg.Pool,
+  actor: SessionUser,
+): Promise<TruckDefaultDriver[]> {
+  await require(appPool, actor, 'dispatch.read');
+  const { rows } = await inRequest(appPool, actor, (tx) =>
+    tx.query<{ id: string; code: string; status: 'active' | 'archived'; default_driver_id: string | null }>(
+      `select id, code, status, default_driver_id from truck order by code`,
+    ),
+  );
+  return rows
+    .map((r) => ({ truckId: r.id, truckCode: r.code, truckStatus: r.status, driverId: r.default_driver_id }))
+    .sort((a, b) => a.truckCode.localeCompare(b.truckCode, 'en', { numeric: true }));
+}
+
+/** A manager sets (or clears) a truck's default driver. The change is audited by the truck's own audit trigger. */
+export async function setTruckDefaultDriver(
+  appPool: pg.Pool,
+  actor: SessionUser,
+  input: { truckId: string; driverId: string | null },
+): Promise<Result<true, 'NOT_FOUND' | 'INVALID'>> {
+  await require(appPool, actor, 'drivers.write');
+  try {
+    const { rowCount } = await inRequest(appPool, actor, (tx) =>
+      tx.query(`update truck set default_driver_id = $2 where id = $1`, [input.truckId, input.driverId]),
+    );
+    return rowCount ? ok(true as const) : err('NOT_FOUND');
+  } catch (error) {
+    const e = error as { code?: string };
+    if (e.code === '23514') return err('INVALID');
+    if (e.code === '23503' || isMalformedId(error)) return err('NOT_FOUND');
     throw error;
   }
 }

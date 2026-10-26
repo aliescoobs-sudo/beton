@@ -334,8 +334,8 @@ export const TABLE_ACCESS = {
     audited: true,
     noDelete: true,
     exception:
-      'master-data T13: managers write (trucks.write); plate, capacity and status are the only updatable columns ' +
-      '(column grant), the plant cannot edit a truck; code immutable (trigger).',
+      'master-data T13: managers write (trucks.write); plate, capacity, status and the default driver (I4.1, drivers.write) are the only updatable columns ' +
+      '(column grant), the plant cannot edit a truck; code immutable (trigger); the default driver must be active (trigger).',
   },
   truck_status_log: {
     kind: 'rls',
@@ -910,7 +910,7 @@ export const TABLE_ACCESS = {
     noDelete: true,
     insertOnly: true,
     exception:
-      'operations O9: a planned rotation (order, truck, driver, volume, the five milestones in minutes). Quantities and times only, no money. Insert-only; guards in the database: live order, truck available that day by the breakdown log, rotation within the truck, active driver. Owner, partner and plant plan; office is blind to orders.',
+      'operations O9: a planned rotation (order, truck, driver, volume, the five milestones in minutes). Quantities and times only, no money. Insert-only; guards in the database: live order, truck available that day by the breakdown log, rotation within the truck, active driver, and a stored reason whenever the driver is not the truck default (I4.1). Owner, partner and plant plan; office is blind to orders.',
   },
   trip_plan_cancellation: {
     kind: 'rls',

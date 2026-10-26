@@ -1563,10 +1563,18 @@
         "OVER_CAPACITY": "Une rotation dépasse la capacité du camion.",
         "CONFLICT": "Le plan a changé entre-temps, réessayez.",
         "FORBIDDEN": "Action non autorisée.",
-        "UNAUTHENTICATED": "Session expirée."
+        "UNAUTHENTICATED": "Session expirée.",
+        "OVERRIDE_REASON": "Un chauffeur autre que celui par défaut demande un motif."
       },
       "started": "En cours : ces rotations ont démarré, elles ne sont plus modifiables",
-      "overdue": "en retard depuis le {date}"
+      "overdue": "en retard depuis le {date}",
+      "defaultDriver": "Chauffeur par défaut : {name}",
+      "noDefaultDriver": "Pas de chauffeur par défaut",
+      "overrideReason": "Motif du changement de chauffeur",
+      "overrideNeeded": "Indiquez le motif de chaque changement de chauffeur.",
+      "defaultsTitle": "Chauffeur par défaut de chaque camion",
+      "defaultsIntro": "Le planning propose ce chauffeur ; en choisir un autre sur une rotation demande un motif et est journalisé.",
+      "defaultFor": "Chauffeur par défaut du camion {truck}"
     },
     "trips": {
       "link": "Suivi des rotations",

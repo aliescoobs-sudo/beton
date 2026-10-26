@@ -3,12 +3,13 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
-import { Button, Select, StatusPill } from '@/ui';
+import { Button, Input, Select, StatusPill } from '@/ui';
 import {
   checkDispatch,
   clockText,
   type Conflict,
   isBlocking,
+  isDriverOverride,
   planDispatch,
   retime,
   type Rotation,
@@ -64,6 +65,9 @@ export function DispatchBoard({
         }))
       : proposal.rotations,
   );
+  const [reasons, setReasons] = useState<Record<string, string>>(() =>
+    Object.fromEntries(savedPlanned.flatMap((s) => (s.overrideReason ? [[s.key, s.overrideReason]] : []))),
+  );
   const [fromProposal, setFromProposal] = useState(!hasSaved);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -81,7 +85,15 @@ export function DispatchBoard({
     ],
     [rotations, ctx, hasSaved, fromProposal, proposal.conflicts],
   );
-  const blocked = conflicts.some(isBlocking);
+  const driverOf = new Map(day.drivers.map((d) => [d.id, d]));
+  const overrides = rotations.filter((r) =>
+    isDriverOverride(
+      day.trucks.find((k) => k.id === r.truckId),
+      r.driverId,
+    ),
+  );
+  const missingReason = overrides.some((r) => !(reasons[r.key] ?? '').trim());
+  const blocked = conflicts.some(isBlocking) || missingReason;
   const orderById = new Map(day.orders.map((o) => [o.orderId, o]));
   const truckById = new Map(day.trucks.map((k) => [k.id, k]));
   const rotationOrderCode = (key: string) => {
@@ -115,6 +127,12 @@ export function DispatchBoard({
           truckId: r.truckId,
           driverId: r.driverId,
           volumeL: r.volumeL,
+          overrideReason: isDriverOverride(
+            day.trucks.find((k) => k.id === r.truckId),
+            r.driverId,
+          )
+            ? (reasons[r.key] ?? '').trim()
+            : null,
         })),
       });
       if (!result.ok) return setMessage(t(`errors.${result.error}` as never));
@@ -351,6 +369,34 @@ export function DispatchBoard({
                           ))}
                         </Select>
                       </label>
+                      {(() => {
+                        const k = truckById.get(r.truckId);
+                        const def = k?.defaultDriverId ? driverOf.get(k.defaultDriverId) : undefined;
+                        const override = isDriverOverride(k, r.driverId);
+                        return (
+                          <>
+                            <span
+                              className="text-muted"
+                              data-testid={`default-driver-${o?.orderCode}-${r.seq}`}
+                            >
+                              {def ? t('defaultDriver', { name: def.name }) : t('noDefaultDriver')}
+                            </span>
+                            {override && (
+                              <label className="flex items-center gap-2">
+                                {t('overrideReason')}
+                                <Input
+                                  value={reasons[r.key] ?? ''}
+                                  maxLength={300}
+                                  disabled={!canWrite}
+                                  required
+                                  onChange={(e) => setReasons((cur) => ({ ...cur, [r.key]: e.target.value }))}
+                                  data-testid={`reason-${o?.orderCode}-${r.seq}`}
+                                />
+                              </label>
+                            )}
+                          </>
+                        );
+                      })()}
                       {savedLabel.get(r.key) && (
                         <span className="text-muted">
                           {t('savedRow', { truck: ltr(savedLabel.get(r.key)?.truckCode ?? '') })}
@@ -386,7 +432,11 @@ export function DispatchBoard({
           >
             {t('save')}
           </Button>
-          {blocked && <span className="text-sm text-status-late">{t('blockedHint')}</span>}
+          {blocked && (
+            <span className="text-sm text-status-late">
+              {missingReason ? t('overrideNeeded') : t('blockedHint')}
+            </span>
+          )}
           {message && (
             <span role="status" className="text-sm" data-testid="dispatch-message">
               {message}

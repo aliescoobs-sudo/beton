@@ -33,6 +33,12 @@ const dispatchSchema = z.object({
         truckId: z.uuid(),
         driverId: z.uuid().nullish(),
         volumeL: z.number().int().min(1).max(30_000),
+        /** Why the driver is not the truck's default (required then, ignored otherwise). */
+        overrideReason: z
+          .string()
+          .transform((v) => v.trim().replace(/\s+/g, ' '))
+          .pipe(z.string().min(1).max(300))
+          .nullish(),
       }),
     )
     .min(1)

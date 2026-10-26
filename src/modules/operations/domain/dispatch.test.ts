@@ -8,6 +8,7 @@ import {
   type DispatchParams,
   type DispatchTruck,
   isBlocking,
+  isDriverOverride,
   planDispatch,
   retime,
   rotationTimes,
@@ -32,11 +33,12 @@ const order = (code: string, remainingL: number, oneWayMin: number | null = 25):
   oneWayMin,
   remainingL,
 });
-const truck = (n: number, capacityL = 8000, available = true): DispatchTruck => ({
+const truck = (n: number, capacityL = 8000, available = true, defaultDriverId = `d${n}`): DispatchTruck => ({
   id: `t${n}`,
   code: `T${n}`,
   capacityL,
   available,
+  defaultDriverId,
 });
 const drivers: DispatchDriver[] = [1, 2, 3, 4, 5].map((n) => ({
   id: `d${n}`,
@@ -94,7 +96,7 @@ describe('planDispatch (AC-OPS-12)', () => {
     ]);
   });
 
-  it('drivers are paired to the available trucks in code order; a truck without a driver is a conflict', () => {
+  it("each rotation takes its truck's default driver; a default that is not an active driver leaves the rotation without one, a conflict (AC-INT-20)", () => {
     const plan = planDispatch(
       [order('CMD-1', 16000)],
       [truck(1), truck(2)],
@@ -103,6 +105,25 @@ describe('planDispatch (AC-OPS-12)', () => {
     );
     expect(plan.driverOfTruck).toEqual({ t1: 'd1', t2: null });
     expect(plan.conflicts.filter((c) => c.kind === 'NO_DRIVER')).toHaveLength(1);
+  });
+
+  it("the default is the truck's own, not the next driver in code order; a truck with no default has no driver proposed", () => {
+    const plan = planDispatch(
+      [order('CMD-1', 16000)],
+      [truck(1, 8000, true, 'd3'), { ...truck(2), defaultDriverId: null }],
+      drivers,
+      P,
+    );
+    expect(plan.driverOfTruck).toEqual({ t1: 'd3', t2: null });
+  });
+
+  it('a driver other than the default, or none where there is a default, is an override; on the default or a truck without one it is not', () => {
+    const t = truck(1, 8000, true, 'd1');
+    expect(isDriverOverride(t, 'd2')).toBe(true);
+    expect(isDriverOverride(t, null)).toBe(true);
+    expect(isDriverOverride(t, 'd1')).toBe(false);
+    expect(isDriverOverride({ defaultDriverId: null }, 'd2')).toBe(false);
+    expect(isDriverOverride(undefined, 'd2')).toBe(false);
   });
 
   it('an order with no zone uses the default and says so', () => {

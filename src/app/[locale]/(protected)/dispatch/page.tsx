@@ -2,17 +2,18 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { getRequestClock } from '@/app/request-clock';
 import { getPool } from '@/lib/db/pools';
 import { isRealDate } from '@/modules/ledger';
-import { getDispatchDay, listDrivers } from '@/modules/operations';
+import { getDispatchDay, listDrivers, listTruckDefaultDrivers } from '@/modules/operations';
 import { DispatchBoard } from '@/modules/operations/ui/dispatch-board';
 import { DriverForm } from '@/modules/operations/ui/driver-form';
 import { formatM3 } from '@/modules/operations/ui/format';
+import { TruckDefaults } from '@/modules/operations/ui/truck-defaults';
 
 /** 2026-10-23 → 23/10/2026 */
 const formatDate = (iso: string): string => iso.split('-').reverse().join('/');
 import { can } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/next';
 import { Button, EmptyState, Input, PageHeader, StatusPill, Table, Td, Th } from '@/ui';
-import { createDriverAction, saveDispatchAction } from './actions';
+import { createDriverAction, saveDispatchAction, setTruckDefaultDriverAction } from './actions';
 
 /** The day's dispatch: each order of the day cut into truck rotations, with truck, driver and times. Quantities and times only. */
 export default async function DispatchPage({
@@ -35,6 +36,7 @@ export default async function DispatchPage({
   const canWrite = can(user.role, 'dispatch.write');
   const canDrivers = can(user.role, 'drivers.write');
   const drivers = await listDrivers(pool, user);
+  const truckDefaults = await listTruckDefaultDrivers(pool, user);
 
   return (
     <div className="space-y-10">
@@ -131,6 +133,19 @@ export default async function DispatchPage({
             <DriverForm create={createDriverAction} />
           </div>
         )}
+      </section>
+
+      <section aria-labelledby="defaults-title">
+        <h2 id="defaults-title" className="mb-1 text-xl">
+          {t('dispatch.defaultsTitle')}
+        </h2>
+        <p className="mb-3 text-sm text-muted">{t('dispatch.defaultsIntro')}</p>
+        <TruckDefaults
+          trucks={truckDefaults.filter((k) => k.truckStatus === 'active')}
+          drivers={drivers.filter((d) => d.status === 'active')}
+          canWrite={canDrivers}
+          save={setTruckDefaultDriverAction}
+        />
       </section>
     </div>
   );

@@ -19,7 +19,9 @@ test.afterAll(() => Promise.all([migrator.end(), app.end()]));
 
 /** A day of its own: this spec's order is the only one due, so the proposal and its times are deterministic. */
 const DAY = '2099-03-02';
+const DAY2 = '2099-03-09';
 let orderCode = '';
+let orderCode2 = '';
 let brokenTruck = '';
 const MONEY = /MAD|DH|\d\s?\d{3},\d{2}/;
 
@@ -30,6 +32,11 @@ test.beforeAll(async () => {
   orderCode = (
     await withRlsContext(app, { userId: ownerId, role: 'owner', requestId: 'e2e-dispatch' }, (tx) =>
       insertOrder(tx, ownerId, master, DAY),
+    )
+  ).code;
+  orderCode2 = (
+    await withRlsContext(app, { userId: ownerId, role: 'owner', requestId: 'e2e-dispatch' }, (tx) =>
+      insertOrder(tx, ownerId, master, DAY2),
     )
   ).code;
   // A truck of its own, in the breakdown log for the day.
@@ -99,6 +106,45 @@ test('the owner sees the proposal with its times, a conflict, a blocked truck, a
   await expect(page.getByTestId('dispatch-source')).toContainText('Plan enregistré');
   await expect(page.getByTestId(`rotation-${orderCode}-1`)).toBeVisible();
   await expect(page.locator('body')).not.toContainText(MONEY);
+  await logout(page);
+});
+
+test('the default driver of a truck is proposed; another driver needs a reason, kept with the rotation (AC-INT-20)', async ({
+  page,
+}) => {
+  await loginOwner(page, 'fr');
+  await page.goto(`/fr/dispatch?date=${DAY2}`);
+  await page.getByTestId('driver-name').fill('Nadia');
+  await page.getByTestId('driver-add').click();
+  await expect(page.getByTestId('drivers-list')).toContainText('Nadia');
+  await page.getByTestId('driver-name').fill('Samir');
+  await page.getByTestId('driver-add').click();
+  await expect(page.getByTestId('drivers-list')).toContainText('Samir');
+
+  // the truck the proposal gives to the first rotation gets Nadia as its default driver
+  const truckSelect = page.getByTestId(`truck-${orderCode2}-1`);
+  const truckCode = (await truckSelect.locator('option:checked').innerText()).split(' ·')[0] as string;
+  const defaults = page.getByTestId(`default-select-${truckCode}`);
+  await defaults.selectOption({ label: 'Nadia' });
+  await expect(defaults.locator('option:checked')).toHaveText('Nadia');
+  await page.reload();
+  await expect(page.getByTestId(`default-select-${truckCode}`).locator('option:checked')).toHaveText('Nadia');
+
+  // the proposal now carries Nadia on that truck, with no reason asked
+  await expect(page.getByTestId(`driver-${orderCode2}-1`).locator('option:checked')).toHaveText('Nadia');
+  await expect(page.getByTestId(`default-driver-${orderCode2}-1`)).toContainText('Nadia');
+  await expect(page.getByTestId(`reason-${orderCode2}-1`)).toHaveCount(0);
+
+  // another driver: a reason is asked and the save waits for it (text, not colour alone)
+  await page.getByTestId(`driver-${orderCode2}-1`).selectOption({ label: 'Samir' });
+  await expect(page.getByTestId(`reason-${orderCode2}-1`)).toBeVisible();
+  await expect(page.getByTestId('dispatch-save')).toBeDisabled();
+  await expect(page.getByText('Indiquez le motif de chaque changement de chauffeur.')).toBeVisible();
+  await page.getByTestId(`reason-${orderCode2}-1`).fill('Nadia est malade');
+  await page.getByTestId('dispatch-save').click();
+  await expect(page.getByTestId('dispatch-message')).toContainText('Plan enregistré');
+  await page.reload();
+  await expect(page.getByTestId(`reason-${orderCode2}-1`)).toHaveValue('Nadia est malade');
   await logout(page);
 });
 

@@ -40,6 +40,8 @@ export interface DispatchTruck {
   capacityL: number;
   /** Not archived and not in the breakdown log on the day (master-data `isTruckAvailable`). */
   available: boolean;
+  /** The truck's default driver (D91, Ali): dispatch proposes it; any other choice on a rotation is an audited override. */
+  defaultDriverId?: string | null;
 }
 
 export interface DispatchDriver {
@@ -123,6 +125,12 @@ const byTruckCode = (a: { code: string }, b: { code: string }): number =>
 const oneWayOf = (o: DispatchOrder | undefined, p: DispatchParams): number =>
   o?.oneWayMin ?? p.defaultOneWayMin;
 
+/** Does this driver choice depart from the truck's default? Then the rotation needs a reason (database guard, AC-INT-20). */
+export const isDriverOverride = (
+  truck: Pick<DispatchTruck, 'defaultDriverId'> | undefined,
+  driverId: string | null,
+): boolean => !!truck?.defaultDriverId && truck.defaultDriverId !== driverId;
+
 /** When a truck is free: the day's start, or the latest back time of its rotations that already started. */
 const busyUntil = (fixed: readonly Rotation[], truckId: string, dayStartMin: number): number =>
   fixed.reduce((m, r) => (r.truckId === truckId ? Math.max(m, r.backMin) : m), dayStartMin);
@@ -142,9 +150,10 @@ export function planDispatch(
   fixed: readonly Rotation[] = [],
 ): { rotations: Rotation[]; conflicts: Conflict[]; driverOfTruck: Record<string, string | null> } {
   const usable = trucks.filter((t) => t.available).sort(byTruckCode);
-  const sortedDrivers = [...drivers].sort((a, b) => a.code.localeCompare(b.code, 'en', { numeric: true }));
+  const active = new Set(drivers.map((d) => d.id));
   const driverOfTruck: Record<string, string | null> = {};
-  usable.forEach((t, i) => (driverOfTruck[t.id] = sortedDrivers[i]?.id ?? null));
+  for (const t of usable)
+    driverOfTruck[t.id] = t.defaultDriverId && active.has(t.defaultDriverId) ? t.defaultDriverId : null;
   const freeAt = new Map(usable.map((t) => [t.id, busyUntil(fixed, t.id, p.dayStartMin)]));
   const rotations: Rotation[] = [];
   const noTruck: Conflict[] = [];

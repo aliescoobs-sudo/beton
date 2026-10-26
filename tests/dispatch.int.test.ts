@@ -291,6 +291,7 @@ describe('saving and replanning (AC-OPS-15)', () => {
         'loadMin',
         'orderCode',
         'orderId',
+        'overrideReason',
         'seq',
         'started',
         'truckCode',
