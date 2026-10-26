@@ -171,6 +171,14 @@ export function StatementView({
         >
           {t('export')}
         </Link>
+        <Link
+          href={exportHref.replace('/export', '/pdf')}
+          className="btn btn-secondary btn-sm"
+          data-testid="statement-pdf"
+          prefetch={false}
+        >
+          {t('pdf')}
+        </Link>
       </form>
       {filter.from && (
         <p className="text-sm text-muted" data-testid="carried-in">

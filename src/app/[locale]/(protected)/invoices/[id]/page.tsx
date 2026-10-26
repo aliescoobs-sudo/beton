@@ -33,6 +33,7 @@ export default async function InvoiceDocumentPage({
   const credit = i.creditNoteOf !== null;
   const t = await getTranslations('ledger.invoiceDocument');
   const tInvoices = await getTranslations('ledger.invoices');
+  const tPdf = await getTranslations('ledger.pdf');
   return (
     <div>
       <PageHeader
@@ -42,8 +43,15 @@ export default async function InvoiceDocumentPage({
           </>
         }
         actions={
-          <span className="no-print">
+          <span className="no-print flex gap-2">
             <PrintInvoiceButton invoiceId={id} audit={printInvoiceAction} />
+            <a
+              href={`/${locale}/invoices/${id}/pdf`}
+              className="btn btn-secondary btn-sm"
+              data-testid="pdf-download"
+            >
+              {tPdf('download')}
+            </a>
           </span>
         }
       />

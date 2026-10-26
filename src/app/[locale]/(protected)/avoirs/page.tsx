@@ -22,6 +22,7 @@ export default async function AvoirsPage({ params }: { params: Promise<{ locale:
   const [candidates, avoirs] = await Promise.all([listAvoirCandidates(pool, user), listAvoirs(pool, user)]);
   const canIssue = can(user.role, 'avoirs.issue');
   const t = await getTranslations('ledger.avoirs');
+  const tPdf = await getTranslations('ledger.pdf');
   const tLoss = await getTranslations('operations.loss');
   return (
     <div className="space-y-10">
@@ -101,7 +102,14 @@ export default async function AvoirsPage({ params }: { params: Promise<{ locale:
               {avoirs.map((a) => (
                 <tr key={a.id} data-testid={`avoir-${a.number}`}>
                   <Td>
-                    <bdi dir="ltr">{a.number}</bdi>
+                    <bdi dir="ltr">{a.number}</bdi>{' '}
+                    <a
+                      href={`/${locale}/avoirs/${a.id}/pdf`}
+                      className="underline"
+                      data-testid={`avoir-pdf-${a.number}`}
+                    >
+                      {tPdf('short')}
+                    </a>
                   </Td>
                   <Td>
                     <bdi dir="ltr">{a.avoirDate}</bdi>

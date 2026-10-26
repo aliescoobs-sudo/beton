@@ -46,6 +46,13 @@ export default async function QuoteDocumentPage({
         actions={
           <span className="no-print flex gap-2">
             <PrintQuoteButton quoteId={id} audit={printQuoteAction} />
+            <a
+              href={`/${locale}/quotes/${id}/pdf`}
+              className="btn btn-secondary btn-sm"
+              data-testid="pdf-download"
+            >
+              {(await getTranslations('ledger.pdf'))('download')}
+            </a>
             {canConvert && (
               <a
                 href={`/${locale}/orders/new?quote=${id}`}

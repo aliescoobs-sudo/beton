@@ -810,7 +810,8 @@
         "unpaid": "Non payée",
         "partial": "Partiellement payée",
         "paid": "Payée"
-      }
+      },
+      "pdf": "PDF"
     },
     "invoices": {
       "link": "Factures",
@@ -1331,6 +1332,10 @@
         "invoiced": "facturation",
         "paid": "paiement"
       }
+    },
+    "pdf": {
+      "download": "Télécharger le PDF",
+      "short": "PDF"
     }
   },
   "operations": {

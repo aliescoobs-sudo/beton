@@ -58,8 +58,15 @@ export default async function DeliveryNotePage({
           </>
         }
         actions={
-          <span className="no-print">
+          <span className="no-print flex gap-2">
             <PrintNoteButton deliveryId={id} audit={printNoteAction} />
+            <a
+              href={`/${locale}/deliveries/${id}/pdf`}
+              className="btn btn-secondary btn-sm"
+              data-testid="pdf-download"
+            >
+              {(await getTranslations('ledger.pdf'))('download')}
+            </a>
           </span>
         }
       />

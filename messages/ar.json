@@ -810,7 +810,8 @@
         "unpaid": "غير مؤداة",
         "partial": "مؤداة جزئياً",
         "paid": "مؤداة"
-      }
+      },
+      "pdf": "PDF"
     },
     "invoices": {
       "link": "الفواتير",
@@ -1331,6 +1332,10 @@
         "invoiced": "الفوترة",
         "paid": "الدفع"
       }
+    },
+    "pdf": {
+      "download": "تنزيل ملف PDF",
+      "short": "PDF"
     }
   },
   "operations": {

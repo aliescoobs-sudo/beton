@@ -136,3 +136,4 @@ export {
   type PartyKind,
   type PartyStatement,
 } from './service/statement-service';
+export { avoirPdf, invoicePdf, quotePdf, SPECIMEN, statementPdf, type PdfContext } from './pdf/documents';

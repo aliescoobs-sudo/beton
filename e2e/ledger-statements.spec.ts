@@ -49,6 +49,18 @@ test('the owner opens the statement of a client after a payment, filters it and 
   expect(body.charCodeAt(0)).toBe(0xfeff);
   expect(body).toContain(reference);
   expect(body).toContain('Solde de clôture');
+
+  // The same statement as a PDF: a download that is never cached, with the pilot watermark.
+  const pdfHref = await page.getByTestId('statement-pdf').getAttribute('href');
+  expect(pdfHref).toContain('/pdf');
+  const pdf = await page.request.get(pdfHref ?? '');
+  expect(pdf.status()).toBe(200);
+  expect(pdf.headers()['content-type']).toBe('application/pdf');
+  expect(pdf.headers()['content-disposition']).toContain('attachment');
+  expect(pdf.headers()['cache-control']).toContain('no-store');
+  expect(pdf.headers()['x-content-type-options']).toBe('nosniff');
+  const bytes = await pdf.body();
+  expect(bytes.subarray(0, 8).toString('latin1')).toBe('%PDF-1.4');
   await logout(page);
 });
 
@@ -68,6 +80,13 @@ test('support reads the statement; office has no link, no page and no export', a
   expect(
     (await page.request.get('/fr/statements/client/00000000-0000-0000-0000-000000000000/export')).status(),
   ).toBe(404);
+  for (const path of [
+    '/fr/statements/client/00000000-0000-0000-0000-000000000000/pdf',
+    '/fr/invoices/00000000-0000-0000-0000-000000000000/pdf',
+    '/fr/avoirs/00000000-0000-0000-0000-000000000000/pdf',
+    '/fr/quotes/00000000-0000-0000-0000-000000000000/pdf',
+  ])
+    expect((await page.request.get(path)).status()).toBe(404);
 });
 
 test('Arabic renders right-to-left with amounts and codes left-to-right', async ({ page }) => {

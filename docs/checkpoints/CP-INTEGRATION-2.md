@@ -26,7 +26,7 @@ Status: `[ ]` to do, `[x]` done (commit), `[~]` partial.
 - [x] I3.1 Order-chain view (AC-INT-16; migration 0073; D108)
 - [x] I3.2 Related-documents panel on every document page (AC-INT-17; D109)
 - [x] I3.3 Search by document number (AC-INT-18; D110; no migration: every source is read under row-level security)
-- [ ] I3.4 Server-side PDF (AC-INT-19)
+- [x] I3.4 Server-side PDF (AC-INT-19)
 
 ### Wave I4: decisions 91 to 96
 - [ ] I4.1 Default driver per truck, audited override (AC-INT-20)
