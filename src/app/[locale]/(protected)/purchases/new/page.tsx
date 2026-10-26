@@ -1,5 +1,4 @@
 import { getTranslations, setRequestLocale } from 'next-intl/server';
-import { getRequestClock } from '@/app/request-clock';
 import { getPool } from '@/lib/db/pools';
 import { PurchaseForm } from '@/modules/ledger/ui/purchases/purchase-form';
 import { listComponents, listPurchaseUnits, listSuppliers } from '@/modules/master-data';
@@ -13,11 +12,10 @@ export default async function NewPurchasePage({ params }: { params: Promise<{ lo
   setRequestLocale(locale);
   const user = await requirePagePermission(locale, 'purchases.write');
   const pool = getPool('app');
-  const [suppliers, components, units, clock] = await Promise.all([
+  const [suppliers, components, units] = await Promise.all([
     listSuppliers(pool, user),
     listComponents(pool, user),
     listPurchaseUnits(pool, user),
-    getRequestClock(),
   ]);
   const t = await getTranslations('ledger.purchases');
   return (
@@ -36,7 +34,6 @@ export default async function NewPurchasePage({ params }: { params: Promise<{ lo
               .filter((u) => u.componentId === c.id && u.status === 'active')
               .map((u) => ({ id: u.id, label: u.label })),
           }))}
-        today={clock.today()}
         createAction={createPurchaseAction}
       />
     </div>

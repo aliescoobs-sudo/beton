@@ -93,11 +93,21 @@ export async function buildAccountingExport(
         vat: string;
         ttc: string;
       }>(
-        `select p.code, to_char(p.order_date, 'YYYY-MM-DD') as date, s.name as supplier, p.supplier_invoice_no as inv,
-                to_char(p.due_date, 'YYYY-MM-DD') as due, p.total_ht_centimes::text as ht, p.total_vat_centimes::text as vat,
-                p.total_ttc_centimes::text as ttc
-           from purchase p join supplier s on s.id = p.supplier_id
-          where p.order_date between $1 and $2 order by p.order_date, p.code`,
+        // The purchases journal is what was bought on the supplier's paper: orders that carry their own payable, and the supplier
+        // invoices approved for payment (the order of an invoice-based payable is a commitment, not an entry).
+        `select code, date, supplier, inv, due, ht, vat, ttc from (
+           select p.code, to_char(p.order_date, 'YYYY-MM-DD') as date, s.name as supplier, p.supplier_invoice_no as inv,
+                  to_char(p.due_date, 'YYYY-MM-DD') as due, p.total_ht_centimes::text as ht, p.total_vat_centimes::text as vat,
+                  p.total_ttc_centimes::text as ttc
+             from purchase p join supplier s on s.id = p.supplier_id
+            where p.payable_source = 'order' and p.order_date between $1 and $2
+           union all
+           select si.code, to_char(si.invoice_date, 'YYYY-MM-DD'), f.name, si.supplier_invoice_no,
+                  to_char(si.due_date, 'YYYY-MM-DD'), si.total_ht_centimes::text, si.total_vat_centimes::text, si.total_ttc_centimes::text
+             from supplier_invoice si join supplier f on f.id = si.supplier_id
+            where si.invoice_date between $1 and $2
+              and (select e.event from supplier_invoice_event e where e.supplier_invoice_id = si.id order by e.seq desc limit 1) = 'approved'
+         ) j order by date, code`,
         [from, to],
       )
     ).rows.map((r): PurchaseRow => ({

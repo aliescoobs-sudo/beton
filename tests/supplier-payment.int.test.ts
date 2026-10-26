@@ -45,6 +45,7 @@ async function scene() {
     users.office,
     {
       supplierId: supplier.value.id,
+      payable: 'order',
       lines: [{ description: 'Ciment (test)', qtyMilli: 30_000, unitPriceHtCentimes: 145_000 }],
       plan: [
         { method: 'cheque', dueDate: '2026-07-01', percentBp: 5000 },

@@ -11,6 +11,7 @@ export const SENSITIVE_ACTIONS = [
   'stock.adjust',
   'ledger.reverse_entry',
   'ledger.credit_note',
+  'purchases.approve_invoice',
   'parameters.change',
   'clock.advance',
   'users.manage',

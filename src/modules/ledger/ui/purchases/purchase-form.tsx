@@ -44,20 +44,14 @@ const emptyLine = (components: ComponentOption[]): Line => ({
 export function PurchaseForm({
   suppliers,
   components,
-  today,
   createAction,
 }: {
   suppliers: SupplierOption[];
   components: ComponentOption[];
-  today: string;
   createAction: (input: unknown) => Promise<Result>;
 }) {
   const t = useTranslations('ledger.purchases');
   const [supplierId, setSupplierId] = useState('');
-  const [invoiceNo, setInvoiceNo] = useState('');
-  const [invoiceDate, setInvoiceDate] = useState(today);
-  const [dueDate, setDueDate] = useState('');
-  const [plan, setPlan] = useState<'transfer' | 'cheques'>('transfer');
   const [lines, setLines] = useState<Line[]>([emptyLine(components)]);
   const [message, setMessage] = useState<string | null>(null);
   const [done, setDone] = useState<{ code: string; effects: Effect[] } | null>(null);
@@ -88,20 +82,8 @@ export function PurchaseForm({
         out.push({ description: l.description.trim(), qtyMilli: qty.value, unitPriceHtCentimes: price });
       }
     }
-    return {
-      supplierId,
-      supplierInvoiceNo: invoiceNo.trim() || null,
-      supplierInvoiceDate: invoiceDate || null,
-      dueDate: dueDate || null,
-      lines: out,
-      plan:
-        plan === 'cheques'
-          ? [
-              { method: 'cheque', dueDate: addDays(invoiceDate || today, 30), percentBp: 5000 },
-              { method: 'cheque', dueDate: addDays(invoiceDate || today, 60), percentBp: 5000 },
-            ]
-          : null,
-    };
+    // The order carries no invoice number and no payment plan: the payable comes from the supplier's invoice, once approved.
+    return { supplierId, lines: out };
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -170,40 +152,6 @@ export function PurchaseForm({
               </option>
             ))}
           </select>
-        </label>
-        <label className="block">
-          <span className="field-label">{t('invoiceNo')}</span>
-          <input
-            value={invoiceNo}
-            onChange={(e) => setInvoiceNo(e.target.value)}
-            dir="ltr"
-            className={INPUT}
-            data-testid="purchase-invoice-no"
-          />
-        </label>
-        <label className="block">
-          <span className="field-label">{t('invoiceDate')}</span>
-          <input
-            type="date"
-            value={invoiceDate}
-            max={today}
-            onChange={(e) => setInvoiceDate(e.target.value)}
-            dir="ltr"
-            className={INPUT}
-            data-testid="purchase-invoice-date"
-          />
-        </label>
-        <label className="block">
-          <span className="field-label">{t('dueDate')}</span>
-          <input
-            type="date"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-            dir="ltr"
-            className={INPUT}
-            data-testid="purchase-due"
-          />
-          <span className="field-hint block">{t('dueHint')}</span>
         </label>
       </div>
 
@@ -315,18 +263,9 @@ export function PurchaseForm({
         </button>
       </fieldset>
 
-      <label className="block max-w-sm">
-        <span className="field-label">{t('plan')}</span>
-        <select
-          value={plan}
-          onChange={(e) => setPlan(e.target.value as 'transfer' | 'cheques')}
-          className={INPUT}
-          data-testid="purchase-plan"
-        >
-          <option value="transfer">{t('planTransfer')}</option>
-          <option value="cheques">{t('planCheques')}</option>
-        </select>
-      </label>
+      <p className="text-sm text-muted" data-testid="purchase-payable-note">
+        {t('payableNote')}
+      </p>
 
       {message && (
         <p role="alert" className="field-error" data-testid="purchase-message">
@@ -338,10 +277,4 @@ export function PurchaseForm({
       </button>
     </form>
   );
-}
-
-/** Calendar days on a business date, local arithmetic on the text (the server validates the plan). */
-function addDays(date: string, days: number): string {
-  const [y, m, d] = date.split('-').map(Number) as [number, number, number];
-  return new Date(Date.UTC(y, m - 1, d) + days * 86_400_000).toISOString().slice(0, 10);
 }

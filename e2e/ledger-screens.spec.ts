@@ -50,6 +50,7 @@ for (const locale of ['fr', 'ar'] as const) {
       ['orders', 'a[href*="/orders/"]'],
       ['invoices', 'a[href*="/invoices/"]'],
       ['purchases', 'a[href*="/purchases/"]'],
+      ['supplier-invoices', 'a[href*="/supplier-invoices/"]'],
       ['loads', 'a[href*="/deliveries/"]'],
     ] as const) {
       await page.goto(`/${locale}/${list}`);

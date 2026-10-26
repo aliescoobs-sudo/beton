@@ -1,10 +1,14 @@
 import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { getPool } from '@/lib/db/pools';
-import { getSupplierInvoice } from '@/modules/ledger';
-import { recordMoneyView } from '@/modules/platform-security';
+import { getSupplierInvoice, getSupplierInvoiceMatch, gapCount } from '@/modules/ledger';
+import { SupplierInvoiceDecisions } from '@/modules/ledger/ui/supplier-invoices/supplier-invoice-decisions';
+import { can, recordMoneyView } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/next';
 import { Money, PageHeader, StatusPill, Table, Td, Th } from '@/ui';
+import { acceptGapsAction, approveAction, rejectAction } from '../actions';
+
+const qty = (milli: number) => (milli / 1000).toLocaleString('fr-FR', { maximumFractionDigits: 3 });
 
 /** One supplier invoice: its lines as the supplier wrote them, the order and the receipts it is linked to, and its events. Owner and support. */
 export default async function SupplierInvoicePage({
@@ -19,6 +23,9 @@ export default async function SupplierInvoicePage({
   await recordMoneyView(pool, user, 'screen:supplier-invoice');
   const detail = await getSupplierInvoice(pool, user, id);
   if (!detail) notFound();
+  const match = (await getSupplierInvoiceMatch(pool, user, id)) ?? [];
+  const gaps = gapCount(match);
+  const canDecide = can(user.role, 'supplier_invoices.approve');
   const { invoice: i } = detail;
   const t = await getTranslations('ledger.supplierInvoices');
   return (
@@ -121,6 +128,67 @@ export default async function SupplierInvoicePage({
           </dd>
         </dl>
       </article>
+      <section aria-labelledby="si-match">
+        <h2 id="si-match" className="mb-2 text-xl">
+          {t('match.title')}
+        </h2>
+        <p className="mb-3 text-sm text-muted" data-testid="si-match-summary">
+          {gaps === 0 ? t('match.clean') : t('match.gaps', { count: gaps })}
+        </p>
+        <Table data-testid="si-match">
+          <thead>
+            <tr>
+              <Th>{t('description')}</Th>
+              <Th numeric>{t('match.ordered')}</Th>
+              <Th numeric>{t('match.received')}</Th>
+              <Th numeric>{t('match.invoiced')}</Th>
+              <Th numeric>{t('match.orderedPrice')}</Th>
+              <Th numeric>{t('match.invoicedPrice')}</Th>
+              <Th>{t('match.flags')}</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {match.map((m) => (
+              <tr key={m.seq} data-testid={`si-match-${m.seq}`}>
+                <Td>{m.description}</Td>
+                <Td numeric>{m.orderedMilli === null ? '—' : qty(m.orderedMilli)}</Td>
+                <Td numeric>{qty(m.receivedMilli)}</Td>
+                <Td numeric>{qty(m.invoicedMilli)}</Td>
+                <Td numeric>
+                  {m.orderedPriceCentimes === null ? '—' : <Money centimes={m.orderedPriceCentimes} />}
+                </Td>
+                <Td numeric>
+                  <Money centimes={m.invoicedPriceCentimes} />
+                </Td>
+                <Td data-testid={`si-flags-${m.seq}`}>
+                  {m.flags.length === 0 ? (
+                    <StatusPill status="paid">{t('match.ok')}</StatusPill>
+                  ) : (
+                    <span className="flex flex-wrap gap-1">
+                      {m.flags.map((f) => (
+                        <StatusPill key={f} status="late">
+                          {t(`match.flag.${f}`)}
+                        </StatusPill>
+                      ))}
+                    </span>
+                  )}
+                </Td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+        {canDecide && (i.state === 'entered' || i.state === 'gaps_accepted') && (
+          <div className="mt-4">
+            <SupplierInvoiceDecisions
+              supplierInvoiceId={i.id}
+              state={i.state}
+              hasGaps={gaps > 0}
+              dueDate={i.dueDate}
+              actions={{ accept: acceptGapsAction, approve: approveAction, reject: rejectAction }}
+            />
+          </div>
+        )}
+      </section>
       <section aria-labelledby="si-receipts">
         <h2 id="si-receipts" className="mb-2 text-xl">
           {t('receipts')}

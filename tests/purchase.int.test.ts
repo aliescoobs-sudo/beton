@@ -35,6 +35,7 @@ const input = (over: Record<string, unknown> = {}) => ({
   supplierId: master.supplierId,
   supplierInvoiceNo: 'F-2026-0042',
   supplierInvoiceDate: '2026-05-30',
+  payable: 'order',
   lines: [
     {
       componentId: master.componentId,

@@ -91,6 +91,7 @@ export async function insertPurchaseRows(
   const totals = computePurchaseTotals(v.lines, vatRateBp);
   if (!totals.ok) return err('INVALID');
 
+  const source = v.payable ?? 'invoice';
   const items: PlanItemInput[] = v.plan
     ? v.plan.map((i) => ({
         method: i.method,
@@ -101,7 +102,7 @@ export async function insertPurchaseRows(
             : { amount: centimes(i.amountCentimes as number) },
       }))
     : [{ method: 'transfer', dueDate: due, share: { percentBp: 10_000 } }];
-  const plan = splitPlan(totals.value.totalTtc, items);
+  const plan = source === 'invoice' ? ok([]) : splitPlan(totals.value.totalTtc, items);
   if (!plan.ok) return err('PLAN_INVALID');
 
   const id = randomUUID();
@@ -109,8 +110,8 @@ export async function insertPurchaseRows(
   // No RETURNING: office has no SELECT policy on the table (blind entry).
   await tx.query(
     `insert into purchase (id, code, supplier_id, order_date, supplier_invoice_no, supplier_invoice_date, due_date,
-                           vat_rate_bp, total_ht_centimes, total_vat_centimes, total_ttc_centimes, created_by)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+                           vat_rate_bp, total_ht_centimes, total_vat_centimes, total_ttc_centimes, created_by, payable_source)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
     [
       id,
       code,
@@ -124,6 +125,7 @@ export async function insertPurchaseRows(
       totals.value.totalVat,
       totals.value.totalTtc,
       actor.id,
+      source,
     ],
   );
   for (const [n, line] of v.lines.entries()) {
@@ -162,7 +164,7 @@ export async function insertPurchaseRows(
       supplierCode: supplierCode.rows[0]?.code ?? null,
       amountCentimes: totals.value.totalTtc,
     },
-  ];
+  ].filter((e) => e.kind !== 'payable' || source === 'order') as Effect[];
   return ok({ id, code, effects: actor.role ? visibleEffects(effects, actor.role) : effects });
 }
 
@@ -207,9 +209,10 @@ export async function cancelPurchase(
         const code = await nextDocNumber(tx, 'ACH', deps.today);
         await tx.query(
           `insert into purchase (id, code, supplier_id, order_date, supplier_invoice_no, supplier_invoice_date, due_date,
-                               vat_rate_bp, total_ht_centimes, total_vat_centimes, total_ttc_centimes, reverses_id, reason, created_by)
+                               vat_rate_bp, total_ht_centimes, total_vat_centimes, total_ttc_centimes, reverses_id, reason, created_by,
+                               payable_source)
          select $1, $2, supplier_id, order_date, supplier_invoice_no, supplier_invoice_date, due_date, vat_rate_bp,
-                -total_ht_centimes, -total_vat_centimes, -total_ttc_centimes, id, $3, $4
+                -total_ht_centimes, -total_vat_centimes, -total_ttc_centimes, id, $3, $4, payable_source
            from purchase where id = $5`,
           [id, code, text, actor.id, purchaseId],
         );

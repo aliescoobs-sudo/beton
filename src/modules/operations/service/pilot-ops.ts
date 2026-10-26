@@ -215,6 +215,7 @@ async function seedStockAndPurchases(
           supplierId: offer.supplier_id,
           supplierInvoiceNo: `F-${date.slice(2, 4)}${date.slice(5, 7)}-${String(100 + purchases)}`,
           supplierInvoiceDate: date,
+          payable: 'order',
           lines: [
             {
               componentId: c.id,
@@ -264,6 +265,7 @@ async function seedStockAndPurchases(
           supplierId: s.id,
           supplierInvoiceNo: `S-${date.slice(2, 4)}${date.slice(5, 7)}-${i}`,
           supplierInvoiceDate: date,
+          payable: 'order',
           lines: [
             {
               description:

@@ -81,6 +81,8 @@ export const PERMISSIONS = {
   // The supplier's invoice, its own document linked to the order and the receipts: entered blind by office, read by owner and support.
   'supplier_invoices.read': MONEY_READ,
   'supplier_invoices.write': BLIND_WRITE,
+  // Accept the gaps, approve for payment (the payable), reject: the owner, the first two after a fresh second factor.
+  'supplier_invoices.approve': MONEY_WRITE,
   // The avoir for concrete refused or brought back after it was billed: the owner issues it (step-up), the owner and support read.
   'avoirs.read': MONEY_READ,
   'avoirs.issue': MONEY_WRITE,

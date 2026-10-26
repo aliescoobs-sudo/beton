@@ -5,14 +5,12 @@ import { E2E_MD, goNav, loginAndEnrol, loginOwner, logout } from './fixtures';
 // and sees quantities only; cancelling is the owner's.
 test.describe.configure({ mode: 'serial' });
 
-const suffix = Math.random().toString(36).slice(2, 7).toUpperCase();
 let ownerCode = '';
 let officeCode = '';
 
-async function enter(page: Page, invoiceNo: string) {
+async function enter(page: Page) {
   await page.goto('/fr/purchases/new');
   await page.getByTestId('purchase-supplier').selectOption({ index: 1 });
-  await page.getByTestId('purchase-invoice-no').fill(invoiceNo);
   await page.getByTestId('purchase-line-component').selectOption({ label: 'Ciment' });
   await page.getByTestId('purchase-line-unit').selectOption({ label: 't' });
   await page.getByTestId('purchase-line-qty').fill('30');
@@ -28,13 +26,14 @@ async function enter(page: Page, invoiceNo: string) {
   return /ACH-\d{4}-\d{5}/.exec((await saved.textContent()) ?? '')?.[0] as string;
 }
 
-test('the owner enters a purchase, sees the payable it creates, reads the list and the detail, and cancels it', async ({
+test('the owner enters a purchase (no payable yet), reads the list and the detail, and cancels it', async ({
   page,
 }) => {
   await loginOwner(page, 'fr');
-  ownerCode = await enter(page, `FO-${suffix}`);
-  // 30 t x 1 450,00 + 2 500,00 = 46 000,00 HT; VAT 20 % 9 200,00; TTC 55 200,00.
-  await expect(page.getByTestId('purchase-effects')).toContainText('55 200,00 MAD');
+  ownerCode = await enter(page);
+  // The order creates no payable: it comes from the supplier invoice, once approved.
+  await expect(page.getByTestId('purchase-effects')).toContainText(ownerCode);
+  await expect(page.getByTestId('purchase-effects')).not.toContainText('55 200,00');
 
   await goNav(page, 'purchases-link');
   await expect(page).toHaveURL('/fr/purchases');
@@ -42,9 +41,8 @@ test('the owner enters a purchase, sees the payable it creates, reads the list a
   await expect(row).toContainText('55 200,00');
   await expect(row).toContainText('En attente de réception');
   await row.getByRole('link', { name: ownerCode }).click();
-  await expect(page.getByTestId('purchase-head')).toContainText(`FO-${suffix}`);
   await expect(page.getByTestId('purchase-lines')).toContainText('Transport (test)');
-  await expect(page.getByTestId('purchase-plan')).toContainText('55 200,00');
+  await expect(page.getByTestId('purchase-no-payable')).toBeVisible();
 
   // The cancel button needs a reason and writes a reversing entry.
   await page.getByTestId('purchase-cancel').click();
@@ -56,7 +54,7 @@ test('the owner enters a purchase, sees the payable it creates, reads the list a
 
 test('office enters a purchase blind: a code and no amount; it has no list', async ({ page }) => {
   await loginAndEnrol(page, 'fr', E2E_MD.purOffice.email);
-  const code = await enter(page, `FB-${suffix}`);
+  const code = await enter(page);
   officeCode = code;
   await expect(page.getByTestId('purchase-effects')).not.toContainText(/MAD|DH|\d,\d{2}/);
   await expect(page.locator('body')).not.toContainText(/MAD|DH/);

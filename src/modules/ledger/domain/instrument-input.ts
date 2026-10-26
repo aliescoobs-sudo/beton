@@ -46,7 +46,8 @@ const receiveSchema = paper
   })
   .transform(normalise)
   .refine(complete);
-const PURCHASE_CODE = /^ACH-[0-9]{4}-[0-9]{5,}$/;
+// The order (ACH) of a payable it carries itself, or the supplier invoice (FF) once approved: the oldest open items are covered.
+const PURCHASE_CODE = /^(ACH|FF)-[0-9]{4}-[0-9]{5,}$/;
 const issueSchema = paper
   .extend({
     supplierId: z.uuid(),

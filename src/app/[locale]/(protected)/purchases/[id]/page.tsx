@@ -119,6 +119,11 @@ export default async function PurchaseDetailPage({
       </section>
       <section>
         <h2 className="mb-3 text-xl">{t('plan')}</h2>
+        {detail.items.length === 0 && (
+          <p className="mb-3 text-sm text-muted" data-testid="purchase-no-payable">
+            {t('noPayable')}
+          </p>
+        )}
         <Table data-testid="purchase-plan">
           <tbody>
             {detail.items.map((i) => (

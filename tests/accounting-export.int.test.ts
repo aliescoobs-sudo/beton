@@ -61,6 +61,7 @@ describe('the accountant export (AC-LED-24)', () => {
       {
         supplierId: master.supplierId,
         supplierInvoiceNo: 'F-AE-1',
+        payable: 'order',
         lines: [{ description: 'Transport (test)', qtyMilli: 1000, unitPriceHtCentimes: 250_000 }],
       },
       { today: DAY },

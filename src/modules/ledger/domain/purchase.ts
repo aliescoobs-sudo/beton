@@ -53,6 +53,11 @@ const purchaseSchema = z.object({
     .max(50),
   /** Defaults to one transfer on the due date for the whole amount. */
   plan: z.array(planItem).min(1).max(24).nullish(),
+  /**
+   * Where the payable comes from: the supplier's invoice, once approved (default; the order carries no plan), or the order itself
+   * (the way it was before; plan and invoice number are then the order's).
+   */
+  payable: z.enum(['order', 'invoice']).nullish(),
 });
 
 export type PurchaseLineInput =

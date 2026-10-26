@@ -141,6 +141,13 @@ export {
 } from './invoice-payment';
 export { groupInvoiceLines, type InvoiceGroup, type InvoiceLineFact, netToPay } from './invoice-groups';
 export {
+  gapCount,
+  MATCH_FLAGS,
+  type MatchFlag,
+  type MatchLine,
+  matchIsClean,
+} from './supplier-invoice-match';
+export {
   parseSupplierInvoiceInput,
   SUPPLIER_INVOICE_STATES,
   type SupplierInvoiceInput,

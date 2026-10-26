@@ -170,10 +170,12 @@ async function enter(
       }
       if (v.purchaseCode) {
         // Same for a supplier payment: the oldest open items of that purchase.
-        const covered = await tx.query<{ n: number }>('select public.allocate_to_purchase($1, $2) as n', [
-          id,
-          v.purchaseCode,
-        ]);
+        const covered = await tx.query<{ n: number }>(
+          v.purchaseCode.startsWith('FF-')
+            ? 'select public.allocate_to_supplier_invoice($1, $2) as n'
+            : 'select public.allocate_to_purchase($1, $2) as n',
+          [id, v.purchaseCode],
+        );
         if (!covered.rows[0]?.n) throw new NothingToAllocate();
         const sum = await tx.query<{ s: string }>(
           'select coalesce(sum(amount_centimes), 0)::text as s from allocation where instrument_id = $1',

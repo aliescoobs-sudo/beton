@@ -116,6 +116,18 @@ export const PARAMETERS = {
     schema: z.number().int().min(100_000).max(8_000_000),
     description: 'Largest uploaded document, a BL scan or a supplier invoice photo (bytes)',
   },
+  // The three-way match of a supplier invoice (SPEC-integration AC-INT-14): the gaps above these are flagged and block approval.
+  match_qty_tolerance_bp: {
+    default: 100,
+    schema: z.number().int().min(0).max(2000),
+    description:
+      'Quantity gap (invoiced against received, or against ordered) tolerated on a supplier invoice (basis points)',
+  },
+  match_price_tolerance_bp: {
+    default: 50,
+    schema: z.number().int().min(0).max(2000),
+    description: 'Unit price gap (invoiced against ordered) tolerated on a supplier invoice (basis points)',
+  },
   reorder_margin_days: {
     default: 2,
     schema: z.number().int().min(0).max(30),

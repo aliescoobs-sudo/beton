@@ -45,7 +45,12 @@ export {
 } from './service/avoir-service';
 export {
   type CreatedSupplierInvoice,
+  acceptSupplierInvoiceGaps,
+  approveSupplierInvoice,
   createSupplierInvoice,
+  type DecisionError,
+  getSupplierInvoiceMatch,
+  rejectSupplierInvoice,
   getSupplierInvoice,
   listSupplierInvoices,
   type SupplierInvoiceDetail,

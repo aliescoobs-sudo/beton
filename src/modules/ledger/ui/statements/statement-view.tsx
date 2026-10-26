@@ -134,6 +134,7 @@ export function StatementView({
                 'invoice',
                 'credit_note',
                 'avoir',
+                'supplier_invoice',
                 'payment',
               ] as const
             ).map((x) => (

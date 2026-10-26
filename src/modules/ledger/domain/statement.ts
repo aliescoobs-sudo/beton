@@ -14,6 +14,7 @@ export type StatementLineType =
   | 'invoice'
   | 'credit_note'
   | 'avoir'
+  | 'supplier_invoice'
   | 'payment';
 export type LineStatus =
   | 'booked'
@@ -164,6 +165,7 @@ const TYPES: readonly StatementLineType[] = [
   'invoice',
   'credit_note',
   'avoir',
+  'supplier_invoice',
   'payment',
 ];
 const STATUSES: readonly LineStatus[] = [

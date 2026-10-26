@@ -153,9 +153,11 @@ async function loadParties(tx: Tx, kind: PartyKind, ids: readonly string[]): Pro
       booked_on: string;
       reversal: boolean;
       cancelled: boolean;
+      by_invoice: boolean;
     }>(
       `select p.id, p.supplier_id, p.code, p.total_ttc_centimes::text as total, to_char(p.order_date, 'YYYY-MM-DD') as date,
               to_char((p.created_at at time zone $2)::date, 'YYYY-MM-DD') as booked_on,
+              (p.payable_source = 'invoice') as by_invoice,
               (p.reverses_id is not null) as reversal,
               exists (select 1 from purchase r where r.reverses_id = p.id) as cancelled
          from purchase p where p.supplier_id = any($1)`,
@@ -170,6 +172,33 @@ async function loadParties(tx: Tx, kind: PartyKind, ids: readonly string[]): Pro
         code: p.code,
         status: p.cancelled ? 'cancelled' : 'booked',
         amountCentimes: centimes(Number(p.total)),
+        // An order whose payable comes from its invoices is a commitment, not a debt: the approved invoices below are.
+        counted: !p.by_invoice,
+      });
+    }
+    // The supplier invoices approved for payment: what we owe, as soon as the owner approved them.
+    const approved = await tx.query<{
+      id: string;
+      supplier_id: string;
+      code: string;
+      total: string;
+      date: string;
+    }>(
+      `select s.id, s.supplier_id, s.code, s.total_ttc_centimes::text as total, to_char(s.invoice_date, 'YYYY-MM-DD') as date
+         from supplier_invoice s
+        where s.supplier_id = any($1)
+          and (select e.event from supplier_invoice_event e where e.supplier_invoice_id = s.id order by e.seq desc limit 1) = 'approved'`,
+      [ids],
+    );
+    for (const s of approved.rows) {
+      data.get(s.supplier_id)?.lines.push({
+        id: `supplier-invoice-${s.id}`,
+        section: 'commercial',
+        date: s.date,
+        type: 'supplier_invoice',
+        code: s.code,
+        status: 'booked',
+        amountCentimes: centimes(Number(s.total)),
         counted: true,
       });
     }

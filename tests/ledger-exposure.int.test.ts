@@ -67,8 +67,11 @@ describe('functions the application role can execute', () => {
     'ctx.user_id()',
     'public.allocate_to_client(p_instrument uuid, p_client_code text)',
     'public.allocate_to_invoice(p_instrument uuid, p_invoice uuid, p_amount bigint, p_reason text)',
+    'public.accept_supplier_invoice_gaps(p_si uuid, p_reason text)',
     'public.allocate_to_order(p_instrument uuid, p_order_code text)',
     'public.allocate_to_purchase(p_instrument uuid, p_purchase_code text)',
+    'public.allocate_to_supplier_invoice(p_instrument uuid, p_code text)',
+    'public.approve_supplier_invoice(p_si uuid, p_plan jsonb)',
     'public.create_invoice(p_order_code text, p_delivery_ids uuid[], p_due date, p_today date)',
     'public.create_invoice_from_deliveries(p_delivery_ids uuid[], p_due date, p_today date)',
     'public.create_supplier_invoice(p_purchase_code text, p_no text, p_invoice_date date, p_due date, p_lines jsonb, p_receipts uuid[], p_today date)',
@@ -85,7 +88,9 @@ describe('functions the application role can execute', () => {
     'public.next_doc_number(p_prefix text, p_year integer, p_width integer)',
     'public.record_receipt(p_purchase uuid, p_date date)',
     'public.record_receipt_lines(p_purchase uuid, p_date date, p_lines jsonb, p_confirm_excess boolean)',
+    'public.reject_supplier_invoice(p_si uuid, p_reason text)',
     'public.resolve_selling_price(p_type uuid, p_client uuid, p_date date)',
+    'public.supplier_invoice_match(p_si uuid)',
   ];
 
   it('is exactly the reviewed list (a new function must be reviewed for exposure and added here)', async () => {

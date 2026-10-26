@@ -199,7 +199,9 @@
       "discount_rate_bp": "Taux annuel d'escompte d'une LCN (points de base : 800 = 8 %)",
       "split_delivery_bp": "Part d'une commande déplacée au jour ouvré suivant dans l'option « scinder la livraison » (points de base)",
       "load_excess_tolerance_bp": "Excédent de chargement toléré sans alerte forte (points de base de la commande : 500 = 5 %)",
-      "upload_max_bytes": "Taille maximale d'un document téléversé, scan de BL ou photo de facture fournisseur (octets)"
+      "upload_max_bytes": "Taille maximale d'un document téléversé, scan de BL ou photo de facture fournisseur (octets)",
+      "match_qty_tolerance_bp": "Écart de quantité toléré sur une facture fournisseur, facturé contre reçu ou contre commandé (points de base : 100 = 1 %)",
+      "match_price_tolerance_bp": "Écart de prix unitaire toléré sur une facture fournisseur, facturé contre commandé (points de base : 50 = 0,5 %)"
     },
     "restartNote": "Les heures des tâches planifiées ne sont prises en compte qu'après un redémarrage du serveur."
   },
@@ -643,7 +645,7 @@
         "lcn": "LCN",
         "transfer": "Virement"
       },
-      "purchaseCode": "Code de l'achat (pour le rattacher)"
+      "purchaseCode": "Code de l'achat ou de la facture fournisseur (pour le rattacher)"
     },
     "instruments": {
       "title": "Paiements et titres",
@@ -788,7 +790,8 @@
         "credit_note": "Avoir",
         "purchase": "Achat",
         "purchase_cancelled": "Annulation d'achat",
-        "avoir": "Avoir (béton refusé)"
+        "avoir": "Avoir (béton refusé)",
+        "supplier_invoice": "Facture fournisseur approuvée"
       },
       "statuses": {
         "booked": "Enregistré",
@@ -960,7 +963,8 @@
       "dueBefore": "L'échéance précède l'achat.",
       "planInvalid": "Le règlement ne correspond pas au total.",
       "conflict": "Conflit, réessayez.",
-      "error": "Action impossible."
+      "error": "Action impossible.",
+      "payableNote": "Le paiement de cet achat est ouvert quand la facture du fournisseur est saisie puis approuvée (Achats > Facture fournisseur)."
     },
     "purchaseDetail": {
       "title": "Achat",
@@ -984,7 +988,8 @@
       "reasonRequired": "Le motif est obligatoire.",
       "alreadyReversed": "Cet achat est déjà annulé.",
       "windowClosed": "Délai d'annulation dépassé.",
-      "error": "Action impossible."
+      "error": "Action impossible.",
+      "noPayable": "Pas de dette à ce stade : elle naît de la facture du fournisseur, une fois saisie et approuvée."
     },
     "deadlines": {
       "link": "Échéances légales",
@@ -1237,7 +1242,50 @@
       "receipts": "Réceptions couvertes",
       "noReceipts": "Aucune réception rattachée à cette facture.",
       "receivedOn": "Reçu le",
-      "history": "Historique"
+      "history": "Historique",
+      "match": {
+        "title": "Rapprochement commande, réceptions, facture",
+        "clean": "Aucun écart : la facture peut être approuvée pour paiement.",
+        "gaps": "{count, plural, one {# ligne présente un écart} other {# lignes présentent un écart}} : à accepter par le propriétaire avant l'approbation.",
+        "ordered": "Commandé",
+        "received": "Reçu",
+        "invoiced": "Facturé",
+        "orderedPrice": "Prix commandé",
+        "invoicedPrice": "Prix facturé",
+        "flags": "Écarts",
+        "ok": "Conforme",
+        "flag": {
+          "NOT_ON_ORDER": "Hors commande",
+          "PRICE": "Prix différent",
+          "QTY_OVER_RECEIVED": "Plus que reçu",
+          "QTY_OVER_ORDERED": "Plus que commandé"
+        }
+      },
+      "decisions": {
+        "accept": {
+          "button": "Accepter les écarts",
+          "confirm": "Accepter les écarts de cette facture : la raison reste dans l'historique."
+        },
+        "approve": {
+          "button": "Approuver pour paiement",
+          "confirm": "Approuver cette facture : la dette envers le fournisseur est créée à partir de la facture.",
+          "plan": "Un virement du montant total, à l'échéance de la facture ({due})."
+        },
+        "reject": {
+          "button": "Rejeter",
+          "confirm": "Rejeter cette facture : le numéro du fournisseur pourra être saisi à nouveau."
+        },
+        "reason": "Raison (obligatoire)",
+        "confirmButton": "Confirmer",
+        "cancelButton": "Annuler",
+        "gapsNotAccepted": "Des écarts restent à accepter avant l'approbation.",
+        "notPending": "Cette facture n'est plus en attente.",
+        "noGaps": "Rien à accepter : aucun écart, ou déjà décidé.",
+        "invalid": "Raison invalide.",
+        "refused": "Décision refusée.",
+        "conflict": "Conflit, réessayez.",
+        "error": "Action impossible."
+      }
     }
   },
   "operations": {
