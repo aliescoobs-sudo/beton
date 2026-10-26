@@ -9,6 +9,7 @@ const SCREENS = [
   'quotes',
   'quotes/new',
   'orders',
+  'orders/chain',
   'orders/new',
   'invoices',
   'invoices/new',

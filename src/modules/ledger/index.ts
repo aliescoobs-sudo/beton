@@ -60,6 +60,7 @@ export {
   type SupplierInvoiceError,
   type SupplierInvoiceView,
 } from './service/supplier-invoice-service';
+export { getOrderChain, type OrderChainRow } from './service/order-chain-service';
 export { getCompanyProfile, listCompanyProfiles, saveCompanyProfile } from './service/company-service';
 export {
   type AccountingExport,

@@ -57,6 +57,8 @@ export const PERMISSIONS = {
   // for the owner and support; office writes blind (field-visibility.ts)
   'orders.read': ['owner', 'partner', 'plant', 'support'],
   'orders.read_money': MONEY_READ,
+  // The order chain: quantities and stages for every role of the company; the payment stage only for the money roles.
+  'orders.chain': ALL,
   'orders.write': BLIND_WRITE,
   'orders.price_override': MONEY_WRITE,
   // Caisse and bank accounts with their opening balances (owner writes; owner and support read)

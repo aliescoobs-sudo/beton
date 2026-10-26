@@ -512,6 +512,13 @@
       "when": 1792591247022,
       "tag": "0072_supplier_invoice_file",
       "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1792591247023,
+      "tag": "0073_order_chain",
+      "breakpoints": true
     }
   ]
 }

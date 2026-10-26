@@ -41,7 +41,12 @@ describe('sidebar navigation by role', () => {
     }
     expect(plant).toEqual(expect.arrayContaining(['/master-data/recettes', '/master-data/trucks']));
     const groups = buildNav('plant', 'fr', t).map((g) => g.id);
-    expect(groups).not.toContain('sales');
+    // The sales group holds one page for the plant: the order chain (quantities and stages, no amount).
+    expect(
+      buildNav('plant', 'fr', t)
+        .find((g) => g.id === 'sales')
+        ?.links.map((l) => l.href),
+    ).toEqual(['/fr/orders/chain']);
     expect(groups).not.toContain('purchases');
   });
 

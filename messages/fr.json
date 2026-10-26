@@ -1296,6 +1296,39 @@
       "document": "Document",
       "noFiles": "Aucune photo ni PDF joint.",
       "attach": "Joindre"
+    },
+    "orderChain": {
+      "link": "Chaîne des commandes",
+      "title": "Chaîne des commandes",
+      "intro": "Une ligne par commande : commandé, planifié, chargé, livré, facturé, payé. Des quantités et des étapes, jamais de montant ; l'étape « payé » est réservée au propriétaire et au support.",
+      "none": "Aucune commande.",
+      "order": "Commande",
+      "client": "Client",
+      "type": "Béton",
+      "ordered": "Commandé",
+      "stages": {
+        "planned": "Planifié",
+        "loaded": "Chargé",
+        "delivered": "Livré",
+        "invoiced": "Facturé",
+        "paid": "Payé"
+      },
+      "paidState": {
+        "unpaid": "Non payé",
+        "partial": "Partiellement",
+        "paid": "Payé"
+      },
+      "masked": "Réservé au propriétaire et au support",
+      "cancelled": "Annulée",
+      "waiting": "En attente de",
+      "complete": "Terminée",
+      "waitingFor": {
+        "planned": "planification",
+        "loaded": "chargement",
+        "delivered": "livraison",
+        "invoiced": "facturation",
+        "paid": "paiement"
+      }
     }
   },
   "operations": {

@@ -85,6 +85,7 @@ describe('functions the application role can execute', () => {
     'public.issue_avoir(p_delivery uuid, p_reason text, p_today date)',
     'public.ledger_parameter(p_key text)',
     'public.next_code(p_key text, p_width integer)',
+    'public.order_chain()',
     'public.ops_parameter(p_key text)',
     'public.next_doc_number(p_prefix text, p_year integer, p_width integer)',
     'public.record_receipt(p_purchase uuid, p_date date)',

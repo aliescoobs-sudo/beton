@@ -47,6 +47,12 @@ const GROUPS: GroupDef[] = [
         allowed: 'orders.read_money',
       },
       {
+        path: '/orders/chain',
+        labelKey: 'ledger.orderChain.link',
+        testId: 'order-chain-link',
+        allowed: 'orders.chain',
+      },
+      {
         path: '/orders/new',
         labelKey: 'ledger.orders.link',
         testId: 'orders-new-link',

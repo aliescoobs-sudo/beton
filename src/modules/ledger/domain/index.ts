@@ -140,6 +140,7 @@ export {
   invoicePayment,
 } from './invoice-payment';
 export { groupInvoiceLines, type InvoiceGroup, type InvoiceLineFact, netToPay } from './invoice-groups';
+export { CHAIN_STAGES, type ChainStage, stageState, type StageState, waitingFor } from './order-chain';
 export {
   gapCount,
   MATCH_FLAGS,

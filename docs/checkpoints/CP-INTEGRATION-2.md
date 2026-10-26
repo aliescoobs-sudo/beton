@@ -23,7 +23,7 @@ Status: `[ ]` to do, `[x]` done (commit), `[~]` partial.
 - [x] I2.3 Supplier invoice photo as an attachment, AI extraction interface off (AC-INT-15; migration 0072; D107; there was no feature flag, `AI_EXTRACTION_ENABLED` is it)
 
 ### Wave I3: cross-cutting
-- [ ] I3.1 Order-chain view (AC-INT-16)
+- [x] I3.1 Order-chain view (AC-INT-16; migration 0073; D108)
 - [ ] I3.2 Related-documents panel (AC-INT-17)
 - [ ] I3.3 Search by number (AC-INT-18)
 - [ ] I3.4 Server-side PDF (AC-INT-19)
@@ -73,4 +73,4 @@ Filled at the end (re-run of the CP-INTEGRATION table).
 Filled at the end.
 
 ## New provisional decisions
-Filled as they are taken (DECISIONS 97 onward): 97 (delivered), 98 (delivered quantity), 99 (stored documents), 100 (signed BL and its scan), 101 (invoicing queue), 102 (invoice from the BLs), 103 (payment spread over invoices), 104 (avoir), 105 (supplier invoice), 106 (three-way match and payable), 107 (supplier invoice photo, AI flag).
+Filled as they are taken (DECISIONS 97 onward): 97 (delivered), 98 (delivered quantity), 99 (stored documents), 100 (signed BL and its scan), 101 (invoicing queue), 102 (invoice from the BLs), 103 (payment spread over invoices), 104 (avoir), 105 (supplier invoice), 106 (three-way match and payable), 107 (supplier invoice photo, AI flag), 108 (order chain).
