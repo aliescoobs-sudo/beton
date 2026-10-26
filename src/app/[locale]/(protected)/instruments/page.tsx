@@ -1,14 +1,16 @@
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { getRequestClock } from '@/app/request-clock';
 import { getPool } from '@/lib/db/pools';
-import { daysBetween, listInstruments, listMoneyAccounts } from '@/modules/ledger';
+import { daysBetween, listInstruments, listMoneyAccounts, listOpenInvoices } from '@/modules/ledger';
 import { DepositBatch } from '@/modules/ledger/ui/instruments/deposit-batch';
 import { InstrumentActions } from '@/modules/ledger/ui/instruments/instrument-actions';
+import { InstrumentAllocate } from '@/modules/ledger/ui/instruments/instrument-allocate';
 import { InstrumentsTable } from '@/modules/ledger/ui/instruments/instruments-table';
 import { can, recordMoneyView } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/next';
 import { PageHeader } from '@/ui';
 import {
+  allocateToInvoiceAction,
   bounceAction,
   cancelAction,
   clearAction,
@@ -25,10 +27,11 @@ export default async function InstrumentsPage({ params }: { params: Promise<{ lo
   const pool = getPool('app');
   await recordMoneyView(pool, user, 'screen:instruments');
   const editable = can(user.role, 'instruments.manage');
-  const [instruments, clock, accounts] = await Promise.all([
+  const [instruments, clock, accounts, openInvoices] = await Promise.all([
     listInstruments(pool, user),
     getRequestClock(),
     editable ? listMoneyAccounts(pool, user) : Promise.resolve([]),
+    editable ? listOpenInvoices(pool, user) : Promise.resolve([]),
   ]);
   const today = clock.today();
   const t = await getTranslations('ledger.instruments');
@@ -85,24 +88,37 @@ export default async function InstrumentsPage({ params }: { params: Promise<{ lo
         actions={
           editable
             ? (row) => (
-                <InstrumentActions
-                  row={row}
-                  today={today}
-                  accounts={accountOptions}
-                  actions={actions}
-                  covers={instruments
-                    .filter(
-                      (c) =>
-                        row.state === 'bounced' &&
-                        c.direction === 'in' &&
-                        c.partyId === row.partyId &&
-                        c.id !== row.id &&
-                        c.amountCentimes >= row.amountCentimes &&
-                        ['received', 'deposited', 'cleared'].includes(c.state) &&
-                        !usedAsCover.has(c.id),
-                    )
-                    .map((c) => ({ id: c.id, label: `${c.number ?? c.method} · ${c.receivedDate}` }))}
-                />
+                <>
+                  <InstrumentAllocate
+                    row={row}
+                    allocate={allocateToInvoiceAction}
+                    invoices={openInvoices.map((i) => ({
+                      id: i.invoiceId,
+                      number: i.number,
+                      dueDate: i.dueDate,
+                      openCentimes: i.openCentimes,
+                      clientId: i.clientId,
+                    }))}
+                  />
+                  <InstrumentActions
+                    row={row}
+                    today={today}
+                    accounts={accountOptions}
+                    actions={actions}
+                    covers={instruments
+                      .filter(
+                        (c) =>
+                          row.state === 'bounced' &&
+                          c.direction === 'in' &&
+                          c.partyId === row.partyId &&
+                          c.id !== row.id &&
+                          c.amountCentimes >= row.amountCentimes &&
+                          ['received', 'deposited', 'cleared'].includes(c.state) &&
+                          !usedAsCover.has(c.id),
+                      )
+                      .map((c) => ({ id: c.id, label: `${c.number ?? c.method} · ${c.receivedDate}` }))}
+                  />
+                </>
               )
             : undefined
         }

@@ -90,6 +90,11 @@ export function EffectsPanel({
                 <bdi dir="ltr">{formatCentimes(e.amountCentimes)} MAD</bdi>
               </>
             )}
+            {e.kind === 'receivable_spread' && (
+              <>
+                {t('spread')} <bdi dir="ltr">{formatCentimes(e.amountCentimes)} MAD</bdi>
+              </>
+            )}
             {e.kind === 'receivable_covered' && (
               <>
                 {t('covered', { code: e.orderCode })}{' '}

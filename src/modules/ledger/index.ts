@@ -34,6 +34,7 @@ export {
   listInvoices,
 } from './service/invoice-service';
 export { getInvoiceQueue, type QueueClient, type QueueDelivery } from './service/invoice-queue-service';
+export { allocateToInvoice, listOpenInvoices, type OpenInvoice } from './service/allocation-service';
 export { getCompanyProfile, listCompanyProfiles, saveCompanyProfile } from './service/company-service';
 export {
   type AccountingExport,

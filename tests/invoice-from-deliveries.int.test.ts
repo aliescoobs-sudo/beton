@@ -19,7 +19,7 @@ import {
   type DeliveryScene,
   insertDelivery,
   insertInstrument,
-  insertOrderWithItems,
+  clientWithLoads,
   newAdvanceInvoice,
   orderMaster,
   type OrderMaster,
@@ -47,35 +47,8 @@ beforeAll(async () => {
   master = await orderMaster(app, users.owner.id, marker);
 });
 
-/** A client with `orders` orders of 10 m³ and, per order, loads of the given litres, delivered unless said otherwise. */
-async function clientWith(loadsPerOrder: number[][], options: { delivered?: boolean } = {}) {
-  return inCtx(users.owner, async (tx) => {
-    const client = await tx.query<{ id: string }>(
-      `insert into client (id, code, name, kind) values (gen_random_uuid(), public.next_code('CLT', 3), $1, 'person') returning id`,
-      [`ifd ${randomUUID()}`],
-    );
-    const clientId = client.rows[0]?.id as string;
-    const orders: { id: string; code: string; itemIds: string[]; deliveryIds: string[]; blNos: string[] }[] =
-      [];
-    for (const loads of loadsPerOrder) {
-      const order = await insertOrderWithItems(tx, users.owner.id, master, clientId, [936_000]);
-      const deliveryIds: string[] = [];
-      const blNos: string[] = [];
-      for (const litres of loads) {
-        const d = await insertDelivery(tx, users.owner.id, { ...scene, orderId: order.id }, litres, 2026);
-        if (options.delivered !== false)
-          await tx.query(
-            `insert into delivery_delivered (id, delivery_id, at, trip_event_id, created_by) values (gen_random_uuid(), $1, now(), null, $2)`,
-            [d.id, users.owner.id],
-          );
-        deliveryIds.push(d.id);
-        blNos.push(d.blNo);
-      }
-      orders.push({ ...order, deliveryIds, blNos });
-    }
-    return { clientId, orders };
-  });
-}
+const clientWith = (loadsPerOrder: number[][], options: { delivered?: boolean } = {}) =>
+  clientWithLoads(app, users.owner.id, master, scene, loadsPerOrder, options);
 const numberOf = (r: Awaited<ReturnType<typeof createInvoice>>) => {
   if (!r.ok) throw new Error(r.error);
   return r.value.number;

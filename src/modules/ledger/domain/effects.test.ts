@@ -20,6 +20,7 @@ const all: Effect[] = [
   { kind: 'payment_in', method: 'cheque', amountCentimes: 936_000, cleared: false },
   { kind: 'payment_out', method: 'transfer', amountCentimes: 552_000, cleared: true },
   { kind: 'receivable_covered', orderCode: 'CMD-2026-00001', amountCentimes: 100_000 },
+  { kind: 'receivable_spread', amountCentimes: 100_000 },
   { kind: 'payable_covered', purchaseCode: 'ACH-2026-00001', amountCentimes: 100_000 },
 ];
 
@@ -37,8 +38,8 @@ describe('visibleEffects (AC-LED-26)', () => {
   it('owner and support see everything', () => {
     for (const role of ['owner', 'support'] as const) expect(visibleEffects(all, role)).toEqual(all);
   });
-  it('every role gets an answer and the money kinds are exactly the six money facts', () => {
+  it('every role gets an answer and the money kinds are exactly the seven money facts', () => {
     for (const role of USER_ROLES) expect(visibleEffects(all, role).length).toBeGreaterThan(0);
-    expect(all.filter(isMoneyEffect)).toHaveLength(6);
+    expect(all.filter(isMoneyEffect)).toHaveLength(7);
   });
 });

@@ -617,3 +617,55 @@ export async function newAdvanceInvoice(
     advanceCentimes: advance,
   };
 }
+
+/**
+ * A client with one order of 10 m³ per entry of `loadsPerOrder` and, per order, loads of the given litres, delivered unless
+ * said otherwise (the owner's own transaction).
+ */
+export async function clientWithLoads(
+  app: pg.Pool,
+  ownerId: string,
+  master: OrderMaster,
+  scene: Pick<DeliveryScene, 'truckId' | 'recetteId'>,
+  loadsPerOrder: number[][],
+  options: { delivered?: boolean } = {},
+) {
+  return withRlsContext(
+    app,
+    { userId: ownerId, role: 'owner', requestId: 'client-with-loads' },
+    async (tx) => {
+      const client = await tx.query<{ id: string }>(
+        `insert into client (id, code, name, kind) values (gen_random_uuid(), public.next_code('CLT', 3), $1, 'person') returning id`,
+        [`cwl ${randomUUID()}`],
+      );
+      const clientId = client.rows[0]?.id as string;
+      const clientCode = (
+        await tx.query<{ code: string }>('select code from client where id = $1', [clientId])
+      ).rows[0]?.code as string;
+      const orders: {
+        id: string;
+        code: string;
+        itemIds: string[];
+        deliveryIds: string[];
+        blNos: string[];
+      }[] = [];
+      for (const loads of loadsPerOrder) {
+        const order = await insertOrderWithItems(tx, ownerId, master, clientId, [936_000]);
+        const deliveryIds: string[] = [];
+        const blNos: string[] = [];
+        for (const litres of loads) {
+          const d = await insertDelivery(tx, ownerId, { ...scene, orderId: order.id }, litres, 2026);
+          if (options.delivered !== false)
+            await tx.query(
+              `insert into delivery_delivered (id, delivery_id, at, trip_event_id, created_by) values (gen_random_uuid(), $1, now(), null, $2)`,
+              [d.id, ownerId],
+            );
+          deliveryIds.push(d.id);
+          blNos.push(d.blNo);
+        }
+        orders.push({ ...order, deliveryIds, blNos });
+      }
+      return { clientId, clientCode, orders };
+    },
+  );
+}

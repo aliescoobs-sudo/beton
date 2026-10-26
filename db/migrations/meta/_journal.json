@@ -477,6 +477,13 @@
       "when": 1792591247017,
       "tag": "0067_invoice_from_deliveries",
       "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1792591247018,
+      "tag": "0068_allocate_to_invoices",
+      "breakpoints": true
     }
   ]
 }

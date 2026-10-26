@@ -3,6 +3,7 @@
 import { getRequestClock } from '@/app/request-clock';
 import { getPool } from '@/lib/db/pools';
 import {
+  allocateToInvoice,
   bounceInstrument,
   cancelInstrument,
   clearInstrument,
@@ -82,4 +83,24 @@ export async function disputeAction(input: unknown): Promise<LifecycleResult> {
 // @permission instruments.manage (owner) + sensitive action ledger.reverse_entry
 export async function cancelAction(input: unknown): Promise<LifecycleResult> {
   return guarded(input, (user) => cancelInstrument(getPool('app'), user, input), true);
+}
+
+// @permission instruments.manage (owner): directs (part of) a payment to one invoice, with a reason; the rows keep it (audited)
+export async function allocateToInvoiceAction(
+  input: unknown,
+): Promise<{ ok: true; allocatedCentimes: number } | { ok: false; error: string }> {
+  const allowed = await authorize('instruments.manage', {
+    getState: currentAuthState,
+    appPool: getPool('app'),
+  });
+  if (!allowed.ok) return { ok: false, error: allowed.reason };
+  try {
+    const result = await allocateToInvoice(getPool('app'), allowed.user, input);
+    return result.ok
+      ? { ok: true, allocatedCentimes: result.value.allocatedCentimes }
+      : { ok: false, error: result.error };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, error: 'FORBIDDEN' };
+    throw error;
+  }
 }

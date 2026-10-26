@@ -65,6 +65,8 @@ describe('functions the application role can execute', () => {
     'ctx.sim_at()',
     'ctx.sim_now()',
     'ctx.user_id()',
+    'public.allocate_to_client(p_instrument uuid, p_client_code text)',
+    'public.allocate_to_invoice(p_instrument uuid, p_invoice uuid, p_amount bigint, p_reason text)',
     'public.allocate_to_order(p_instrument uuid, p_order_code text)',
     'public.allocate_to_purchase(p_instrument uuid, p_purchase_code text)',
     'public.create_invoice(p_order_code text, p_delivery_ids uuid[], p_due date, p_today date)',

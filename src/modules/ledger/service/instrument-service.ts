@@ -102,6 +102,7 @@ async function enter(
     partyId: string;
     orderCode?: string | null;
     purchaseCode?: string | null;
+    allocateToClient?: boolean | null;
   },
   today: string,
 ): Promise<Result<InstrumentRef, InstrumentError>> {
@@ -156,6 +157,17 @@ async function enter(
         );
         coveredCentimes = Number(sum.rows[0]?.s ?? 0);
       }
+      if (direction === 'in' && v.allocateToClient && !v.orderCode) {
+        // No order named: the client's open invoices, oldest due date first (AC-INT-09). Nothing open is not a failure: the
+        // payment stays on account. Office reads no allocation and gets no amount back.
+        const client = await tx.query<{ code: string }>('select code from client where id = $1', [v.partyId]);
+        await tx.query('select public.allocate_to_client($1, $2) as n', [id, client.rows[0]?.code]);
+        const sum = await tx.query<{ s: string }>(
+          'select coalesce(sum(amount_centimes), 0)::text as s from allocation where instrument_id = $1',
+          [id],
+        );
+        coveredCentimes = Number(sum.rows[0]?.s ?? 0);
+      }
       if (v.purchaseCode) {
         // Same for a supplier payment: the oldest open items of that purchase.
         const covered = await tx.query<{ n: number }>('select public.allocate_to_purchase($1, $2) as n', [
@@ -188,6 +200,8 @@ async function enter(
     ];
     if (v.orderCode && direction === 'in' && coveredCentimes > 0)
       effects.push({ kind: 'receivable_covered', orderCode: v.orderCode, amountCentimes: coveredCentimes });
+    if (v.allocateToClient && !v.orderCode && direction === 'in' && coveredCentimes > 0)
+      effects.push({ kind: 'receivable_spread', amountCentimes: coveredCentimes });
     if (v.purchaseCode && direction === 'out' && coveredCentimes > 0)
       effects.push({
         kind: 'payable_covered',
@@ -311,22 +325,28 @@ export async function bounceInstrument(
         event: 'bounced',
         date: v.date,
       });
-      const open = await tx.query<{ id: string; payment_plan_item_id: string; amount_centimes: string }>(
-        `select a.id, a.payment_plan_item_id, a.amount_centimes::text from allocation a
+      const open = await tx.query<{
+        id: string;
+        payment_plan_item_id: string;
+        amount_centimes: string;
+        invoice_id: string | null;
+      }>(
+        `select a.id, a.payment_plan_item_id, a.amount_centimes::text, a.invoice_id from allocation a
           where a.instrument_id = $1 and a.reverses_id is null
             and not exists (select 1 from allocation r where r.reverses_id = a.id)`,
         [v.instrumentId],
       );
       for (const a of open.rows) {
         await tx.query(
-          `insert into allocation (id, instrument_id, payment_plan_item_id, amount_centimes, reverses_id, reason, created_by)
-           values ($1, $2, $3, $4, $5, 'chèque ou LCN rejeté', $6)`,
+          `insert into allocation (id, instrument_id, payment_plan_item_id, amount_centimes, reverses_id, reason, invoice_id, created_by)
+           values ($1, $2, $3, $4, $5, 'chèque ou LCN rejeté', $6, $7)`,
           [
             randomUUID(),
             v.instrumentId,
             a.payment_plan_item_id,
             negateCentimes(centimes(Number(a.amount_centimes))),
             a.id,
+            a.invoice_id,
             actor.id,
           ],
         );
@@ -499,6 +519,8 @@ export interface InstrumentView {
   clientDisputed: boolean;
   state: InstrumentState;
   stateDate: string;
+  /** What the instrument has not yet been allocated to (amount minus the allocations, reversals included). */
+  unallocatedCentimes: number;
   events: InstrumentEventView[];
 }
 
@@ -514,6 +536,7 @@ interface InstrumentRow {
   written_date: string | null;
   received_date: string;
   client_disputed: boolean;
+  unallocated: string;
   events: {
     event: InstrumentState;
     at_date: string;
@@ -537,6 +560,7 @@ export async function listInstruments(appPool: pg.Pool, actor: SessionUser): Pro
                                                  'deadline', to_char(e.regularization_deadline, 'YYYY-MM-DD'),
                                                  'covering', e.covering_instrument_id) order by e.seq)
                  from instrument_event e where e.instrument_id = i.id) as events,
+              (i.amount_centimes - coalesce((select sum(a.amount_centimes) from allocation a where a.instrument_id = i.id), 0))::text as unallocated,
               (i.client_id is not null and exists (
                  select 1 from payment_instrument d join instrument_event de on de.instrument_id = d.id and de.event = 'disputed'
                   where d.client_id = i.client_id)) as client_disputed
@@ -571,6 +595,7 @@ export async function listInstruments(appPool: pg.Pool, actor: SessionUser): Pro
       clientDisputed: r.client_disputed,
       state: last.event,
       stateDate: last.atDate,
+      unallocatedCentimes: Number(r.unallocated),
       events,
     };
   });

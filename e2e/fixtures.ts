@@ -89,6 +89,7 @@ export const E2E_MD = {
   tripPlantAr: { email: 'e2e-tp-plant-ar@belgobeton.test', name: 'مركز الرحلات' },
   queueOffice: { email: 'e2e-iq-office@belgobeton.test', name: 'Bureau À facturer' },
   queueOfficeAr: { email: 'e2e-iq-office-ar@belgobeton.test', name: 'مكتب الفوترة' },
+  allocOffice: { email: 'e2e-al-office@belgobeton.test', name: 'Bureau Imputations' },
   queuePlant: { email: 'e2e-iq-plant@belgobeton.test', name: 'Centrale À facturer' },
   queueSupport: { email: 'e2e-iq-support@belgobeton.test', name: 'Support À facturer' },
   tripOffice: { email: 'e2e-tp-office@belgobeton.test', name: 'Bureau Rotations' },

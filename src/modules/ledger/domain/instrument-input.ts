@@ -41,6 +41,8 @@ const receiveSchema = paper
       .transform((v) => v.trim().toUpperCase())
       .pipe(z.string().regex(ORDER_CODE))
       .nullish(),
+    // No order named: spread the payment over the client's open invoices, oldest due date first.
+    allocateToClient: z.boolean().nullish(),
   })
   .transform(normalise)
   .refine(complete);

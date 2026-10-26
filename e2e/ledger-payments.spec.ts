@@ -1,5 +1,8 @@
 import { expect, test } from '@playwright/test';
+import { randomUUID } from 'node:crypto';
 import pg from 'pg';
+import { withRlsContext } from '../src/lib/db/rls-context';
+import { insertOrderWithItems, orderMaster } from '../tests/helpers/ledger-fixtures';
 import { E2E_DATABASE } from '../scripts/db-bootstrap';
 import { testEnv } from '../tests/db-env';
 import { E2E_MD, goNav, loginAndEnrol, loginOwner, logout } from './fixtures';
@@ -8,7 +11,8 @@ import { E2E_MD, goNav, loginAndEnrol, loginOwner, logout } from './fixtures';
 test.describe.configure({ mode: 'serial' });
 
 const migrator = new pg.Pool({ connectionString: testEnv(E2E_DATABASE).DATABASE_URL_MIGRATOR, max: 1 });
-test.afterAll(() => migrator.end());
+const app = new pg.Pool({ connectionString: testEnv(E2E_DATABASE).DATABASE_URL_APP, max: 2 });
+test.afterAll(() => Promise.all([migrator.end(), app.end()]));
 const suffix = Math.random().toString(36).slice(2, 8).toUpperCase();
 const chequeNo = `E2E${suffix}`;
 
@@ -23,6 +27,19 @@ test('the owner makes sure there is a caisse', async ({ page }) => {
 });
 
 test('office enters a cash payment and a post-dated cheque for an order, blind', async ({ page }) => {
+  // A payment with no order named is spread over what Atlas owes, oldest first: give Atlas an order with room for both
+  // payments below, so the test does not depend on what earlier specs left open.
+  const ownerId = (await migrator.query<{ id: string }>(`select id from "user" where role = 'owner'`)).rows[0]
+    ?.id as string;
+  const atlas = (
+    await migrator.query<{ id: string }>(
+      `select id from client where name ilike '%atlas%' order by code limit 1`,
+    )
+  ).rows[0];
+  const master = await orderMaster(app, ownerId, `e2epay${randomUUID().replace(/-/g, '').slice(0, 8)}`);
+  await withRlsContext(app, { userId: ownerId, role: 'owner', requestId: 'e2e-pay' }, (tx) =>
+    insertOrderWithItems(tx, ownerId, master, atlas?.id as string, [936_000]),
+  );
   await loginAndEnrol(page, 'fr', E2E_MD.payOffice.email);
   await goNav(page, 'payments-new-link');
   await expect(page).toHaveURL('/fr/payments/new');

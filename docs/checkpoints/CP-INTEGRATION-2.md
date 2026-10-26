@@ -14,7 +14,7 @@ Status: `[ ]` to do, `[x]` done (commit), `[~]` partial.
 - [x] I1.2b Signed BL with optional scan: `delivery_file`, one authorized route, audited views (AC-INT-02, 04; migration 0065; D100)
 - [x] I1.3 Delivered-not-invoiced queue per client (AC-INT-05; migration 0066; D101)
 - [x] I1.4 Invoice from selected BLs, grouped by product, advances, one invoice per BL, office door (AC-INT-06, 07, 08; migration 0067; D102)
-- [ ] I1.5 Allocation across all open invoices, owner override, bounce (AC-INT-09, 10, 11)
+- [x] I1.5 Allocation across all open invoices, owner override, bounce (AC-INT-09, 10, 11; migration 0068; D103)
 - [ ] I1.6 Avoir for rejected or returned concrete (AC-INT-12)
 
 ### Wave I2: purchase chain
@@ -73,4 +73,4 @@ Filled at the end (re-run of the CP-INTEGRATION table).
 Filled at the end.
 
 ## New provisional decisions
-Filled as they are taken (DECISIONS 97 onward): 97 (delivered), 98 (delivered quantity), 99 (stored documents), 100 (signed BL and its scan), 101 (invoicing queue), 102 (invoice from the BLs).
+Filled as they are taken (DECISIONS 97 onward): 97 (delivered), 98 (delivered quantity), 99 (stored documents), 100 (signed BL and its scan), 101 (invoicing queue), 102 (invoice from the BLs), 103 (payment spread over invoices).

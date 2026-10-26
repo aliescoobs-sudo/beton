@@ -626,7 +626,7 @@
       "reference": "Référence du virement",
       "bank": "Banque",
       "writtenDate": "Date écrite sur le titre",
-      "orderCode": "Commande payée (code, facultatif)",
+      "orderCode": "Commande payée (code, facultatif : sans code, le paiement est imputé sur les factures ouvertes du client, les plus anciennes échues d'abord)",
       "save": "Enregistrer",
       "saved": "Paiement enregistré.",
       "another": "Saisir un autre paiement",
@@ -1143,6 +1143,17 @@
       "dueDate": "Échéance (facultatif)",
       "invoiceSelection": "Facturer la sélection ({count})",
       "refused": "Facture refusée : choisissez des BL livrés, non facturés, d'un seul client."
+    },
+    "directAllocation": {
+      "button": "Imputer sur une facture",
+      "confirm": "Reste à imputer : {left} MAD. Choisissez la facture, le montant et la raison.",
+      "invoice": "Facture",
+      "amount": "Montant",
+      "reason": "Raison (obligatoire)",
+      "confirmButton": "Imputer",
+      "cancelButton": "Annuler",
+      "invalid": "Saisie invalide.",
+      "refused": "Imputation impossible : facture non ouverte pour ce client, ou rien à imputer."
     }
   },
   "operations": {
@@ -1597,7 +1608,8 @@
     "cleared": "encaissé",
     "pending": "pas encore encaissé",
     "covered": "Commande {code} réglée à hauteur de",
-    "payableCovered": "Achat {code} réglé à hauteur de"
+    "payableCovered": "Achat {code} réglé à hauteur de",
+    "spread": "Imputé sur les factures ouvertes du client, les plus anciennes échues d'abord :"
   },
   "dashboard": {
     "title": "Aujourd'hui",

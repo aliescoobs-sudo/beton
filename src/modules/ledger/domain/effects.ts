@@ -31,6 +31,8 @@ export type Effect =
   | { kind: 'payment_in'; method: string; amountCentimes: number; cleared: boolean }
   | { kind: 'payment_out'; method: string; amountCentimes: number; cleared: boolean }
   | { kind: 'receivable_covered'; orderCode: string; amountCentimes: number }
+  // A payment with no order named, spread over the client's open invoices (oldest due date first).
+  | { kind: 'receivable_spread'; amountCentimes: number }
   | { kind: 'payable_covered'; purchaseCode: string; amountCentimes: number };
 
 const MONEY_KINDS: ReadonlySet<Effect['kind']> = new Set([
@@ -39,6 +41,7 @@ const MONEY_KINDS: ReadonlySet<Effect['kind']> = new Set([
   'payment_in',
   'payment_out',
   'receivable_covered',
+  'receivable_spread',
   'payable_covered',
 ]);
 

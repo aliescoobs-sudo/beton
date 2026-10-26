@@ -73,7 +73,12 @@ export function PaymentForm({
       method,
       amountCentimes: amount,
       ...(direction === 'in'
-        ? { clientId: partyId, orderCode: text('orderCode') || null }
+        ? {
+            clientId: partyId,
+            orderCode: text('orderCode') || null,
+            // No order named: spread over the client's open invoices, oldest due date first.
+            allocateToClient: !text('orderCode'),
+          }
         : { supplierId: partyId, purchaseCode: text('purchaseCode') || null }),
       number: text('number') || null,
       bank: text('bank') || null,
