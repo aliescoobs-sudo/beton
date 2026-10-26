@@ -101,6 +101,9 @@ export const PERMISSIONS = {
   'deliveries.bl_return': ['owner', 'partner', 'office', 'plant'],
   // A load made outside a rotation is marked delivered by hand; a rotation's load is delivered by its tracking step
   'deliveries.deliver': ['owner', 'partner', 'plant'],
+  // The scan of a signed BL: add it (with the return, or after), and open it. Opening re-checks RLS and is audited.
+  'delivery_files.write': ['owner', 'partner', 'office', 'plant'],
+  'delivery_files.read': ['owner', 'partner', 'office', 'plant', 'support'],
   // Concrete that came back or was refused, recorded on its load with a reason (counted as loss in the consumption report)
   'deliveries.loss': ['owner', 'partner', 'office', 'plant'],
   // Daily dispatch: the plan of the day's rotations (truck, driver, times); quantities and times only. Office is blind to orders.

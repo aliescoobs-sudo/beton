@@ -2,12 +2,17 @@
 
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { type FormEvent, useState } from 'react';
 import { Button } from '@/ui';
 
 export type BlReturnResult = { ok: true } | { ok: false; error: string };
 
-/** Records that the signed BL came back, today, with nothing returned unused (the common case). Once only. */
+const ACCEPT = 'image/jpeg,image/png,image/webp,application/pdf';
+
+/**
+ * Records that the signed BL came back, today, with nothing returned unused (the common case), and the scan when one is
+ * chosen (a photo or a PDF). Once only; the scan can also be added later by `BlScanAttach`.
+ */
 export function BlReturnButton({
   deliveryId,
   blNo,
@@ -17,18 +22,20 @@ export function BlReturnButton({
   deliveryId: string;
   blNo: string;
   today: string;
-  record: (input: unknown) => Promise<BlReturnResult>;
+  record: (data: FormData) => Promise<BlReturnResult>;
 }) {
   const t = useTranslations('operations.deliveries');
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  async function click() {
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
     setPending(true);
     setMessage(null);
     try {
-      const result = await record({ deliveryId, returnedOn: today, returnedVolumeL: 0 });
+      const result = await record(data);
       if (result.ok) return router.refresh();
       setMessage(t(`errors.${result.error}` as never));
       if (result.error === 'ALREADY_RETURNED') router.refresh();
@@ -40,14 +47,21 @@ export function BlReturnButton({
   }
 
   return (
-    <span className="inline-flex flex-col gap-1">
-      <Button
-        type="button"
-        variant="secondary"
-        disabled={pending}
-        onClick={click}
-        data-testid={`bl-return-${blNo}`}
-      >
+    <form onSubmit={submit} className="inline-flex flex-col gap-1">
+      <input type="hidden" name="deliveryId" value={deliveryId} />
+      <input type="hidden" name="returnedOn" value={today} />
+      <label className="text-sm">
+        <span className="sr-only">{t('scanLabel')}</span>
+        <input
+          type="file"
+          name="file"
+          accept={ACCEPT}
+          aria-label={t('scanLabel')}
+          data-testid={`bl-file-${blNo}`}
+          className="max-w-48 text-sm"
+        />
+      </label>
+      <Button type="submit" variant="secondary" disabled={pending} data-testid={`bl-return-${blNo}`}>
         {t('markReturned')}
       </Button>
       {message && (
@@ -55,6 +69,6 @@ export function BlReturnButton({
           {message}
         </span>
       )}
-    </span>
+    </form>
   );
 }

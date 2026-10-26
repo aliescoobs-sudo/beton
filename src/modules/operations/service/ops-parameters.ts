@@ -11,7 +11,8 @@ export type OpsParameterKey =
   | 'day_start_min'
   | 'default_one_way_min'
   | 'consumption_tolerance_bp'
-  | 'reorder_margin_days';
+  | 'reorder_margin_days'
+  | 'upload_max_bytes';
 
 /** An operations parameter as the roles that load, plan and read trucks may read it (the plant cannot read the parameter table). */
 export async function opsParameter(tx: pg.PoolClient, key: OpsParameterKey): Promise<number> {

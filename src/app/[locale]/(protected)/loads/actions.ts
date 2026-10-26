@@ -2,14 +2,18 @@
 
 import { getRequestClock } from '@/app/request-clock';
 import { getPool } from '@/lib/db/pools';
+import { defaultFileStore } from '@/lib/files/server-store';
 import type { Effect } from '@/modules/ledger';
 import {
+  attachDeliveryScan,
   cancelLoad,
   createLoad,
   type DeliveryError,
   markDelivered,
   recordBlReturn,
+  recordBlReturnWithScan,
   recordLoss,
+  type ScanUpload,
 } from '@/modules/operations';
 import { authorize, ForbiddenError, type Permission, withStepUp } from '@/modules/platform-security';
 import { currentAuthState } from '@/modules/platform-security/next';
@@ -53,6 +57,48 @@ export async function createLoadAction(
 export async function blReturnAction(input: unknown): Promise<{ ok: true } | Failure> {
   return guarded('deliveries.bl_return', async (user) => {
     const result = await recordBlReturn(getPool('app'), user, input);
+    return result.ok ? { ok: true as const } : { ok: false as const, error: result.error };
+  });
+}
+
+/** The file field of a form, as the bytes and the type the browser declared; null when none was chosen. */
+async function uploadOf(data: FormData): Promise<ScanUpload | null> {
+  const file = data.get('file');
+  if (!(file instanceof File) || file.size === 0) return null;
+  return { declaredType: file.type, bytes: new Uint8Array(await file.arrayBuffer()) };
+}
+
+// @permission deliveries.bl_return (plant, office, owner, partner): the signed BL comes back, with its scan when one is chosen
+export async function blReturnWithScanAction(data: FormData): Promise<{ ok: true } | Failure> {
+  return guarded('deliveries.bl_return', async (user) => {
+    const upload = await uploadOf(data);
+    const result = await recordBlReturnWithScan(
+      getPool('app'),
+      user,
+      {
+        deliveryId: String(data.get('deliveryId') ?? ''),
+        returnedOn: String(data.get('returnedOn') ?? ''),
+        returnedVolumeL: 0,
+      },
+      upload,
+      { store: defaultFileStore() },
+    );
+    return result.ok ? { ok: true as const } : { ok: false as const, error: result.error };
+  });
+}
+
+// @permission delivery_files.write (plant, office, owner, partner): the scan of a BL whose signed return is recorded
+export async function attachScanAction(data: FormData): Promise<{ ok: true } | Failure> {
+  return guarded('delivery_files.write', async (user) => {
+    const upload = await uploadOf(data);
+    if (!upload) return { ok: false as const, error: 'EMPTY' };
+    const result = await attachDeliveryScan(
+      getPool('app'),
+      user,
+      { deliveryId: String(data.get('deliveryId') ?? '') },
+      upload,
+      { store: defaultFileStore() },
+    );
     return result.ok ? { ok: true as const } : { ok: false as const, error: result.error };
   });
 }

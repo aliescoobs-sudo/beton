@@ -198,7 +198,8 @@
       "advance_extra_bp": "Acompte supplémentaire demandé à un client, en part de la commande (points de base : 3000 = 30 %)",
       "discount_rate_bp": "Taux annuel d'escompte d'une LCN (points de base : 800 = 8 %)",
       "split_delivery_bp": "Part d'une commande déplacée au jour ouvré suivant dans l'option « scinder la livraison » (points de base)",
-      "load_excess_tolerance_bp": "Excédent de chargement toléré sans alerte forte (points de base de la commande : 500 = 5 %)"
+      "load_excess_tolerance_bp": "Excédent de chargement toléré sans alerte forte (points de base de la commande : 500 = 5 %)",
+      "upload_max_bytes": "Taille maximale d'un document téléversé, scan de BL ou photo de facture fournisseur (octets)"
     },
     "restartNote": "Les heures des tâches planifiées ne sont prises en compte qu'après un redémarrage du serveur."
   },
@@ -1180,7 +1181,15 @@
         "UNAUTHENTICATED": "Session expirée.",
         "FORBIDDEN": "Action non autorisée.",
         "ALREADY_DELIVERED": "Ce BL est déjà livré.",
-        "FOLLOWS_ROTATION": "Ce chargement suit sa tournée : il est livré à la fin du déchargement."
+        "FOLLOWS_ROTATION": "Ce chargement suit sa tournée : il est livré à la fin du déchargement.",
+        "EMPTY": "Aucun fichier choisi.",
+        "TOO_LARGE": "Fichier trop volumineux.",
+        "TYPE_NOT_ALLOWED": "Seuls les images (JPEG, PNG, WebP) et les PDF sont acceptés.",
+        "TYPE_MISMATCH": "Le contenu du fichier ne correspond pas à son type.",
+        "CORRUPT": "Fichier illisible ou incomplet.",
+        "ACTIVE_CONTENT": "Ce PDF contient du contenu actif : refusé.",
+        "NO_RETURN": "Enregistrez d'abord le retour du BL signé.",
+        "ALREADY_HAS_SCAN": "Ce BL a déjà un scan."
       },
       "cancelLoad": "Annuler le chargement",
       "cancelReason": "Raison de l'annulation (obligatoire)",
@@ -1196,7 +1205,10 @@
       "markDelivered": "Marquer livré",
       "deliveredAt": "Livré le",
       "refused": "Refusé",
-      "onRotation": "en tournée"
+      "onRotation": "en tournée",
+      "scanLabel": "Scan du BL signé (facultatif)",
+      "addScan": "Ajouter le scan",
+      "viewScan": "Voir le scan"
     },
     "stock": {
       "link": "Stock",

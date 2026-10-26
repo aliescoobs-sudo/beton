@@ -4,6 +4,7 @@ import { getPool } from '@/lib/db/pools';
 import { listTrucks } from '@/modules/master-data';
 import { listDeliveries, listLoadableOrders } from '@/modules/operations';
 import { BlReturnButton } from '@/modules/operations/ui/bl-return-button';
+import { BlScanAttach } from '@/modules/operations/ui/bl-scan-attach';
 import { CancelLoadButton } from '@/modules/operations/ui/cancel-load-button';
 import { formatM3 } from '@/modules/operations/ui/format';
 import { LoadRowForm } from '@/modules/operations/ui/load-row-form';
@@ -13,7 +14,8 @@ import { can } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/next';
 import { EmptyState, PageHeader, StatusPill, Table, Td, Th } from '@/ui';
 import {
-  blReturnAction,
+  attachScanAction,
+  blReturnWithScanAction,
   cancelLoadAction,
   createLoadAction,
   markDeliveredAction,
@@ -31,6 +33,7 @@ export default async function LoadsPage({ params }: { params: Promise<{ locale: 
   const canCancel = can(user.role, 'deliveries.cancel');
   const canLoss = can(user.role, 'deliveries.loss');
   const canDeliver = can(user.role, 'deliveries.deliver');
+  const canScan = can(user.role, 'delivery_files.write');
   const [orders, deliveries, trucks] = await Promise.all([
     listLoadableOrders(pool, user, today),
     listDeliveries(pool, user),
@@ -170,11 +173,33 @@ export default async function LoadsPage({ params }: { params: Promise<{ locale: 
                     ) : d.cancelled ? (
                       <StatusPill status="cancelled">{t('deliveries.cancelled')}</StatusPill>
                     ) : d.returnedOn ? (
-                      <StatusPill status="paid">
-                        {t('deliveries.returned')} <bdi dir="ltr">{d.returnedOn}</bdi>
-                      </StatusPill>
+                      <span className="inline-flex flex-col gap-1">
+                        <StatusPill status="paid">
+                          {t('deliveries.returned')} <bdi dir="ltr">{d.returnedOn}</bdi>
+                        </StatusPill>
+                        {d.hasScan ? (
+                          <a
+                            href={`/${locale}/deliveries/${d.id}/scan`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm underline"
+                            data-testid={`scan-link-${d.blNo}`}
+                          >
+                            {t('deliveries.viewScan')}
+                          </a>
+                        ) : (
+                          canScan && (
+                            <BlScanAttach deliveryId={d.id} blNo={d.blNo} attach={attachScanAction} />
+                          )
+                        )}
+                      </span>
                     ) : (
-                      <BlReturnButton deliveryId={d.id} blNo={d.blNo} today={today} record={blReturnAction} />
+                      <BlReturnButton
+                        deliveryId={d.id}
+                        blNo={d.blNo}
+                        today={today}
+                        record={blReturnWithScanAction}
+                      />
                     )}
                   </Td>
                   {canLoss && (

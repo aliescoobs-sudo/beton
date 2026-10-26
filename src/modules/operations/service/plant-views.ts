@@ -76,6 +76,8 @@ export interface DeliveryRow {
   cancelled: boolean;
   /** Present once the signed BL came back. */
   returnedOn: string | null;
+  /** A scan of the signed BL is stored. */
+  hasScan: boolean;
   /** The instant the load was delivered (the unloading step of its rotation, or a hand mark); null while on the road. */
   deliveredAt: string | null;
   /** The load belongs to a rotation: only the tracking delivers it. */
@@ -110,6 +112,7 @@ export async function listDeliveries(
       loss_reason: string | null;
       delivered_at: string | null;
       on_rotation: boolean;
+      has_scan: boolean;
     }>(
       `select d.id, d.bl_no, o.code as order_code, o.client_code, t.code as type_code, k.code as truck_code,
               d.volume_l, to_char(d.load_date, 'YYYY-MM-DD') as load_date, d.reverses_id,
@@ -118,7 +121,8 @@ export async function listDeliveries(
               (select x.volume_l from delivery_loss x where x.delivery_id = d.id) as loss_l,
               (select x.reason from delivery_loss x where x.delivery_id = d.id) as loss_reason,
               (select to_char(g.at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') from delivery_delivered g where g.delivery_id = d.id) as delivered_at,
-              exists (select 1 from trip_event e where e.delivery_id = d.id) as on_rotation
+              exists (select 1 from trip_event e where e.delivery_id = d.id) as on_rotation,
+              exists (select 1 from delivery_file f where f.delivery_id = d.id) as has_scan
          from delivery d
          left join sales_order_ops o on o.id = d.order_id
          left join concrete_type t on t.id = o.concrete_type_id
@@ -140,6 +144,7 @@ export async function listDeliveries(
     returnedOn: r.returned_on,
     deliveredAt: r.delivered_at,
     onRotation: r.on_rotation,
+    hasScan: r.has_scan,
     refused: r.loss_l !== null && r.loss_l >= r.volume_l,
     loss: r.loss_l === null ? null : { volumeL: r.loss_l, reason: r.loss_reason as string },
   }));

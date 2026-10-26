@@ -110,6 +110,12 @@ export const PARAMETERS = {
     description:
       'Gap between the theoretical consumption and the physical counts that is flagged (basis points)',
   }, // Days of cover and reorder (SPEC-operations §7.1, AC-OPS-20): safety days on top of a supplier's lead time.
+  // Stored documents (SPEC-integration §2, AC-INT-03): the largest BL scan or invoice photo accepted.
+  upload_max_bytes: {
+    default: 5_000_000,
+    schema: z.number().int().min(100_000).max(8_000_000),
+    description: 'Largest uploaded document, a BL scan or a supplier invoice photo (bytes)',
+  },
   reorder_margin_days: {
     default: 2,
     schema: z.number().int().min(0).max(30),

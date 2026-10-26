@@ -26,6 +26,8 @@ export default defineConfig({
       DATABASE_URL_MIGRATOR: env.DATABASE_URL_MIGRATOR,
       APP_BASE_URL: E2E_BASE_URL,
       JOB_SCHEDULER_DISABLED: 'true',
+      // Wiped with test-results at every run.
+      FILE_STORE_DIR: 'test-results/file-store',
       NEXT_TELEMETRY_DISABLED: '1',
     },
   },

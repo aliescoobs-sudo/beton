@@ -1006,6 +1006,24 @@ export const TABLE_ACCESS = {
     exception:
       'integration I1.1: a load is delivered at the unloading step of its rotation (a SECURITY DEFINER trigger writes the row with the step instant) or, outside a rotation, by hand (plant, owner, partner). One row per load; quantities and times only. The view delivered_load drops cancelled and wholly refused loads.',
   },
+  delivery_file: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'all',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'integration I1.2: the scan of a signed BL, one per load, only after the signed return. Metadata only (type, size, SHA-256, who); the bytes are sealed in the file store. Plant, office, owner and partner add it; every role that reads loads reads the row; the bytes are served by a route that re-checks RLS and audits the view.',
+  },
   delivery_loss: {
     kind: 'rls',
     seed: 'insert',

@@ -8,6 +8,8 @@ const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR ?? '.next',
   poweredByHeader: false,
   reactStrictMode: true,
+  // A BL scan or an invoice photo travels in a Server Function: the largest one accepted is 8 MB (`upload_max_bytes`).
+  experimental: { serverActions: { bodySizeLimit: '9mb' } },
   // Stop `next dev` from injecting its agent-rules block into CLAUDE.md/AGENTS.md.
   agentRules: false,
   // `next dev` prints every Server Function call with its arguments; never let that reach a terminal or a log file.

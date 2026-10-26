@@ -333,6 +333,31 @@ const FIXTURES: Record<
     },
     visible: `select g.created_by::text as owner from delivery_delivered g join delivery d on d.id = g.delivery_id where d.bl_no like 'BL-2092-%' and $1::text is not null`,
   },
+  delivery_file: {
+    // One scan per load: each writer gets a delivery of its own (year 2091) with its signed return, made by the owner.
+    writers: ['owner', 'partner', 'office', 'plant'],
+    seed: async (tx, actor) => {
+      const delivery = await newDelivery(
+        app,
+        actors.owner,
+        marker,
+        await deliveryScene(app, actors.owner, marker),
+        40,
+        2091,
+      );
+      await withRlsContext(app, { userId: actors.owner, role: 'owner', requestId: marker }, (o) =>
+        o.query(
+          `insert into delivery_return (id, delivery_id, returned_on, created_by) values (gen_random_uuid(), $1, '2026-06-02', $2)`,
+          [delivery.id, actors.owner],
+        ),
+      );
+      return tx.query(
+        `insert into delivery_file (id, delivery_id, content_type, size_bytes, sha256, uploaded_by) values (gen_random_uuid(), $1, 'image/png', 10, repeat('a', 64), $2)`,
+        [delivery.id, actor],
+      );
+    },
+    visible: `select f.uploaded_by::text as owner from delivery_file f join delivery d on d.id = f.delivery_id where d.bl_no like 'BL-2091-%' and $1::text is not null`,
+  },
   delivery_loss: {
     // One loss per load: each writer gets a delivery of its own (year 2093), made by the owner.
     writers: ['owner', 'partner', 'office', 'plant'],

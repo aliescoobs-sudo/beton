@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, request, test } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import pg from 'pg';
 import { E2E_DATABASE } from '../scripts/db-bootstrap';
@@ -9,7 +9,13 @@ import {
   newReceivablePurchase,
   purchaseMaster,
 } from '../tests/helpers/ledger-fixtures';
-import { E2E_MD, goNav, loginAndEnrol, logout } from './fixtures';
+import { E2E_BASE_URL, E2E_MD, goNav, loginAndEnrol, logout } from './fixtures';
+
+// A 1x1 PNG with a text chunk that must not survive (author), as a phone or a scanner app might write one.
+const PNG_WITH_AUTHOR = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAAFHRFWHRBdXRob3IAU0VDUkVULUFVVEhPUrJPzoEAAAAMSURBVHicY/jPwAAAAwEBAMn+ku8AAAAASUVORK5CYII=',
+  'base64',
+);
 
 // operations O4: the plant loads an order from the day's list; no price, total or client contact anywhere on the screens.
 test.describe.configure({ mode: 'serial' });
@@ -48,8 +54,32 @@ test('the plant loads an order, gets a BL number, marks the signed BL back, and 
   await expect(effects).not.toContainText(/MAD|DH/);
   await page.getByTestId(`load-continue-${orderCode}`).click();
   await expect(page.getByTestId(`delivery-${blNo}`)).toBeVisible();
+  // A file that is not an image or a PDF is refused and records nothing; a good scan records the return with the scan.
+  await page.getByTestId(`bl-file-${blNo}`).setInputFiles({
+    name: 'x.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from('<html>not a picture</html>'),
+  });
+  await page.getByTestId(`bl-return-${blNo}`).click();
+  await expect(page.getByTestId(`delivery-${blNo}`).getByRole('alert')).toContainText('images');
+  await expect(page.getByTestId(`delivery-${blNo}`)).not.toContainText('Rentré le');
+  await page
+    .getByTestId(`bl-file-${blNo}`)
+    .setInputFiles({ name: 'bl.png', mimeType: 'image/png', buffer: PNG_WITH_AUTHOR });
   await page.getByTestId(`bl-return-${blNo}`).click();
   await expect(page.getByTestId(`delivery-${blNo}`)).toContainText('Rentré le');
+  const scanLink = page.getByTestId(`scan-link-${blNo}`);
+  await expect(scanLink).toBeVisible();
+  const scanUrl = (await scanLink.getAttribute('href')) as string;
+  const scan = await page.request.get(scanUrl);
+  expect(scan.status()).toBe(200);
+  expect(scan.headers()['content-type']).toBe('image/png');
+  expect(scan.headers()['x-content-type-options']).toBe('nosniff');
+  expect((await scan.body()).includes(Buffer.from('SECRET'))).toBe(false);
+  // Nobody signed in gets nothing.
+  const anonymous = await request.newContext({ baseURL: E2E_BASE_URL });
+  expect((await anonymous.get(scanUrl, { maxRedirects: 0 })).status()).not.toBe(200);
+  await anonymous.dispose();
   // A load outside a rotation is delivered by hand, once (AC-INT-01).
   await page.getByTestId(`mark-delivered-${blNo}`).click();
   await expect(page.getByTestId(`delivery-${blNo}`)).toContainText('Livré');

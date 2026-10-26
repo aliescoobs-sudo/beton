@@ -12,6 +12,14 @@ export {
   recordBlReturn,
 } from './service/delivery-service';
 export {
+  attachDeliveryScan,
+  openDeliveryScan,
+  type OpenedScan,
+  recordBlReturnWithScan,
+  type ScanError,
+  type ScanUpload,
+} from './service/delivery-file-service';
+export {
   adjustStockAfterCount,
   listStockAdjustments,
   type StockAdjustment,
