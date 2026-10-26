@@ -157,11 +157,9 @@ export async function buildAccountingExport(
     const receivables = (
       await tx.query<{ party: string; doc: string; due: string; open: string }>(
         `select i.client_name as party, i.number as doc, to_char(i.due_date, 'YYYY-MM-DD') as due,
-                least(i.total_ttc_centimes, o.total_ttc_centimes - coalesce((select sum(a.amount_centimes) from allocation a
-                       join payment_plan_item p on p.id = a.payment_plan_item_id where p.order_id = o.id), 0))::text as open
-           from invoice i join sales_order o on o.id = i.order_id
+                (s.total_ttc_centimes - s.paid_centimes)::text as open
+           from invoice i join public.invoice_payment_state() s on s.invoice_id = i.id
           where i.credit_note_of is null and i.invoice_date <= $1
-            and not exists (select 1 from invoice cn where cn.credit_note_of = i.id)
           order by i.due_date, i.number`,
         [to],
       )

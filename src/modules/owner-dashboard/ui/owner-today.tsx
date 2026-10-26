@@ -191,7 +191,7 @@ export async function OwnerToday({
               <li key={x.id} className="row-item text-sm">
                 <p>
                   {t('excess.line', {
-                    bl: x.blNo,
+                    bl: ltr(x.blNo),
                     order: ltr(x.orderCode),
                     client: ltr(x.clientCode),
                     excess: m3Text(x.excessL),

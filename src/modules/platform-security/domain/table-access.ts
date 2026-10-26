@@ -988,8 +988,28 @@ export const TABLE_ACCESS = {
     exception:
       'operations O13: fuel bought (litres and the total paid). Money (DECISIONS 81): the owner writes, the owner and support read, nobody else; its audit rows are hidden from the others. The price per litre and the cost of a truck are computed from it, never stored.',
   },
+  invoice_advance: {
+    kind: 'rls',
+    money: true,
+    read: {
+      owner: 'all',
+      partner: 'none',
+      office: 'none',
+      plant: 'none',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'integration I1.4: the advance applied on an invoice, per order (a snapshot, "Acompte reçu"). Money (D81): owner and support read; written only by create_invoice_from_deliveries (SECURITY DEFINER), never by a role; its audit rows are hidden from the others.',
+  },
   delivery_delivered: {
     kind: 'rls',
+    seed: 'insert',
     read: {
       owner: 'all',
       partner: 'all',

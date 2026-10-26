@@ -3,7 +3,7 @@ import pg from 'pg';
 import { E2E_DATABASE } from '../scripts/db-bootstrap';
 import { testEnv } from '../tests/db-env';
 import { realSessionUser } from '../tests/helpers/actors';
-import { createLoad } from '../src/modules/operations';
+import { createLoad, markDelivered } from '../src/modules/operations';
 import { E2E_MD, goNav, loginAndEnrol, loginOwner, logout } from './fixtures';
 
 // operations O6 + ledger L35: one action, its effect end to end. order -> load -> stock down -> invoice -> cheque -> cash,
@@ -85,7 +85,13 @@ test('the owner walks order, load, stock, invoice, cheque and cash, and sees wha
   const loadEffects = page.getByTestId(`load-effects-${orderCode}`);
   await expect(loadEffects).toContainText('Ciment');
   await expect(loadEffects).toContainText('−1 400 kg');
+  const blNo = /BL-\d{4}-\d{5}/.exec(
+    (await page.getByTestId(`load-done-${orderCode}`).textContent()) ?? '',
+  )?.[0] as string;
   await page.getByTestId(`load-continue-${orderCode}`).click();
+  // The truck unloaded: the load is delivered, so it can be billed.
+  await page.getByTestId(`mark-delivered-${blNo}`).click();
+  await expect(page.getByTestId(`delivery-${blNo}`)).toContainText('Livré');
 
   // 3. The stock screen agrees.
   await goNav(page, 'stock-link');
@@ -154,6 +160,8 @@ test('office walks order, invoice and cheque: it sees the documents and the stoc
     { today: new Date().toISOString().slice(0, 10) },
   );
   expect(load.ok).toBe(true);
+  // The truck unloaded (the plant's tracking): only a delivered load is billed.
+  if (load.ok) await markDelivered(app, plant, { deliveryId: load.value.id }, { now: new Date() });
 
   await goNav(page, 'invoices-new-link');
   await page.getByTestId('invoice-order-code').fill(orderCode);

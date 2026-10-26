@@ -3,7 +3,7 @@ import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { withRlsContext } from '../src/lib/db/rls-context';
 import { buildAccountingExport, cancelInvoice, createInvoice, createPurchase } from '../src/modules/ledger';
-import { createLoad } from '../src/modules/operations';
+import { createLoad, markDelivered } from '../src/modules/operations';
 import type { SessionUser } from '../src/modules/platform-security/auth/session-gate';
 import { testEnv } from './db-env';
 import { realSessionUser } from './helpers/actors';
@@ -45,6 +45,13 @@ describe('the accountant export (AC-LED-24)', () => {
       { today: '2026-06-10' },
     );
     if (!load.ok) throw new Error(load.error);
+    // Only a delivered load is billed (D97).
+    await markDelivered(
+      app,
+      users.plant,
+      { deliveryId: load.value.id },
+      { now: new Date('2026-06-10T10:00:00Z') },
+    );
     const inv = await createInvoice(app, users.owner, { orderCode: code }, { today: DAY });
     if (!inv.ok) throw new Error(inv.error);
     const master = await purchaseMaster(app, users.owner.id, marker);

@@ -247,7 +247,7 @@ export async function insertOrderWithItems(
   master: OrderMaster,
   clientId: string,
   items: number[],
-  options: { zoneId?: string; volumeL?: number } = {},
+  options: { zoneId?: string; volumeL?: number; methods?: string[] } = {},
 ): Promise<{ id: string; code: string; itemIds: string[] }> {
   const id = randomUUID();
   const code = (await tx.query<{ n: string }>(`select public.next_doc_number('CMD', 2026, 5) as n`)).rows[0]
@@ -274,8 +274,8 @@ export async function insertOrderWithItems(
     itemIds.push(itemId);
     await tx.query(
       `insert into payment_plan_item (id, order_id, seq, direction, method, due_date, amount_centimes, created_by)
-       values ($1, $2, $3, 'in', 'cheque', $4, $5, $6)`,
-      [itemId, id, n + 1, `2026-07-0${n + 1}`, amount, actorId],
+       values ($1, $2, $3, 'in', $7, $4, $5, $6)`,
+      [itemId, id, n + 1, `2026-07-0${n + 1}`, amount, actorId, options.methods?.[n] ?? 'cheque'],
     );
   }
   return { id, code, itemIds };
@@ -514,6 +514,12 @@ export async function insertInvoice(
     ?.n as string;
   const ht = Math.round((78_000 * volumeL) / 1000);
   const vat = Math.round((ht * 2000) / 10_000);
+  // Only a delivered load is billed (D97): the fixture's load is delivered if nobody did it yet.
+  await tx.query(
+    `insert into delivery_delivered (id, delivery_id, at, trip_event_id, created_by)
+     values (gen_random_uuid(), $1, now(), null, $2) on conflict (delivery_id) do nothing`,
+    [delivery.id, actorId],
+  );
   await tx.query(
     `insert into invoice (id, number, order_id, client_id, client_name, invoice_date, issue_deadline, due_date, vat_rate_bp,
                           total_ht_centimes, total_vat_centimes, total_ttc_centimes, created_by)
@@ -547,4 +553,67 @@ export async function insertQuote(
     [id, code, master.clientId, master.typeId, master.sellingPriceId, master.unitPriceCentimes, actorId],
   );
   return { id, code };
+}
+
+/**
+ * A client who paid an advance on an order (the first plan item, method `advance`, covered by a cheque) and had a load of
+ * `loadL` litres delivered; the invoice is made from that load by the database function, as the owner. Run it inside the
+ * owner's transaction. The client is named `adv<marker>`.
+ */
+export async function newAdvanceInvoice(
+  tx: pg.PoolClient,
+  ownerId: string,
+  master: OrderMaster,
+  scene: Pick<DeliveryScene, 'truckId' | 'recetteId'>,
+  marker: string,
+  options: { advanceCentimes?: number; loadL?: number; today?: string } = {},
+): Promise<{
+  number: string | null;
+  clientId: string;
+  orderId: string;
+  deliveryId: string;
+  advanceCentimes: number;
+}> {
+  const advance = Math.min(options.advanceCentimes ?? 280_800, 936_000);
+  const client = await tx.query<{ id: string }>(
+    `insert into client (id, code, name, kind) values (gen_random_uuid(), public.next_code('CLT', 3), $1, 'person') returning id`,
+    [`adv${marker}`],
+  );
+  const clientId = client.rows[0]?.id as string;
+  const whole = advance >= 936_000;
+  const order = await insertOrderWithItems(
+    tx,
+    ownerId,
+    master,
+    clientId,
+    whole ? [936_000] : [advance, 936_000 - advance],
+    { methods: ['advance', 'installment'] },
+  );
+  const instrument = await insertInstrument(tx, ownerId, { clientId, amountCentimes: advance });
+  await tx.query(
+    `insert into allocation (id, instrument_id, payment_plan_item_id, amount_centimes, created_by) values (gen_random_uuid(), $1, $2, $3, $4)`,
+    [instrument.id, order.itemIds[0], advance, ownerId],
+  );
+  const delivery = await insertDelivery(
+    tx,
+    ownerId,
+    { ...scene, orderId: order.id },
+    options.loadL ?? 6000,
+    2026,
+  );
+  await tx.query(
+    `insert into delivery_delivered (id, delivery_id, at, trip_event_id, created_by) values (gen_random_uuid(), $1, now(), null, $2)`,
+    [delivery.id, ownerId],
+  );
+  const made = await tx.query<{ n: string | null }>(
+    `select public.create_invoice_from_deliveries(ARRAY[$1]::uuid[], null, $2::date) as n`,
+    [delivery.id, options.today ?? '2026-06-10'],
+  );
+  return {
+    number: made.rows[0]?.n ?? null,
+    clientId,
+    orderId: order.id,
+    deliveryId: delivery.id,
+    advanceCentimes: advance,
+  };
 }

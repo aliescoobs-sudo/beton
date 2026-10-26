@@ -52,7 +52,7 @@ BEGIN
                            'payment_plan_item', 'payment_instrument', 'instrument_event', 'allocation', 'purchase',
                            'purchase_line', 'purchase_plan_item', 'stock_threshold', 'invoice', 'invoice_line', 'delivery', 'delivery_return', 'stock_movement',
                            'company_profile', 'quote', 'driver', 'trip_plan', 'trip_event', 'fuel_fill', 'fuel_purchase',
-                           'delivery_loss'] LOOP
+                           'delivery_loss', 'delivery_delivered'] LOOP
     EXECUTE format('GRANT SELECT, INSERT ON public.%I TO belgobeton_seed', t);
     EXECUTE format('DROP POLICY IF EXISTS seed_read ON public.%I', t);
     EXECUTE format('CREATE POLICY seed_read ON public.%I FOR SELECT TO belgobeton_seed USING (ctx.role() = ''system'')', t);

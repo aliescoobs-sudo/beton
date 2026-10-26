@@ -5,7 +5,8 @@ import { err, ok, type Result } from '@/lib/result';
 import { can, inRequest, isMalformedId, require, type SessionUser } from '@/modules/platform-security';
 import { type Effect, visibleEffects } from '../domain/effects';
 import { invoiceDueDate, type InvoiceInput, parseInvoiceInput } from '../domain/invoice';
-import { type InvoicePayment, type InvoicePaymentState, settleInvoices } from '../domain/invoice-payment';
+import { groupInvoiceLines, type InvoiceGroup, netToPay } from '../domain/invoice-groups';
+import { type InvoicePayment, type InvoicePaymentState, invoicePayment } from '../domain/invoice-payment';
 import { nextDocNumber } from './doc-number';
 
 export type InvoiceError =
@@ -79,10 +80,18 @@ export async function insertInvoiceRows(
   due: string,
   today: string,
 ): Promise<Result<CreatedInvoice, InvoiceError>> {
-  const made = await tx.query<{ number: string | null }>(
-    'select public.create_invoice($1, $2, $3, $4) as number',
-    [v.orderCode, v.deliveryIds ?? null, due, today],
-  );
+  // By the BLs of one client (the queue), or by the code of an order (office types what is printed): one door each.
+  const made = v.orderCode
+    ? await tx.query<{ number: string | null }>('select public.create_invoice($1, $2, $3, $4) as number', [
+        v.orderCode,
+        v.deliveryIds ?? null,
+        due,
+        today,
+      ])
+    : await tx.query<{ number: string | null }>(
+        'select public.create_invoice_from_deliveries($1, $2, $3) as number',
+        [v.deliveryIds, due, today],
+      );
   const number = made.rows[0]?.number;
   if (!number) return err('NOTHING_TO_INVOICE');
   const effects: Effect[] = [{ kind: 'document', document: 'invoice', code: number }];
@@ -191,7 +200,8 @@ export async function insertCreditNoteRows(
 export interface InvoiceView {
   id: string;
   number: string;
-  orderCode: string;
+  /** The orders it bills (one or several), from its lines. */
+  orderCodes: string[];
   clientId: string;
   clientName: string;
   clientIce: string | null;
@@ -213,44 +223,15 @@ export interface InvoiceView {
 }
 
 /**
- * The payment state of every live invoice (not a credit note, not cancelled): what each order's covered plan items pay,
- * oldest invoice first. Derived on every read, never stored.
+ * The payment state of every live invoice (not a credit note, not cancelled), derived by the database on every read, never
+ * stored: what the client paid on each order covers the live invoices that bill it, oldest due date first
+ * (`public.invoice_payment_state()`, owner and support only).
  */
 export async function loadInvoicePayments(tx: pg.PoolClient): Promise<Map<string, InvoicePayment>> {
-  const invoices = await tx.query<{
-    id: string;
-    order_id: string;
-    number: string;
-    date: string;
-    total: string;
-  }>(
-    `select i.id, i.order_id, i.number, to_char(i.invoice_date, 'YYYY-MM-DD') as date, i.total_ttc_centimes::text as total
-       from invoice i
-      where i.credit_note_of is null and not exists (select 1 from invoice c where c.credit_note_of = i.id)`,
+  const { rows } = await tx.query<{ invoice_id: string; total: string; paid: string }>(
+    `select invoice_id, total_ttc_centimes::text as total, paid_centimes::text as paid from public.invoice_payment_state()`,
   );
-  const covered = await tx.query<{ order_id: string; covered: string }>(
-    `select p.order_id, coalesce(sum(a.amount_centimes), 0)::text as covered
-       from payment_plan_item p join allocation a on a.payment_plan_item_id = p.id
-      where p.order_id = any($1) group by p.order_id`,
-    [[...new Set(invoices.rows.map((i) => i.order_id))]],
-  );
-  const coveredOf = new Map(covered.rows.map((r) => [r.order_id, Number(r.covered)] as const));
-  const byOrder = new Map<string, typeof invoices.rows>();
-  for (const i of invoices.rows) byOrder.set(i.order_id, [...(byOrder.get(i.order_id) ?? []), i]);
-  const out = new Map<string, InvoicePayment>();
-  for (const [orderId, list] of byOrder) {
-    const settled = settleInvoices(
-      list.map((i) => ({
-        id: i.id,
-        date: i.date,
-        number: i.number,
-        totalTtcCentimes: centimes(Number(i.total)),
-      })),
-      coveredOf.get(orderId) ?? 0,
-    );
-    for (const [id, p] of settled) out.set(id, p);
-  }
-  return out;
+  return new Map(rows.map((r) => [r.invoice_id, invoicePayment(Number(r.total), Number(r.paid))] as const));
 }
 
 /** Invoices and credit notes, newest first. Owner and support only (money). */
@@ -261,7 +242,7 @@ export async function listInvoices(appPool: pg.Pool, actor: SessionUser): Promis
     const result = await tx.query<{
       id: string;
       number: string;
-      order_code: string;
+      order_codes: string[];
       client_id: string;
       client_name: string;
       client_ice: string | null;
@@ -276,12 +257,15 @@ export async function listInvoices(appPool: pg.Pool, actor: SessionUser): Promis
       cancelled: boolean;
       reason: string | null;
     }>(
-      `select i.id, i.number, o.code as order_code, i.client_id, i.client_name, i.client_ice,
+      `select i.id, i.number,
+              array(select distinct o.code from invoice_line l join delivery d on d.id = l.delivery_id
+                      join sales_order o on o.id = d.order_id where l.invoice_id = i.id order by 1) as order_codes,
+              i.client_id, i.client_name, i.client_ice,
               to_char(i.invoice_date, 'YYYY-MM-DD') as invoice_date, to_char(i.issue_deadline, 'YYYY-MM-DD') as issue_deadline,
               to_char(i.due_date, 'YYYY-MM-DD') as due_date, i.vat_rate_bp, i.total_ht_centimes::text as total_ht,
               i.total_vat_centimes::text as total_vat, i.total_ttc_centimes::text as total_ttc, i.credit_note_of,
               exists (select 1 from invoice c where c.credit_note_of = i.id) as cancelled, i.reason
-         from invoice i join sales_order o on o.id = i.order_id
+         from invoice i
         order by i.invoice_date desc, i.number desc`,
     );
     return { rows: result.rows, payments };
@@ -289,7 +273,7 @@ export async function listInvoices(appPool: pg.Pool, actor: SessionUser): Promis
   return rows.map((r) => ({
     id: r.id,
     number: r.number,
-    orderCode: r.order_code,
+    orderCodes: r.order_codes,
     clientId: r.client_id,
     clientName: r.client_name,
     clientIce: r.client_ice,
@@ -319,6 +303,12 @@ export interface InvoiceDocument {
     unitPriceHtCentimes: number;
     lineHtCentimes: number;
   }[];
+  /** The lines as the document shows them: one per product and price, the quantity summed, the BL numbers listed. */
+  groups: InvoiceGroup[];
+  /** "Acompte reçu": advances the client paid on these orders, applied when the invoice was made; 0 on a credit note. */
+  advanceCentimes: number;
+  /** "Net à payer": the total minus the advance. */
+  netToPayCentimes: number;
   /** Whole days from the invoice date to the due date (the law 69-21 term printed on the document). */
   termDays: number;
 }
@@ -343,11 +333,24 @@ export async function getInvoiceDocument(
         volume_l: number;
         price: string;
         total: string;
+        bl_no: string;
+        type_code: string;
+        type_label: string;
       }>(
-        `select seq, description, volume_l, unit_price_ht_centimes::text as price, line_ht_centimes::text as total
-           from invoice_line where invoice_id = $1 order by seq`,
+        `select l.seq, l.description, l.volume_l, l.unit_price_ht_centimes::text as price, l.line_ht_centimes::text as total,
+                d.bl_no, t.code as type_code, t.label as type_label
+           from invoice_line l
+           join delivery d on d.id = l.delivery_id
+           join sales_order o on o.id = d.order_id
+           join concrete_type t on t.id = o.concrete_type_id
+          where l.invoice_id = $1 order by l.seq`,
         [invoiceId],
       );
+      const advance = await tx.query<{ amount: string }>(
+        `select coalesce(sum(amount_centimes), 0)::text as amount from invoice_advance where invoice_id = $1`,
+        [invoiceId],
+      );
+      const advanceCentimes = Number(advance.rows[0]?.amount ?? 0);
       const meta = await tx.query<{ credited: string | null; term: number }>(
         `select (select o.number from invoice o where o.id = i.credit_note_of) as credited, (i.due_date - i.invoice_date) as term
            from invoice i where i.id = $1`,
@@ -357,6 +360,18 @@ export async function getInvoiceDocument(
         invoice,
         creditNoteOfNumber: meta.rows[0]?.credited ?? null,
         termDays: Number(meta.rows[0]?.term ?? 0),
+        groups: groupInvoiceLines(
+          lines.rows.map((l) => ({
+            blNo: l.bl_no,
+            typeCode: l.type_code,
+            typeLabel: l.type_label,
+            volumeL: l.volume_l,
+            unitPriceHtCentimes: Number(l.price),
+            lineHtCentimes: Number(l.total),
+          })),
+        ),
+        advanceCentimes,
+        netToPayCentimes: netToPay(invoice.totalTtcCentimes, advanceCentimes),
         lines: lines.rows.map((l) => ({
           seq: l.seq,
           description: l.description,

@@ -11,7 +11,7 @@ import {
   legalDeadlines,
   listInvoices,
 } from '../src/modules/ledger';
-import { createLoad } from '../src/modules/operations';
+import { createLoad, markDelivered } from '../src/modules/operations';
 import type { SessionUser } from '../src/modules/platform-security/auth/session-gate';
 import { testEnv } from './db-env';
 import { realSessionUser } from './helpers/actors';
@@ -59,6 +59,14 @@ async function orderWithLoads(volumesL: number[]) {
       { today: LOAD_DAY },
     );
     if (!l.ok) throw new Error(l.error);
+    // Only a delivered load is billed (D97).
+    const d = await markDelivered(
+      app,
+      users.plant,
+      { deliveryId: l.value.id },
+      { now: new Date(`${LOAD_DAY}T10:00:00Z`) },
+    );
+    if (!d.ok) throw new Error(d.error);
     ids.push(l.value.id);
   }
   return { order, ids, ice };

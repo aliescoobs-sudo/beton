@@ -50,17 +50,14 @@ export function BlReturnButton({
     <form onSubmit={submit} className="inline-flex flex-col gap-1">
       <input type="hidden" name="deliveryId" value={deliveryId} />
       <input type="hidden" name="returnedOn" value={today} />
-      <label className="text-sm">
-        <span className="sr-only">{t('scanLabel')}</span>
-        <input
-          type="file"
-          name="file"
-          accept={ACCEPT}
-          aria-label={t('scanLabel')}
-          data-testid={`bl-file-${blNo}`}
-          className="max-w-48 text-sm"
-        />
-      </label>
+      <input
+        type="file"
+        name="file"
+        accept={ACCEPT}
+        aria-label={t('scanLabel')}
+        data-testid={`bl-file-${blNo}`}
+        className="max-w-48 text-sm"
+      />
       <Button type="submit" variant="secondary" disabled={pending} data-testid={`bl-return-${blNo}`}>
         {t('markReturned')}
       </Button>

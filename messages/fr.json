@@ -1056,7 +1056,10 @@
       "totalHt": "Total HT",
       "vat": "TVA",
       "totalTtc": "Total TTC",
-      "terms": "Conditions de paiement : {days, plural, one {# jour} other {# jours}} à compter de la date de facture, conformément à la loi n° 69-21 (60 jours par défaut, 120 jours au plus)."
+      "terms": "Conditions de paiement : {days, plural, one {# jour} other {# jours}} à compter de la date de facture, conformément à la loi n° 69-21 (60 jours par défaut, 120 jours au plus).",
+      "blNumbers": "BL",
+      "advanceReceived": "Acompte reçu",
+      "netToPay": "Net à payer"
     },
     "accounting": {
       "link": "Export comptable",
@@ -1135,7 +1138,11 @@
       "delivered": "Livré le",
       "product": "Béton",
       "volume": "Volume",
-      "amountHt": "Montant HT"
+      "amountHt": "Montant HT",
+      "selectAll": "Tout sélectionner",
+      "dueDate": "Échéance (facultatif)",
+      "invoiceSelection": "Facturer la sélection ({count})",
+      "refused": "Facture refusée : choisissez des BL livrés, non facturés, d'un seul client."
     }
   },
   "operations": {

@@ -3,7 +3,7 @@ import pg from 'pg';
 import { E2E_DATABASE } from '../scripts/db-bootstrap';
 import { testEnv } from '../tests/db-env';
 import { realSessionUser } from '../tests/helpers/actors';
-import { createLoad } from '../src/modules/operations';
+import { createLoad, markDelivered } from '../src/modules/operations';
 import { goNav, loginOwner } from './fixtures';
 
 // ledger L29 + L30 + L19 + L32: our legal identity on the documents, the invoice as a printable document (print audited),
@@ -59,6 +59,8 @@ test('the owner enters the legal identity, invoices a delivered order, prints it
     { today: new Date().toISOString().slice(0, 10) },
   );
   expect(load.ok).toBe(true);
+  // Only a delivered load is billed.
+  if (load.ok) await markDelivered(app, plant, { deliveryId: load.value.id }, { now: new Date() });
   await page.goto('/fr/invoices/new');
   await page.getByTestId('invoice-order-code').fill(code);
   await page.getByTestId('invoice-save').click();

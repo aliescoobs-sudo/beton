@@ -53,7 +53,7 @@ export default async function InvoicesPage({ params }: { params: Promise<{ local
                   </a>
                 </Td>
                 <Td>
-                  <bdi dir="ltr">{i.orderCode}</bdi>
+                  <bdi dir="ltr">{i.orderCodes.join(', ')}</bdi>
                 </Td>
                 <Td>
                   {i.clientName}

@@ -137,6 +137,6 @@ export {
   INVOICE_PAYMENT_STATES,
   type InvoicePayment,
   type InvoicePaymentState,
-  type InvoiceToSettle,
-  settleInvoices,
+  invoicePayment,
 } from './invoice-payment';
+export { groupInvoiceLines, type InvoiceGroup, type InvoiceLineFact, netToPay } from './invoice-groups';

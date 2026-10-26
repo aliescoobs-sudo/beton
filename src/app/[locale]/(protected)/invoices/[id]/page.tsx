@@ -84,7 +84,7 @@ export default async function InvoiceDocumentPage({
           <div>
             <dt className="field-label">{t('order')}</dt>
             <dd>
-              <bdi dir="ltr">{i.orderCode}</bdi>
+              <bdi dir="ltr">{i.orderCodes.join(', ')}</bdi>
             </dd>
           </div>
           <div>
@@ -129,17 +129,26 @@ export default async function InvoiceDocumentPage({
             </tr>
           </thead>
           <tbody>
-            {doc.lines.map((l) => (
-              <tr key={l.seq}>
+            {doc.groups.map((g) => (
+              <tr key={`${g.typeCode}-${g.unitPriceHtCentimes}`} data-testid={`invoice-group-${g.typeCode}`}>
                 <Td>
-                  <bdi dir="ltr">{l.description}</bdi>
+                  <bdi dir="ltr">
+                    {g.typeCode} · {g.typeLabel}
+                  </bdi>
+                  <br />
+                  <span className="text-sm text-muted">
+                    {t('blNumbers')} :{' '}
+                    <bdi dir="ltr" data-testid="invoice-group-bls">
+                      {g.blNos.join(', ')}
+                    </bdi>
+                  </span>
                 </Td>
-                <Td numeric>{formatM3(l.volumeL)} m³</Td>
+                <Td numeric>{formatM3(g.volumeL)} m³</Td>
                 <Td numeric>
-                  <Money centimes={l.unitPriceHtCentimes} />
+                  <Money centimes={g.unitPriceHtCentimes} />
                 </Td>
                 <Td numeric>
-                  <Money centimes={l.lineHtCentimes} />
+                  <Money centimes={g.amountHtCentimes} />
                 </Td>
               </tr>
             ))}
@@ -163,6 +172,18 @@ export default async function InvoiceDocumentPage({
           <dd className="text-end font-bold">
             <Money centimes={i.totalTtcCentimes} />
           </dd>
+          {doc.advanceCentimes > 0 && (
+            <>
+              <dt data-testid="invoice-advance-label">{t('advanceReceived')}</dt>
+              <dd className="text-end" data-testid="invoice-advance">
+                − <Money centimes={doc.advanceCentimes} />
+              </dd>
+              <dt className="font-bold">{t('netToPay')}</dt>
+              <dd className="text-end font-bold" data-testid="invoice-net">
+                <Money centimes={doc.netToPayCentimes} />
+              </dd>
+            </>
+          )}
         </dl>
         <p className="text-sm" data-testid="invoice-terms">
           {t('terms', { days: doc.termDays })}

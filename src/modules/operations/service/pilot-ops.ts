@@ -103,6 +103,14 @@ async function seedLoads(tx: Tx, today: string, rng: Rng): Promise<{ loads: numb
         loadedAt,
       });
       loads += 1;
+      // A load older than the tracked fortnight was delivered, 100 minutes after it left; the tracked rotations of the last
+      // fortnight (second wave) deliver theirs through their unloading step.
+      if (o.delivery_date < addDaysIso(today, -14)) {
+        await tx.query(
+          `insert into delivery_delivered (id, delivery_id, at, trip_event_id, created_by) values ($1, $2, $3::timestamptz + interval '100 minutes', null, $4)`,
+          [randomUUID(), load.id, loadedAt, SYSTEM_ACTOR_ID],
+        );
+      }
       // The signed delivery note comes back within a day or two for most loads older than two days.
       if (o.delivery_date <= addDaysIso(today, -2) && rng.next() < 0.92) {
         const back = addDaysIso(o.delivery_date, rng.int(0, 1));
@@ -334,6 +342,7 @@ async function seedInvoices(tx: Tx, today: string, rng: Rng): Promise<number> {
         where o.reverses_id is null
         group by o.id, o.code, o.volume_l
        having sum(d.volume_l) = o.volume_l and max(d.load_date) <= $1::date - 4
+          and bool_and(exists (select 1 from delivery_delivered g where g.delivery_id = d.id))
         order by max(d.load_date), o.code`,
       [today],
     )

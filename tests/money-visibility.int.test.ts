@@ -20,6 +20,7 @@ import {
   insertPurchase,
   insertQuote,
   moneyMaster,
+  newAdvanceInvoice,
   newCashMovement,
   orderMaster,
   purchaseMaster,
@@ -162,6 +163,13 @@ const SEED: Record<MoneyTable, (tx: pg.PoolClient, actor: string) => Promise<unk
     const scene = await deliveryScene(app, actors.owner.id, marker);
     const delivery = await newDelivery(app, actors.owner.id, marker, scene, 50, 2098);
     return insertInvoice(tx, actor, scene, delivery, `dl${marker}`);
+  },
+  // The advance an invoice applies is written by the invoicing function: each writer pays an advance and invoices a load.
+  invoice_advance: async (tx, actor) => {
+    const scene = await deliveryScene(app, actors.owner.id, marker);
+    const master = await orderMaster(app, actors.owner.id, marker);
+    const made = await newAdvanceInvoice(tx, actor, master, scene, marker);
+    if (!made.number) throw new Error('the advance invoice was refused');
   },
   selling_price: async (tx, actor) => {
     const type = await tx.query<{ id: string }>(

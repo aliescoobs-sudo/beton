@@ -4,7 +4,9 @@ import { getInvoiceQueue } from '@/modules/ledger';
 import { formatM3 } from '@/modules/operations/ui/format';
 import { can, recordMoneyView } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/next';
-import { EmptyState, Money, PageHeader, Table, Td, Th } from '@/ui';
+import { QueueSelection } from '@/modules/ledger/ui/invoices/queue-selection';
+import { EmptyState, Money, PageHeader } from '@/ui';
+import { createInvoiceAction } from '../actions';
 
 /**
  * Delivered, not invoiced: the loads waiting to be billed, per client. Owner and support also see what each comes to; office
@@ -16,6 +18,7 @@ export default async function InvoiceQueuePage({ params }: { params: Promise<{ l
   const user = await requirePagePermission(locale, 'invoices.queue');
   const pool = getPool('app');
   const withMoney = can(user.role, 'invoices.read');
+  const canInvoice = can(user.role, 'invoices.write');
   if (withMoney) await recordMoneyView(pool, user, 'screen:invoice-queue');
   const clients = await getInvoiceQueue(pool, user);
   const t = await getTranslations('ledger.invoiceQueue');
@@ -44,42 +47,22 @@ export default async function InvoiceQueuePage({ params }: { params: Promise<{ l
                 </>
               )}
             </p>
-            <Table data-testid={`queue-list-${c.clientCode}`}>
-              <thead>
-                <tr>
-                  <Th>{t('bl')}</Th>
-                  <Th>{t('delivered')}</Th>
-                  <Th>{t('product')}</Th>
-                  <Th numeric>{t('volume')}</Th>
-                  {c.money && <Th numeric>{t('amountHt')}</Th>}
-                </tr>
-              </thead>
-              <tbody>
-                {c.deliveries.map((d) => (
-                  <tr key={d.deliveryId} data-testid={`queue-row-${d.blNo}`}>
-                    <Td>
-                      <a href={`/${locale}/deliveries/${d.deliveryId}`} className="underline">
-                        <bdi dir="ltr">{d.blNo}</bdi>
-                      </a>
-                    </Td>
-                    <Td>
-                      <bdi dir="ltr">{d.deliveredAt.slice(0, 10)}</bdi>
-                    </Td>
-                    <Td>
-                      <bdi dir="ltr">{d.typeCode}</bdi> · {d.typeLabel}
-                    </Td>
-                    <Td numeric>
-                      <bdi dir="ltr">{formatM3(d.volumeL)} m³</bdi>
-                    </Td>
-                    {c.money && (
-                      <Td numeric>
-                        {d.amountHtCentimes !== undefined && <Money centimes={d.amountHtCentimes} />}
-                      </Td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
+            <QueueSelection
+              clientCode={c.clientCode}
+              withAmounts={Boolean(c.money)}
+              canInvoice={canInvoice}
+              createAction={createInvoiceAction}
+              rows={c.deliveries.map((d) => ({
+                id: d.deliveryId,
+                blNo: d.blNo,
+                noteHref: `/${locale}/deliveries/${d.deliveryId}`,
+                deliveredOn: d.deliveredAt.slice(0, 10),
+                typeCode: d.typeCode,
+                typeLabel: d.typeLabel,
+                volumeLabel: `${formatM3(d.volumeL)} m³`,
+                ...(d.amountHtCentimes !== undefined ? { amountHtCentimes: d.amountHtCentimes } : {}),
+              }))}
+            />
           </section>
         ))
       )}

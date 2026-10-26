@@ -57,8 +57,9 @@ export async function listOrders(
                           from payment_plan_item i
                          where i.order_id = o.id and i.reverses_id is null and i.due_date < $1::date
                            and i.amount_centimes > coalesce((select sum(a.amount_centimes) from allocation a where a.payment_plan_item_id = i.id), 0)), 0)::text as overdue,
-              exists (select 1 from invoice v where v.order_id = o.id and v.credit_note_of is null
-                        and not exists (select 1 from invoice cn where cn.credit_note_of = v.id)) as invoiced,
+              exists (select 1 from invoice_line l join invoice v on v.id = l.invoice_id join delivery d on d.id = l.delivery_id
+                       where d.order_id = o.id and v.credit_note_of is null
+                         and not exists (select 1 from invoice cn where cn.credit_note_of = v.id)) as invoiced,
               exists (select 1 from sales_order r where r.reverses_id = o.id) as cancelled
          from sales_order o
          join client c on c.id = o.client_id
@@ -157,7 +158,9 @@ export async function getOrderDetail(
       );
       const invoices = await tx.query<{ number: string; date: string; total: string; credit: boolean }>(
         `select number, to_char(invoice_date, 'YYYY-MM-DD') as date, total_ttc_centimes::text as total,
-                (credit_note_of is not null) as credit from invoice where order_id = $1 order by invoice_date, number`,
+                (credit_note_of is not null) as credit from invoice
+                 where id in (select l.invoice_id from invoice_line l join delivery d on d.id = l.delivery_id where d.order_id = $1)
+                 order by invoice_date, number`,
         [orderId],
       );
       const payments = await tx.query<{

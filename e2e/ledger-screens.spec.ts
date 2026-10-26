@@ -12,6 +12,7 @@ const SCREENS = [
   'orders/new',
   'invoices',
   'invoices/new',
+  'invoices/queue',
   'purchases',
   'purchases/new',
   'deadlines',

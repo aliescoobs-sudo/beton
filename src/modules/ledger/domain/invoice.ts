@@ -60,13 +60,18 @@ export function computeInvoiceTotals(
   return ok({ lineHt, totalHt, totalVat, totalTtc: addCentimes(totalHt, totalVat) });
 }
 
-const invoiceSchema = z.object({
-  /** The code of the order (CMD-2026-00012): office cannot read orders, so it names the order the way it is printed. */
-  orderCode: z.string().regex(/^CMD-\d{4}-\d{5,}$/),
-  /** The loads to invoice; every uninvoiced load of the order when absent. */
-  deliveryIds: z.array(z.uuid()).min(1).max(200).nullish(),
-  dueDate: z.string().refine(isRealDate, 'date').nullish(),
-});
+const invoiceSchema = z
+  .object({
+    /** The code of the order (CMD-2026-00012): office cannot read orders, so it names the order the way it is printed. */
+    orderCode: z
+      .string()
+      .regex(/^CMD-\d{4}-\d{5,}$/)
+      .nullish(),
+    /** The loads to invoice: the selected BLs of one client; with an order code, only those of that order (all when absent). */
+    deliveryIds: z.array(z.uuid()).min(1).max(200).nullish(),
+    dueDate: z.string().refine(isRealDate, 'date').nullish(),
+  })
+  .refine((v) => Boolean(v.orderCode) || Boolean(v.deliveryIds), 'an order code or BL ids');
 export type InvoiceInput = z.infer<typeof invoiceSchema>;
 
 export function parseInvoiceInput(input: unknown): Result<InvoiceInput, 'INVALID'> {

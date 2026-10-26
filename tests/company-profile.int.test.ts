@@ -12,7 +12,7 @@ import {
   listInvoices,
   saveCompanyProfile,
 } from '../src/modules/ledger';
-import { createLoad } from '../src/modules/operations';
+import { createLoad, markDelivered } from '../src/modules/operations';
 import type { SessionUser } from '../src/modules/platform-security/auth/session-gate';
 import { testEnv } from './db-env';
 import { realSessionUser } from './helpers/actors';
@@ -130,6 +130,13 @@ describe('the invoice document equals the stored invoice (AC-LED-22)', () => {
       { today: '2026-06-10' },
     );
     if (!load.ok) throw new Error(load.error);
+    // Only a delivered load is billed (D97).
+    await markDelivered(
+      app,
+      users.plant,
+      { deliveryId: load.value.id },
+      { now: new Date('2026-06-10T10:00:00Z') },
+    );
     const made = await createInvoice(app, users.owner, { orderCode }, { today: '2026-07-03' });
     if (!made.ok) throw new Error(made.error);
     const stored = (await listInvoices(app, users.owner)).find((i) => i.id === made.value.id)!;
