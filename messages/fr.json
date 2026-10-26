@@ -1763,6 +1763,21 @@
       "total": "Total livré :",
       "note": "Quantités seulement : les montants sont réservés au propriétaire.",
       "noteMoney": "Montant HT = m³ × prix unitaire de la commande, arrondi une fois par chargement ; un chargement annulé retire son montant."
+    },
+    "officeDispatch": {
+      "link": "Où est mon camion",
+      "title": "Où est mon camion",
+      "intro": "Les rotations du jour en lecture seule : camion, horaires, volume, client et étape atteinte. Ni prix, ni montant.",
+      "date": "Jour",
+      "show": "Afficher",
+      "none": "Aucune rotation planifiée ce jour.",
+      "truck": "Camion",
+      "client": "Client",
+      "place": "Chantier",
+      "volume": "Volume",
+      "times": "Chargement → arrivée → retour",
+      "step": "Étape",
+      "planned": "Planifiée"
     }
   },
   "effects": {

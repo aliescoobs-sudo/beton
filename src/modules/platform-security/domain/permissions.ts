@@ -123,6 +123,8 @@ export const PERMISSIONS = {
   // Daily dispatch: the plan of the day's rotations (truck, driver, times); quantities and times only. Office is blind to orders.
   'dispatch.read': PLANT_READ,
   'dispatch.write': PLANT,
+  // Office's read-only view of the day's rotations: truck, times, litres, client name, the step reached. No price, no order.
+  'dispatch.read_office': ['office'],
   'drivers.write': MANAGERS,
   // Trip tracking: one tap per step of a rotation (the first one is the load, so the plant's rights); times and quantities only.
   'trips.read': PLANT_READ,

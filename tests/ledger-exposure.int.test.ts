@@ -80,6 +80,7 @@ describe('functions the application role can execute', () => {
     'public.create_quote(p_client uuid, p_type uuid, p_volume_l integer, p_valid_days integer, p_today date, p_vat_default integer)',
     'public.default_cash_account()',
     'public.delivery_note(p_delivery uuid)',
+    'public.dispatch_office(p_date date)',
     'public.invoice_payment_state()',
     'public.invoice_queue()',
     'public.issue_avoir(p_delivery uuid, p_reason text, p_today date)',

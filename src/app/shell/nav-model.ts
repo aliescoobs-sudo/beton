@@ -200,6 +200,12 @@ const GROUPS: GroupDef[] = [
         allowed: 'dispatch.read',
       },
       {
+        path: '/dispatch/office',
+        labelKey: 'operations.officeDispatch.link',
+        testId: 'dispatch-office-link',
+        allowed: 'dispatch.read_office',
+      },
+      {
         path: '/trips',
         labelKey: 'operations.trips.link',
         testId: 'trips-link',

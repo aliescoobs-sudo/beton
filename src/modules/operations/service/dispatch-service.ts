@@ -462,3 +462,79 @@ export async function setTruckDefaultDriver(
     throw error;
   }
 }
+
+/** One rotation as office sees it: where the truck is for a client. No price, no order number, no amount. */
+export interface OfficeRotation {
+  tripId: string;
+  seq: number;
+  truckCode: string;
+  truckPlate: string;
+  clientName: string;
+  siteLabel: string | null;
+  zoneName: string | null;
+  volumeL: number;
+  loadMin: number;
+  departMin: number;
+  arriveMin: number;
+  unloadEndMin: number;
+  backMin: number;
+  /** The last step recorded on the rotation; null while it is only planned. */
+  step: 'loaded' | 'departed' | 'arrived' | 'unloading_started' | 'unloading_finished' | 'back' | null;
+  blNo: string | null;
+}
+
+/**
+ * Office's read-only dispatch of a day (D91, AC-INT-21): one reviewed database function returns the rotations with the fields
+ * above and nothing else, because office reads neither the plan nor the orders. The same call works for the roles that read the plan.
+ */
+export async function getOfficeDispatch(
+  appPool: pg.Pool,
+  actor: SessionUser,
+  date: string,
+): Promise<Result<OfficeRotation[], 'INVALID'>> {
+  await require(appPool, actor, 'dispatch.read_office');
+  if (!isRealDate(date)) return err('INVALID');
+  const { rows } = await inRequest(appPool, actor, (tx) =>
+    tx.query<{
+      trip_id: string;
+      seq: number;
+      truck_code: string;
+      truck_plate: string;
+      client_name: string;
+      site_label: string | null;
+      zone_name: string | null;
+      volume_l: number;
+      load_min: number;
+      depart_min: number;
+      arrive_min: number;
+      unload_end_min: number;
+      back_min: number;
+      step: OfficeRotation['step'];
+      bl_no: string | null;
+    }>(
+      `select trip_id, seq, truck_code, truck_plate, client_name, site_label, zone_name, volume_l, load_min, depart_min,
+              arrive_min, unload_end_min, back_min, step, bl_no
+         from public.dispatch_office($1::date)`,
+      [date],
+    ),
+  );
+  return ok(
+    rows.map((r) => ({
+      tripId: r.trip_id,
+      seq: r.seq,
+      truckCode: r.truck_code,
+      truckPlate: r.truck_plate,
+      clientName: r.client_name,
+      siteLabel: r.site_label,
+      zoneName: r.zone_name,
+      volumeL: r.volume_l,
+      loadMin: r.load_min,
+      departMin: r.depart_min,
+      arriveMin: r.arrive_min,
+      unloadEndMin: r.unload_end_min,
+      backMin: r.back_min,
+      step: r.step,
+      blNo: r.bl_no,
+    })),
+  );
+}

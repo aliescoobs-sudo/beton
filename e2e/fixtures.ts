@@ -151,6 +151,7 @@ const NAV_GROUP: Record<string, string> = {
   'trucks-link': 'production',
   'loads-link': 'production',
   'dispatch-link': 'production',
+  'dispatch-office-link': 'production',
   'trips-link': 'production',
   'consumption-report-link': 'production',
   'fuel-link': 'production',

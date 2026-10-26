@@ -167,8 +167,36 @@ test('the plant reads and plans the day; the partner too; no money', async ({ pa
   await expect(page.locator('body')).not.toContainText(MONEY);
 });
 
-test('office has no dispatch page and no link', async ({ page }) => {
+test("office has no planning page and no link, but reads the day's rotations without any price (AC-INT-21)", async ({
+  page,
+}) => {
   await loginAndEnrol(page, 'fr', E2E_MD.dispOffice.email);
   await expect(page.getByTestId('dispatch-link')).toHaveCount(0);
   expect((await page.goto(`/fr/dispatch?date=${DAY}`))?.status()).toBe(404);
+
+  await page.goto('/fr');
+  await goNav(page, 'dispatch-office-link');
+  await page.goto(`/fr/dispatch/office?date=${DAY}`);
+  await expect(page.getByTestId('office-dispatch')).toBeVisible();
+  await expect(page.locator('[data-testid^="office-rotation-"]').first()).toContainText('m³');
+  await expect(page.getByTestId('office-dispatch')).toContainText('Planifiée');
+  await expect(page.locator('body')).not.toContainText(MONEY);
+  await expect(page.getByTestId('dispatch-save')).toHaveCount(0);
+  await expect(page.getByTestId('dispatch-board')).toHaveCount(0);
+
+  // a day with nothing planned says so
+  await page.goto('/fr/dispatch/office?date=2099-12-30');
+  await expect(page.getByTestId('office-dispatch-none')).toBeVisible();
+
+  // Arabic: right-to-left, codes and times left-to-right
+  await page.goto(`/ar/dispatch/office?date=${DAY}`);
+  await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+  await expect(page.getByTestId('office-dispatch').locator('bdi[dir="ltr"]').first()).toBeVisible();
+  await logout(page);
+});
+
+test('the plant and the owner have no office view', async ({ page }) => {
+  await loginOwner(page, 'fr');
+  expect((await page.goto(`/fr/dispatch/office?date=${DAY}`))?.status()).toBe(404);
+  await expect(page.getByTestId('dispatch-office-link')).toHaveCount(0);
 });
