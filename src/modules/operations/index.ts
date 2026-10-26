@@ -98,4 +98,5 @@ export {
 } from './service/fuel-service';
 export { getVolumeAnalytics, type VolumeAnalytics } from './service/analytics-service';
 export { seedOperationsWave2, type Wave2Result } from './service/pilot-ops2';
+export { type IntegrationScenarioResult, seedIntegrationScenario } from './service/pilot-integration';
 export { deliveryNotePdf } from './pdf/delivery-note-pdf';

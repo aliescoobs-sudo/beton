@@ -1,9 +1,8 @@
 # Demo: what is ready to show, and where
 
-Updated 2026-10-25 (rules engine, owner dashboard and the operations second wave added: dispatch, trip tracking, consumption, cover, fuel, refused loads, sales volumes; the demo itself is postponed). Everything below is on the **dev database**, fake data only (the amber band
-says so). It was prepared tonight: all migrations applied (63), `db:seed` re-run, `db:scenario` run (it now also seeds the operations second wave), the audit
-chain verified (9 364 events), the single user and its 2FA untouched. A fresh `pnpm dev` is running on http://127.0.0.1:3000 (if it is not,
-stop any old one and run `pnpm dev` again: the stale-server problem was a server started before the last migrations).
+Updated 2026-10-26 (the integration wave: documents flow without re-typing, from the rotation to the paid invoice and from the purchase order to the paid supplier invoice; the demo itself is postponed). Everything below is on the **dev database**, fake data only (the amber band
+says so). Migrations applied: 75, `db:seed` re-run, `db:scenario` run (it now also walks the two chains below), the audit
+chain verified (9 492 events), the single user and its 2FA untouched. If the dev server was started before the last migrations, stop it and run `pnpm dev` again.
 
 **Sign in** at `/fr/login` with your owner account and authenticator. `/ar/…` is the same site in Arabic (right-to-left).
 **The simulated clock is on 1 November 2026, 07:00** (a Sunday): the data is dated around it (opening 1 August, about three
@@ -21,6 +20,10 @@ the 15/25 gravel; 32 fuel fills with the odometer and 3 fuel purchases; 5 refuse
 times (cement 3 days, aggregates 2, admixture 4). The 15/25 gravel is now short in two days: the cover screen suggests a
 reorder.
 
+**The integration walk** (new, same dev data; `db:scenario` is idempotent and adds it once):
+- *Sales chain* for the client **Chantier Intégration (fictif)** (CLT-026): three orders (CMD-2026-00100 to 00102, 16, 8 and 8 m³). The 16 m³ one is planned in two rotations on 22 October: the first on its truck's **default driver**, the second **overridden with a reason**. Both are tracked to the end, so the unloading step **delivers** their BLs (BL-2026-00631, 00632); the other two BLs (00633, 00634) went out without a rotation and were marked delivered by hand. Signed BLs are back for two of the four. One **invoice from three BLs of two orders** (FA-2026-00087, with the 50 % **advance** applied: "Acompte reçu" 8 160,00, "Net à payer") and a second from the fourth BL (FA-2026-00088). A first cheque is **allocated oldest due first** (it clears the first invoice and puts 3 000,00 on the second), a second cheque for the rest **bounces**: its allocations are reversed, the second invoice is open again, the 30-day window to regularize runs to 30 November. The **client statement** shows all of it.
+- *Purchase chain*: purchase order ACH-2026-00083 (30 units of cement), **partial receipt** (18 of 30), the supplier's invoice FS-DEMO-0001 (our code FF-2026-00001) for all 30 at 3 % above our price: the **match flags** the quantity beyond what was received and the price, the owner **accepts the gaps with a reason**, **approves** it (the payable is created from the invoice, not from the order), and a transfer **pays** it, allocated to the invoice.
+
 ## Screens ready, with their path (menu group in brackets)
 | Screen | Path | What to show |
 |---|---|---|
@@ -36,6 +39,16 @@ reorder.
 | Béton perdu | `/fr/loads` (Production) | on each load, "Béton refusé ou rapporté": reason and m³, once; counted in the consumption report |
 | Aujourd'hui (office, plant, partner) | `/fr` | no money at all: loads to make and stock alerts |
 | Clients, suppliers, prices, recettes, trucks, zones, components | `/fr/master-data/…` (Données de base, Ventes, Achats, Production) | master data with archive and price history |
+| À facturer | `/fr/invoices/queue` (Ventes) | delivered BLs not yet invoiced, per client; tick some BLs, "Facturer" makes one invoice (grouped by product with the BL numbers, advance and net to pay); office sees BL numbers, dates, m³ and product, never an amount |
+| Livraison et BL signé | `/fr/loads`, delivery note `/fr/deliveries/<id>` (Production) | "Marquer livré" for a load outside a rotation, "BL signé de retour" with an optional scan (photo or PDF, checked by type and content, stored encrypted, opened by an audited route) |
+| Imputation d'un paiement | `/fr/instruments` (Trésorerie) | one action spreads a client's payment over the open invoices, oldest due first; the owner may override with a reason; a bounce reverses the allocations and reopens the invoices |
+| Avoirs | `/fr/avoirs` (Trésorerie) | concrete refused or brought back after billing waits here; the owner issues the avoir (step-up) referencing invoice, BL and loss; support reads |
+| Factures fournisseurs | `/fr/supplier-invoices`, `/fr/supplier-invoices/new` (Achats) | the supplier's invoice as its own document linked to the order and receipts; the three-way match with its flags; accept the gaps with a reason, approve (step-up) or reject; attach the photo; office enters blind |
+| Chaîne de commande | `/fr/orders/chain` (Ventes) | one row per order: ordered, planned, loaded, delivered, invoiced, paid; every role sees quantities and stages, only owner and support see "paid", nobody an amount |
+| Documents liés et recherche | the panel under each document, the search box in the top bar (`/fr/search`) | neighbours by number, filtered by the caller's rights; search by document number only (4 characters at least), misses audited |
+| PDF | "Télécharger le PDF" on a BL, invoice, quote, avoir, statement | server-generated, never stored, legal mentions, "SPÉCIMEN — données fictives" on every page, each download audited; the BL PDF has no price |
+| Où est mon camion (office) | `/fr/dispatch/office` (Production) | office's read-only day: truck, times, m³, client name, step reached, BL number; no price, no order |
+| Chauffeur par défaut | `/fr/dispatch` (bottom of the page) | each truck's default driver; the proposal uses it; another driver on a rotation asks for a reason; overdue orders are flagged by a red edge and the text "en retard depuis le…" |
 | Devis | `/fr/quotes`, `/fr/quotes/new` (Ventes) | a quote at the price in force, printable, "Convertir en commande" opens the prefilled order form |
 | Commandes | `/fr/orders`, detail `/fr/orders/<id>` (Ventes) | what is delivered / invoiced / paid, state of each échéance, cancel with a reason (step-up) |
 | Nouvelle commande | `/fr/orders/new` (Ventes) | office-style entry; as owner: preview of the amounts and a price override with a reason; after saving, "ce que cette action a changé" |
@@ -54,7 +67,9 @@ reorder.
 | Entreprise | `/fr/company` (Administration) | our legal identity, versioned |
 | Administration | `/fr/admin/users`, `/fr/parameters`, `/fr/checklist`, `/fr/historique`, `/fr/security` | users and 2FA, parameters, security checklist, audit viewer |
 
-A good ten-minute path: Tableau de bord → Commandes (open one) → Planning du jour (the proposal, save it) → Suivi des rotations (tap through one rotation) → Chargements (load one of the 3
+**The integration path (ten minutes):** Chaîne de commande (find CMD-2026-00100) → open the order, "Documents liés" → the BL → "Télécharger le PDF" (no price) → À facturer (the client has nothing left to invoice; the walk did it) → Factures: FA-2026-00087 (grouped lines, "Acompte reçu", "Net à payer", PDF) → Comptes: the client statement (invoices, cleared cheque, **bounced cheque**) → Paiements et titres (the bounce and its window) → Planning du jour on 22 October (default driver, the override and its reason) → Factures fournisseurs: FF-2026-00001 (the match, the accepted gaps, approved, paid). Then sign in as office: "Où est mon camion", À facturer without amounts, the order chain without "paid".
+
+A good ten-minute path (the original one): Tableau de bord → Commandes (open one) → Planning du jour (the proposal, save it) → Suivi des rotations (tap through one rotation) → Chargements (load one of the 3
 waiting orders, read the effects) → Stock → Facturer that order → Factures (open, Imprimer) → Saisir un paiement (a cheque for it) → Paiements et titres
 (deposit, clear) → Position de trésorerie → Échéances légales → Export comptable. Then sign in as office or the plant (create
 those users from `/fr/admin/users`; I created none) to show the blind entry and the plant's quantity-only screens.
@@ -79,12 +94,14 @@ The dev database keeps whatever you confirm: advance the clock or ignore it, not
 - Truck over-capacity and the reconciliation gap alerts wait for their modules.
 - Office can no longer enter an order, quote or invoice by direct insert: it goes through database functions that return
   only the number (security fix, docs/checkpoints/CP-RE-1.md). The dev server needs no restart; the database is migrated.
-- Invoices print through the browser (Imprimer / save as PDF); there is no server-side PDF library yet (needs your approval of
-  one). An invoice does not show "paid" by itself: payments cover the order's échéances.
+- PDFs are French only: the standard PDF fonts have no Arabic letters, which print as "?" (an embedded font is a later step, decision 111).
 - Not built: reconciliation with the plant software, notifications, the AI layer. (Stock counts and load cancellation have
   screens now: Stock and Chargements, owner only.)
-- Drivers are paired to trucks in code order by the proposal; a fixed driver per truck is a question for you. Fuel filled at
-  a station is valued at the average price of the fuel bought. Rejected concrete stays billed unless you issue a credit note.
+- Each truck has a default driver (set on the dispatch page; the walk gave the first trucks theirs); overriding it on a rotation needs a reason. Fuel filled at
+  a station is valued at the average price of the fuel bought. Rejected concrete stays billed until you issue an avoir.
+- Decisions 97 to 113 are provisional until you confirm them (list in docs/checkpoints/CP-INTEGRATION-2.md).
+- The older purchases of the scenario keep the former way (the payable comes from the order); only the new chain uses the supplier invoice as the source of the payable.
+- The assistant is specified (docs/SPEC-assistant.md) and not built.
 - A stock count counts in the period it is entered and measures everything since the previous count.
 - Times shown on the tracking screen are formatted on the server in Casablanca time.
 - The partner role still sees no money (decision 81, provisional). The plant sees and prints the client's name and the site on the delivery note (decision 83, provisional).

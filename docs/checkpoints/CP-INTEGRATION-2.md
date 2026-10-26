@@ -38,7 +38,7 @@ Status: `[ ]` to do, `[x]` done (commit), `[~]` partial.
 - [x] docs/REFERENCE-MAP.md
 
 ### Finish
-- [ ] db:scenario walk and DEMO.md (AC-INT-23)
+- [x] db:scenario walk and DEMO.md (AC-INT-23)
 - [ ] Full regression: unit, integration, e2e on an idle machine (single worker if load makes it flaky, no raised timeouts)
 - [ ] Re-run of the CP-INTEGRATION table with the new verdicts (below)
 - [ ] Unfinished list and new provisional decisions (below)

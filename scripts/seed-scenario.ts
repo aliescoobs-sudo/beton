@@ -8,6 +8,7 @@ import pg from 'pg';
 import { loadSeedUrl } from '../src/lib/env.ts';
 import { seedPilotScenario } from '../src/modules/ledger/service/pilot-scenario.ts';
 import { seedOperationsScenario } from '../src/modules/operations/service/pilot-ops.ts';
+import { seedIntegrationScenario } from '../src/modules/operations/service/pilot-integration.ts';
 import { seedOperationsWave2 } from '../src/modules/operations/service/pilot-ops2.ts';
 import { handleHelp } from './cli-help';
 
@@ -55,6 +56,14 @@ if (import.meta.main) {
       wave2.applied
         ? `Operations wave 2 seeded: ${wave2.drivers} drivers, ${wave2.rotations} rotations (${wave2.events} steps), ${wave2.plannedAhead} planned ahead, ${wave2.counts} counts, ${wave2.fills} fuel fills, ${wave2.fuelPurchases} fuel purchases, ${wave2.losses} refused loads`
         : 'Operations wave 2 already in place (nothing changed)',
+    );
+    // The integration walk (CP-INTEGRATION-2): the sales chain from rotation to bounced cheque, the purchase chain from a
+    // partial receipt to a paid supplier invoice that carried gaps.
+    const integration = await seedIntegrationScenario(pool, env, today);
+    console.log(
+      integration.applied
+        ? `Integration walk seeded: ${integration.loads} loads, ${integration.invoices} invoices from BLs, ${integration.payments} payments (one bounced), ${integration.supplierInvoices} supplier invoice approved and paid`
+        : 'Integration walk already in place (nothing changed)',
     );
   } finally {
     await pool.end();

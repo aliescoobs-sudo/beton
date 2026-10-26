@@ -6,6 +6,8 @@ export {
   type CreatedOrder,
   type OrderError,
   type OrderPreview,
+  insertOrderRows,
+  prepareOrder,
   previewOrder,
 } from './service/order-service';
 export {

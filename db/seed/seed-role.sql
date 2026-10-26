@@ -75,3 +75,21 @@ GRANT UPDATE (lead_time_days) ON public.supplier TO belgobeton_seed;
 DROP POLICY IF EXISTS seed_update_lead_time ON public.supplier;
 CREATE POLICY seed_update_lead_time ON public.supplier FOR UPDATE TO belgobeton_seed
   USING (ctx.role() = 'system') WITH CHECK (ctx.role() = 'system');
+
+-- Integration walk (CP-INTEGRATION-2, AC-INT-23): the scenario uses the application's own doors, executed in the system request
+-- context, and reads the supplier invoice it just made to find its id. Same rules as above: no UPDATE, no DELETE, rows stamped
+-- with the system actor; the doors check the role themselves.
+GRANT EXECUTE ON FUNCTION public.create_invoice_from_deliveries(uuid[], date, date) TO belgobeton_seed;
+GRANT EXECUTE ON FUNCTION public.allocate_to_client(uuid, text) TO belgobeton_seed;
+GRANT EXECUTE ON FUNCTION public.create_supplier_invoice(text, text, date, date, jsonb, uuid[], date) TO belgobeton_seed;
+GRANT EXECUTE ON FUNCTION public.accept_supplier_invoice_gaps(uuid, text) TO belgobeton_seed;
+GRANT EXECUTE ON FUNCTION public.approve_supplier_invoice(uuid, jsonb) TO belgobeton_seed;
+GRANT EXECUTE ON FUNCTION public.allocate_to_supplier_invoice(uuid, text) TO belgobeton_seed;
+GRANT SELECT ON public.supplier_invoice TO belgobeton_seed;
+DROP POLICY IF EXISTS seed_read ON public.supplier_invoice;
+CREATE POLICY seed_read ON public.supplier_invoice FOR SELECT TO belgobeton_seed USING (ctx.role() = 'system');
+-- The scenario gives the first trucks their default driver (the only truck column it updates, system context only).
+GRANT UPDATE (default_driver_id) ON public.truck TO belgobeton_seed;
+DROP POLICY IF EXISTS seed_update_default_driver ON public.truck;
+CREATE POLICY seed_update_default_driver ON public.truck FOR UPDATE TO belgobeton_seed
+  USING (ctx.role() = 'system') WITH CHECK (ctx.role() = 'system');

@@ -3,7 +3,13 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ensureRoles, recreateDatabase, SCENARIO_TEST_DATABASE } from '../scripts/db-bootstrap';
 import { runMigrations } from '../scripts/db-migrate';
 import { withRlsContext } from '../src/lib/db/rls-context';
-import { getCashPosition, listInvoices, listPurchases } from '../src/modules/ledger';
+import {
+  getCashPosition,
+  getClientStatement,
+  getOrderChain,
+  listInvoices,
+  listPurchases,
+} from '../src/modules/ledger';
 import {
   getConsumptionReport,
   getDispatchDay,
@@ -11,6 +17,7 @@ import {
   getStockLevels,
   getVolumeAnalytics,
   listTrips,
+  seedIntegrationScenario,
   seedOperationsScenario,
   seedOperationsWave2,
 } from '../src/modules/operations';
@@ -431,3 +438,156 @@ describe('the second wave of the operations scenario (O9 to O15)', () => {
     }
   });
 });
+
+// CP-INTEGRATION-2 finish (AC-INT-23): the demo walks the sales chain and the purchase chain on the pilot data.
+describe('the integration walk (AC-INT-23)', () => {
+  let walk: Awaited<ReturnType<typeof seedIntegrationScenario>>;
+  let clientId: string;
+  beforeAll(async () => {
+    // the earlier parts are idempotent: the walk needs them whatever order the file runs in
+    await seedOperationsScenario(seed, allowed, TODAY);
+    await seedOperationsWave2(seed, allowed, TODAY);
+    walk = await seedIntegrationScenario(seed, allowed, TODAY);
+    clientId = (
+      await asOwner((tx) =>
+        tx.query<{ id: string }>(`select id from client where name = 'Chantier Intégration (fictif)'`),
+      )
+    ).rows[0]?.id as string;
+  }, 120_000);
+
+  it('seeds the sales chain: loads, invoices made from BLs, three payments, one supplier invoice paid', async () => {
+    expect(walk).toEqual({ applied: true, loads: 4, invoices: 2, payments: 3, supplierInvoices: 1 });
+    expect(clientId).toBeDefined();
+  });
+
+  it('plans the rotations on the default driver and overrides one with a reason (I4.1)', async () => {
+    const rows = (
+      await asOwner((tx) =>
+        tx.query<{ driver_id: string | null; reason: string | null; default_driver_id: string | null }>(
+          `select p.driver_id, p.driver_override_reason as reason, t.default_driver_id
+             from trip_plan p join truck t on t.id = p.truck_id join sales_order o on o.id = p.order_id
+            where o.client_id = $1 order by p.seq`,
+          [clientId],
+        ),
+      )
+    ).rows;
+    expect(rows).toHaveLength(2);
+    expect(rows[0]?.driver_id).toBe(rows[0]?.default_driver_id);
+    expect(rows[0]?.reason).toBeNull();
+    expect(rows[1]?.driver_id).not.toBe(rows[1]?.default_driver_id);
+    expect(rows[1]?.reason).toMatch(/absent/);
+  });
+
+  it('delivers the tracked loads by their unloading step and the others by hand; two BLs are signed back (I1.1, I1.2)', async () => {
+    const delivered = (
+      await asOwner((tx) =>
+        tx.query<{ tracked: boolean }>(
+          `select g.trip_event_id is not null as tracked from delivery_delivered g join delivery d on d.id = g.delivery_id
+             join sales_order o on o.id = d.order_id where o.client_id = $1`,
+          [clientId],
+        ),
+      )
+    ).rows;
+    expect(delivered).toHaveLength(4);
+    expect(delivered.filter((d) => d.tracked)).toHaveLength(2);
+    expect(
+      await one(
+        `select count(*)::text as n from delivery_return r join delivery d on d.id = r.delivery_id join sales_order o on o.id = d.order_id where o.client_id = $1`,
+        [clientId],
+      ),
+    ).toBe(2);
+  });
+
+  it('invoices three BLs of two orders at once with the advance applied, and a fourth BL alone (I1.4)', async () => {
+    const invoices = (await asOwner((tx) => listInvoices_(tx, clientId))).rows;
+    expect(invoices).toHaveLength(2);
+    const first = invoices[0];
+    expect(Number(first?.lines)).toBe(3);
+    expect(Number(first?.advance)).toBeGreaterThan(0);
+    expect(Number(invoices[1]?.lines)).toBe(1);
+  });
+
+  it('allocates the first cheque oldest due first and reopens the second invoice when the second cheque bounces (I1.5)', async () => {
+    const list = (await listInvoices(app, owner)).filter((i) => i.clientId === clientId);
+    expect(list).toHaveLength(2);
+    const states = Object.fromEntries(list.map((i) => [i.paymentState, i]));
+    expect(Object.keys(states).sort()).toEqual(['paid', 'partial']);
+    expect(states.partial?.paidCentimes).toBe(300_000);
+    const bounced = await asOwner((tx) =>
+      tx.query<{ deadline: string }>(
+        `select to_char(e.regularization_deadline, 'YYYY-MM-DD') as deadline from instrument_event e
+           join payment_instrument i on i.id = e.instrument_id where i.number = 'CHQ-INT-002' and e.event = 'bounced'`,
+      ),
+    );
+    expect(bounced.rows[0]?.deadline).toBe('2026-11-22');
+  });
+
+  it('shows all of it on the client statement and on the order chain (I3.1)', async () => {
+    const statement = await getClientStatement(app, owner, clientId, {}, { today: TODAY });
+    if (!statement) throw new Error('no statement');
+    const lines = [...statement.statement.commercial, ...statement.statement.financial];
+    expect(lines.filter((l) => l.type === 'invoice')).toHaveLength(2);
+    expect(lines.some((l) => l.type === 'payment' && l.status === 'bounced')).toBe(true);
+    expect(lines.some((l) => l.type === 'payment' && l.status === 'cleared')).toBe(true);
+    const chain = (await getOrderChain(app, owner)).filter((r) => r.clientCode === statement.code);
+    expect(chain).toHaveLength(3);
+    for (const r of chain) {
+      expect(r.deliveredL).toBe(r.orderedL);
+      expect(r.invoicedL).toBe(r.orderedL);
+    }
+  });
+
+  it('walks the purchase chain: partial receipt, a supplier invoice with gaps, accepted, approved, paid (I2.2)', async () => {
+    const si = (
+      await asOwner((tx) =>
+        tx.query<{ id: string; code: string; events: string[] }>(
+          `select s.id, s.code, array(select e.event from supplier_invoice_event e where e.supplier_invoice_id = s.id order by e.seq) as events
+             from supplier_invoice s where s.supplier_invoice_no = 'FS-DEMO-0001'`,
+        ),
+      )
+    ).rows[0];
+    expect(si?.events).toEqual(['entered', 'gaps_accepted', 'approved']);
+    const flags = (
+      await asOwner((tx) =>
+        tx.query<{ flags: string[] }>(`select flags from public.supplier_invoice_match($1)`, [si?.id]),
+      )
+    ).rows[0]?.flags;
+    expect(flags?.length).toBeGreaterThanOrEqual(1);
+    // the payable was made from the invoice, and a payment is allocated to it
+    expect(
+      await one(
+        `select count(*)::text as n from purchase_plan_item p join supplier_invoice s on s.purchase_id = p.purchase_id where s.id = $1`,
+        [si?.id],
+      ),
+    ).toBeGreaterThanOrEqual(1);
+    expect(
+      await one(
+        `select count(*)::text as n from allocation a join payment_instrument i on i.id = a.instrument_id where i.number = 'VIR-FRN-INT-001'`,
+      ),
+    ).toBeGreaterThanOrEqual(1);
+  });
+
+  it('is idempotent and audited as the system actor', async () => {
+    expect(await seedIntegrationScenario(seed, allowed, TODAY)).toMatchObject({ applied: false });
+    for (const table of ['sales_order', 'invoice', 'invoice_advance', 'trip_event', 'supplier_invoice']) {
+      expect(
+        await one(
+          `select count(*)::text as n from audit_event where table_name = $1 and actor_user_id <> '00000000-0000-7000-8000-000000000002' and request_id = 'seed-scenario-integration'`,
+          [table],
+        ),
+        table,
+      ).toBe(0);
+    }
+    await expect(seedIntegrationScenario(seed, { ...allowed, REAL_DATA: true }, TODAY)).rejects.toThrow(
+      /REAL_DATA/,
+    );
+  });
+});
+
+const listInvoices_ = (tx: pg.PoolClient, clientId: string) =>
+  tx.query<{ lines: string; advance: string }>(
+    `select (select count(*) from invoice_line l where l.invoice_id = i.id)::text as lines,
+            (select coalesce(sum(a.amount_centimes), 0) from invoice_advance a where a.invoice_id = i.id)::text as advance
+       from invoice i where i.client_id = $1 and i.credit_note_of is null order by i.number`,
+    [clientId],
+  );
