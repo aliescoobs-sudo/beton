@@ -20,6 +20,9 @@ import { formatM3, ltr } from './format';
 export type SaveDispatchResult =
   { ok: true; rotations: number; conflicts: number } | { ok: false; error: string };
 
+/** 2026-10-23 → 23/10/2026 */
+const formatDate = (iso: string): string => iso.split('-').reverse().join('/');
+
 const BAR_COLOURS = [
   'var(--color-ink)',
   'var(--color-amber)',
@@ -96,6 +99,9 @@ export function DispatchBoard({
   const blocked = conflicts.some(isBlocking) || missingReason;
   const orderById = new Map(day.orders.map((o) => [o.orderId, o]));
   const truckById = new Map(day.trucks.map((k) => [k.id, k]));
+  const overdueCount = new Set(
+    rotations.filter((r) => orderById.get(r.orderId)?.dueDate).map((r) => r.orderId),
+  ).size;
   const rotationOrderCode = (key: string) => {
     const r = rotations.find((x) => x.key === key);
     return r ? (orderById.get(r.orderId)?.orderCode ?? '') : '';
@@ -162,6 +168,13 @@ export function DispatchBoard({
             ? t('sourceProposal')
             : t('sourceEdited')}
       </p>
+
+      {overdueCount > 0 && (
+        <p className="text-sm" data-testid="dispatch-overdue-summary">
+          <StatusPill status="late">{t('overdueFlag')}</StatusPill>{' '}
+          {t('overdueSummary', { count: overdueCount })}
+        </p>
+      )}
 
       {conflicts.length > 0 ? (
         <section aria-labelledby="conflicts-title" className="border-s-4 border-status-late bg-surface p-4">
@@ -309,14 +322,20 @@ export function DispatchBoard({
                 return (
                   <li
                     key={r.key}
-                    className="border border-rule bg-surface p-3 text-sm"
+                    className={`border border-rule bg-surface p-3 text-sm${o?.dueDate ? ' border-s-4 border-s-status-late' : ''}`}
                     data-testid={`rotation-${o?.orderCode}-${r.seq}`}
+                    data-overdue={o?.dueDate ? 'true' : undefined}
                     data-conflicts={flagged.map((c) => c.kind).join(' ')}
                   >
                     <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
                       <strong>
                         <bdi dir="ltr">{o?.orderCode}</bdi> · {t('rotation', { n: r.seq })}
                       </strong>
+                      {o?.dueDate && (
+                        <StatusPill status="late" data-testid={`overdue-${o.orderCode}-${r.seq}`}>
+                          {t('overdue', { date: formatDate(o.dueDate) })}
+                        </StatusPill>
+                      )}
                       <span>
                         <bdi dir="ltr">{o?.clientCode}</bdi> · <bdi dir="ltr">{o?.typeLabel}</bdi>
                       </span>

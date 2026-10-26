@@ -31,7 +31,7 @@ Status: `[ ]` to do, `[x]` done (commit), `[~]` partial.
 ### Wave I4: decisions 91 to 96
 - [x] I4.1 Default driver per truck, audited override (AC-INT-20)
 - [x] I4.2 Office read-only dispatch view (AC-INT-21)
-- [ ] I4.3 Overdue orders flagged (AC-INT-22)
+- [x] I4.3 Overdue orders flagged (AC-INT-22)
 
 ### Wave I5: documents only, no code
 - [ ] docs/SPEC-assistant.md

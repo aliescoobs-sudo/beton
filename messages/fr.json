@@ -1574,7 +1574,9 @@
       "overrideNeeded": "Indiquez le motif de chaque changement de chauffeur.",
       "defaultsTitle": "Chauffeur par défaut de chaque camion",
       "defaultsIntro": "Le planning propose ce chauffeur ; en choisir un autre sur une rotation demande un motif et est journalisé.",
-      "defaultFor": "Chauffeur par défaut du camion {truck}"
+      "defaultFor": "Chauffeur par défaut du camion {truck}",
+      "overdueFlag": "En retard",
+      "overdueSummary": "Commandes en retard planifiées avec celles du jour : {count}"
     },
     "trips": {
       "link": "Suivi des rotations",

@@ -22,6 +22,7 @@ const DAY = '2099-03-02';
 const DAY2 = '2099-03-09';
 let orderCode = '';
 let orderCode2 = '';
+let overdueCode = '';
 let brokenTruck = '';
 const MONEY = /MAD|DH|\d\s?\d{3},\d{2}/;
 
@@ -37,6 +38,13 @@ test.beforeAll(async () => {
   orderCode2 = (
     await withRlsContext(app, { userId: ownerId, role: 'owner', requestId: 'e2e-dispatch' }, (tx) =>
       insertOrder(tx, ownerId, master, DAY2),
+    )
+  ).code;
+  // An order due two days ago and still to load: it is planned with today's and must be flagged on the board.
+  const twoDaysAgo = new Date(Date.now() - 2 * 86_400_000).toISOString().slice(0, 10);
+  overdueCode = (
+    await withRlsContext(app, { userId: ownerId, role: 'owner', requestId: 'e2e-dispatch' }, (tx) =>
+      insertOrder(tx, ownerId, master, twoDaysAgo),
     )
   ).code;
   // A truck of its own, in the breakdown log for the day.
@@ -145,6 +153,22 @@ test('the default driver of a truck is proposed; another driver needs a reason, 
   await expect(page.getByTestId('dispatch-message')).toContainText('Plan enregistré');
   await page.reload();
   await expect(page.getByTestId(`reason-${orderCode2}-1`)).toHaveValue('Nadia est malade');
+  await logout(page);
+});
+
+test('an overdue order still to load is planned with the day and flagged by colour and by text (AC-INT-22)', async ({
+  page,
+}) => {
+  await loginOwner(page, 'fr');
+  await page.goto('/fr/dispatch');
+  const card = page.getByTestId(`rotation-${overdueCode}-1`);
+  await expect(card).toHaveAttribute('data-overdue', 'true');
+  // the text says it, so the colour is never the only signal
+  await expect(page.getByTestId(`overdue-${overdueCode}-1`)).toContainText('en retard depuis le');
+  await expect(page.getByTestId('dispatch-overdue-summary')).toContainText('En retard');
+  await expect(page.getByTestId(`day-order-${overdueCode}`)).toContainText('en retard depuis le');
+  await page.goto('/ar/dispatch');
+  await expect(page.getByTestId(`overdue-${overdueCode}-1`)).toContainText('متأخرة منذ');
   await logout(page);
 });
 
