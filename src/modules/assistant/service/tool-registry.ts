@@ -2,10 +2,14 @@ import { z } from 'zod';
 import type { LlmToolSpec } from '@/lib/ai/llm-provider';
 import type { Role } from '@/modules/platform-security';
 import type { AssistantTool } from '../domain/tool-types';
+import { consumptionVariance } from './tools/consumption-variance';
 import { deliveriesToday } from './tools/deliveries-today';
+import { findDocument } from './tools/find-document';
 import { forecast } from './tools/forecast';
 import { nextLoad } from './tools/next-load';
 import { openInvoices } from './tools/open-invoices';
+import { orderChain } from './tools/order-chain';
+import { purchaseStatus } from './tools/purchase-status';
 import { stockAndCover } from './tools/stock-and-cover';
 import { uninvoicedBls } from './tools/uninvoiced-bls';
 
@@ -17,6 +21,10 @@ export const TOOLS: readonly AssistantTool[] = [
   openInvoices,
   forecast,
   nextLoad,
+  orderChain,
+  findDocument,
+  purchaseStatus,
+  consumptionVariance,
 ];
 
 export const findTool = (name: string): AssistantTool | undefined => TOOLS.find((t) => t.name === name);
