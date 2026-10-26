@@ -200,3 +200,60 @@ describe('the seed role is simulation only', () => {
     expect(loadEnv({ ...valid, DATABASE_URL_SEED: seed })).not.toHaveProperty('DATABASE_URL_SEED');
   });
 });
+
+describe('the assistant switches (AC-ASSIST-02, 26)', () => {
+  it('are off and fake by default, with no key', () => {
+    const env = loadEnv(valid);
+    expect(env.ASSISTANT_ENABLED).toBe(false);
+    expect(env.ASSISTANT_PROVIDER).toBe('fake');
+    expect(env.ANTHROPIC_API_KEY).toBeUndefined();
+  });
+
+  it('accept the flag on in development and test, with the fake provider', () => {
+    expect(loadEnv({ ...valid, ASSISTANT_ENABLED: 'true' }).ASSISTANT_ENABLED).toBe(true);
+    expect(loadEnv({ ...valid, NODE_ENV: 'test', ASSISTANT_ENABLED: 'true' }).ASSISTANT_ENABLED).toBe(true);
+  });
+
+  it('refuse the flag next to real data or in production', () => {
+    expect(() => loadEnv({ ...valid, ASSISTANT_ENABLED: 'true', REAL_DATA: 'true' })).toThrow(
+      /ASSISTANT_ENABLED/,
+    );
+    expect(() => loadEnv({ ...valid, ASSISTANT_ENABLED: 'true', NODE_ENV: 'production' })).toThrow(/CNDP/);
+  });
+
+  it('refuse the real provider and any key next to real data or in production', () => {
+    const key = 'sk-ant-test-0123456789abcdefghijklmnop';
+    expect(() => loadEnv({ ...valid, ASSISTANT_PROVIDER: 'anthropic', REAL_DATA: 'true' })).toThrow(
+      /ASSISTANT_PROVIDER/,
+    );
+    expect(() => loadEnv({ ...valid, ASSISTANT_PROVIDER: 'anthropic', NODE_ENV: 'production' })).toThrow(
+      /ASSISTANT_PROVIDER/,
+    );
+    expect(() => loadEnv({ ...valid, ANTHROPIC_API_KEY: key, NODE_ENV: 'production' })).toThrow(
+      /ANTHROPIC_API_KEY/,
+    );
+    try {
+      loadEnv({ ...valid, ANTHROPIC_API_KEY: key, REAL_DATA: 'true' });
+    } catch (error) {
+      expect(String(error)).not.toContain(key);
+    }
+  });
+
+  it('need a key for the real provider once the flag is on', () => {
+    expect(() => loadEnv({ ...valid, ASSISTANT_ENABLED: 'true', ASSISTANT_PROVIDER: 'anthropic' })).toThrow(
+      /ANTHROPIC_API_KEY/,
+    );
+    const key = 'sk-ant-test-0123456789abcdefghijklmnop';
+    const env = loadEnv({
+      ...valid,
+      ASSISTANT_ENABLED: 'true',
+      ASSISTANT_PROVIDER: 'anthropic',
+      ANTHROPIC_API_KEY: key,
+    });
+    expect(secretValuesOf(env)).toContain(key);
+  });
+
+  it('read an empty key as no key', () => {
+    expect(loadEnv({ ...valid, ANTHROPIC_API_KEY: '  ' }).ANTHROPIC_API_KEY).toBeUndefined();
+  });
+});

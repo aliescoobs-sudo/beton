@@ -84,6 +84,18 @@ const envObject = z.object({
   // The AI reading of a supplier invoice photo. OFF, and refused next to real data or in production, until the CNDP has
   // authorized the transfer (DECISIONS 107); even on, only an interface exists: no provider is wired and nothing leaves the server.
   AI_EXTRACTION_ENABLED: flag,
+  // The in-app assistant (SPEC-assistant). OFF by default; refused next to real data or in production until the CNDP has
+  // authorized the transfer (D114). `ASSISTANT_PROVIDER` is `fake` unless the real adapter is asked for, which needs the flag on,
+  // fake data, a development or test build and a key. The key lives in .env.local only and is never sent to the client.
+  ASSISTANT_ENABLED: flag,
+  ASSISTANT_PROVIDER: z
+    .enum(['fake', 'anthropic'], { error: 'must be "fake" or "anthropic"' })
+    .default('fake'),
+  ASSISTANT_MODEL: z.string().min(1).max(100).default('claude-sonnet-5-5'),
+  ANTHROPIC_API_KEY: z
+    .string()
+    .optional()
+    .transform((value) => (value === undefined || value.trim() === '' ? undefined : value.trim())),
   // Test servers (e2e) that share a database being recreated must not run the pg-boss cron scheduler.
   JOB_SCHEDULER_DISABLED: flag,
   // Reverse proxies in front of the app that each append the address they received the request from to
@@ -110,6 +122,34 @@ const envSchema = envObject.superRefine((env, ctx) => {
       code: 'custom',
       path: ['AI_EXTRACTION_ENABLED'],
       message: 'must be "false" until the CNDP has authorized sending invoices to an AI provider',
+    });
+  }
+  if (env.ASSISTANT_ENABLED && (env.NODE_ENV === 'production' || env.REAL_DATA)) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['ASSISTANT_ENABLED'],
+      message: 'must be "false" until the CNDP has authorized sending questions to an AI provider',
+    });
+  }
+  if (env.ASSISTANT_PROVIDER === 'anthropic' && (env.NODE_ENV === 'production' || env.REAL_DATA)) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['ASSISTANT_PROVIDER'],
+      message: 'must be "fake" when NODE_ENV=production or REAL_DATA=true',
+    });
+  }
+  if (env.ANTHROPIC_API_KEY && (env.NODE_ENV === 'production' || env.REAL_DATA)) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['ANTHROPIC_API_KEY'],
+      message: 'must not be set when NODE_ENV=production or REAL_DATA=true',
+    });
+  }
+  if (env.ASSISTANT_ENABLED && env.ASSISTANT_PROVIDER === 'anthropic' && !env.ANTHROPIC_API_KEY) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['ANTHROPIC_API_KEY'],
+      message: 'is required for the anthropic provider',
     });
   }
 });
@@ -176,6 +216,7 @@ export function secretValuesOf(env: Env): string[] {
     }
   }
   if (env.AUTH_SECRETS) values.push(...parseAuthSecrets(env).map((secret) => secret.value));
+  if (env.ANTHROPIC_API_KEY) values.push(env.ANTHROPIC_API_KEY);
   return values;
 }
 
