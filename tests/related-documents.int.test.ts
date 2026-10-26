@@ -23,8 +23,6 @@ import {
   insertInstrument,
   orderMaster,
   type OrderMaster,
-  purchaseMaster,
-  type PurchaseMaster,
 } from './helpers/ledger-fixtures';
 
 // integration I3.2: the neighbours of a document, from the database relations and the caller's row-level security. AC-INT-17.
@@ -37,7 +35,6 @@ const marker = `rd${randomUUID().replace(/-/g, '').slice(0, 10)}`;
 const TODAY = '2026-07-03';
 let scene: DeliveryScene;
 let master: OrderMaster;
-let pm: PurchaseMaster;
 const inCtx = <T>(user: SessionUser, fn: (tx: pg.PoolClient) => Promise<T>) =>
   withRlsContext(app, { userId: user.id, role: user.role, requestId: marker }, fn);
 
@@ -47,7 +44,6 @@ beforeAll(async () => {
   }
   scene = await deliveryScene(app, users.owner.id, marker);
   master = await orderMaster(app, users.owner.id, marker);
-  pm = await purchaseMaster(app, users.owner.id, marker);
 });
 
 /** A sold chain: an order, a BL billed on an invoice, a cheque covering the order, and an avoir for litres refused. */

@@ -96,6 +96,17 @@ test('office sees the BL, the date, the product and the m³, and no amount at al
   invoiceNumber = /FA-\d{4}-\d{5}/.exec((await saved.textContent()) ?? '')?.[0] as string;
   await expect(page.getByTestId(`queue-row-${blNo}`)).toHaveCount(0);
   await expect(page.locator('body')).not.toContainText(MONEY);
+  // Search by number: office finds the BL, and not the invoice it just made (it reads no invoice).
+  await page.getByTestId('search-box').fill(blNo);
+  await page.getByTestId('search-box').press('Enter');
+  await expect(page.getByTestId(`search-hit-${blNo}`)).toBeVisible();
+  await page.getByTestId('search-input').fill(invoiceNumber);
+  await page.getByTestId('search-submit').click();
+  await expect(page.getByTestId('search-none')).toBeVisible();
+  await expect(page.getByTestId(`search-hit-${invoiceNumber}`)).toHaveCount(0);
+  await page.getByTestId('search-input').fill('Atlas Béton');
+  await page.getByTestId('search-submit').click();
+  await expect(page.getByTestId('search-error')).toBeVisible();
   await logout(page);
 });
 
@@ -105,6 +116,12 @@ test('the owner opens that invoice: grouped by product, the BL listed, the total
   await page.getByTestId(`invoice-open-${invoiceNumber}`).click();
   await expect(page.getByTestId(`invoice-group-${typeCode}`)).toContainText('8 m³');
   await expect(page.getByTestId('invoice-group-bls')).toContainText(blNo);
+  await expect(page.getByTestId('invoice-totals')).toContainText('7 488,00');
+  // Search by number finds the invoice by its prefix, with a link that opens it.
+  await page.getByTestId('search-box').fill(invoiceNumber.slice(0, 9));
+  await page.getByTestId('search-box').press('Enter');
+  await expect(page.getByTestId(`search-hit-${invoiceNumber}`)).toBeVisible();
+  await page.getByTestId(`search-hit-${invoiceNumber}`).getByRole('link').click();
   await expect(page.getByTestId('invoice-totals')).toContainText('7 488,00');
   // The neighbours of the invoice: its BL, a link that opens the delivery note, which points back to the invoice (AC-INT-17).
   await page.getByTestId(`related-link-${blNo}`).click();

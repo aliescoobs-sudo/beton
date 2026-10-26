@@ -25,7 +25,7 @@ Status: `[ ]` to do, `[x]` done (commit), `[~]` partial.
 ### Wave I3: cross-cutting
 - [x] I3.1 Order-chain view (AC-INT-16; migration 0073; D108)
 - [x] I3.2 Related-documents panel on every document page (AC-INT-17; D109)
-- [ ] I3.3 Search by number (AC-INT-18)
+- [x] I3.3 Search by document number (AC-INT-18; D110; no migration: every source is read under row-level security)
 - [ ] I3.4 Server-side PDF (AC-INT-19)
 
 ### Wave I4: decisions 91 to 96
@@ -73,4 +73,4 @@ Filled at the end (re-run of the CP-INTEGRATION table).
 Filled at the end.
 
 ## New provisional decisions
-Filled as they are taken (DECISIONS 97 onward): 97 (delivered), 98 (delivered quantity), 99 (stored documents), 100 (signed BL and its scan), 101 (invoicing queue), 102 (invoice from the BLs), 103 (payment spread over invoices), 104 (avoir), 105 (supplier invoice), 106 (three-way match and payable), 107 (supplier invoice photo, AI flag), 108 (order chain), 109 (related documents).
+Filled as they are taken (DECISIONS 97 onward): 97 (delivered), 98 (delivered quantity), 99 (stored documents), 100 (signed BL and its scan), 101 (invoicing queue), 102 (invoice from the BLs), 103 (payment spread over invoices), 104 (avoir), 105 (supplier invoice), 106 (three-way match and payable), 107 (supplier invoice photo, AI flag), 108 (order chain), 109 (related documents), 110 (search).

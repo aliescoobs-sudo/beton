@@ -15,6 +15,7 @@ const SCREENS = [
   'invoices/new',
   'invoices/queue',
   'avoirs',
+  'search',
   'supplier-invoices',
   'supplier-invoices/new',
   'purchases',

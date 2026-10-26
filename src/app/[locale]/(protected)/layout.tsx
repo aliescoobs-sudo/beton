@@ -31,8 +31,11 @@ export default async function ProtectedLayout({
         close: t('shell.nav.close'),
         mainNav: t('shell.nav.main'),
         subNav: t('shell.nav.sub'),
+        search: t('shell.searchLabel'),
+        searchPlaceholder: t('shell.searchPlaceholder'),
       }}
       homeHref={`/${locale}`}
+      searchHref={`/${locale}/search`}
       simBand={<SimBand locale={locale} />}
       userMenu={
         <UserMenu

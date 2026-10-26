@@ -13,6 +13,8 @@ interface ShellLabels {
   close: string;
   mainNav: string;
   subNav: string;
+  search: string;
+  searchPlaceholder: string;
 }
 
 /**
@@ -25,6 +27,7 @@ export function AppShell({
   groups,
   labels,
   homeHref,
+  searchHref,
   simBand,
   userMenu,
   children,
@@ -32,6 +35,8 @@ export function AppShell({
   groups: NavGroup[];
   labels: ShellLabels;
   homeHref: string;
+  /** The page that finds a document by its number (a GET form, so it is a link as much as a box). */
+  searchHref: string;
   simBand: ReactNode;
   userMenu: ReactNode;
   children: ReactNode;
@@ -87,6 +92,21 @@ export function AppShell({
             })}
           </nav>
           <span className="flex-1 md:hidden" />
+          <form action={searchHref} method="get" role="search" className="hidden items-center md:flex">
+            <input
+              name="q"
+              type="search"
+              minLength={4}
+              maxLength={40}
+              required
+              dir="ltr"
+              autoComplete="off"
+              placeholder={labels.searchPlaceholder}
+              aria-label={labels.search}
+              className="w-40 rounded border border-white/30 bg-white/10 px-2 py-1 text-sm text-white placeholder:text-white/60"
+              data-testid="search-box"
+            />
+          </form>
           <div className="flex items-center gap-2 py-2">
             {userMenu}
             <button
@@ -161,6 +181,21 @@ export function AppShell({
                 {labels.close}
               </button>
             </div>
+            <form action={searchHref} method="get" role="search" className="px-5 pb-3">
+              <input
+                name="q"
+                type="search"
+                minLength={4}
+                maxLength={40}
+                required
+                dir="ltr"
+                autoComplete="off"
+                placeholder={labels.searchPlaceholder}
+                aria-label={labels.search}
+                className="w-full rounded border border-white/30 bg-white/10 px-2 py-1.5 text-sm text-white placeholder:text-white/60"
+                data-testid="drawer-search-box"
+              />
+            </form>
             <nav className="flex-1 px-5 pb-8">
               {groups.map((group) => (
                 <div key={group.id} className="mt-5 first:mt-0">

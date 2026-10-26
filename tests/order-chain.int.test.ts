@@ -4,7 +4,6 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { withRlsContext } from '../src/lib/db/rls-context';
 import { allocate, cancelOrder, createInvoice, getOrderChain } from '../src/modules/ledger';
 import { saveDispatch } from '../src/modules/operations';
-import { ForbiddenError } from '../src/modules/platform-security';
 import type { SessionUser } from '../src/modules/platform-security/auth/session-gate';
 import { testEnv } from './db-env';
 import { realSessionUser } from './helpers/actors';

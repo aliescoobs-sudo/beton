@@ -143,6 +143,13 @@ export { groupInvoiceLines, type InvoiceGroup, type InvoiceLineFact, netToPay } 
 export { CHAIN_STAGES, type ChainStage, stageState, type StageState, waitingFor } from './order-chain';
 export { RELATED_KINDS, type RelatedDocument, type RelatedKind, uniqueRelated } from './related';
 export {
+  MAX_SEARCH_LENGTH,
+  MIN_SEARCH_LENGTH,
+  normalizeSearchQuery,
+  type SearchQueryError,
+  SearchRateLimiter,
+} from './search';
+export {
   gapCount,
   MATCH_FLAGS,
   type MatchFlag,

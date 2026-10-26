@@ -50,7 +50,9 @@
         "loads": "Chargements",
         "receipts": "Réceptions"
       }
-    }
+    },
+    "searchLabel": "Rechercher un document par son numéro",
+    "searchPlaceholder": "N° de document"
   },
   "auth": {
     "login": {
@@ -2116,6 +2118,31 @@
       "purchase": "Commande d'achat",
       "receipt": "Réceptions",
       "supplier_invoice": "Factures fournisseur"
+    }
+  },
+  "search": {
+    "title": "Recherche par numéro",
+    "intro": "Tapez le début d'un numéro de document (quatre caractères au moins) : BL, commande, facture, avoir, devis, achat, facture fournisseur, chèque. Vous ne trouvez que ce que votre rôle peut lire.",
+    "label": "Numéro de document",
+    "submit": "Chercher",
+    "none": "Aucun document avec ce numéro.",
+    "errors": {
+      "TOO_SHORT": "Quatre caractères au moins.",
+      "INVALID": "Ce n'est pas un numéro de document : lettres, chiffres, tirets et barres seulement.",
+      "RATE_LIMITED": "Trop de recherches : patientez une minute.",
+      "TOO_MANY_ATTEMPTS": "Trop de numéros inconnus : la recherche est bloquée quelques minutes."
+    },
+    "kinds": {
+      "quote": "Devis",
+      "order": "Commande",
+      "trip": "Rotation",
+      "bl": "BL",
+      "invoice": "Facture",
+      "avoir": "Avoir",
+      "purchase": "Achat",
+      "receipt": "Réception",
+      "supplier_invoice": "Facture fournisseur",
+      "payment": "Paiement"
     }
   }
 }

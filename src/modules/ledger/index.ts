@@ -62,6 +62,7 @@ export {
 } from './service/supplier-invoice-service';
 export { getOrderChain, type OrderChainRow } from './service/order-chain-service';
 export { getRelatedDocuments, type RelatedSubject } from './service/related-service';
+export { searchDocuments, type SearchError } from './service/search-service';
 export { getCompanyProfile, listCompanyProfiles, saveCompanyProfile } from './service/company-service';
 export {
   type AccountingExport,
