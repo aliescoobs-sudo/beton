@@ -66,6 +66,7 @@ describe('functions the application role can execute', () => {
     'ctx.sim_now()',
     'ctx.user_id()',
     'public.allocate_to_client(p_instrument uuid, p_client_code text)',
+    'public.attach_supplier_invoice_file(p_code text, p_file uuid, p_type text, p_size integer, p_sha text)',
     'public.allocate_to_invoice(p_instrument uuid, p_invoice uuid, p_amount bigint, p_reason text)',
     'public.accept_supplier_invoice_gaps(p_si uuid, p_reason text)',
     'public.allocate_to_order(p_instrument uuid, p_order_code text)',

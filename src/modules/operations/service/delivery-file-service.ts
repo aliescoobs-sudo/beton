@@ -134,8 +134,10 @@ export async function recordBlReturnWithScan(
 }
 
 class ScanRefused extends Error {
-  constructor(readonly reason: ScanError) {
+  readonly reason: ScanError;
+  constructor(reason: ScanError) {
     super(reason);
+    this.reason = reason;
   }
 }
 

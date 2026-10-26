@@ -46,6 +46,9 @@ export {
 export {
   type CreatedSupplierInvoice,
   acceptSupplierInvoiceGaps,
+  attachSupplierInvoiceFile,
+  type DocumentUpload,
+  openSupplierInvoiceFile,
   approveSupplierInvoice,
   createSupplierInvoice,
   type DecisionError,

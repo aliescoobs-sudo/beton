@@ -1,6 +1,7 @@
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { getRequestClock } from '@/app/request-clock';
 import { getPool } from '@/lib/db/pools';
+import { getEnv } from '@/lib/server-env';
 import { SupplierInvoiceForm } from '@/modules/ledger/ui/supplier-invoices/supplier-invoice-form';
 import { listComponents } from '@/modules/master-data';
 import { requirePagePermission } from '@/modules/platform-security/next';
@@ -24,6 +25,7 @@ export default async function NewSupplierInvoicePage({ params }: { params: Promi
           .map((c) => ({ id: c.id, name: locale === 'ar' ? c.nameAr : c.nameFr }))}
         today={clock.today()}
         createAction={createSupplierInvoiceAction}
+        aiEnabled={getEnv().AI_EXTRACTION_ENABLED}
       />
     </div>
   );

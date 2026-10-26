@@ -712,6 +712,7 @@ export async function newSupplierInvoice(
     receive?: boolean;
     invoiceNo?: string;
     today?: string;
+    withFile?: boolean;
   } = {},
 ): Promise<{ code: string; purchaseId: string; purchaseCode: string; receiptId: string | null }> {
   // A supplier of its own, so that fixtures counting the master supplier's purchases are not disturbed.
@@ -760,6 +761,13 @@ export async function newSupplierInvoice(
       `select reason from audit_event where table_name = 'supplier_invoice_create' order by id desc limit 1`,
     );
     throw new Error(`the supplier invoice was refused: ${why.rows[0]?.reason ?? 'no reason audited'}`);
+  }
+  if (options.withFile) {
+    const attached = await tx.query<{ ok: boolean }>(
+      `select public.attach_supplier_invoice_file($1, gen_random_uuid(), 'image/png', 10, repeat('a', 64)) as ok`,
+      [made.rows[0].code],
+    );
+    if (!attached.rows[0]?.ok) throw new Error('the document was refused');
   }
   return { code: made.rows[0].code, purchaseId: po.id, purchaseCode: po.code, receiptId };
 }

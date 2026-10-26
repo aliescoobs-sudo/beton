@@ -1007,6 +1007,25 @@ export const TABLE_ACCESS = {
     exception:
       'integration I2.1: the supplier invoice (own document, linked to its order and its receipts). Money (D81): owner and support read; written only by create_supplier_invoice (SECURITY DEFINER; the owner or office, blind), never by a role directly; its audit rows are hidden from the others.',
   },
+  supplier_invoice_file: {
+    kind: 'rls',
+    money: true,
+    read: {
+      owner: 'all',
+      partner: 'none',
+      office: 'none',
+      plant: 'none',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'integration I2.3: the photo or PDF of a supplier invoice (metadata: type, size, SHA-256; the bytes are sealed in the file store). Money (D81): owner and support read; written only by attach_supplier_invoice_file (SECURITY DEFINER; the owner or office, blind); opened by a route that re-checks RLS and audits the view; its audit rows are hidden from the others.',
+  },
   supplier_invoice_line: {
     kind: 'rls',
     money: true,

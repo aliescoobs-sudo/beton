@@ -18,6 +18,11 @@ const migrator = new pg.Pool({ connectionString: env.DATABASE_URL_MIGRATOR, max:
 const app = new pg.Pool({ connectionString: env.DATABASE_URL_APP, max: 2 });
 test.afterAll(() => Promise.all([migrator.end(), app.end()]));
 const MONEY = /MAD|DH|\d\s?\d{3},\d{2}/;
+// A 1x1 PNG with a text chunk that must not survive (author), as a phone or a scanner app might write one.
+const PNG_WITH_AUTHOR = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAAFHRFWHRBdXRob3IAU0VDUkVULUFVVEhPUrJPzoEAAAAMSURBVHicY/jPwAAAAwEBAMn+ku8AAAAASUVORK5CYII=',
+  'base64',
+);
 let poCode = '';
 let poId = '';
 let componentId = '';
@@ -79,6 +84,11 @@ test('office enters the supplier invoice for the order: blind, our code back, no
   await page.getByTestId('si-component-0').selectOption(componentId);
   await page.getByTestId('si-qty-0').fill('30');
   await page.getByTestId('si-price-0').fill('1 450,00');
+  // The AI reading is off: the form says so and offers nothing; the photo is just stored.
+  await expect(page.getByTestId('si-ai-note')).toContainText('désactivée');
+  await page
+    .getByTestId('si-file')
+    .setInputFiles({ name: 'facture.png', mimeType: 'image/png', buffer: PNG_WITH_AUTHOR });
   await page.getByTestId('si-save').click();
   const saved = page.getByTestId('si-saved');
   await expect(saved).toContainText(/FF-\d{4}-\d{5}/);
@@ -108,6 +118,14 @@ test('the owner reads it: amounts, the order and the receipt it is linked to', a
   await expect(page.getByTestId('si-totals')).toContainText('8 700,00');
   await expect(page.getByTestId('si-purchase-link')).toContainText(poCode);
   await expect(page.getByTestId('si-receipts-list')).toContainText('2026-06-02');
+  // the photo office attached: opened through the authorized route, without its metadata
+  const link = page.getByTestId('si-file-1');
+  await expect(link).toBeVisible();
+  const doc = await page.request.get((await link.getAttribute('href')) as string);
+  expect(doc.status()).toBe(200);
+  expect(doc.headers()['content-type']).toBe('image/png');
+  expect(doc.headers()['x-content-type-options']).toBe('nosniff');
+  expect((await doc.body()).includes(Buffer.from('SECRET'))).toBe(false);
   await page.getByTestId('si-purchase-link').click();
   await expect(page).toHaveURL(new RegExp(`/fr/purchases/${poId}`));
   await logout(page);

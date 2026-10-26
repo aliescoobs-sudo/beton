@@ -1,7 +1,18 @@
 import type pg from 'pg';
 import { z } from 'zod';
+import { createHash, randomUUID } from 'node:crypto';
+import type { FileStore } from '@/lib/files/store';
+import { type UploadError, validateUpload } from '@/lib/files/validate-upload';
 import { err, ok, type Result } from '@/lib/result';
-import { can, inRequest, isMalformedId, require, type SessionUser } from '@/modules/platform-security';
+import {
+  can,
+  inRequest,
+  isMalformedId,
+  parameterOrDefault,
+  recordAuditEvent,
+  require,
+  type SessionUser,
+} from '@/modules/platform-security';
 import { type Effect, visibleEffects } from '../domain/effects';
 import { isRealDate } from '../domain/dates';
 import { invoiceDueDate } from '../domain/invoice';
@@ -12,7 +23,14 @@ import {
   type SupplierInvoiceState,
 } from '../domain/supplier-invoice';
 
+/** What a browser sent: the type it declared and the bytes. Both are checked, never trusted (src/lib/files). */
+export interface DocumentUpload {
+  declaredType: string;
+  bytes: Uint8Array;
+}
+
 export type SupplierInvoiceError =
+  | UploadError
   | 'INVALID'
   | 'NOT_FOUND'
   | 'REFUSED'
@@ -48,6 +66,7 @@ export async function createSupplierInvoice(
   actor: SessionUser,
   input: unknown,
   deps: { today: string },
+  file?: { upload: DocumentUpload; store: FileStore } | null,
 ): Promise<Result<CreatedSupplierInvoice, SupplierInvoiceError>> {
   await require(appPool, actor, 'supplier_invoices.write');
   const parsed = parseSupplierInvoiceInput(input);
@@ -60,6 +79,9 @@ export async function createSupplierInvoice(
       appPool,
       actor,
       async (tx): Promise<Result<CreatedSupplierInvoice, SupplierInvoiceError>> => {
+        // The photo is checked before anything is written: a refused file leaves no invoice behind.
+        const checked = file ? validateUpload({ ...file.upload, maxBytes: await uploadMaxBytes(tx) }) : null;
+        if (checked && !checked.ok) return err(checked.error);
         const made = await tx.query<{ code: string | null }>(
           'select public.create_supplier_invoice($1, $2, $3, $4, $5::jsonb, $6, $7) as code',
           [
@@ -81,6 +103,8 @@ export async function createSupplierInvoice(
         );
         const code = made.rows[0]?.code;
         if (!code) return err('REFUSED');
+        if (file && checked?.ok && !(await storeDocument(tx, code, checked.value, file.store)))
+          throw new RollBack('REFUSED');
         let id = '';
         if (can(actor.role, 'supplier_invoices.read')) {
           const row = await tx.query<{ id: string }>('select id from supplier_invoice where code = $1', [
@@ -93,8 +117,106 @@ export async function createSupplierInvoice(
       },
     );
   } catch (error) {
+    if (error instanceof RollBack) return err(error.reason);
     return err(failure(error));
   }
+}
+
+class RollBack extends Error {
+  readonly reason: SupplierInvoiceError;
+  constructor(reason: SupplierInvoiceError) {
+    super(reason);
+    this.reason = reason;
+  }
+}
+
+async function uploadMaxBytes(tx: pg.PoolClient): Promise<number> {
+  const { rows } = await tx.query<{ value: unknown }>(
+    `select public.ops_parameter('upload_max_bytes') as value`,
+  );
+  return parameterOrDefault('upload_max_bytes', rows[0]?.value);
+}
+
+/** Seals a checked document and records it against the invoice (by our code); false when the database refuses it. */
+async function storeDocument(
+  tx: pg.PoolClient,
+  code: string,
+  checked: { type: string; bytes: Uint8Array },
+  store: FileStore,
+): Promise<boolean> {
+  const id = randomUUID();
+  const attached = await tx.query<{ ok: boolean }>(
+    'select public.attach_supplier_invoice_file($1, $2, $3, $4, $5) as ok',
+    [code, id, checked.type, checked.bytes.length, createHash('sha256').update(checked.bytes).digest('hex')],
+  );
+  if (!attached.rows[0]?.ok) return false;
+  await store.put(id, checked.bytes);
+  return true;
+}
+
+/**
+ * Adds a photo or a PDF to an invoice entered earlier, by our code (owner or office, blind: nothing but a yes or no comes
+ * back). At most five documents per invoice. Same rules as every stored document (DECISIONS 99).
+ */
+export async function attachSupplierInvoiceFile(
+  appPool: pg.Pool,
+  actor: SessionUser,
+  input: unknown,
+  upload: DocumentUpload,
+  deps: { store: FileStore },
+): Promise<Result<{ attached: true }, SupplierInvoiceError>> {
+  await require(appPool, actor, 'supplier_invoices.write');
+  const parsed = z.object({ code: z.string().regex(/^FF-[0-9]{4}-[0-9]{5,}$/) }).safeParse(input);
+  if (!parsed.success) return err('INVALID');
+  try {
+    return await inRequest(
+      appPool,
+      actor,
+      async (tx): Promise<Result<{ attached: true }, SupplierInvoiceError>> => {
+        const checked = validateUpload({ ...upload, maxBytes: await uploadMaxBytes(tx) });
+        if (!checked.ok) return err(checked.error);
+        return (await storeDocument(tx, parsed.data.code, checked.value, deps.store))
+          ? ok({ attached: true })
+          : err('REFUSED');
+      },
+    );
+  } catch (error) {
+    return err(failure(error));
+  }
+}
+
+/**
+ * A stored document of an invoice for download: found through the caller's own row-level security (owner and support; anyone
+ * else gets NOT_FOUND), the view audited first, then opened; a file that no longer matches its recorded hash is refused.
+ */
+export async function openSupplierInvoiceFile(
+  appPool: pg.Pool,
+  actor: SessionUser,
+  ids: { supplierInvoiceId: string; fileId: string },
+  deps: { store: FileStore },
+): Promise<
+  Result<{ code: string; contentType: string; bytes: Buffer; seq: number }, 'NOT_FOUND' | 'CORRUPT'>
+> {
+  await require(appPool, actor, 'supplier_invoices.read');
+  const parsed = z.object({ supplierInvoiceId: z.uuid(), fileId: z.uuid() }).safeParse(ids);
+  if (!parsed.success) return err('NOT_FOUND');
+  return inRequest(appPool, actor, async (tx) => {
+    const { rows } = await tx.query<{ content_type: string; sha256: string; code: string; seq: number }>(
+      `select f.content_type, f.sha256, s.code, f.seq from supplier_invoice_file f
+         join supplier_invoice s on s.id = f.supplier_invoice_id where f.id = $1 and f.supplier_invoice_id = $2`,
+      [parsed.data.fileId, parsed.data.supplierInvoiceId],
+    );
+    const row = rows[0];
+    if (!row) return err('NOT_FOUND');
+    await recordAuditEvent(tx, {
+      action: 'view',
+      table: `file:supplier_invoice:${row.code}`,
+      rowId: parsed.data.fileId,
+    });
+    const bytes = await deps.store.get(parsed.data.fileId).catch(() => null);
+    if (!bytes || createHash('sha256').update(bytes).digest('hex') !== row.sha256) return err('CORRUPT');
+    return ok({ code: row.code, contentType: row.content_type, bytes, seq: row.seq });
+  });
 }
 
 export interface SupplierInvoiceView {
@@ -179,6 +301,8 @@ export interface SupplierInvoiceDetail {
   }[];
   receipts: { id: string; receivedDate: string }[];
   events: { seq: number; event: SupplierInvoiceState; reason: string | null; at: string }[];
+  /** The stored documents (photos or PDFs) of the invoice. */
+  files: { id: string; seq: number; contentType: string; sizeBytes: number }[];
 }
 
 /** One supplier invoice with its lines, the receipts it covers and its events. Owner and support. */
@@ -222,8 +346,18 @@ export async function getSupplierInvoice(
            from supplier_invoice_event where supplier_invoice_id = $1 order by seq`,
         [id],
       );
+      const files = await tx.query<{ id: string; seq: number; content_type: string; size_bytes: number }>(
+        `select id, seq, content_type, size_bytes from supplier_invoice_file where supplier_invoice_id = $1 order by seq`,
+        [id],
+      );
       return {
         invoice,
+        files: files.rows.map((f) => ({
+          id: f.id,
+          seq: f.seq,
+          contentType: f.content_type,
+          sizeBytes: f.size_bytes,
+        })),
         lines: lines.rows.map((l) => ({
           seq: l.seq,
           description: l.description,

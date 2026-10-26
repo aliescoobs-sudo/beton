@@ -2,11 +2,14 @@
 
 import { getRequestClock } from '@/app/request-clock';
 import { getPool } from '@/lib/db/pools';
+import { defaultFileStore } from '@/lib/files/server-store';
 import {
   acceptSupplierInvoiceGaps,
   approveSupplierInvoice,
+  attachSupplierInvoiceFile,
   createSupplierInvoice,
   type DecisionError,
+  type DocumentUpload,
   type Effect,
   rejectSupplierInvoice,
   type SupplierInvoiceError,
@@ -16,9 +19,17 @@ import { currentAuthState } from '@/modules/platform-security/next';
 
 type Failure = { ok: false; error: SupplierInvoiceError | 'UNAUTHENTICATED' | 'FORBIDDEN' };
 
-// @permission supplier_invoices.write (owner, office): blind entry, the answer is our code and the effects the role may see
+/** The file field of a form, as the bytes and the type the browser declared; null when none was chosen. */
+async function uploadOf(data: FormData): Promise<DocumentUpload | null> {
+  const file = data.get('file');
+  if (!(file instanceof File) || file.size === 0) return null;
+  return { declaredType: file.type, bytes: new Uint8Array(await file.arrayBuffer()) };
+}
+
+// @permission supplier_invoices.write (owner, office): blind entry, the answer is our code and the effects the role may see;
+// the photo or PDF of the invoice, when chosen, is checked and sealed with it
 export async function createSupplierInvoiceAction(
-  input: unknown,
+  data: FormData,
 ): Promise<{ ok: true; code: string; effects: Effect[] } | Failure> {
   const allowed = await authorize('supplier_invoices.write', {
     getState: currentAuthState,
@@ -26,10 +37,45 @@ export async function createSupplierInvoiceAction(
   });
   if (!allowed.ok) return { ok: false, error: allowed.reason };
   try {
-    const result = await createSupplierInvoice(getPool('app'), allowed.user, input, {
-      today: (await getRequestClock()).today(),
-    });
+    let payload: unknown = null;
+    try {
+      payload = JSON.parse(String(data.get('payload') ?? 'null'));
+    } catch {
+      return { ok: false, error: 'INVALID' };
+    }
+    const upload = await uploadOf(data);
+    const result = await createSupplierInvoice(
+      getPool('app'),
+      allowed.user,
+      payload,
+      { today: (await getRequestClock()).today() },
+      upload ? { upload, store: defaultFileStore() } : null,
+    );
     return result.ok ? { ok: true, code: result.value.code, effects: result.value.effects } : result;
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, error: 'FORBIDDEN' };
+    throw error;
+  }
+}
+
+// @permission supplier_invoices.write (owner, office): adds a photo or a PDF to an invoice by our code; blind, a yes or a no
+export async function attachSupplierInvoiceFileAction(data: FormData): Promise<{ ok: true } | Failure> {
+  const allowed = await authorize('supplier_invoices.write', {
+    getState: currentAuthState,
+    appPool: getPool('app'),
+  });
+  if (!allowed.ok) return { ok: false, error: allowed.reason };
+  try {
+    const upload = await uploadOf(data);
+    if (!upload) return { ok: false, error: 'EMPTY' };
+    const result = await attachSupplierInvoiceFile(
+      getPool('app'),
+      allowed.user,
+      { code: String(data.get('code') ?? '') },
+      upload,
+      { store: defaultFileStore() },
+    );
+    return result.ok ? { ok: true } : result;
   } catch (error) {
     if (error instanceof ForbiddenError) return { ok: false, error: 'FORBIDDEN' };
     throw error;

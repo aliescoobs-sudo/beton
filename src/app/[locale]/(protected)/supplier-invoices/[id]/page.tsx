@@ -2,11 +2,12 @@ import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { getPool } from '@/lib/db/pools';
 import { getSupplierInvoice, getSupplierInvoiceMatch, gapCount } from '@/modules/ledger';
+import { SupplierInvoiceFiles } from '@/modules/ledger/ui/supplier-invoices/supplier-invoice-files';
 import { SupplierInvoiceDecisions } from '@/modules/ledger/ui/supplier-invoices/supplier-invoice-decisions';
 import { can, recordMoneyView } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/next';
 import { Money, PageHeader, StatusPill, Table, Td, Th } from '@/ui';
-import { acceptGapsAction, approveAction, rejectAction } from '../actions';
+import { acceptGapsAction, approveAction, attachSupplierInvoiceFileAction, rejectAction } from '../actions';
 
 const qty = (milli: number) => (milli / 1000).toLocaleString('fr-FR', { maximumFractionDigits: 3 });
 
@@ -188,6 +189,18 @@ export default async function SupplierInvoicePage({
             />
           </div>
         )}
+      </section>
+      <section aria-labelledby="si-documents">
+        <h2 id="si-documents" className="mb-2 text-xl">
+          {t('documents')}
+        </h2>
+        <SupplierInvoiceFiles
+          code={i.code}
+          hrefBase={`/${locale}/supplier-invoices/${i.id}/files`}
+          files={detail.files}
+          canAttach={can(user.role, 'supplier_invoices.write')}
+          attach={attachSupplierInvoiceFileAction}
+        />
       </section>
       <section aria-labelledby="si-receipts">
         <h2 id="si-receipts" className="mb-2 text-xl">

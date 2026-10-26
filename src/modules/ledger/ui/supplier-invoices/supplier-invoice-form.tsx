@@ -29,10 +29,13 @@ export function SupplierInvoiceForm({
   components,
   today,
   createAction,
+  aiEnabled = false,
 }: {
   components: ComponentChoice[];
   today: string;
-  createAction: (input: unknown) => Promise<Result>;
+  createAction: (data: FormData) => Promise<Result>;
+  /** The AI reading of the photo: off until the CNDP has authorized it; only said, never offered. */
+  aiEnabled?: boolean;
 }) {
   const t = useTranslations('ledger.supplierInvoices');
   const [lines, setLines] = useState<Line[]>([emptyLine()]);
@@ -63,19 +66,32 @@ export function SupplierInvoiceForm({
     setMessage(null);
     setBusy(true);
     try {
-      const result = await createAction({
-        purchaseCode: text('purchaseCode'),
-        supplierInvoiceNo: text('supplierInvoiceNo'),
-        invoiceDate: text('invoiceDate'),
-        dueDate: text('dueDate') || null,
-        lines: parsed,
-      });
+      const body = new FormData();
+      body.set(
+        'payload',
+        JSON.stringify({
+          purchaseCode: text('purchaseCode'),
+          supplierInvoiceNo: text('supplierInvoiceNo'),
+          invoiceDate: text('invoiceDate'),
+          dueDate: text('dueDate') || null,
+          lines: parsed,
+        }),
+      );
+      const file = data.get('file');
+      if (file instanceof File && file.size > 0) body.set('file', file);
+      const result = await createAction(body);
       if (result.ok) setDone({ code: result.code, effects: result.effects });
       else
         setMessage(
           {
             INVALID: t('invalid'),
             REFUSED: t('refused'),
+            EMPTY: t('fileRefused'),
+            TOO_LARGE: t('fileTooLarge'),
+            TYPE_NOT_ALLOWED: t('fileRefused'),
+            TYPE_MISMATCH: t('fileRefused'),
+            CORRUPT: t('fileRefused'),
+            ACTIVE_CONTENT: t('fileRefused'),
             NOT_FOUND: t('notFound'),
             PAYMENT_TERM_TOO_LONG: t('termTooLong'),
             DUE_BEFORE_INVOICE: t('dueBefore'),
@@ -158,6 +174,19 @@ export function SupplierInvoiceForm({
           <span className="field-hint block">{t('dueHint')}</span>
         </label>
       </div>
+      <label className="block">
+        <span className="field-label">{t('photo')}</span>
+        <input
+          type="file"
+          name="file"
+          accept="image/jpeg,image/png,image/webp,application/pdf"
+          className="mt-1 block text-sm"
+          data-testid="si-file"
+        />
+        <span className="field-hint block" data-testid="si-ai-note">
+          {aiEnabled ? t('aiOn') : t('aiOff')}
+        </span>
+      </label>
       <fieldset className="space-y-3">
         <legend className="field-label">{t('lines')}</legend>
         {lines.map((l, i) => (

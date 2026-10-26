@@ -180,6 +180,12 @@ const SEED: Record<MoneyTable, (tx: pg.PoolClient, actor: string) => Promise<unk
       invoiceNo: `FS-${randomUUID().slice(0, 12)}`,
     });
   },
+  supplier_invoice_file: async (tx, actor) => {
+    await newSupplierInvoice(tx, actor, marker, {
+      invoiceNo: `FS-${randomUUID().slice(0, 12)}`,
+      withFile: true,
+    });
+  },
   supplier_invoice_line: async (tx, actor) => {
     await newSupplierInvoice(tx, actor, marker, {
       invoiceNo: `FS-${randomUUID().slice(0, 12)}`,

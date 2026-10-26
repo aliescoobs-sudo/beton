@@ -565,6 +565,15 @@ const FIXTURES: Record<
     },
     visible: `select s.created_by::text as owner from supplier_invoice s where s.supplier_invoice_no = 'FS-' || $1`,
   },
+  supplier_invoice_file: {
+    // Written by attach_supplier_invoice_file only: the owner's fixture enters an invoice and attaches a document (its own marker).
+    writers: ['owner'],
+    seed: async (tx, actor) => {
+      await newSupplierInvoice(tx, actor, `${marker}f`, { withFile: true });
+    },
+    visible: `select f.created_by::text as owner from supplier_invoice_file f join supplier_invoice s on s.id = f.supplier_invoice_id
+                where s.supplier_invoice_no = 'FS-' || $1 || 'f'`,
+  },
   supplier_invoice_line: {
     // Written together with their invoice (seeded by the fixture above).
     writers: ['owner'],

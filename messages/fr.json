@@ -1285,7 +1285,17 @@
         "refused": "Décision refusée.",
         "conflict": "Conflit, réessayez.",
         "error": "Action impossible."
-      }
+      },
+      "photo": "Photo ou PDF de la facture (facultatif)",
+      "aiOff": "La lecture automatique par IA est désactivée, en attendant l'autorisation de la CNDP : saisissez les lignes à la main.",
+      "aiOn": "La lecture automatique par IA n'est pas encore disponible : saisissez les lignes à la main.",
+      "fileRefused": "Fichier refusé : seules les images (JPEG, PNG, WebP) et les PDF sans contenu actif sont acceptés.",
+      "fileTooLarge": "Fichier trop volumineux.",
+      "fileLimit": "Impossible d'ajouter ce document : cinq au plus par facture.",
+      "documents": "Documents de la facture",
+      "document": "Document",
+      "noFiles": "Aucune photo ni PDF joint.",
+      "attach": "Joindre"
     }
   },
   "operations": {

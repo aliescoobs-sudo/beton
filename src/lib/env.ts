@@ -81,6 +81,9 @@ const envObject = z.object({
   BACKUP_AGE_RECIPIENT: z.string().startsWith('age1', { error: 'must be an age public key (age1…)' }),
   SIMULATION_ENABLED: flag,
   REAL_DATA: flag,
+  // The AI reading of a supplier invoice photo. OFF, and refused next to real data or in production, until the CNDP has
+  // authorized the transfer (DECISIONS 107); even on, only an interface exists: no provider is wired and nothing leaves the server.
+  AI_EXTRACTION_ENABLED: flag,
   // Test servers (e2e) that share a database being recreated must not run the pg-boss cron scheduler.
   JOB_SCHEDULER_DISABLED: flag,
   // Reverse proxies in front of the app that each append the address they received the request from to
@@ -100,6 +103,13 @@ const envSchema = envObject.superRefine((env, ctx) => {
       code: 'custom',
       path: ['SIMULATION_ENABLED'],
       message: 'must be "false" when NODE_ENV=production or REAL_DATA=true',
+    });
+  }
+  if (env.AI_EXTRACTION_ENABLED && (env.NODE_ENV === 'production' || env.REAL_DATA)) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['AI_EXTRACTION_ENABLED'],
+      message: 'must be "false" until the CNDP has authorized sending invoices to an AI provider',
     });
   }
 });
