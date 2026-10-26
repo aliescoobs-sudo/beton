@@ -34,8 +34,8 @@ Status: `[ ]` to do, `[x]` done (commit), `[~]` partial.
 - [x] I4.3 Overdue orders flagged (AC-INT-22)
 
 ### Wave I5: documents only, no code
-- [ ] docs/SPEC-assistant.md
-- [ ] docs/REFERENCE-MAP.md
+- [x] docs/SPEC-assistant.md
+- [x] docs/REFERENCE-MAP.md
 
 ### Finish
 - [ ] db:scenario walk and DEMO.md (AC-INT-23)
