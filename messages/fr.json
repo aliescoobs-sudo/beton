@@ -1123,6 +1123,19 @@
       "totalHt": "Total HT",
       "vat": "TVA",
       "convertedTo": "Devenu la commande"
+    },
+    "invoiceQueue": {
+      "link": "À facturer",
+      "title": "Livré, non facturé",
+      "intro": "Les livraisons terminées qu'aucune facture ne porte encore, par client.",
+      "none": "Tout ce qui est livré est facturé.",
+      "summary": "{count, plural, one {# BL} other {# BL}}",
+      "ttc": "à facturer TTC",
+      "bl": "BL",
+      "delivered": "Livré le",
+      "product": "Béton",
+      "volume": "Volume",
+      "amountHt": "Montant HT"
     }
   },
   "operations": {

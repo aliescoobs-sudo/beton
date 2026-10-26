@@ -12,7 +12,7 @@ Status: `[ ]` to do, `[x]` done (commit), `[~]` partial.
 - [x] I1.1 Delivered BL from the `unloading_finished` tracking step, hand mark outside a rotation, view `delivered_load`, order delivered quantity (AC-INT-01; migration 0064; D97, D98)
 - [x] I1.2a File vault library: validation by type and magic bytes, metadata stripping, AES-GCM sealed disk store bound to the file id, key rotation (AC-INT-03; D99; the route and the audit of views are in I1.2b, AC-INT-04)
 - [x] I1.2b Signed BL with optional scan: `delivery_file`, one authorized route, audited views (AC-INT-02, 04; migration 0065; D100)
-- [ ] I1.3 Delivered-not-invoiced queue per client (AC-INT-05)
+- [x] I1.3 Delivered-not-invoiced queue per client (AC-INT-05; migration 0066; D101)
 - [ ] I1.4 Invoice from selected BLs, grouped by product, advances, one-invoice-per-BL constraint (AC-INT-06, 07, 08)
 - [ ] I1.5 Allocation across all open invoices, owner override, bounce (AC-INT-09, 10, 11)
 - [ ] I1.6 Avoir for rejected or returned concrete (AC-INT-12)
@@ -73,4 +73,4 @@ Filled at the end (re-run of the CP-INTEGRATION table).
 Filled at the end.
 
 ## New provisional decisions
-Filled as they are taken (DECISIONS 97 onward): 97 (delivered), 98 (delivered quantity), 99 (stored documents), 100 (signed BL and its scan).
+Filled as they are taken (DECISIONS 97 onward): 97 (delivered), 98 (delivered quantity), 99 (stored documents), 100 (signed BL and its scan), 101 (invoicing queue).

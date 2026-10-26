@@ -78,6 +78,8 @@ export const PERMISSIONS = {
   // Invoices
   'invoices.read': MONEY_READ,
   'invoices.write': BLIND_WRITE,
+  // The delivered loads no invoice carries yet. Office reads it without any amount (the answer has no money key).
+  'invoices.queue': ['owner', 'office', 'support'],
   // Purchases, supplier payments (plant: receipt lines, no amount)
   'purchases.read': ['owner', 'plant', 'support'],
   'purchases.read_money': MONEY_READ,

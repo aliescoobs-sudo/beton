@@ -53,6 +53,12 @@ const GROUPS: GroupDef[] = [
         allowed: 'orders.write',
       },
       {
+        path: '/invoices/queue',
+        labelKey: 'ledger.invoiceQueue.link',
+        testId: 'invoice-queue-link',
+        allowed: 'invoices.queue',
+      },
+      {
         path: '/invoices/new',
         labelKey: 'ledger.invoices.newLink',
         testId: 'invoices-new-link',
