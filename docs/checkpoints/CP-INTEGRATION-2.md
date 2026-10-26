@@ -39,9 +39,9 @@ Status: `[ ]` to do, `[x]` done (commit), `[~]` partial.
 
 ### Finish
 - [x] db:scenario walk and DEMO.md (AC-INT-23)
-- [ ] Full regression: unit, integration, e2e on an idle machine (single worker if load makes it flaky, no raised timeouts)
-- [ ] Re-run of the CP-INTEGRATION table with the new verdicts (below)
-- [ ] Unfinished list and new provisional decisions (below)
+- [x] Full regression: unit, integration, e2e on an idle machine (single worker if load makes it flaky, no raised timeouts)
+- [x] Re-run of the CP-INTEGRATION table with the new verdicts (below)
+- [x] Unfinished list and new provisional decisions (below)
 
 ## Order and dependencies
 ```
@@ -67,10 +67,55 @@ Built in the order of the brief, except that I1.2a (the vault) is split out beca
 | Scope: 20 tasks | Med | one task per commit; the table below is updated at every commit |
 
 ## Verdicts after the work
-Filled at the end (re-run of the CP-INTEGRATION table).
+Re-run of the CP-INTEGRATION table. Verdicts come from the tests and e2e specs of each task and from the full regression below, not from reading alone.
+
+| # | Link | Before | After | What closed it (commit task, acceptance criterion) |
+|---|---|---|---|---|
+| **Sales chain** | | | | |
+| S1 | Order | works | works | untouched |
+| S2 | Planned rotations | works | works | office's read-only view, default driver per truck with audited override, overdue flagged (I4.1 to I4.3, AC-INT-20 to 22) |
+| S3 | Loaded, BL, no price | works | works | untouched; BL PDF without a price (I3.4) |
+| S4 | Delivered | partial | **works** | the unloading step delivers the BL, or the plant marks it for a load outside a rotation; only delivered loads are invoiced (I1.1, AC-INT-01) |
+| S5 | Signed BL returned | partial | **works** | recorded once, optional scan attached then or later, type and magic bytes, metadata stripped, encrypted at rest, audited route (I1.2, AC-INT-02, 03) |
+| S6 | "Delivered, not invoiced" queue | missing | **works** | per client; owner amounts, office BL numbers/dates/m³/product only (I1.3, AC-INT-04, 05) |
+| S7 | Invoice from selected BLs | partial | **works** | one action across a client's orders, grouped by product with BL numbers, "Acompte reçu" / "Net à payer", a BL on one invoice by database constraint (I1.4, AC-INT-06 to 08) |
+| S8 | Payment, oldest first | partial | **works** | allocation across the client's open invoices, owner override audited, a bounce reverses and reopens, the 30-day window kept (I1.5, AC-INT-09 to 11) |
+| S9 | Instrument lifecycle, bounce | works | works | extended by S8 |
+| S10 | Client statement | works | works | feeds the avoirs; PDF added (I1.6, I3.4) |
+| S11 | Cash and bank | works | works | untouched |
+| **Purchase chain** | | | | |
+| P1 | Purchase order | partial | **works** | the supplier invoice is its own document linked to the order and the receipts; purchases entered before keep their former payable (I2.1, AC-INT-13) |
+| P2, P3 | Receipt, stock | works | works | untouched |
+| P4 | Supplier invoice, three-way match, photo, AI flag | missing | **works, AI reading is an interface only** | match with tolerances as parameters, gaps accepted with a reason after a fresh second factor, photo attached (I2.2, I2.3, AC-INT-14, 15); the AI extraction is a flag that is off and a stub that makes no request: nothing reads an invoice by AI |
+| P5 | Payable | works | works | now created from the approved supplier invoice, not from the order (D106) |
+| P6, P7 | Supplier payment, statement | works | works | payment allocated to the supplier invoice; PDF added |
+| **Cross-cutting** | | | | |
+| X1 | Order-chain view | partial | **works** | six stages per order, paid masked for roles without money (I3.1, AC-INT-16) |
+| X2 | Links between documents | partial | **works** | panel on every document page from database relations under the caller's RLS (I3.2, AC-INT-17) |
+| X3 | Search by document number | missing | **works** | one box and a page; exact or prefix of four characters, numbers only, audited misses, lock-out (I3.3, AC-INT-18) |
+| X4 | PDF | partial | **works, French only** | BL, invoice, avoir, quote, both statements; in memory, never stored, watermark in the pilot, audited (I3.4, AC-INT-19). Purchase orders, receipts and payment receipts still have no PDF (not asked) |
+| X5 | CSV | works | works | untouched |
+| Asked | `docs/REFERENCE-MAP.md`, `docs/SPEC-assistant.md` | missing | **written** | I5 (documents only). The assistant itself is **not built**, by instruction |
+
+Regression (the machine idle, one worker, no timeout raised): see "Regression" below.
+
+## Regression
+- Lint, typecheck, unit and integration tests: 199 files, 3 184 tests passed, run after the last code change (the run is repeated in the last commit's message if anything moved).
+- Build (`SIMULATION_ENABLED=false NEXT_DIST_DIR=.next-e2e`) and the whole Playwright suite: 133 specs, one worker, 29.8 minutes: 130 passed, 2 design-screenshot specs skipped by design. One failure, a stale assertion (`master-client` expected the plant to have no sales tab, but since I3.1 it holds the order chain); the assertion was corrected and that spec re-run (4 of 4 passed, including the Arabic spec that the failure had skipped).
+- The dev database was migrated (75 migrations), `db:scenario` run (it adds the integration walk once), the audit chain verified (9 492 events).
 
 ## Not finished
-Filled at the end.
+- **Arabic on PDFs.** The standard PDF fonts have no Arabic letters, which print as "?". All PDFs are French (the legal language of invoices). An embedded font is needed for Arabic documents (D111).
+- **AI reading of the supplier invoice** is not implemented: only the interface behind `AI_EXTRACTION_ENABLED` (off, refused with real data or in production) and a test that the off path makes no request (D107).
+- **The assistant** is specified (`docs/SPEC-assistant.md`) and not built. Nothing of it exists in code.
+- **No PDF** for purchase orders, receipts, payment receipts.
+- **The older purchases of `db:scenario` keep the former payable** (from the order). Only the new walk uses the supplier invoice as the source. Converting the 80 older ones would need a data migration as the system actor (D79 exception) and was not asked.
+- **Scans and photos in the walk.** The demo walk does not attach a scan or a photo (the vault needs the key ring of a running server); the attach flows are covered by the integration and e2e tests.
+- **Free-text reasons.** The override reason of a driver, the reason to accept a gap and the avoir reason are free text; short lists are a possible later step.
+- **Not checked in a browser by a person.** Everything above passed automated checks; nobody has clicked through it.
 
 ## New provisional decisions
-Filled as they are taken (DECISIONS 97 onward): 97 (delivered), 98 (delivered quantity), 99 (stored documents), 100 (signed BL and its scan), 101 (invoicing queue), 102 (invoice from the BLs), 103 (payment spread over invoices), 104 (avoir), 105 (supplier invoice), 106 (three-way match and payable), 107 (supplier invoice photo, AI flag), 108 (order chain), 109 (related documents), 110 (search).
+All "Ali, provisional until the owner confirms". In docs/DECISIONS.md, section "Integration wave":
+97 delivered; 98 delivered quantity; 99 stored documents (the vault); 100 signed BL and its scan; 101 invoicing queue; 102 invoice from the BLs; 103 payment spread over invoices; 104 avoir; 105 supplier invoice; 106 three-way match and payable; 107 supplier invoice photo and the AI flag; 108 order chain; 109 related documents; 110 search by number; **111 server-side PDF (own writer, no dependency, French only, pilot watermark)**; **112 default driver per truck with audited override (reasons in free text, replaces code-order pairing)**; **113 office's read-only dispatch (one database function, client names shown, no order number)**.
+
+Questions for the owner that these raise: may office see client names on the dispatch (113); who may download which PDF (111, with 82); is a step-up needed every time office confirms a money draft once the assistant exists (SPEC-assistant §11); does office get the assistant at all.

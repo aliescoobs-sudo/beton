@@ -85,7 +85,8 @@ test('an office user creates a client but is blocked on a duplicate ICE and cann
 test('plant has no clients page (404)', async ({ page }) => {
   await loginAndEnrol(page, 'fr', E2E_MD.clientPlant.email);
   await expect(page.getByTestId('clients-link')).toHaveCount(0);
-  await expect(page.getByTestId('tab-sales')).toHaveCount(0);
+  // the plant's sales group holds only the order chain (quantities and stages), no client or price page
+  await expect(page.getByTestId('selling-prices-link')).toHaveCount(0);
   const response = await page.goto('/fr/master-data/clients');
   expect(response?.status()).toBe(404);
 });
