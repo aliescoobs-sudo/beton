@@ -75,6 +75,8 @@ const envObject = z.object({
   FIELD_ENCRYPTION_KEYS: keyring,
   RECOVERY_CODES_KEYS: keyring,
   LOOKUP_HMAC_KEY: base64Key32,
+  // Where the encrypted content of stored documents (BL scans, supplier invoice photos) lives: outside any public path.
+  FILE_STORE_DIR: z.string().min(1).default('file-store'),
   APP_BASE_URL: z.url({ protocol: /^https?$/, error: 'must be the http(s) origin the app is served from' }),
   BACKUP_AGE_RECIPIENT: z.string().startsWith('age1', { error: 'must be an age public key (age1…)' }),
   SIMULATION_ENABLED: flag,

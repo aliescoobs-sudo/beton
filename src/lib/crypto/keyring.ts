@@ -12,6 +12,15 @@ export interface Keyring {
   decrypt(sealed: string): string;
   keyIdOf(sealed: string): string;
   needsRotation(sealed: string): boolean;
+  /**
+   * The same AES-256-GCM for binary content (stored files). Output: `BBF1`, key id length (1 byte), key id, IV (12), tag
+   * (16), ciphertext. `aad` is authenticated, not stored: bind a file to its record so a blob swapped between two records
+   * fails to open.
+   */
+  encryptBytes(plain: Uint8Array, aad?: Uint8Array): Buffer;
+  decryptBytes(sealed: Uint8Array, aad?: Uint8Array): Buffer;
+  keyIdOfBytes(sealed: Uint8Array): string;
+  needsRotationBytes(sealed: Uint8Array): boolean;
 }
 
 /**
@@ -40,8 +49,43 @@ export function parseKeyring(spec: string): Keyring {
     return { keyId, iv, tag, ciphertext };
   };
 
+  const BYTES_MAGIC = Buffer.from('BBF1');
+  const parseBytes = (sealed: Uint8Array) => {
+    const buf = Buffer.from(sealed.buffer, sealed.byteOffset, sealed.byteLength);
+    const idLength = buf.length > 5 ? buf[4]! : 0;
+    const headerEnd = 5 + idLength + 12 + 16;
+    if (buf.length < headerEnd || !buf.subarray(0, 4).equals(BYTES_MAGIC) || idLength === 0) {
+      throw new Error('Unrecognized ciphertext format');
+    }
+    return {
+      keyId: buf.subarray(5, 5 + idLength).toString('utf8'),
+      iv: buf.subarray(5 + idLength, 5 + idLength + 12),
+      tag: buf.subarray(5 + idLength + 12, headerEnd),
+      ciphertext: buf.subarray(headerEnd),
+    };
+  };
+
   return {
     currentId,
+    encryptBytes(plain, aad) {
+      const iv = randomBytes(12);
+      const cipher = createCipheriv('aes-256-gcm', keys.get(currentId)!, iv);
+      if (aad) cipher.setAAD(aad);
+      const ciphertext = Buffer.concat([cipher.update(plain), cipher.final()]);
+      const id = Buffer.from(currentId, 'utf8');
+      return Buffer.concat([BYTES_MAGIC, Buffer.from([id.length]), id, iv, cipher.getAuthTag(), ciphertext]);
+    },
+    decryptBytes(sealed, aad) {
+      const { keyId, iv, tag, ciphertext } = parseBytes(sealed);
+      const key = keys.get(keyId);
+      if (!key) throw new Error(`Value was sealed with key "${keyId}", which is not in the keyring`);
+      const decipher = createDecipheriv('aes-256-gcm', key, iv);
+      if (aad) decipher.setAAD(aad);
+      decipher.setAuthTag(tag);
+      return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+    },
+    keyIdOfBytes: (sealed) => parseBytes(sealed).keyId,
+    needsRotationBytes: (sealed) => parseBytes(sealed).keyId !== currentId,
     encrypt(plaintext) {
       const iv = randomBytes(12);
       const cipher = createCipheriv('aes-256-gcm', keys.get(currentId)!, iv);

@@ -60,4 +60,42 @@ describe('keyring (AC-SEC-10)', () => {
     }
     expect(message).not.toContain(Buffer.alloc(16, 7).toString('base64'));
   });
+
+  describe('bytes (stored files)', () => {
+    const data = Buffer.from([0, 1, 2, 250, 255, 128, 7]);
+
+    it('round-trips binary content and never keeps it readable', () => {
+      const ring = parseKeyring(`k1:${k(1)}`);
+      const sealed = ring.encryptBytes(data);
+      expect(sealed.includes(data)).toBe(false);
+      expect(ring.decryptBytes(sealed).equals(data)).toBe(true);
+      expect(ring.keyIdOfBytes(sealed)).toBe('k1');
+    });
+
+    it('binds the content to its record: another aad, or none, fails to open', () => {
+      const ring = parseKeyring(`k1:${k(1)}`);
+      const sealed = ring.encryptBytes(data, Buffer.from('file-a'));
+      expect(ring.decryptBytes(sealed, Buffer.from('file-a')).equals(data)).toBe(true);
+      expect(() => ring.decryptBytes(sealed, Buffer.from('file-b'))).toThrow();
+      expect(() => ring.decryptBytes(sealed)).toThrow();
+    });
+
+    it('detects altered content, a wrong format and a missing key', () => {
+      const ring = parseKeyring(`k1:${k(1)}`);
+      const sealed = ring.encryptBytes(data);
+      const altered = Buffer.from(sealed);
+      altered[altered.length - 1] = altered[altered.length - 1]! ^ 1;
+      expect(() => ring.decryptBytes(altered)).toThrow();
+      expect(() => ring.decryptBytes(Buffer.from('nope'))).toThrow('Unrecognized');
+      expect(() => parseKeyring(`k2:${k(2)}`).decryptBytes(sealed)).toThrow('not in the keyring');
+    });
+
+    it('rotates: the old key still opens it, the new one seals, needsRotationBytes says so', () => {
+      const old = parseKeyring(`k1:${k(1)}`).encryptBytes(data);
+      const ring = parseKeyring(`k2:${k(2)},k1:${k(1)}`);
+      expect(ring.needsRotationBytes(old)).toBe(true);
+      const fresh = ring.encryptBytes(ring.decryptBytes(old));
+      expect(ring.needsRotationBytes(fresh)).toBe(false);
+    });
+  });
 });

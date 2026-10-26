@@ -18,6 +18,7 @@ import {
   keyringCipher,
   rotateColumn,
 } from '@/modules/platform-security/service/key-rotation';
+import { createDiskStore } from '@/lib/files/store';
 import { handleHelp } from './cli-help';
 
 handleHelp(import.meta.url);
@@ -58,6 +59,20 @@ try {
       );
     }
   }
+  // Stored documents (BL scans, supplier invoice photos) are sealed with FIELD_ENCRYPTION_KEYS too.
+  const store = createDiskStore(env.FILE_STORE_DIR, parseKeyring(env.FIELD_ENCRYPTION_KEYS));
+  let stale = 0;
+  let moved = 0;
+  for (const id of await store.ids()) {
+    if (checkOnly) stale += (await store.onRetiredKey(id)) ? 1 : 0;
+    else if (await store.rotate(id)) moved += 1;
+  }
+  remaining += stale;
+  console.log(
+    checkOnly
+      ? `stored files: ${stale} on retired keys`
+      : `stored files: ${moved} re-encrypted to the current key`,
+  );
 } finally {
   await Promise.all(Object.values(pools).map((p) => p.end()));
 }

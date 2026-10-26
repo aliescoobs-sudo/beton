@@ -8,6 +8,7 @@ next-env.d.ts
 *.tsbuildinfo
 coverage/
 backups/
+file-store/
 playwright-report/
 test-results/
 .next-e2e/
