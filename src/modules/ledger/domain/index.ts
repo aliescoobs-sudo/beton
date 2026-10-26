@@ -140,3 +140,9 @@ export {
   invoicePayment,
 } from './invoice-payment';
 export { groupInvoiceLines, type InvoiceGroup, type InvoiceLineFact, netToPay } from './invoice-groups';
+export {
+  parseSupplierInvoiceInput,
+  SUPPLIER_INVOICE_STATES,
+  type SupplierInvoiceInput,
+  type SupplierInvoiceState,
+} from './supplier-invoice';

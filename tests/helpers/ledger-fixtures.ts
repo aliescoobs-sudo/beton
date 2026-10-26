@@ -697,3 +697,69 @@ export async function newAvoir(
   ).rows[0]?.n;
   return { ...made, avoirNumber: number ?? null, lostL };
 }
+
+/**
+ * A purchase of 30 t, received whole, and the supplier's invoice for it entered through the database door (30 t at 1 450,00:
+ * HT 43 500,00, VAT 8 700,00, TTC 52 200,00); the supplier number is `FS-<marker>`. Run it inside the owner's transaction.
+ */
+export async function newSupplierInvoice(
+  tx: pg.PoolClient,
+  actorId: string,
+  marker: string,
+  options: {
+    qtyMilli?: number;
+    unitPriceHtCentimes?: number;
+    receive?: boolean;
+    invoiceNo?: string;
+    today?: string;
+  } = {},
+): Promise<{ code: string; purchaseId: string; purchaseCode: string; receiptId: string | null }> {
+  // A supplier of its own, so that fixtures counting the master supplier's purchases are not disturbed.
+  const supplier = await tx.query<{ id: string }>(
+    `insert into supplier (id, code, name, category) values (gen_random_uuid(), public.next_code('FRN', 2), $1, 'cement') returning id`,
+    [`si${randomUUID().slice(0, 12)}`],
+  );
+  // ... and a component of its own, for the same reason (the receipt fixtures read the master component's purchases).
+  const tag = randomUUID().slice(0, 12);
+  const component = await tx.query<{ id: string }>(
+    `insert into component (id, code, name_fr, name_ar, base_unit) values (gen_random_uuid(), public.next_code('CMP', 2), $1, 'x', 'g') returning id`,
+    [`si${tag}`],
+  );
+  const unit = await tx.query<{ id: string }>(
+    `insert into purchase_unit (id, component_id, label, factor_to_base) values (gen_random_uuid(), $1, 'kg', 1000) returning id`,
+    [component.rows[0]?.id],
+  );
+  const own = {
+    supplierId: supplier.rows[0]?.id as string,
+    componentId: component.rows[0]?.id as string,
+    unitId: unit.rows[0]?.id as string,
+  };
+  const po = await insertPurchase(tx, actorId, own);
+  const receiptId =
+    options.receive === false
+      ? null
+      : ((await tx.query<{ id: string }>(`select public.record_receipt($1, '2026-06-02') as id`, [po.id]))
+          .rows[0]?.id ?? null);
+  const made = await tx.query<{ code: string | null }>(
+    `select public.create_supplier_invoice($1, $2, '2026-06-02', null, $3::jsonb, null, $4::date) as code`,
+    [
+      po.code,
+      options.invoiceNo ?? `FS-${marker}`,
+      JSON.stringify([
+        {
+          componentId: own.componentId,
+          qtyMilli: options.qtyMilli ?? 30_000,
+          unitPriceHtCentimes: options.unitPriceHtCentimes ?? 145_000,
+        },
+      ]),
+      options.today ?? '2026-06-03',
+    ],
+  );
+  if (!made.rows[0]?.code) {
+    const why = await tx.query<{ reason: string }>(
+      `select reason from audit_event where table_name = 'supplier_invoice_create' order by id desc limit 1`,
+    );
+    throw new Error(`the supplier invoice was refused: ${why.rows[0]?.reason ?? 'no reason audited'}`);
+  }
+  return { code: made.rows[0].code, purchaseId: po.id, purchaseCode: po.code, receiptId };
+}

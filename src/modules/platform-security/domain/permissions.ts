@@ -78,6 +78,9 @@ export const PERMISSIONS = {
   // Invoices
   'invoices.read': MONEY_READ,
   'invoices.write': BLIND_WRITE,
+  // The supplier's invoice, its own document linked to the order and the receipts: entered blind by office, read by owner and support.
+  'supplier_invoices.read': MONEY_READ,
+  'supplier_invoices.write': BLIND_WRITE,
   // The avoir for concrete refused or brought back after it was billed: the owner issues it (step-up), the owner and support read.
   'avoirs.read': MONEY_READ,
   'avoirs.issue': MONEY_WRITE,

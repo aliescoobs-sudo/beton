@@ -43,6 +43,15 @@ export {
   listAvoirCandidates,
   listAvoirs,
 } from './service/avoir-service';
+export {
+  type CreatedSupplierInvoice,
+  createSupplierInvoice,
+  getSupplierInvoice,
+  listSupplierInvoices,
+  type SupplierInvoiceDetail,
+  type SupplierInvoiceError,
+  type SupplierInvoiceView,
+} from './service/supplier-invoice-service';
 export { getCompanyProfile, listCompanyProfiles, saveCompanyProfile } from './service/company-service';
 export {
   type AccountingExport,

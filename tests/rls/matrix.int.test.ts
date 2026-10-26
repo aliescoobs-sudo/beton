@@ -20,6 +20,7 @@ import {
   moneyMaster,
   newAdvanceInvoice,
   newAvoir,
+  newSupplierInvoice,
   newReceivablePurchase,
   newCashMovement,
   orderMaster,
@@ -555,6 +556,33 @@ const FIXTURES: Record<
     seed: async () => undefined,
     visible: `select l.created_by::text as owner from invoice_line l join invoice i on i.id = l.invoice_id
                 where i.client_name = 'dl' || $1`,
+  },
+  supplier_invoice: {
+    // Written by create_supplier_invoice only: the owner's fixture buys 30 t, receives them and enters the invoice.
+    writers: ['owner'],
+    seed: async (tx, actor) => {
+      await newSupplierInvoice(tx, actor, marker);
+    },
+    visible: `select s.created_by::text as owner from supplier_invoice s where s.supplier_invoice_no = 'FS-' || $1`,
+  },
+  supplier_invoice_line: {
+    // Written together with their invoice (seeded by the fixture above).
+    writers: ['owner'],
+    seed: async () => undefined,
+    visible: `select l.created_by::text as owner from supplier_invoice_line l join supplier_invoice s on s.id = l.supplier_invoice_id
+                where s.supplier_invoice_no = 'FS-' || $1`,
+  },
+  supplier_invoice_receipt: {
+    writers: ['owner'],
+    seed: async () => undefined,
+    visible: `select r.created_by::text as owner from supplier_invoice_receipt r join supplier_invoice s on s.id = r.supplier_invoice_id
+                where s.supplier_invoice_no = 'FS-' || $1`,
+  },
+  supplier_invoice_event: {
+    writers: ['owner'],
+    seed: async () => undefined,
+    visible: `select e.created_by::text as owner from supplier_invoice_event e join supplier_invoice s on s.id = e.supplier_invoice_id
+                where s.supplier_invoice_no = 'FS-' || $1`,
   },
   avoir: {
     // Written by issue_avoir only: the owner's fixture invoices a load, records its loss and issues the avoir.

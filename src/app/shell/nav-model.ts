@@ -94,6 +94,18 @@ const GROUPS: GroupDef[] = [
         allowed: 'purchases.write',
       },
       {
+        path: '/supplier-invoices/new',
+        labelKey: 'ledger.supplierInvoices.newLink',
+        testId: 'supplier-invoices-new-link',
+        allowed: 'supplier_invoices.write',
+      },
+      {
+        path: '/supplier-invoices',
+        labelKey: 'ledger.supplierInvoices.link',
+        testId: 'supplier-invoices-link',
+        allowed: 'supplier_invoices.read',
+      },
+      {
         path: '/purchases',
         labelKey: 'ledger.purchases.link',
         testId: 'purchases-link',

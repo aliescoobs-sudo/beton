@@ -18,7 +18,7 @@ Status: `[ ]` to do, `[x]` done (commit), `[~]` partial.
 - [x] I1.6 Avoir for rejected or returned concrete (AC-INT-12; migration 0069; D104)
 
 ### Wave I2: purchase chain
-- [ ] I2.1 Supplier invoice as its own document (AC-INT-13)
+- [x] I2.1 Supplier invoice as its own document, linked to its order and receipts (AC-INT-13; migration 0070; D105; db:scenario conversion in the Finish step)
 - [ ] I2.2 Three-way match, acceptance, payable from the approved invoice (AC-INT-14)
 - [ ] I2.3 Supplier invoice photo, AI extraction interface off (AC-INT-15)
 
@@ -73,4 +73,4 @@ Filled at the end (re-run of the CP-INTEGRATION table).
 Filled at the end.
 
 ## New provisional decisions
-Filled as they are taken (DECISIONS 97 onward): 97 (delivered), 98 (delivered quantity), 99 (stored documents), 100 (signed BL and its scan), 101 (invoicing queue), 102 (invoice from the BLs), 103 (payment spread over invoices), 104 (avoir).
+Filled as they are taken (DECISIONS 97 onward): 97 (delivered), 98 (delivered quantity), 99 (stored documents), 100 (signed BL and its scan), 101 (invoicing queue), 102 (invoice from the BLs), 103 (payment spread over invoices), 104 (avoir), 105 (supplier invoice).

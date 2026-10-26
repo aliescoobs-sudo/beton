@@ -11,7 +11,16 @@ export type Effect =
   | {
       kind: 'document';
       document:
-        'order' | 'bl' | 'invoice' | 'credit_note' | 'avoir' | 'purchase' | 'payment' | 'receipt' | 'quote';
+        | 'order'
+        | 'bl'
+        | 'invoice'
+        | 'credit_note'
+        | 'avoir'
+        | 'supplier_invoice'
+        | 'purchase'
+        | 'payment'
+        | 'receipt'
+        | 'quote';
       code: string;
     }
   | { kind: 'scheduled'; code: string; date: string }

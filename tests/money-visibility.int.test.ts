@@ -22,6 +22,7 @@ import {
   moneyMaster,
   newAdvanceInvoice,
   newAvoir,
+  newSupplierInvoice,
   newCashMovement,
   orderMaster,
   purchaseMaster,
@@ -171,6 +172,28 @@ const SEED: Record<MoneyTable, (tx: pg.PoolClient, actor: string) => Promise<unk
     const master = await orderMaster(app, actors.owner.id, marker);
     const made = await newAdvanceInvoice(tx, actor, master, scene, marker);
     if (!made.number) throw new Error('the advance invoice was refused');
+  },
+  // The supplier invoice, its lines, the receipts it covers and its events are written together by the entry door: each writer
+  // buys 30 t, receives them and enters the supplier's invoice.
+  supplier_invoice: async (tx, actor) => {
+    await newSupplierInvoice(tx, actor, marker, {
+      invoiceNo: `FS-${randomUUID().slice(0, 12)}`,
+    });
+  },
+  supplier_invoice_line: async (tx, actor) => {
+    await newSupplierInvoice(tx, actor, marker, {
+      invoiceNo: `FS-${randomUUID().slice(0, 12)}`,
+    });
+  },
+  supplier_invoice_receipt: async (tx, actor) => {
+    await newSupplierInvoice(tx, actor, marker, {
+      invoiceNo: `FS-${randomUUID().slice(0, 12)}`,
+    });
+  },
+  supplier_invoice_event: async (tx, actor) => {
+    await newSupplierInvoice(tx, actor, marker, {
+      invoiceNo: `FS-${randomUUID().slice(0, 12)}`,
+    });
   },
   avoir: async (tx, actor) => {
     const scene = await deliveryScene(app, actors.owner.id, marker);
