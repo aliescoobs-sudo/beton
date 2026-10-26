@@ -199,15 +199,20 @@ describe('views the application role can read', () => {
     'is_reversed',
   ];
 
-  it('there are exactly two, sales_order_ops and purchase_line_ops, and both are security barriers', async () => {
+  it("there are exactly three, sales_order_ops, purchase_line_ops and delivered_load; all are security barriers, and delivered_load runs with the caller's rights", async () => {
     const { rows } = await migrator.query<{ v: string; reloptions: string[] | null }>(
       `select n.nspname || '.' || c.relname as v, c.reloptions
          from pg_class c join pg_namespace n on n.oid = c.relnamespace
         where c.relkind in ('v', 'm') and n.nspname in ('public', 'ctx', 'audit')
           and has_table_privilege('belgobeton_app', c.oid, 'SELECT')`,
     );
-    expect(rows.map((r) => r.v).sort()).toEqual(['public.purchase_line_ops', 'public.sales_order_ops']);
+    expect(rows.map((r) => r.v).sort()).toEqual([
+      'public.delivered_load',
+      'public.purchase_line_ops',
+      'public.sales_order_ops',
+    ]);
     for (const r of rows) expect(r.reloptions, r.v).toContain('security_barrier=true');
+    expect(rows.find((r) => r.v === 'public.delivered_load')?.reloptions).toContain('security_invoker=true');
   });
 
   it('exposes operational columns only: no price, total, VAT, plan or amount column', async () => {

@@ -50,6 +50,10 @@ test('the plant loads an order, gets a BL number, marks the signed BL back, and 
   await expect(page.getByTestId(`delivery-${blNo}`)).toBeVisible();
   await page.getByTestId(`bl-return-${blNo}`).click();
   await expect(page.getByTestId(`delivery-${blNo}`)).toContainText('Rentré le');
+  // A load outside a rotation is delivered by hand, once (AC-INT-01).
+  await page.getByTestId(`mark-delivered-${blNo}`).click();
+  await expect(page.getByTestId(`delivery-${blNo}`)).toContainText('Livré');
+  await expect(page.getByTestId(`mark-delivered-${blNo}`)).toHaveCount(0);
   await expect(page.locator('body')).not.toContainText(/MAD|DH|\d\s?\d{3},\d{2}/);
 
   await page.getByTestId(`note-link-${blNo}`).click();

@@ -48,7 +48,7 @@ export async function listOrders(
       cancelled: boolean;
     }>(
       `select o.id, o.code, o.client_id, c.code as client_code, c.name as client_name, t.code as type_code, o.volume_l,
-              coalesce((select sum(d.volume_l) from delivery d where d.order_id = o.id), 0)::text as delivered_l,
+              coalesce((select sum(g.volume_l) from delivered_load g where g.order_id = o.id), 0)::text as delivered_l,
               to_char(o.order_date, 'YYYY-MM-DD') as order_date, to_char(o.delivery_date, 'YYYY-MM-DD') as delivery_date,
               o.total_ttc_centimes::text as total,
               coalesce((select sum(a.amount_centimes) from allocation a join payment_plan_item i on i.id = a.payment_plan_item_id

@@ -1178,7 +1178,9 @@
         "ALREADY_RETURNED": "Ce BL est déjà rentré.",
         "CONFLICT": "Conflit, réessayez.",
         "UNAUTHENTICATED": "Session expirée.",
-        "FORBIDDEN": "Action non autorisée."
+        "FORBIDDEN": "Action non autorisée.",
+        "ALREADY_DELIVERED": "Ce BL est déjà livré.",
+        "FOLLOWS_ROTATION": "Ce chargement suit sa tournée : il est livré à la fin du déchargement."
       },
       "cancelLoad": "Annuler le chargement",
       "cancelReason": "Raison de l'annulation (obligatoire)",
@@ -1189,7 +1191,12 @@
         "NOT_FOUND": "Chargement introuvable.",
         "ALREADY_CANCELLED": "Ce chargement est déjà annulé.",
         "other": "Annulation impossible."
-      }
+      },
+      "delivered": "Livré",
+      "markDelivered": "Marquer livré",
+      "deliveredAt": "Livré le",
+      "refused": "Refusé",
+      "onRotation": "en tournée"
     },
     "stock": {
       "link": "Stock",

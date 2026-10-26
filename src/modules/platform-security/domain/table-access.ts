@@ -988,6 +988,24 @@ export const TABLE_ACCESS = {
     exception:
       'operations O13: fuel bought (litres and the total paid). Money (DECISIONS 81): the owner writes, the owner and support read, nobody else; its audit rows are hidden from the others. The price per litre and the cost of a truck are computed from it, never stored.',
   },
+  delivery_delivered: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'all',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'integration I1.1: a load is delivered at the unloading step of its rotation (a SECURITY DEFINER trigger writes the row with the step instant) or, outside a rotation, by hand (plant, owner, partner). One row per load; quantities and times only. The view delivered_load drops cancelled and wholly refused loads.',
+  },
   delivery_loss: {
     kind: 'rls',
     seed: 'insert',

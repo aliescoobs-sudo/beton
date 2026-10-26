@@ -69,6 +69,12 @@ test('the owner plans the day, the plant follows the first rotation with one tap
     if (s === 'unloading_started') await expect(card.getByTestId('trip-waiting')).toContainText('min');
   }
   await expect(card).toContainText('Rotation terminée');
+  // The unloading step delivered the BL: the loads screen shows it delivered, with nothing to tap (AC-INT-01).
+  const blNo = /BL-\d{4}-\d{5}/.exec((await card.textContent()) ?? '')?.[0] as string;
+  await page.goto('/fr/loads');
+  await expect(page.getByTestId(`delivery-${blNo}`)).toContainText('Livré');
+  await expect(page.getByTestId(`mark-delivered-${blNo}`)).toHaveCount(0);
+  await page.goto(`/fr/trips?date=${DAY}`);
   await expect(card.getByTestId('trip-times')).toContainText('Rotation (départ → retour)');
   await expect(page.locator('body')).not.toContainText(MONEY);
   await context.close();

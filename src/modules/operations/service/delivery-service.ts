@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type pg from 'pg';
+import { z } from 'zod';
 import { err, ok, type Result } from '@/lib/result';
 import { type Effect, nextDocNumber, visibleEffects } from '@/modules/ledger';
 import {
@@ -30,6 +31,8 @@ export type DeliveryError =
   | 'OVER_ORDER'
   | 'NO_RECETTE'
   | 'ALREADY_RETURNED'
+  | 'ALREADY_DELIVERED'
+  | 'FOLLOWS_ROTATION'
   | 'CONFLICT';
 
 export function deliveryFailure(error: unknown): DeliveryError {
@@ -332,6 +335,34 @@ export async function cancelLoad(
     );
   } catch (error) {
     if (isUniqueViolation(error)) return err('ALREADY_CANCELLED');
+    return err(deliveryFailure(error));
+  }
+}
+
+/** Marks a load made outside any rotation as delivered, now (AC-INT-01); a load of a rotation follows its tracking step. */
+export async function markDelivered(
+  appPool: pg.Pool,
+  actor: SessionUser,
+  input: unknown,
+  deps: { now: Date },
+): Promise<Result<{ id: string }, DeliveryError>> {
+  await require(appPool, actor, 'deliveries.deliver');
+  const parsed = z.object({ deliveryId: z.uuid() }).safeParse(input);
+  if (!parsed.success) return err('INVALID');
+  const id = randomUUID();
+  try {
+    await inRequest(appPool, actor, (tx) =>
+      tx.query(
+        `insert into delivery_delivered (id, delivery_id, at, trip_event_id, created_by) values ($1, $2, $3, null, $4)`,
+        [id, parsed.data.deliveryId, deps.now.toISOString(), actor.id],
+      ),
+    );
+    return ok({ id });
+  } catch (error) {
+    if (isUniqueViolation(error)) return err('ALREADY_DELIVERED');
+    const e = error as { code?: string; message?: string };
+    if (e.code === '23514' && /follows its rotation/.test(e.message ?? '')) return err('FOLLOWS_ROTATION');
+    if (e.code === '23503' || isMalformedId(error)) return err('NOT_FOUND');
     return err(deliveryFailure(error));
   }
 }

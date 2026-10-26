@@ -122,6 +122,10 @@ Status of 91 to 96: **Ali, provisional until owner confirms** (answers of 2026-1
 96. 🟡 **Sales volume analytics.** m³ per day, week and month by client, concrete type and zone, cancellations on the day of their load; the amount (m³ × the order's unit price, HT, one rounding per load) is computed apart and given to owner and support only; the partner reads the quantities, plant and office have no page.
     - Ali, 2026-10-26: kept as proposed.
 
+## Integration wave (2026-10-26, from CP-INTEGRATION; all provisional, Ali until the owner confirms)
+97. 🟡 **Delivered.** A load is delivered when its rotation records `unloading_finished` (a database trigger writes `delivery_delivered` with the step's own instant), or, for a load made outside any rotation, when the plant, owner or partner marks it (the clock's instant). A load that belongs to a rotation can only be delivered by its tracking. One row per load, insert-only.
+98. 🟡 **What counts as delivered quantity.** The view `delivered_load` (caller's own rights) keeps delivered loads that are not cancelled and not wholly lost: a load whose whole volume was refused or brought back (O14) never reached the client; a partial loss still counts, and stays billed until an avoir (93). An order's delivered quantity is the sum of this view. The sales analytics (O15) still count loaded m³ per day; they are not changed here.
+
 ## Legal
 30. 🟡 Law 69-21 deadline alerts in MVP; full quarterly report in phase 2.
 31. 🟡 Internal invoices only in MVP; official e-invoicing out of scope but data model ready (ICE etc.); possible phase-2 priority.

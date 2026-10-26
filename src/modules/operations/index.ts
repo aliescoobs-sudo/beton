@@ -8,6 +8,7 @@ export {
   type CreatedLoad,
   type DeliveryError,
   type FirstReturn,
+  markDelivered,
   recordBlReturn,
 } from './service/delivery-service';
 export {

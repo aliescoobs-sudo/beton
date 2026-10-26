@@ -314,6 +314,25 @@ const FIXTURES: Record<
       ),
     visible: `select created_by::text as owner from fuel_purchase where purchased_on = '2094-03-02' and $1::text is not null`,
   },
+  delivery_delivered: {
+    // Each writer delivers a load of its own (year 2092) outside any rotation, by hand.
+    writers: ['owner', 'partner', 'plant'],
+    seed: async (tx, actor) => {
+      const delivery = await newDelivery(
+        app,
+        actors.owner,
+        marker,
+        await deliveryScene(app, actors.owner, marker),
+        40,
+        2092,
+      );
+      return tx.query(
+        `insert into delivery_delivered (id, delivery_id, at, trip_event_id, created_by) values (gen_random_uuid(), $1, now(), null, $2)`,
+        [delivery.id, actor],
+      );
+    },
+    visible: `select g.created_by::text as owner from delivery_delivered g join delivery d on d.id = g.delivery_id where d.bl_no like 'BL-2092-%' and $1::text is not null`,
+  },
   delivery_loss: {
     // One loss per load: each writer gets a delivery of its own (year 2093), made by the owner.
     writers: ['owner', 'partner', 'office', 'plant'],

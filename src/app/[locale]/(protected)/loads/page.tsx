@@ -8,10 +8,17 @@ import { CancelLoadButton } from '@/modules/operations/ui/cancel-load-button';
 import { formatM3 } from '@/modules/operations/ui/format';
 import { LoadRowForm } from '@/modules/operations/ui/load-row-form';
 import { LossButton } from '@/modules/operations/ui/loss-button';
+import { MarkDeliveredButton } from '@/modules/operations/ui/mark-delivered-button';
 import { can } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/next';
 import { EmptyState, PageHeader, StatusPill, Table, Td, Th } from '@/ui';
-import { blReturnAction, cancelLoadAction, createLoadAction, recordLossAction } from './actions';
+import {
+  blReturnAction,
+  cancelLoadAction,
+  createLoadAction,
+  markDeliveredAction,
+  recordLossAction,
+} from './actions';
 
 /** The day's loads: orders due with what is left to deliver, one tap to load, and the recent delivery notes. No price. */
 export default async function LoadsPage({ params }: { params: Promise<{ locale: string }> }) {
@@ -23,6 +30,7 @@ export default async function LoadsPage({ params }: { params: Promise<{ locale: 
   const canLoad = can(user.role, 'deliveries.write');
   const canCancel = can(user.role, 'deliveries.cancel');
   const canLoss = can(user.role, 'deliveries.loss');
+  const canDeliver = can(user.role, 'deliveries.deliver');
   const [orders, deliveries, trucks] = await Promise.all([
     listLoadableOrders(pool, user, today),
     listDeliveries(pool, user),
@@ -108,6 +116,7 @@ export default async function LoadsPage({ params }: { params: Promise<{ locale: 
                 <Th>{t('loads.truck')}</Th>
                 <Th>{t('loads.date')}</Th>
                 <Th numeric>{t('deliveries.volume')}</Th>
+                <Th>{t('deliveries.delivered')}</Th>
                 <Th>{t('deliveries.signed')}</Th>
                 {canLoss && <Th>{t('loss.column')}</Th>}
                 {canCancel && <Th>{t('deliveries.cancelLoad')}</Th>}
@@ -138,6 +147,23 @@ export default async function LoadsPage({ params }: { params: Promise<{ locale: 
                     <bdi dir="ltr">{d.loadDate}</bdi>
                   </Td>
                   <Td numeric>{formatM3(d.volumeL)} m³</Td>
+                  <Td>
+                    {d.volumeL < 0 || d.cancelled ? (
+                      '—'
+                    ) : d.refused ? (
+                      <StatusPill status="cancelled">{t('deliveries.refused')}</StatusPill>
+                    ) : d.deliveredAt ? (
+                      <StatusPill status="paid">
+                        {t('deliveries.delivered')} <bdi dir="ltr">{d.deliveredAt.slice(0, 10)}</bdi>
+                      </StatusPill>
+                    ) : d.onRotation || !canDeliver ? (
+                      <span className="text-sm text-muted">
+                        {d.onRotation ? t('deliveries.onRotation') : '—'}
+                      </span>
+                    ) : (
+                      <MarkDeliveredButton deliveryId={d.id} blNo={d.blNo} record={markDeliveredAction} />
+                    )}
+                  </Td>
                   <Td>
                     {d.volumeL < 0 ? (
                       <StatusPill status="cancelled">{t('deliveries.cancelledRow')}</StatusPill>

@@ -9,7 +9,7 @@ One task per commit. Each commit: lint (eslint + prettier), typecheck, unit and 
 Status: `[ ]` to do, `[x]` done (commit), `[~]` partial.
 
 ### Wave I1: sales chain
-- [ ] I1.1 Delivered BL from the `delivered` tracking step (AC-INT-01)
+- [x] I1.1 Delivered BL from the `unloading_finished` tracking step, hand mark outside a rotation, view `delivered_load`, order delivered quantity (AC-INT-01; migration 0064; D97, D98)
 - [ ] I1.2a File vault: validated, EXIF-stripped, encrypted attachments, authorized route, audit (AC-INT-03, 04)
 - [ ] I1.2b Signed BL marker plus optional scan (AC-INT-02)
 - [ ] I1.3 Delivered-not-invoiced queue per client (AC-INT-05)
@@ -73,4 +73,4 @@ Filled at the end (re-run of the CP-INTEGRATION table).
 Filled at the end.
 
 ## New provisional decisions
-Filled as they are taken (DECISIONS 97 onward).
+Filled as they are taken (DECISIONS 97 onward): 97 (delivered), 98 (delivered quantity).

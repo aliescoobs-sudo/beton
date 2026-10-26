@@ -76,6 +76,12 @@ export interface DeliveryRow {
   cancelled: boolean;
   /** Present once the signed BL came back. */
   returnedOn: string | null;
+  /** The instant the load was delivered (the unloading step of its rotation, or a hand mark); null while on the road. */
+  deliveredAt: string | null;
+  /** The load belongs to a rotation: only the tracking delivers it. */
+  onRotation: boolean;
+  /** The whole load was refused or brought back: it never counts as delivered. */
+  refused: boolean;
   /** Litres of this load that were lost (rejected or brought back), with the reason; null when none. */
   loss: { volumeL: number; reason: string } | null;
 }
@@ -102,13 +108,17 @@ export async function listDeliveries(
       returned_on: string | null;
       loss_l: number | null;
       loss_reason: string | null;
+      delivered_at: string | null;
+      on_rotation: boolean;
     }>(
       `select d.id, d.bl_no, o.code as order_code, o.client_code, t.code as type_code, k.code as truck_code,
               d.volume_l, to_char(d.load_date, 'YYYY-MM-DD') as load_date, d.reverses_id,
               exists (select 1 from delivery r where r.reverses_id = d.id) as cancelled,
               (select to_char(r.returned_on, 'YYYY-MM-DD') from delivery_return r where r.delivery_id = d.id) as returned_on,
               (select x.volume_l from delivery_loss x where x.delivery_id = d.id) as loss_l,
-              (select x.reason from delivery_loss x where x.delivery_id = d.id) as loss_reason
+              (select x.reason from delivery_loss x where x.delivery_id = d.id) as loss_reason,
+              (select to_char(g.at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') from delivery_delivered g where g.delivery_id = d.id) as delivered_at,
+              exists (select 1 from trip_event e where e.delivery_id = d.id) as on_rotation
          from delivery d
          left join sales_order_ops o on o.id = d.order_id
          left join concrete_type t on t.id = o.concrete_type_id
@@ -128,6 +138,9 @@ export async function listDeliveries(
     loadDate: r.load_date,
     cancelled: r.cancelled || r.reverses_id !== null,
     returnedOn: r.returned_on,
+    deliveredAt: r.delivered_at,
+    onRotation: r.on_rotation,
+    refused: r.loss_l !== null && r.loss_l >= r.volume_l,
     loss: r.loss_l === null ? null : { volumeL: r.loss_l, reason: r.loss_reason as string },
   }));
 }

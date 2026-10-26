@@ -1178,7 +1178,9 @@
         "ALREADY_RETURNED": "هذا السند أُرجع من قبل.",
         "CONFLICT": "تعارض، أعد المحاولة.",
         "UNAUTHENTICATED": "انتهت الجلسة.",
-        "FORBIDDEN": "إجراء غير مسموح."
+        "FORBIDDEN": "إجراء غير مسموح.",
+        "ALREADY_DELIVERED": "تم تسليم هذا السند من قبل.",
+        "FOLLOWS_ROTATION": "هذه الحمولة تتبع جولتها: تُسلَّم عند نهاية التفريغ."
       },
       "cancelLoad": "إلغاء الشحنة",
       "cancelReason": "سبب الإلغاء (إلزامي)",
@@ -1189,7 +1191,12 @@
         "NOT_FOUND": "شحنة غير موجودة.",
         "ALREADY_CANCELLED": "هذه الشحنة ملغاة مسبقاً.",
         "other": "تعذر الإلغاء."
-      }
+      },
+      "delivered": "تم التسليم",
+      "markDelivered": "تأكيد التسليم",
+      "deliveredAt": "سُلّم في",
+      "refused": "مرفوض",
+      "onRotation": "ضمن الجولة"
     },
     "stock": {
       "link": "المخزون",

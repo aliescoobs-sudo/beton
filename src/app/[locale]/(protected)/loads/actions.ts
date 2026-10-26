@@ -3,7 +3,14 @@
 import { getRequestClock } from '@/app/request-clock';
 import { getPool } from '@/lib/db/pools';
 import type { Effect } from '@/modules/ledger';
-import { cancelLoad, createLoad, type DeliveryError, recordBlReturn, recordLoss } from '@/modules/operations';
+import {
+  cancelLoad,
+  createLoad,
+  type DeliveryError,
+  markDelivered,
+  recordBlReturn,
+  recordLoss,
+} from '@/modules/operations';
 import { authorize, ForbiddenError, type Permission, withStepUp } from '@/modules/platform-security';
 import { currentAuthState } from '@/modules/platform-security/next';
 
@@ -46,6 +53,15 @@ export async function createLoadAction(
 export async function blReturnAction(input: unknown): Promise<{ ok: true } | Failure> {
   return guarded('deliveries.bl_return', async (user) => {
     const result = await recordBlReturn(getPool('app'), user, input);
+    return result.ok ? { ok: true as const } : { ok: false as const, error: result.error };
+  });
+}
+
+// @permission deliveries.deliver (plant, owner, partner): a load made outside a rotation is delivered, now
+export async function markDeliveredAction(input: unknown): Promise<{ ok: true } | Failure> {
+  return guarded('deliveries.deliver', async (user) => {
+    const now = (await getRequestClock()).now();
+    const result = await markDelivered(getPool('app'), user, input, { now });
     return result.ok ? { ok: true as const } : { ok: false as const, error: result.error };
   });
 }
