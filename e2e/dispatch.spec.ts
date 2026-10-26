@@ -5,6 +5,7 @@ import { E2E_DATABASE } from '../scripts/db-bootstrap';
 import { withRlsContext } from '../src/lib/db/rls-context';
 import { testEnv } from '../tests/db-env';
 import { insertOrder, orderMaster } from '../tests/helpers/ledger-fixtures';
+import { checkScreen, watch } from './screen-check';
 import { E2E_MD, goNav, loginAndEnrol, loginOwner, logout } from './fixtures';
 
 // operations O9 (AC-OPS-12…15): the owner opens the day's plan, sees the proposal and its times, adds a driver, sees a
@@ -167,8 +168,12 @@ test('an overdue order still to load is planned with the day and flagged by colo
   await expect(page.getByTestId(`overdue-${overdueCode}-1`)).toContainText('en retard depuis le');
   await expect(page.getByTestId('dispatch-overdue-summary')).toContainText('En retard');
   await expect(page.getByTestId(`day-order-${overdueCode}`)).toContainText('en retard depuis le');
+  const problems = watch(page);
+  await checkScreen(page, 'fr', 'dispatch-board');
   await page.goto('/ar/dispatch');
   await expect(page.getByTestId(`overdue-${overdueCode}-1`)).toContainText('متأخرة منذ');
+  await checkScreen(page, 'ar', 'dispatch-board');
+  expect(problems).toEqual([]);
   await logout(page);
 });
 
@@ -212,6 +217,13 @@ test("office has no planning page and no link, but reads the day's rotations wit
   await page.goto('/fr/dispatch/office?date=2099-12-30');
   await expect(page.getByTestId('office-dispatch-none')).toBeVisible();
 
+  // fr and ar at 375 and 1280 px: no overflow, no missing key, no CSP violation, codes left-to-right (AC-INT-24)
+  const problems = watch(page);
+  await page.goto(`/fr/dispatch/office?date=${DAY}`);
+  await checkScreen(page, 'fr', 'office-dispatch');
+  await page.goto(`/ar/dispatch/office?date=${DAY}`);
+  await checkScreen(page, 'ar', 'office-dispatch');
+  expect(problems).toEqual([]);
   // Arabic: right-to-left, codes and times left-to-right
   await page.goto(`/ar/dispatch/office?date=${DAY}`);
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
