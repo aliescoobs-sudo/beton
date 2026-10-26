@@ -23,7 +23,8 @@ const as = <T>(role: keyof typeof actors, fn: (tx: pg.PoolClient) => Promise<T>)
   inCtx(role, actors[role].id, fn);
 
 /** The amounts of the fixture order: unit price, HT, VAT, TTC (centimes) and TTC in dirhams. */
-const AMOUNTS = /\b(78000|780000|156000|936000|9360|7800|1560)\b/;
+// Not inside a code or a number (CLT-1560, CMD-2026-07800): a counter of the shared test database reaches these values.
+const AMOUNTS = /(?<![\w-])(78000|780000|156000|936000|9360|7800|1560)(?![\w-])/;
 const leaks = (value: unknown) => AMOUNTS.test(JSON.stringify(value) ?? '');
 const errorText = (e: unknown) => {
   const x = e as Record<string, unknown>;

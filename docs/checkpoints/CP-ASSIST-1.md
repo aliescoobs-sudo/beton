@@ -12,7 +12,7 @@ Status: `[ ]` to do, `[x]` done, `[~]` partial.
 - [x] A1 Switches and provider: env (`ASSISTANT_ENABLED`, `ASSISTANT_PROVIDER`, `ANTHROPIC_API_KEY`), start-up refusals, `LlmProvider`, `FakeProvider`, the Anthropic adapter behind its four conditions, the key never in the repository, the build or the client (AC-ASSIST-01 part, 02, 26, 27)
 - [x] A2 The pure core: pre-pass (phones, ICE, numbers, amounts, known names to codes), placeholders and re-hydration, leak scan, numbers post-check, injection hardening of data blocks (AC-ASSIST-05 to 08 at unit level)
 - [x] A3 Tables and the assistant module: `ai_interaction`, `ai_tool_call`, `ai_proposal` (migration, RLS, audit, encrypted payloads, 90-day purge), the `ai_confirmed` audit kind, permission `assistant.use`, rate limits and budget (AC-ASSIST-14, 15)
-- [ ] A4 Read tools, first six (deliveries_today, stock_and_cover, uninvoiced_bls, open_invoices, forecast, next_load): matrix, allow-lists, refusals, exposure test (AC-ASSIST-03, 04)
+- [x] A4 Read tools, first six (deliveries_today, stock_and_cover, uninvoiced_bls, open_invoices, forecast, next_load): matrix, allow-lists, refusals, exposure test (AC-ASSIST-03, 04)
 - [ ] A5 Read tools, four new (order_chain, find_document, purchase_status, consumption_variance) (AC-ASSIST-21 to 25)
 - [ ] A6 The turn: orchestrator over provider, tools, pre-pass, post-check, fallback, audit; injection fixtures (AC-ASSIST-01, 05 to 09, 14, 15)
 - [ ] A7 Drafts and confirmation: plan_order, record_payment, create_purchase, record_return, invoice_from_bls; proposals; confirm with step-up and the human as actor (AC-ASSIST-10 to 13, 16, 19, 20)
