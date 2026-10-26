@@ -14,7 +14,7 @@ Status: `[ ]` to do, `[x]` done, `[~]` partial.
 - [x] A3 Tables and the assistant module: `ai_interaction`, `ai_tool_call`, `ai_proposal` (migration, RLS, audit, encrypted payloads, 90-day purge), the `ai_confirmed` audit kind, permission `assistant.use`, rate limits and budget (AC-ASSIST-14, 15)
 - [x] A4 Read tools, first six (deliveries_today, stock_and_cover, uninvoiced_bls, open_invoices, forecast, next_load): matrix, allow-lists, refusals, exposure test (AC-ASSIST-03, 04)
 - [x] A5 Read tools, four new (order_chain, find_document, purchase_status, consumption_variance) (AC-ASSIST-21 to 25)
-- [ ] A6 The turn: orchestrator over provider, tools, pre-pass, post-check, fallback, audit; injection fixtures (AC-ASSIST-01, 05 to 09, 14, 15)
+- [x] A6 The turn: orchestrator over provider, tools, pre-pass, post-check, fallback, audit; injection fixtures (AC-ASSIST-01, 05 to 09, 14, 15)
 - [ ] A7 Drafts and confirmation: plan_order, record_payment, create_purchase, record_return, invoice_from_bls; proposals; confirm with step-up and the human as actor (AC-ASSIST-10 to 13, 16, 19, 20)
 - [ ] A8 The panel: top-bar button on every screen, suggested questions per role, tool chips, "what was sent to the AI", draft cards; fr and ar, 375 and 1280 px; e2e (AC-ASSIST-17, 28, 29)
 - [ ] A9 Fixture set: 20 questions per role, French and Darija, replayed by the Fake provider (AC-ASSIST-18)

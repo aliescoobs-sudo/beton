@@ -61,3 +61,21 @@ describe('amounts of tool results are placeholders, put back by code (AC-ASSIST-
     });
   });
 });
+
+describe('names back for codes (the person sees what their screens show)', () => {
+  it('knows the code of a name a screen shows, in any case or script', () => {
+    const ps = new Pseudonymizer(entities);
+    expect(ps.codeOfName('Béton Atlas Sud')).toBe('CLT-017');
+    expect(ps.codeOfName('BETON ATLAS SUD')).toBe('CLT-017');
+    expect(ps.codeOfName('شركة النور')).toBe('CLT-003');
+    expect(ps.codeOfName('Inconnu SARL')).toBeNull();
+  });
+
+  it('shows the names of the entities the person may read and leaves other codes as codes', () => {
+    const ps = new Pseudonymizer(entities);
+    expect(ps.showNames('CLT-017 doit 3 m³, FRN-05 aussi, CLT-999 aussi')).toBe(
+      'Béton Atlas Sud doit 3 m³, Ciment du Maroc aussi, CLT-999 aussi',
+    );
+    expect(new Pseudonymizer([]).showNames('CLT-017')).toBe('CLT-017');
+  });
+});

@@ -2,11 +2,13 @@ import { formatCentimes, parseCentimes } from '@/lib/money';
 import { err, ok, type Result } from '@/lib/result';
 import { findRuns, latinDigits, nameWords, tokenize } from './normalize';
 
-/** A person or company the question may name, by its code. The names are what a person might type. */
+/** A person or company the question may name, by its code. The names are what a person might type; the first is shown. */
 export interface EntityRef {
   code: string;
   names: string[];
 }
+
+const ENTITY_CODE = /\b(?:CLT|FRN)-\d{1,6}\b/g;
 
 const AMOUNT =
   /(?<![\d.,])([\d٠-٩۰-۹]{1,3}(?:[  .][\d٠-٩۰-۹]{3})+|[\d٠-٩۰-۹]+)(?:[.,]([\d٠-٩۰-۹]{1,2}))?\s*(?:mad|dhs?|dirhams?|درهم|دراهم|د\.م\.?)(?![\p{L}])/giu;
@@ -28,8 +30,14 @@ export class Pseudonymizer {
   private readonly numbers = new Map<string, string>();
   private counter = 0;
   private readonly entities: { words: string[]; code: string }[];
+  private readonly shown = new Map<string, string>();
+  private readonly byName = new Map<string, string>();
 
   constructor(entities: readonly EntityRef[]) {
+    for (const e of entities) {
+      if (e.names[0]) this.shown.set(e.code, e.names[0]);
+      for (const n of e.names) this.byName.set(nameWords(n).join(' '), e.code);
+    }
     // Longest names first, so "Béton Atlas Sud" wins over "Atlas".
     this.entities = entities
       .flatMap((e) => e.names.map((n) => ({ words: nameWords(n), code: e.code })))
@@ -81,6 +89,16 @@ export class Pseudonymizer {
       out = `${out.slice(0, span.start)}${span.code}${out.slice(span.end)}`;
     }
     return out;
+  }
+
+  /** The code of a client or supplier by the name a screen shows, or null when it is not one this person may see. */
+  codeOfName(name: string): string | null {
+    return this.byName.get(nameWords(name).join(' ')) ?? null;
+  }
+
+  /** Codes of the entities this person may read, back to the names the screens show; other codes stay codes. */
+  showNames(text: string): string {
+    return text.replace(ENTITY_CODE, (code) => this.shown.get(code) ?? code);
   }
 
   /** The placeholder that stands for an amount a tool returned. The model never sees the figure. */
