@@ -2,7 +2,8 @@ import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { getRequestClock } from '@/app/request-clock';
 import { getPool } from '@/lib/db/pools';
-import { getOrderDetail } from '@/modules/ledger';
+import { RelatedDocuments } from '@/modules/ledger/ui/related/related-documents';
+import { getOrderDetail, getRelatedDocuments } from '@/modules/ledger';
 import { CancelOrder } from '@/modules/ledger/ui/orders/cancel-order';
 import { formatM3 } from '@/modules/operations/ui/format';
 import { can, recordMoneyView } from '@/modules/platform-security';
@@ -28,6 +29,7 @@ export default async function OrderDetailPage({
   setRequestLocale(locale);
   const user = await requirePagePermission(locale, 'orders.read_money');
   const pool = getPool('app');
+  const related = await getRelatedDocuments(pool, user, { kind: 'order', id: id });
   await recordMoneyView(pool, user, 'screen:order');
   const today = (await getRequestClock()).today();
   const detail = await getOrderDetail(pool, user, id, { today });
@@ -216,6 +218,7 @@ export default async function OrderDetailPage({
           </Table>
         )}
       </section>
+      <RelatedDocuments items={related} locale={locale} className="mt-8" />
     </div>
   );
 }

@@ -2,7 +2,8 @@ import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { getRequestClock } from '@/app/request-clock';
 import { getPool } from '@/lib/db/pools';
-import { getCompanyProfile, legalMentions } from '@/modules/ledger';
+import { getCompanyProfile, getRelatedDocuments, legalMentions } from '@/modules/ledger';
+import { RelatedDocuments } from '@/modules/ledger/ui/related/related-documents';
 import { getDeliveryNote } from '@/modules/operations';
 import { formatM3 } from '@/modules/operations/ui/format';
 import { PrintNoteButton } from '@/modules/operations/ui/print-note-button';
@@ -23,6 +24,7 @@ export default async function DeliveryNotePage({
   if (!note) notFound();
   const company = await getCompanyProfile(getPool('app'), user, { today: (await getRequestClock()).today() });
   const t = await getTranslations('operations.note');
+  const related = await getRelatedDocuments(getPool('app'), user, { kind: 'bl', id });
   const rows: [string, React.ReactNode][] = [
     [
       t('client'),
@@ -91,6 +93,7 @@ export default async function DeliveryNotePage({
           <div className="border-t border-ink pt-2 text-sm">{t('signClient')}</div>
         </div>
       </article>
+      <RelatedDocuments items={related} locale={locale} className="mt-8" />
     </div>
   );
 }

@@ -2,7 +2,8 @@ import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { getRequestClock } from '@/app/request-clock';
 import { getPool } from '@/lib/db/pools';
-import { getCompanyProfile, getInvoiceDocument, legalMentions } from '@/modules/ledger';
+import { RelatedDocuments } from '@/modules/ledger/ui/related/related-documents';
+import { getCompanyProfile, getInvoiceDocument, getRelatedDocuments, legalMentions } from '@/modules/ledger';
 import { PrintInvoiceButton } from '@/modules/ledger/ui/invoices/print-button';
 import { formatM3 } from '@/modules/operations/ui/format';
 import { recordMoneyView } from '@/modules/platform-security';
@@ -24,6 +25,7 @@ export default async function InvoiceDocumentPage({
   const user = await requirePagePermission(locale, 'invoices.read');
   const pool = getPool('app');
   await recordMoneyView(pool, user, 'screen:invoice');
+  const related = await getRelatedDocuments(pool, user, { kind: 'invoice', id: id });
   const doc = await getInvoiceDocument(pool, user, id);
   if (!doc) notFound();
   const company = await getCompanyProfile(pool, user, { today: (await getRequestClock()).today() });
@@ -189,6 +191,7 @@ export default async function InvoiceDocumentPage({
           {t('terms', { days: doc.termDays })}
         </p>
       </article>
+      <RelatedDocuments items={related} locale={locale} className="mt-8" />
     </div>
   );
 }

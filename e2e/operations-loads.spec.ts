@@ -90,6 +90,12 @@ test('the plant loads an order, gets a BL number, marks the signed BL back, and 
   await expect(page.getByRole('heading', { level: 1 })).toContainText(blNo);
   await expect(page.getByTestId('delivery-note')).toContainText(orderCode);
   await expect(page.getByTestId('delivery-note')).toContainText('Signature du chauffeur');
+  // The neighbours of the BL: the order as a number the plant cannot open, and nothing that is money (AC-INT-17).
+  await expect(page.getByTestId('related-order')).toContainText(orderCode);
+  await expect(page.getByTestId(`related-plain-${orderCode}`)).toBeVisible();
+  await expect(page.getByTestId(`related-link-${orderCode}`)).toHaveCount(0);
+  await expect(page.getByTestId('related-invoice')).toHaveCount(0);
+  await expect(page.getByTestId('related-payment')).toHaveCount(0);
   await expect(page.locator('body')).not.toContainText(/MAD|DH|\d\s?\d{3},\d{2}/);
   await page.goto('/fr/loads');
 

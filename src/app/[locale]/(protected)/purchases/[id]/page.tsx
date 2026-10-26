@@ -1,7 +1,8 @@
 import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { getPool } from '@/lib/db/pools';
-import { getPurchaseDetail } from '@/modules/ledger';
+import { RelatedDocuments } from '@/modules/ledger/ui/related/related-documents';
+import { getPurchaseDetail, getRelatedDocuments } from '@/modules/ledger';
 import { CancelPurchase } from '@/modules/ledger/ui/purchases/cancel-purchase';
 import { formatM3 } from '@/modules/operations/ui/format';
 import { can, recordMoneyView } from '@/modules/platform-security';
@@ -19,6 +20,7 @@ export default async function PurchaseDetailPage({
   setRequestLocale(locale);
   const user = await requirePagePermission(locale, 'purchases.read_money');
   const pool = getPool('app');
+  const related = await getRelatedDocuments(pool, user, { kind: 'purchase', id: id });
   await recordMoneyView(pool, user, 'screen:purchase');
   const detail = await getPurchaseDetail(pool, user, id);
   if (!detail) notFound();
@@ -140,6 +142,7 @@ export default async function PurchaseDetailPage({
           </tbody>
         </Table>
       </section>
+      <RelatedDocuments items={related} locale={locale} className="mt-8" />
     </div>
   );
 }

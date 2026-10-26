@@ -2102,5 +2102,20 @@
       "confirmed": "Excédent confirmé.",
       "error": "Confirmation impossible."
     }
+  },
+  "related": {
+    "title": "Documents liés",
+    "kinds": {
+      "quote": "Devis",
+      "order": "Commande",
+      "trip": "Rotation",
+      "bl": "Bons de livraison",
+      "invoice": "Factures",
+      "payment": "Paiements",
+      "avoir": "Avoirs",
+      "purchase": "Commande d'achat",
+      "receipt": "Réceptions",
+      "supplier_invoice": "Factures fournisseur"
+    }
   }
 }

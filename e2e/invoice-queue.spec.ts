@@ -106,6 +106,11 @@ test('the owner opens that invoice: grouped by product, the BL listed, the total
   await expect(page.getByTestId(`invoice-group-${typeCode}`)).toContainText('8 m³');
   await expect(page.getByTestId('invoice-group-bls')).toContainText(blNo);
   await expect(page.getByTestId('invoice-totals')).toContainText('7 488,00');
+  // The neighbours of the invoice: its BL, a link that opens the delivery note, which points back to the invoice (AC-INT-17).
+  await page.getByTestId(`related-link-${blNo}`).click();
+  await expect(page).toHaveURL(/\/fr\/deliveries\//);
+  await expect(page.getByTestId('related-invoice')).toContainText(invoiceNumber);
+  await expect(page.getByTestId(`related-link-${invoiceNumber}`)).toBeVisible();
   await logout(page);
 });
 

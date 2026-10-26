@@ -2,7 +2,14 @@ import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { getRequestClock } from '@/app/request-clock';
 import { getPool } from '@/lib/db/pools';
-import { getCompanyProfile, getQuote, legalMentions, quoteIsOpen } from '@/modules/ledger';
+import { RelatedDocuments } from '@/modules/ledger/ui/related/related-documents';
+import {
+  getCompanyProfile,
+  getQuote,
+  getRelatedDocuments,
+  legalMentions,
+  quoteIsOpen,
+} from '@/modules/ledger';
 import { PrintQuoteButton } from '@/modules/ledger/ui/quotes/print-button';
 import { formatM3 } from '@/modules/operations/ui/format';
 import { can, recordMoneyView } from '@/modules/platform-security';
@@ -21,6 +28,7 @@ export default async function QuoteDocumentPage({
   const user = await requirePagePermission(locale, 'quotes.read');
   const pool = getPool('app');
   await recordMoneyView(pool, user, 'screen:quote');
+  const related = await getRelatedDocuments(pool, user, { kind: 'quote', id: id });
   const quote = await getQuote(pool, user, id);
   if (!quote) notFound();
   const today = (await getRequestClock()).today();
@@ -135,6 +143,7 @@ export default async function QuoteDocumentPage({
           </p>
         )}
       </article>
+      <RelatedDocuments items={related} locale={locale} className="mt-8" />
     </div>
   );
 }

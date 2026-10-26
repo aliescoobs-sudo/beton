@@ -1,7 +1,8 @@
 import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { getPool } from '@/lib/db/pools';
-import { getSupplierInvoice, getSupplierInvoiceMatch, gapCount } from '@/modules/ledger';
+import { RelatedDocuments } from '@/modules/ledger/ui/related/related-documents';
+import { gapCount, getRelatedDocuments, getSupplierInvoice, getSupplierInvoiceMatch } from '@/modules/ledger';
 import { SupplierInvoiceFiles } from '@/modules/ledger/ui/supplier-invoices/supplier-invoice-files';
 import { SupplierInvoiceDecisions } from '@/modules/ledger/ui/supplier-invoices/supplier-invoice-decisions';
 import { can, recordMoneyView } from '@/modules/platform-security';
@@ -22,6 +23,7 @@ export default async function SupplierInvoicePage({
   const user = await requirePagePermission(locale, 'supplier_invoices.read');
   const pool = getPool('app');
   await recordMoneyView(pool, user, 'screen:supplier-invoice');
+  const related = await getRelatedDocuments(pool, user, { kind: 'supplier_invoice', id: id });
   const detail = await getSupplierInvoice(pool, user, id);
   if (!detail) notFound();
   const match = (await getSupplierInvoiceMatch(pool, user, id)) ?? [];
@@ -233,6 +235,7 @@ export default async function SupplierInvoicePage({
           ))}
         </ul>
       </section>
+      <RelatedDocuments items={related} locale={locale} className="mt-8" />
     </div>
   );
 }
