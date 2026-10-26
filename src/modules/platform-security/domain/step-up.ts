@@ -10,6 +10,7 @@ export const SENSITIVE_ACTIONS = [
   'load.cancel',
   'stock.adjust',
   'ledger.reverse_entry',
+  'ledger.credit_note',
   'parameters.change',
   'clock.advance',
   'users.manage',

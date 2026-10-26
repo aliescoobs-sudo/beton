@@ -669,3 +669,31 @@ export async function clientWithLoads(
     },
   );
 }
+
+/**
+ * A load of 6 m³ delivered and invoiced (after an advance), of which `lostL` litres were refused by the client, and the avoir
+ * for them issued by the database function, as the owner. Run inside the owner's transaction. The client is `adv<marker>`.
+ */
+export async function newAvoir(
+  tx: pg.PoolClient,
+  ownerId: string,
+  master: OrderMaster,
+  scene: Pick<DeliveryScene, 'truckId' | 'recetteId'>,
+  marker: string,
+  options: { lostL?: number; today?: string } = {},
+) {
+  const made = await newAdvanceInvoice(tx, ownerId, master, scene, marker, { today: options.today });
+  const lostL = options.lostL ?? 2000;
+  await tx.query(
+    `insert into delivery_loss (id, delivery_id, volume_l, reason, created_by) values (gen_random_uuid(), $1, $2, 'rejected_by_client', $3)`,
+    [made.deliveryId, lostL, ownerId],
+  );
+  const number = (
+    await tx.query<{ n: string | null }>(`select public.issue_avoir($1, $2, $3::date) as n`, [
+      made.deliveryId,
+      'refusé par le client',
+      options.today ?? '2026-06-12',
+    ])
+  ).rows[0]?.n;
+  return { ...made, avoirNumber: number ?? null, lostL };
+}

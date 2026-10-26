@@ -123,6 +123,12 @@ const GROUPS: GroupDef[] = [
         allowed: 'invoices.read',
       },
       {
+        path: '/avoirs',
+        labelKey: 'ledger.avoirs.link',
+        testId: 'avoirs-link',
+        allowed: 'avoirs.read',
+      },
+      {
         path: '/accounts',
         labelKey: 'ledger.accounts.link',
         testId: 'accounts-link',

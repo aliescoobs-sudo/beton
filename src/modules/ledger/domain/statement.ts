@@ -13,6 +13,7 @@ export type StatementLineType =
   | 'purchase_cancelled'
   | 'invoice'
   | 'credit_note'
+  | 'avoir'
   | 'payment';
 export type LineStatus =
   | 'booked'
@@ -162,6 +163,7 @@ const TYPES: readonly StatementLineType[] = [
   'purchase_cancelled',
   'invoice',
   'credit_note',
+  'avoir',
   'payment',
 ];
 const STATUSES: readonly LineStatus[] = [

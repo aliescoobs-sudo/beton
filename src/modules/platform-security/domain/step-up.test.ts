@@ -42,6 +42,7 @@ describe('sensitive action registry', () => {
       'ai.confirm_command',
       'alert.reclassify',
       'ledger.reverse_entry',
+      'ledger.credit_note',
       'parameters.change',
       'clock.advance',
       'users.manage',

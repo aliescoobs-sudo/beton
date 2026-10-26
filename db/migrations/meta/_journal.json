@@ -484,6 +484,13 @@
       "when": 1792591247018,
       "tag": "0068_allocate_to_invoices",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1792591247019,
+      "tag": "0069_avoir",
+      "breakpoints": true
     }
   ]
 }

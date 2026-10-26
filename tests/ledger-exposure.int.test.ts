@@ -77,6 +77,7 @@ describe('functions the application role can execute', () => {
     'public.delivery_note(p_delivery uuid)',
     'public.invoice_payment_state()',
     'public.invoice_queue()',
+    'public.issue_avoir(p_delivery uuid, p_reason text, p_today date)',
     'public.ledger_parameter(p_key text)',
     'public.next_code(p_key text, p_width integer)',
     'public.ops_parameter(p_key text)',

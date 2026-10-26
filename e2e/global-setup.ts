@@ -94,6 +94,8 @@ export default async function globalSetup() {
       [E2E_MD.queueSupport, 'support', 'fr'],
       [E2E_MD.queuePlant, 'plant', 'fr'],
       [E2E_MD.allocOffice, 'office', 'fr'],
+      [E2E_MD.avoirSupport, 'support', 'fr'],
+      [E2E_MD.avoirOffice, 'office', 'fr'],
       [E2E_MD.repPlant, 'plant', 'fr'],
       [E2E_MD.repPlantAr, 'plant', 'ar'],
       [E2E_MD.repPartner, 'partner', 'fr'],

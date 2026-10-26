@@ -103,6 +103,30 @@ async function loadParties(tx: Tx, kind: PartyKind, ids: readonly string[]): Pro
         ...(payments.get(i.id) ? { payment: payments.get(i.id)?.state } : {}),
       });
     }
+    // The avoirs for concrete refused after it was billed: commercial lines that count (they lower what the client owes).
+    const avoirs = await tx.query<{
+      id: string;
+      client_id: string;
+      number: string;
+      ttc: string;
+      date: string;
+    }>(
+      `select a.id, a.client_id, a.number, a.total_ttc_centimes::text as ttc, to_char(a.avoir_date, 'YYYY-MM-DD') as date
+         from avoir a where a.client_id = any($1)`,
+      [ids],
+    );
+    for (const a of avoirs.rows) {
+      data.get(a.client_id)?.lines.push({
+        id: `avoir-${a.id}`,
+        section: 'commercial',
+        date: a.date,
+        type: 'avoir',
+        code: a.number,
+        status: 'booked',
+        amountCentimes: centimes(-Number(a.ttc)),
+        counted: true,
+      });
+    }
     const items = await tx.query<{ client_id: string; due: string; amount: string; covered: string }>(
       `select o.client_id, to_char(i.due_date, 'YYYY-MM-DD') as due, i.amount_centimes::text as amount,
               coalesce((select sum(a.amount_centimes) from allocation a where a.payment_plan_item_id = i.id), 0)::text as covered

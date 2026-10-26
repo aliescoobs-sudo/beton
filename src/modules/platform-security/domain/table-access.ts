@@ -988,6 +988,25 @@ export const TABLE_ACCESS = {
     exception:
       'operations O13: fuel bought (litres and the total paid). Money (DECISIONS 81): the owner writes, the owner and support read, nobody else; its audit rows are hidden from the others. The price per litre and the cost of a truck are computed from it, never stored.',
   },
+  avoir: {
+    kind: 'rls',
+    money: true,
+    read: {
+      owner: 'all',
+      partner: 'none',
+      office: 'none',
+      plant: 'none',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'integration I1.6: the avoir for concrete refused or brought back after it was billed, one per loss record, with its AV number. Money (D81): owner and support read; written only by issue_avoir (SECURITY DEFINER, owner, step-up 2FA in the action), never by a role directly; it references the invoice, the BL and the loss and never edits the invoice; its audit rows are hidden from the others.',
+  },
   invoice_advance: {
     kind: 'rls',
     money: true,

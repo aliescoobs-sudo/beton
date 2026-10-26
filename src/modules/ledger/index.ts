@@ -35,6 +35,14 @@ export {
 } from './service/invoice-service';
 export { getInvoiceQueue, type QueueClient, type QueueDelivery } from './service/invoice-queue-service';
 export { allocateToInvoice, listOpenInvoices, type OpenInvoice } from './service/allocation-service';
+export {
+  type AvoirCandidate,
+  type AvoirError,
+  type AvoirView,
+  issueAvoir,
+  listAvoirCandidates,
+  listAvoirs,
+} from './service/avoir-service';
 export { getCompanyProfile, listCompanyProfiles, saveCompanyProfile } from './service/company-service';
 export {
   type AccountingExport,

@@ -19,6 +19,7 @@ import {
   insertQuote,
   moneyMaster,
   newAdvanceInvoice,
+  newAvoir,
   newReceivablePurchase,
   newCashMovement,
   orderMaster,
@@ -554,6 +555,17 @@ const FIXTURES: Record<
     seed: async () => undefined,
     visible: `select l.created_by::text as owner from invoice_line l join invoice i on i.id = l.invoice_id
                 where i.client_name = 'dl' || $1`,
+  },
+  avoir: {
+    // Written by issue_avoir only: the owner's fixture invoices a load, records its loss and issues the avoir.
+    writers: ['owner'],
+    seed: async (tx, actor) => {
+      const scene = await deliveryScene(app, actors.owner, marker);
+      const master = await orderMaster(app, actors.owner, marker);
+      const made = await newAvoir(tx, actor, master, scene, `${marker}av`);
+      if (!made.avoirNumber) throw new Error('the avoir was refused');
+    },
+    visible: `select a.created_by::text as owner from avoir a join client c on c.id = a.client_id where c.name = 'adv' || $1 || 'av'`,
   },
   invoice_advance: {
     // Written by create_invoice_from_deliveries only: the owner's fixture pays an advance and invoices a delivered load.

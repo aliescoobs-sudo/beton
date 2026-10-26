@@ -787,7 +787,8 @@
         "invoice": "Facture",
         "credit_note": "Avoir",
         "purchase": "Achat",
-        "purchase_cancelled": "Annulation d'achat"
+        "purchase_cancelled": "Annulation d'achat",
+        "avoir": "Avoir (béton refusé)"
       },
       "statuses": {
         "booked": "Enregistré",
@@ -1154,6 +1155,34 @@
       "cancelButton": "Annuler",
       "invalid": "Saisie invalide.",
       "refused": "Imputation impossible : facture non ouverte pour ce client, ou rien à imputer."
+    },
+    "avoirs": {
+      "link": "Avoirs",
+      "title": "Avoirs",
+      "intro": "Le béton refusé ou rapporté après facturation reste facturé jusqu'à ce que le propriétaire émette un avoir. L'avoir renvoie à la facture, au BL et à l'enregistrement du retour ; il ne modifie jamais la facture.",
+      "toCredit": "À créditer",
+      "noneToCredit": "Aucun chargement refusé ou rapporté n'attend d'avoir.",
+      "issued": "Avoirs émis",
+      "noneIssued": "Aucun avoir émis.",
+      "bl": "BL",
+      "invoice": "Facture",
+      "client": "Client",
+      "lost": "Volume perdu",
+      "lossReason": "Motif",
+      "amountTtc": "Montant TTC",
+      "action": "Action",
+      "number": "N° d'avoir",
+      "date": "Date",
+      "totalHt": "Total HT",
+      "totalTtc": "Total TTC",
+      "reason": "Raison",
+      "issue": "Émettre l'avoir",
+      "confirm": "Émettre",
+      "cancel": "Annuler",
+      "nothing": "Rien à créditer : déjà fait, ou la facture est annulée.",
+      "invalid": "Raison invalide.",
+      "conflict": "Conflit, réessayez.",
+      "error": "Action impossible."
     }
   },
   "operations": {
@@ -1585,7 +1614,8 @@
       "purchase": "Achat",
       "payment": "Paiement enregistré",
       "receipt": "Réception",
-      "quote": "Devis"
+      "quote": "Devis",
+      "avoir": "Avoir"
     },
     "scheduled": "Livraison prévue le",
     "remaining": "Reste à livrer sur {code} :",

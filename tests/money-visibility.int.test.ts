@@ -21,6 +21,7 @@ import {
   insertQuote,
   moneyMaster,
   newAdvanceInvoice,
+  newAvoir,
   newCashMovement,
   orderMaster,
   purchaseMaster,
@@ -170,6 +171,12 @@ const SEED: Record<MoneyTable, (tx: pg.PoolClient, actor: string) => Promise<unk
     const master = await orderMaster(app, actors.owner.id, marker);
     const made = await newAdvanceInvoice(tx, actor, master, scene, marker);
     if (!made.number) throw new Error('the advance invoice was refused');
+  },
+  avoir: async (tx, actor) => {
+    const scene = await deliveryScene(app, actors.owner.id, marker);
+    const master = await orderMaster(app, actors.owner.id, marker);
+    const made = await newAvoir(tx, actor, master, scene, `${marker}av`);
+    if (!made.avoirNumber) throw new Error('the avoir was refused');
   },
   selling_price: async (tx, actor) => {
     const type = await tx.query<{ id: string }>(

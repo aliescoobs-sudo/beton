@@ -133,6 +133,7 @@ export function StatementView({
                 'purchase_cancelled',
                 'invoice',
                 'credit_note',
+                'avoir',
                 'payment',
               ] as const
             ).map((x) => (

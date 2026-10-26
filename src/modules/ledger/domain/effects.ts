@@ -10,7 +10,8 @@ export type Effect =
   // Non-money facts
   | {
       kind: 'document';
-      document: 'order' | 'bl' | 'invoice' | 'credit_note' | 'purchase' | 'payment' | 'receipt' | 'quote';
+      document:
+        'order' | 'bl' | 'invoice' | 'credit_note' | 'avoir' | 'purchase' | 'payment' | 'receipt' | 'quote';
       code: string;
     }
   | { kind: 'scheduled'; code: string; date: string }

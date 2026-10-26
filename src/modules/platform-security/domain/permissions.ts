@@ -78,6 +78,9 @@ export const PERMISSIONS = {
   // Invoices
   'invoices.read': MONEY_READ,
   'invoices.write': BLIND_WRITE,
+  // The avoir for concrete refused or brought back after it was billed: the owner issues it (step-up), the owner and support read.
+  'avoirs.read': MONEY_READ,
+  'avoirs.issue': MONEY_WRITE,
   // The delivered loads no invoice carries yet. Office reads it without any amount (the answer has no money key).
   'invoices.queue': ['owner', 'office', 'support'],
   // Purchases, supplier payments (plant: receipt lines, no amount)
