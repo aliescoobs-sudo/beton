@@ -12,6 +12,8 @@ export const moduleDependencies = {
   notifications: ['rules-engine'],
   'owner-dashboard': ['rules-engine', 'reconciliation', 'notifications'],
   'ai-layer': ['rules-engine', 'reconciliation', 'ledger', 'owner-dashboard'],
+  // The in-app assistant (SPEC-assistant): tools over the services of these modules, under the caller's own row-level security.
+  assistant: ['platform-security', 'master-data', 'ledger', 'operations', 'rules-engine', 'clock'],
 };
 
 /** Direct + transitive dependencies of a module. */

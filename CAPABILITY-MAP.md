@@ -24,6 +24,7 @@ Legend (same as DECISIONS.md): ✅ confirmed · 🟡 assumption. `D<n>` = DECISI
 | `notifications` | In-app inbox, web push, minimal Telegram | `rules-engine` | [SPEC-notifications.md](SPEC-notifications.md) |
 | `owner-dashboard` | Brain's home, forecast view, black-day report; works with AI off | `rules-engine`, `reconciliation`, `notifications` | [SPEC-owner-dashboard.md](SPEC-owner-dashboard.md) |
 | `ai-layer` | Provider abstraction, pseudonymization, 5 AI roles, confirmation flow, kill switches, budget | `rules-engine`, `reconciliation`, `ledger`, `owner-dashboard` | [SPEC-ai-layer.md](SPEC-ai-layer.md) |
+| `assistant` | The in-app assistant: tool calling over the services under the caller's RLS, drafts confirmed by a human, pseudonymization, post-check of numbers, audit | `platform-security`, `master-data`, `ledger`, `operations`, `rules-engine`, `clock` | [docs/SPEC-assistant.md](docs/SPEC-assistant.md) |
 
 **Build order:** `clock` (real mode) → `platform-security` → `master-data` → `ledger` → `operations` → `rules-engine`, `reconciliation` → `simulation` → `notifications`, `owner-dashboard` → `ai-layer`
 

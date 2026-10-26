@@ -10,7 +10,7 @@ Status: `[ ]` to do, `[x]` done, `[~]` partial.
 
 - [x] A0 SPEC changes (v1.1) and this plan (documents only)
 - [x] A1 Switches and provider: env (`ASSISTANT_ENABLED`, `ASSISTANT_PROVIDER`, `ANTHROPIC_API_KEY`), start-up refusals, `LlmProvider`, `FakeProvider`, the Anthropic adapter behind its four conditions, the key never in the repository, the build or the client (AC-ASSIST-01 part, 02, 26, 27)
-- [ ] A2 The pure core: pre-pass (phones, ICE, numbers, amounts, known names to codes), placeholders and re-hydration, leak scan, numbers post-check, injection hardening of data blocks (AC-ASSIST-05 to 08 at unit level)
+- [x] A2 The pure core: pre-pass (phones, ICE, numbers, amounts, known names to codes), placeholders and re-hydration, leak scan, numbers post-check, injection hardening of data blocks (AC-ASSIST-05 to 08 at unit level)
 - [ ] A3 Tables and the assistant module: `ai_interaction`, `ai_tool_call`, `ai_proposal` (migration, RLS, audit, encrypted payloads, 90-day purge), the `ai_confirmed` audit kind, permission `assistant.use`, rate limits and budget (AC-ASSIST-14, 15)
 - [ ] A4 Read tools, first six (deliveries_today, stock_and_cover, uninvoiced_bls, open_invoices, forecast, next_load): matrix, allow-lists, refusals, exposure test (AC-ASSIST-03, 04)
 - [ ] A5 Read tools, four new (order_chain, find_document, purchase_status, consumption_variance) (AC-ASSIST-21 to 25)
