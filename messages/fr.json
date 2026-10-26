@@ -202,6 +202,11 @@
       "split_delivery_bp": "Part d'une commande déplacée au jour ouvré suivant dans l'option « scinder la livraison » (points de base)",
       "load_excess_tolerance_bp": "Excédent de chargement toléré sans alerte forte (points de base de la commande : 500 = 5 %)",
       "upload_max_bytes": "Taille maximale d'un document téléversé, scan de BL ou photo de facture fournisseur (octets)",
+      "assistant__global_off": "Assistant : interrupteur général (1 = coupé pour tous, aucun appel au fournisseur d'IA)",
+      "assistant__disabled_roles": "Assistant : rôles pour lesquels il est coupé (séparés par des virgules : owner, partner, office, plant, support)",
+      "assistant__questions_per_10_min": "Assistant : questions par utilisateur en dix minutes",
+      "assistant__questions_per_day": "Assistant : questions par utilisateur et par jour",
+      "assistant__budget_usd_month": "Assistant : budget mensuel en dollars américains entiers (à 100 %, il ne répond plus que par les outils)",
       "match_qty_tolerance_bp": "Écart de quantité toléré sur une facture fournisseur, facturé contre reçu ou contre commandé (points de base : 100 = 1 %)",
       "match_price_tolerance_bp": "Écart de prix unitaire toléré sur une facture fournisseur, facturé contre commandé (points de base : 50 = 0,5 %)"
     },

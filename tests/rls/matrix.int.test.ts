@@ -832,6 +832,49 @@ const FIXTURES: Record<
       ),
     visible: `select split_part(name, ':', 2) as owner from supplier where name like $1 || ':%'`,
   },
+  ai_interaction: {
+    // Each role asks one question; every role then reads its own and the system reads all (purge, key rotation).
+    writers: ['owner', 'partner', 'office', 'plant', 'support'],
+    seed: (tx, actor) =>
+      tx.query(
+        `insert into ai_interaction (id, user_id, role, locale, provider, model, question_hash, outcome)
+         values (gen_random_uuid(), $2, ctx.role(), 'fr', 'fake', 'fake', encode(sha256(convert_to($1::text, 'UTF8')), 'hex'), 'ok')`,
+        [marker, actor],
+      ),
+    visible: `select user_id::text as owner from ai_interaction where question_hash = encode(sha256(convert_to($1::text, 'UTF8')), 'hex')`,
+  },
+  ai_tool_call: {
+    writers: ['owner', 'partner', 'office', 'plant', 'support'],
+    seed: async (tx, actor) => {
+      const turn = await tx.query<{ id: string }>(
+        `insert into ai_interaction (id, user_id, role, locale, provider, model, question_hash, outcome)
+         values (gen_random_uuid(), $2, ctx.role(), 'fr', 'fake', 'fake', encode(sha256(convert_to($1::text || 'tc', 'UTF8')), 'hex'), 'ok') returning id`,
+        [marker, actor],
+      );
+      return tx.query(
+        `insert into ai_tool_call (id, interaction_id, user_id, seq, tool, args, outcome)
+         values (gen_random_uuid(), $1, $2, 1, 'matrix_probe', '{}', 'ok')`,
+        [turn.rows[0]?.id, actor],
+      );
+    },
+    visible: `select c.user_id::text as owner from ai_tool_call c where c.tool = 'matrix_probe' and $1::text is not null`,
+  },
+  ai_proposal: {
+    writers: ['owner', 'partner', 'office', 'plant'],
+    seed: async (tx, actor) => {
+      const turn = await tx.query<{ id: string }>(
+        `insert into ai_interaction (id, user_id, role, locale, provider, model, question_hash, outcome)
+         values (gen_random_uuid(), $2, ctx.role(), 'fr', 'fake', 'fake', encode(sha256(convert_to($1::text || 'pp', 'UTF8')), 'hex'), 'ok') returning id`,
+        [marker, actor],
+      );
+      return tx.query(
+        `insert into ai_proposal (id, interaction_id, user_id, role, action, params_enc, expires_at)
+         values (gen_random_uuid(), $1, $2, ctx.role(), 'record_return', $3, now() + interval '1 hour')`,
+        [turn.rows[0]?.id, actor, `matrix:${marker}`],
+      );
+    },
+    visible: `select user_id::text as owner from ai_proposal where params_enc = 'matrix:' || $1`,
+  },
   security_alert_ack: {
     writers: ['owner', 'partner'],
     seed: (tx, actor) =>

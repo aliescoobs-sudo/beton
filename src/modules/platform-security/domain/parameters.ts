@@ -192,6 +192,35 @@ export const PARAMETERS = {
     description:
       'Share of an order moved to the next working day in the "split delivery" option (basis points)',
   },
+  // The assistant (SPEC-assistant §9). The limits can only be made stricter than the spec defaults, except the budget the owner may raise.
+  'assistant.global_off': {
+    default: 0,
+    schema: z.number().int().min(0).max(1),
+    description: 'Kill switch of the assistant for everyone: 1 = off, no provider call',
+  },
+  'assistant.disabled_roles': {
+    default: '',
+    schema: z
+      .string()
+      .regex(/^(?:(?:owner|partner|office|plant|support)(?:,(?:owner|partner|office|plant|support))*)?$/),
+    description: 'Roles for which the assistant is off (comma-separated)',
+  },
+  'assistant.questions_per_10_min': {
+    default: 20,
+    schema: z.number().int().min(1).max(20),
+    description: 'Questions one user may ask the assistant in ten minutes',
+  },
+  'assistant.questions_per_day': {
+    default: 200,
+    schema: z.number().int().min(1).max(200),
+    description: 'Questions one user may ask the assistant in a day',
+  },
+  'assistant.budget_usd_month': {
+    default: 20,
+    schema: z.number().int().min(0).max(1000),
+    description:
+      'Monthly budget of the assistant in whole US dollars; at 100 % it answers from the tools only',
+  },
 } as const;
 
 export type ParameterKey = keyof typeof PARAMETERS;

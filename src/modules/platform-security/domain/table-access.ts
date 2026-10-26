@@ -1140,6 +1140,58 @@ export const TABLE_ACCESS = {
     exception:
       'integration I1.1: a load is delivered at the unloading step of its rotation (a SECURITY DEFINER trigger writes the row with the step instant) or, outside a rotation, by hand (plant, owner, partner). One row per load; quantities and times only. The view delivered_load drops cancelled and wholly refused loads.',
   },
+  ai_interaction: {
+    kind: 'rls',
+    read: {
+      owner: 'own',
+      partner: 'own',
+      office: 'own',
+      plant: 'own',
+      system: 'all',
+      anonymous: 'none',
+      support: 'own',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      "assistant A3: what a person asked is that person's, so every role reads its own rows only; belgobeton_system reads and may only empty or re-seal the sealed payloads (the 90-day purge, key rotation).",
+  },
+  ai_tool_call: {
+    kind: 'rls',
+    read: {
+      owner: 'own',
+      partner: 'own',
+      office: 'own',
+      plant: 'own',
+      system: 'all',
+      anonymous: 'none',
+      support: 'own',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception: 'assistant A3: own rows only, like the interaction it belongs to; written once.',
+  },
+  ai_proposal: {
+    kind: 'rls',
+    read: {
+      owner: 'own',
+      partner: 'own',
+      office: 'own',
+      plant: 'own',
+      system: 'all',
+      anonymous: 'none',
+      support: 'own',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    exception:
+      'assistant A3: a draft is read and moved along by the user it was made for only (status, instant and resulting number, by a guard trigger); the parameters are sealed and never change; belgobeton_system may only re-seal them.',
+  },
   delivery_file: {
     kind: 'rls',
     read: {

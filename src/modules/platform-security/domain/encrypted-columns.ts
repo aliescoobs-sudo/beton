@@ -30,6 +30,28 @@ export const ENCRYPTED_COLUMNS = [
     keyring: 'FIELD_ENCRYPTION_KEYS',
     pool: 'system',
   },
+  // The assistant's sealed payloads (SPEC-assistant §9): the question and the answer, the parameters of a draft.
+  {
+    table: 'ai_interaction',
+    column: 'question_enc',
+    idColumn: 'id',
+    keyring: 'FIELD_ENCRYPTION_KEYS',
+    pool: 'system',
+  },
+  {
+    table: 'ai_interaction',
+    column: 'output_enc',
+    idColumn: 'id',
+    keyring: 'FIELD_ENCRYPTION_KEYS',
+    pool: 'system',
+  },
+  {
+    table: 'ai_proposal',
+    column: 'params_enc',
+    idColumn: 'id',
+    keyring: 'FIELD_ENCRYPTION_KEYS',
+    pool: 'system',
+  },
 ] as const;
 
 export type EncryptedColumn = {

@@ -174,6 +174,8 @@ export const PERMISSIONS = {
   // AI (🟡 A22)
   'ai.qa': MONEY_READ,
   'ai.assisted_entry': OFFICE,
+  // The in-app assistant (SPEC-assistant, v1.1: office included). What it can read or draft is each tool's own permission; this one is the entry.
+  'assistant.use': ALL,
   // Pilot operations
   'simulation.control': ['owner'],
   'backups.manage': ['owner'],

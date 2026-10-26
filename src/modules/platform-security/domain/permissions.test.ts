@@ -39,6 +39,7 @@ describe('permission matrix (SPEC-platform-security §4)', () => {
     ['audit.read_own', ['owner', 'partner', 'office', 'plant', 'support']],
     ['ai.qa', ['owner', 'support']],
     ['ai.assisted_entry', ['owner', 'partner', 'office']],
+    ['assistant.use', ['owner', 'partner', 'office', 'plant', 'support']],
     ['simulation.control', ['owner']],
     ['backups.manage', ['owner']],
   ])('%s → %j', (permission, roles) => {

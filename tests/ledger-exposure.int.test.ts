@@ -60,6 +60,7 @@ describe('functions the application role can execute', () => {
   const ALLOWED = [
     'audit.is_money_table(p_table text)',
     'audit.record(p_action text, p_table text, p_row_id text, p_before jsonb, p_after jsonb, p_reason text)',
+    'ctx.ai_proposal_id()',
     'ctx.request_id()',
     'ctx.role()',
     'ctx.sim_at()',

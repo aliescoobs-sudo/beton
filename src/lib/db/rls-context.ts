@@ -14,6 +14,8 @@ const contextSchema = z.object({
   }),
   requestId: z.string().min(1).max(100),
   simAt: z.date().optional(),
+  /** A draft of the assistant being confirmed by its human: the audit trail then says `ai_confirmed` and names the proposal. */
+  aiProposalId: z.uuid().optional(),
 });
 
 export type RlsContext = z.infer<typeof contextSchema>;
@@ -34,8 +36,16 @@ export async function withRlsContext<T>(
     await client.query('BEGIN');
     await client.query(
       `select set_config('app.user_id', $1, true), set_config('app.role', $2, true),
-              set_config('app.request_id', $3, true), set_config('app.sim_at', $4, true)`,
-      [ctx.userId, ctx.role, ctx.requestId, ctx.simAt?.toISOString() ?? ''],
+              set_config('app.request_id', $3, true), set_config('app.sim_at', $4, true),
+              set_config('app.ai_proposal_id', $5, true)`,
+      [
+        ctx.userId,
+        ctx.role,
+        // The proposal id is also in the request id, so one line of the audit log carries both (SPEC-assistant §7).
+        ctx.aiProposalId ? `${ctx.requestId}|ai:${ctx.aiProposalId}` : ctx.requestId,
+        ctx.simAt?.toISOString() ?? '',
+        ctx.aiProposalId ?? '',
+      ],
     );
     // In simulated mode every transaction (including anonymous failed logins) is stamped with the simulated
     // instant, so audit events never depend on the caller remembering to pass it (AC-SEC-08, sim part).

@@ -21,5 +21,6 @@ export { auditDenied, authorize, type Authorization } from './auth/guards';
 // Building blocks for other modules' services. Pages and actions also need ./next (Next.js-only, not loadable by CLIs).
 export type { SessionUser } from './auth/session-gate';
 export { ForbiddenError } from './service/user-admin';
-export { inRequest, isMalformedId, isUniqueViolation, require } from './service/request';
-export { parameterOrDefault } from './domain/parameters';
+export { asAiConfirmation, inRequest, isMalformedId, isUniqueViolation, require } from './service/request';
+export { parameterOrDefault, type ParameterValues } from './domain/parameters';
+export { readParameters } from './service/parameter-service';
