@@ -85,6 +85,31 @@ the early deposit really deposits the cheques (choose the bank account) and reco
 advance and reminder options record the decision and give a draft message you copy and send yourself.
 The dev database keeps whatever you confirm: advance the clock or ignore it, nothing is reset.
 
+## The assistant, one walk per role (scripted provider, no network)
+Switch it on for the demo only: in `.env.local` put `ASSISTANT_ENABLED=true` (`ASSISTANT_PROVIDER` stays `fake`, the default), restart the
+dev server. The application refuses to start with the flag on next to real data or in production. Then `corepack pnpm db:scenario`
+plays the morning of each role through the application's own door, as that person, with the Fake provider (the demo accounts of the
+office and the plant are created if missing, with a random password nobody sees: sign in as them after the owner resets it, or just
+read what the walk left). Everything it did is in the audit log; the questions are recorded sealed, with a hash of the raw text.
+The button **Assistant** is in the top bar of every screen; the panel opens beside the page, in the user's language.
+- **Owner:** "Qu'est-ce qui est sorti aujourd'hui ?", "Combien de jours de couverture en ciment ?", "Qu'est-ce qu'il reste à facturer ?"
+  (with amounts), then "Facture les BL BL-… BL-… pour CLT-…": a **card** shows the invoice as the database would make it (lines grouped by
+  product, advance received, net to pay). Click **Confirmer**: a code from the authenticator is asked, then the invoice number is shown
+  on the card. Then "Quelles factures sont impayées ?" and "Quelle est la prévision de la semaine ?" (amounts are put back from the
+  stored figures). Open "Ce qui a été envoyé à l'IA" under any answer: codes and references, never a name or an amount.
+- **Office:** "Quels BL ne sont pas encore facturés ?" (BL, date, m³, product, no amount), "Enregistre un chèque 8451237 de 12 000 dh de CLT-…":
+  the card shows the method, number and date and **no amount** (blind, as the form), and confirming asks for the code too. "Quelles factures
+  sont impayées ?" is a question office has no tool for: the answer is a refusal, with no figure.
+- **Plant:** "Quel est le prochain chargement ?" (truck, time, m³, client code and the concrete type, which is the mix), "Où en est le silo de ciment ?"
+  (tonnes and days of cover, no supplier or price), then "Enregistre le retour du BL BL-…, refusé par le client": a card for the return,
+  which writes no money and needs no code.
+- The drafts the walk leaves are **pending**: nothing is confirmed by a script, since a money draft needs its person's fresh second factor.
+  They expire after 24 hours. In Arabic the same questions work in Arabic script or Darija ("أي السندات ما تفوترش بعد؟").
+- If nothing waits to be invoiced when the owner's walk is played, the walk first has the plant load and deliver 3 m³ of an open order
+  (through the plant's own door) so that there is a BL to invoice.
+- The kill switches, the limits (20 questions in ten minutes, 200 a day) and the monthly budget (USD 20) are parameters in Administration.
+  `corepack pnpm assistant:purge` empties the sealed payloads older than 90 days (not scheduled: run it daily).
+
 ## Not ready, or to say out loud
 - The daily brief is template text from the same facts (the AI layer is not built). No notifications yet.
 - Not wired: the nightly recompute job (the system role cannot read money tables; a decision for you). Alerts are stored
@@ -101,7 +126,7 @@ The dev database keeps whatever you confirm: advance the clock or ignore it, not
   a station is valued at the average price of the fuel bought. Rejected concrete stays billed until you issue an avoir.
 - Decisions 97 to 113 are provisional until you confirm them (list in docs/checkpoints/CP-INTEGRATION-2.md).
 - The older purchases of the scenario keep the former way (the payable comes from the order); only the new chain uses the supplier invoice as the source of the payable.
-- The assistant is specified (docs/SPEC-assistant.md) and not built.
+- The assistant (docs/SPEC-assistant.md, CP-ASSIST-1) is built and off by default; the walk below shows it with the scripted provider. The real provider is never used in the demo.
 - A stock count counts in the period it is entered and measures everything since the previous count.
 - Times shown on the tracking screen are formatted on the server in Casablanca time.
 - The partner role still sees no money (decision 81, provisional). The plant sees and prints the client's name and the site on the delivery note (decision 83, provisional).

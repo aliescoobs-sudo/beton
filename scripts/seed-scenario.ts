@@ -65,6 +65,23 @@ if (import.meta.main) {
         ? `Integration walk seeded: ${integration.loads} loads, ${integration.invoices} invoices from BLs, ${integration.payments} payments (one bounced), ${integration.supplierInvoices} supplier invoice approved and paid`
         : 'Integration walk already in place (nothing changed)',
     );
+    // The assistant walk (CP-ASSIST-1): what an owner, an office user and a plant user would ask on a morning, answered by the Fake
+    // provider through the application's own door, with the drafts left pending for the person to confirm in the screen.
+    const { seedAssistantWalk } = await import('../src/modules/assistant/service/pilot-assistant.ts');
+    const appPool = new pg.Pool({ connectionString: env.DATABASE_URL_APP, max: 2 });
+    const authPool = new pg.Pool({ connectionString: env.DATABASE_URL_AUTH, max: 2 });
+    const systemPool = new pg.Pool({ connectionString: env.DATABASE_URL_SYSTEM, max: 2 });
+    try {
+      const walk = await seedAssistantWalk({ appPool, authPool, systemPool, env, today });
+      console.log(
+        walk.applied
+          ? `Assistant walk played: ${walk.turns} questions, ${walk.drafts} drafts waiting for their person to confirm`
+          : 'Assistant walk already in place (nothing changed)',
+      );
+      for (const note of walk.skipped) console.log(`  assistant walk: ${note}`);
+    } finally {
+      await Promise.all([appPool.end(), authPool.end(), systemPool.end()]);
+    }
   } finally {
     await pool.end();
   }
