@@ -20,7 +20,7 @@ import { DRAFT_ROLES, MONEY_ACTIONS, needsStepUp } from '../src/modules/assistan
 import { createInvoice, createOrder, getInvoiceQueue, receiveInstrument } from '../src/modules/ledger';
 import { createPurchasePrice } from '../src/modules/master-data';
 import { recordLoss } from '../src/modules/operations';
-import { can, type Role } from '../src/modules/platform-security';
+import { can } from '../src/modules/platform-security';
 import type { SessionUser } from '../src/modules/platform-security/auth/session-gate';
 import { defaultParameters } from '../src/modules/platform-security/domain/parameters';
 import { verifyAuditChain } from '../src/modules/platform-security/service/audit-chain';
@@ -435,7 +435,7 @@ describe('what a draft refuses (AC-ASSIST-07, 09)', () => {
   it('refuses an amount the model wrote itself, one it took from a tool result, and one that was never in the question', async () => {
     const target = await clientToInvoice();
     for (const amount of ['45000', '{{AMT_9}}', 'cinq mille']) {
-      const r = await draft(users.owner, 'Chèque', 'record_payment', (x) => ({
+      const r = await draft(users.owner, 'Chèque', 'record_payment', () => ({
         client: target.code,
         method: 'cash',
         amount,

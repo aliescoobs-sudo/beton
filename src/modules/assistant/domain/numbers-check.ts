@@ -10,6 +10,7 @@ const CODE = /\b[A-Z]{2,6}(?:-[A-Z0-9]+)+\b/g;
 const TOKEN = /\b[A-Za-z]{1,6}\d+[A-Za-z0-9]*\b/g;
 const PLACEHOLDER = /\{\{(?:AMT|NUM)_\d+\}\}/g;
 const DATE_ISO = /\b(\d{4})-(\d{2})-(\d{2})\b/g;
+const MONTH = /\b(\d{4})-(0[1-9]|1[0-2])\b/g;
 const DATE_SLASH = /\b(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})\b/g;
 const TIME = /\b(\d{1,2})\s?(?::|h)\s?(\d{2})\b/g;
 const NUMBER = /\d+(?:[\s  .,]\d+)*/g;
@@ -52,8 +53,9 @@ function visit(value: unknown, into: Allowed, key?: string): void {
     for (const m of value.matchAll(TOKEN)) into.codes.add(m[0].toUpperCase());
     const text = value.replace(CODE, ' ').replace(PLACEHOLDER, ' ');
     for (const m of text.matchAll(DATE_ISO)) into.dates.add(m[0]);
+    for (const m of text.replace(DATE_ISO, ' ').matchAll(MONTH)) into.dates.add(m[0]);
     for (const m of text.matchAll(TIME)) into.times.add(`${Number(m[1])}:${m[2]}`);
-    const rest = text.replace(DATE_ISO, ' ').replace(TIME, ' ');
+    const rest = text.replace(DATE_ISO, ' ').replace(MONTH, ' ').replace(TIME, ' ');
     // A numeric field serialized as a string ("12.5"), not free text.
     if (key !== undefined && /^\d+(?:\.\d+)?$/.test(rest.trim())) {
       const c = canonicalNumber(rest.trim());
@@ -97,6 +99,10 @@ export function checkNumbers(answer: string, allowed: Allowed): NumbersVerdict {
     return ' ';
   });
   text = text.replace(DATE_ISO, (all) => {
+    if (!allowed.dates.has(all)) rejected += 1;
+    return ' ';
+  });
+  text = text.replace(MONTH, (all) => {
     if (!allowed.dates.has(all)) rejected += 1;
     return ' ';
   });

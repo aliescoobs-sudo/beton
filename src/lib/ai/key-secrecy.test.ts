@@ -95,9 +95,9 @@ describe('the API key stays out of the repository and the build (AC-ASSIST-27)',
     expect(offenders).toEqual([]);
   });
 
-  it('is read in the provider module only', () => {
+  it('is read by the environment loader and the provider factory only', () => {
     const files = committableFiles().filter((f) => /^src\/.*\.(ts|tsx)$/.test(f) && !f.endsWith('.test.ts'));
     const readers = files.filter((f) => /ANTHROPIC_API_KEY/.test(readFileSync(join(ROOT, f), 'utf8')));
-    expect(readers.sort()).toEqual(['src/lib/env.ts']);
+    expect(readers.sort()).toEqual(['src/lib/env.ts', 'src/modules/assistant/service/provider-factory.ts']);
   });
 });

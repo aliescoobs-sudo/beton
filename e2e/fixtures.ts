@@ -5,6 +5,9 @@ import { expect, type Page } from '@playwright/test';
 
 export const E2E_PORT = 3100;
 export const E2E_BASE_URL = `http://localhost:${E2E_PORT}`;
+/** A second server on the same database with the assistant flag OFF: the entry is absent and the endpoints answer 404 (AC-ASSIST-01). */
+export const E2E_OFF_PORT = 3101;
+export const E2E_OFF_URL = `http://localhost:${E2E_OFF_PORT}`;
 export const E2E_PASSWORD = 'correct-horse-battery-staple';
 export const E2E_USERS = {
   fr: { email: 'e2e-fr@belgobeton.test', name: 'Utilisateur E2E' },
@@ -112,6 +115,13 @@ export const E2E_MD = {
   lossOffice: { email: 'e2e-lo-office@belgobeton.test', name: 'Bureau Pertes' },
   anPartner: { email: 'e2e-an-partner@belgobeton.test', name: 'Associé Volumes' },
   anPlant: { email: 'e2e-an-plant@belgobeton.test', name: 'Centrale Volumes' },
+  astOffice: { email: 'e2e-as-office@belgobeton.test', name: 'Bureau Assistant' },
+  astOfficeAr: { email: 'e2e-as-office-ar@belgobeton.test', name: 'مكتب المساعد' },
+  astPlant: { email: 'e2e-as-plant@belgobeton.test', name: 'Centrale Assistant' },
+  astPlantAr: { email: 'e2e-as-plant-ar@belgobeton.test', name: 'مركز المساعد' },
+  astSupport: { email: 'e2e-as-support@belgobeton.test', name: 'Support Assistant' },
+  astOff: { email: 'e2e-as-off@belgobeton.test', name: 'Support Assistant coupé' },
+  astPartner: { email: 'e2e-as-partner@belgobeton.test', name: 'Associé Assistant' },
 } as const;
 export const E2E_CSP = { email: 'e2e-csp@belgobeton.test', name: 'CSP E2E' } as const;
 

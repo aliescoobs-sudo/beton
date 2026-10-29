@@ -154,6 +154,13 @@ export default async function globalSetup() {
       [E2E_MD.truckOffice, 'office', 'fr'],
       [E2E_MD.supplierOffice, 'office', 'fr'],
       [E2E_MD.supplierPartner, 'partner', 'fr'],
+      [E2E_MD.astOffice, 'office', 'fr'],
+      [E2E_MD.astOfficeAr, 'office', 'ar'],
+      [E2E_MD.astPlant, 'plant', 'fr'],
+      [E2E_MD.astPlantAr, 'plant', 'ar'],
+      [E2E_MD.astSupport, 'support', 'fr'],
+      [E2E_MD.astPartner, 'partner', 'fr'],
+      [E2E_MD.astOff, 'support', 'fr'],
     ] as const) {
       await createUser(auth, authPool, {
         actor: bootstrap,

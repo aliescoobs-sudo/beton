@@ -30,6 +30,7 @@ export function AppShell({
   searchHref,
   simBand,
   userMenu,
+  assistant,
   children,
 }: {
   groups: NavGroup[];
@@ -39,6 +40,8 @@ export function AppShell({
   searchHref: string;
   simBand: ReactNode;
   userMenu: ReactNode;
+  /** The assistant's button and panel, when the assistant is on for this application; absent otherwise. */
+  assistant?: ReactNode;
   children: ReactNode;
 }) {
   const pathname = usePathname();
@@ -108,6 +111,7 @@ export function AppShell({
             />
           </form>
           <div className="flex items-center gap-2 py-2">
+            {assistant}
             {userMenu}
             <button
               type="button"

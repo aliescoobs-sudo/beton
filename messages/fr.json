@@ -52,7 +52,8 @@
       }
     },
     "searchLabel": "Rechercher un document par son numéro",
-    "searchPlaceholder": "N° de document"
+    "searchPlaceholder": "N° de document",
+    "assistant": "Assistant"
   },
   "auth": {
     "login": {
@@ -2178,6 +2179,201 @@
       "receipt": "Réception",
       "supplier_invoice": "Facture fournisseur",
       "payment": "Paiement"
+    }
+  },
+  "assistant": {
+    "open": "Assistant",
+    "title": "Assistant",
+    "close": "Fermer",
+    "notice": "Les réponses viennent des outils de l'application, avec vos droits. L'assistant ne calcule rien, et rien n'est enregistré sans votre confirmation.",
+    "placeholder": "Posez votre question…",
+    "questionLabel": "Votre question",
+    "send": "Envoyer",
+    "thinking": "Je cherche…",
+    "you": "Vous",
+    "assistantName": "Assistant",
+    "suggestionsTitle": "Questions fréquentes",
+    "suggestions": {
+      "owner": {
+        "s1": "Qu'est-ce qui est sorti aujourd'hui ?",
+        "s2": "Combien de jours de couverture en ciment ?",
+        "s3": "Qu'est-ce qu'il reste à facturer ?",
+        "s4": "Quelles factures sont impayées ?",
+        "s5": "Quelle est la prévision de la semaine ?"
+      },
+      "partner": {
+        "s1": "Quels camions chargent aujourd'hui ?",
+        "s2": "Quel est le prochain chargement ?",
+        "s3": "Où en est la consommation du mois ?"
+      },
+      "office": {
+        "s1": "Quels BL ne sont pas encore facturés ?",
+        "s2": "Où est mon camion ?",
+        "s3": "Retrouve le document BL-2026-00001",
+        "s4": "Quelles sont les factures impayées ?"
+      },
+      "plant": {
+        "s1": "Quel est le prochain chargement ?",
+        "s2": "Où en est le silo de ciment ?",
+        "s3": "Quels camions chargent aujourd'hui ?",
+        "s4": "Enregistre un retour de béton sur un BL"
+      },
+      "support": {
+        "s1": "Quelles factures sont ouvertes ?",
+        "s2": "Quelle est la prévision de la semaine ?",
+        "s3": "Qu'est-ce qui est sorti aujourd'hui ?"
+      }
+    },
+    "refusal": {
+      "disabled": "L'assistant est coupé pour le moment. Tous les écrans fonctionnent normalement.",
+      "rate_limited": "Vous avez posé trop de questions en peu de temps. Réessayez dans quelques minutes.",
+      "budget_stop": "Le budget mensuel de l'assistant est atteint. Il reprendra le mois prochain, ou quand le propriétaire le relève.",
+      "blocked_leak": "Votre question contient un nom ou un numéro que je ne peux pas envoyer à l'IA. Reformulez-la avec un code (CLT-…, BL-…) ou sans nom.",
+      "unavailable": "L'assistant n'est pas disponible. Réessayez plus tard."
+    },
+    "error": {
+      "generic": "Une erreur est survenue. Réessayez.",
+      "network": "Le serveur ne répond pas. Réessayez."
+    },
+    "budget80": "Le budget mensuel de l'assistant est utilisé à {percent} %.",
+    "fallbackTitle": "Voici les résultats tels que l'application les donne, sans commentaire :",
+    "fallbackNote": "La réponse rédigée n'a pas passé les contrôles (un chiffre qui ne vient pas des outils, ou un format refusé).",
+    "chips": {
+      "title": "Outils utilisés",
+      "rows": "{count} lignes"
+    },
+    "chip": {
+      "ok": "ok",
+      "permission_denied": "refusé",
+      "invalid_args": "demande invalide",
+      "error": "erreur"
+    },
+    "tool": {
+      "deliveries_today": "Livraisons du jour",
+      "stock_and_cover": "Stock et couverture",
+      "uninvoiced_bls": "BL à facturer",
+      "open_invoices": "Factures ouvertes",
+      "forecast": "Prévision de trésorerie",
+      "next_load": "Prochain chargement",
+      "order_chain": "Suivi de commande",
+      "find_document": "Recherche de document",
+      "purchase_status": "Achats fournisseurs",
+      "consumption_variance": "Écart de consommation",
+      "plan_order": "Brouillon de commande",
+      "record_payment": "Brouillon de paiement",
+      "create_purchase": "Brouillon d'achat",
+      "record_return": "Brouillon de retour",
+      "invoice_from_bls": "Brouillon de facture"
+    },
+    "sent": {
+      "summary": "Ce qui a été envoyé à l'IA",
+      "intro": "Le texte exact qui est parti : des codes à la place des noms, des références à la place des montants et des numéros. Rien d'autre.",
+      "system": "Consigne",
+      "messages": "Messages",
+      "none": "Rien n'a été envoyé : la demande a été arrêtée avant."
+    },
+    "card": {
+      "title": {
+        "plan_order": "Commande à créer",
+        "record_payment": "Paiement à enregistrer",
+        "create_purchase": "Achat à créer",
+        "record_return": "Retour de béton à enregistrer",
+        "invoice_from_bls": "Facture à créer"
+      },
+      "status": {
+        "pending": "À confirmer",
+        "confirming": "En cours",
+        "confirmed": "Confirmé",
+        "rejected": "Refusé",
+        "expired": "Expiré",
+        "failed": "Échec"
+      },
+      "field": {
+        "client": "Client",
+        "product": "Produit",
+        "volume": "Volume",
+        "date": "Date de livraison",
+        "site": "Chantier",
+        "plan": "Paiement",
+        "unitPrice": "Prix unitaire HT",
+        "totalHt": "Total HT",
+        "vat": "TVA",
+        "totalTtc": "Total TTC",
+        "method": "Mode",
+        "dueDate": "Échéance",
+        "amount": "Montant",
+        "number": "Numéro",
+        "writtenDate": "Date écrite",
+        "order": "Commande",
+        "covers": "Couvre",
+        "supplier": "Fournisseur",
+        "component": "Composant",
+        "quantity": "Quantité",
+        "bl": "BL",
+        "loadVolume": "Volume du chargement",
+        "returnedVolume": "Volume ramené ou refusé",
+        "reason": "Motif",
+        "bls": "BL",
+        "amountHt": "Montant HT",
+        "advance": "Acompte reçu",
+        "netToPay": "Net à payer"
+      },
+      "enum": {
+        "plan": {
+          "cash": "Comptant",
+          "advance50": "50 % d'avance",
+          "installments3": "Trois échéances",
+          "cheque30": "Chèque à 30 jours"
+        },
+        "method": {
+          "cash": "Espèces",
+          "cheque": "Chèque",
+          "lcn": "LCN",
+          "transfer": "Virement"
+        },
+        "reason": {
+          "rejected_by_client": "Refusé par le client",
+          "returned_unused": "Ramené non utilisé",
+          "too_old": "Trop vieux",
+          "quality": "Qualité",
+          "other": "Autre"
+        },
+        "volume": {
+          "whole": "Tout le chargement"
+        }
+      },
+      "note": {
+        "checkClient": "Vérifiez le client.",
+        "checkDate": "Vérifiez la date de livraison.",
+        "checkPriceOverride": "Le prix est celui que vous avez indiqué, pas celui en vigueur.",
+        "checkAmount": "Vérifiez le montant et le numéro.",
+        "allocationOldestFirst": "Il couvre les factures ouvertes de la plus ancienne échéance à la plus récente.",
+        "checkAmountOnForm": "Vérifiez que le montant est bien celui que vous avez tapé : il n'est pas affiché ici.",
+        "checkSupplier": "Vérifiez le fournisseur.",
+        "checkQuantity": "Vérifiez la quantité et l'unité.",
+        "checkPrice": "Vérifiez le prix.",
+        "checkBl": "Vérifiez le numéro de BL.",
+        "noMoney": "Aucun montant : l'avoir éventuel reste une action du propriétaire.",
+        "checkBls": "Vérifiez les BL et le client.",
+        "oneBlOneInvoice": "Un BL n'est que sur une facture."
+      },
+      "blind": "Aucun montant n'est affiché : c'est le fonctionnement normal de votre profil. Ce que vous confirmez est identique à ce que le formulaire aurait créé.",
+      "stepUp": "La confirmation demande un code de votre application d'authentification.",
+      "confirm": "Confirmer",
+      "reject": "Refuser",
+      "result": "Créé : {ref}",
+      "resultReturn": "Enregistré sur {ref}",
+      "expires": "Valable jusqu'au {date}",
+      "error": {
+        "NOT_FOUND": "Ce brouillon n'existe plus.",
+        "ALREADY_DECIDED": "Ce brouillon a déjà été confirmé ou refusé.",
+        "EXPIRED": "Ce brouillon a expiré : refaites la demande.",
+        "STALE": "Les données ont changé depuis : rien n'a été enregistré. Refaites la demande.",
+        "FAILED": "L'enregistrement a échoué : rien n'a été enregistré.",
+        "STEP_UP_REQUIRED": "Un code de vérification est nécessaire.",
+        "FORBIDDEN": "Action non autorisée.",
+        "generic": "Une erreur est survenue. Réessayez."
+      }
     }
   }
 }

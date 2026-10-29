@@ -1,9 +1,22 @@
 import { defineConfig, devices } from '@playwright/test';
 import { E2E_DATABASE } from './scripts/db-bootstrap';
 import { testEnv } from './tests/db-env';
-import { E2E_BASE_URL, E2E_PORT } from './e2e/fixtures';
+import { E2E_BASE_URL, E2E_OFF_PORT, E2E_OFF_URL, E2E_PORT } from './e2e/fixtures';
 
 const env = testEnv(E2E_DATABASE);
+
+const serverEnv = (baseUrl: string) => ({
+  DATABASE_URL_APP: env.DATABASE_URL_APP,
+  DATABASE_URL_AUTH: env.DATABASE_URL_AUTH,
+  DATABASE_URL_SYSTEM: env.DATABASE_URL_SYSTEM,
+  DATABASE_URL_MIGRATOR: env.DATABASE_URL_MIGRATOR,
+  APP_BASE_URL: baseUrl,
+  JOB_SCHEDULER_DISABLED: 'true',
+  // Wiped with test-results at every run.
+  FILE_STORE_DIR: 'test-results/file-store',
+  NEXT_TELEMETRY_DISABLED: '1',
+  NODE_ENV: 'test',
+});
 
 export default defineConfig({
   testDir: 'e2e',
@@ -13,22 +26,22 @@ export default defineConfig({
   globalSetup: './e2e/global-setup.ts',
   use: { baseURL: E2E_BASE_URL, trace: 'retain-on-failure' },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
-  webServer: {
-    // Production build (pnpm build runs first in test:e2e), on the e2e database.
-    command: `node node_modules/next/dist/bin/next start -H 127.0.0.1 -p ${E2E_PORT}`,
-    // Wait on the port only: pages query the e2e database, which globalSetup may still be creating.
-    port: E2E_PORT,
-    reuseExistingServer: false,
-    env: {
-      DATABASE_URL_APP: env.DATABASE_URL_APP,
-      DATABASE_URL_AUTH: env.DATABASE_URL_AUTH,
-      DATABASE_URL_SYSTEM: env.DATABASE_URL_SYSTEM,
-      DATABASE_URL_MIGRATOR: env.DATABASE_URL_MIGRATOR,
-      APP_BASE_URL: E2E_BASE_URL,
-      JOB_SCHEDULER_DISABLED: 'true',
-      // Wiped with test-results at every run.
-      FILE_STORE_DIR: 'test-results/file-store',
-      NEXT_TELEMETRY_DISABLED: '1',
+  webServer: [
+    {
+      // Production build (pnpm build runs first in test:e2e), on the e2e database. NODE_ENV=test: `next start` would otherwise
+      // say production, where the assistant flag is refused (SPEC-assistant §9); this is a test server on fake data.
+      command: `node node_modules/next/dist/bin/next start -H 127.0.0.1 -p ${E2E_PORT}`,
+      // Wait on the port only: pages query the e2e database, which globalSetup may still be creating.
+      port: E2E_PORT,
+      reuseExistingServer: false,
+      env: { ...serverEnv(E2E_BASE_URL), ASSISTANT_ENABLED: 'true', ASSISTANT_PROVIDER: 'fake' },
     },
-  },
+    {
+      // The same application with the assistant OFF (its default): only the 404 and the absent entry are checked here.
+      command: `node node_modules/next/dist/bin/next start -H 127.0.0.1 -p ${E2E_OFF_PORT}`,
+      port: E2E_OFF_PORT,
+      reuseExistingServer: false,
+      env: { ...serverEnv(E2E_OFF_URL), ASSISTANT_ENABLED: 'false' },
+    },
+  ],
 });

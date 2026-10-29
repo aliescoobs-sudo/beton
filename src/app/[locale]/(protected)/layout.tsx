@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
+import { getEnv } from '@/lib/server-env';
+import { AssistantPanel } from '@/modules/assistant/ui/assistant-panel';
 import { currentAuthState } from '@/modules/platform-security/auth/request-state';
 import { SecurityAlertBanner } from '@/modules/platform-security/ui/alerts/security-alert-banner';
 import { AppShell } from '../../shell/app-shell';
@@ -37,6 +39,8 @@ export default async function ProtectedLayout({
       homeHref={`/${locale}`}
       searchHref={`/${locale}/search`}
       simBand={<SimBand locale={locale} />}
+      // With the flag off there is no entry point at all (AC-ASSIST-01).
+      assistant={getEnv().ASSISTANT_ENABLED ? <AssistantPanel role={state.user.role} /> : null}
       userMenu={
         <UserMenu
           name={state.user.name}

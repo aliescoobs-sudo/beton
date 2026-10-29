@@ -49,8 +49,6 @@ const ctxOf = (actor: SessionUser, today = DAY): ToolContext => ({
 });
 const call = (role: Role, tool: string, args: unknown = {}, today = DAY) =>
   runTool(ctxOf(users[role as (typeof ROLES)[number]], today), tool, args);
-const inCtx = <T>(user: SessionUser, fn: (tx: pg.PoolClient) => Promise<T>) =>
-  withRlsContext(app, { userId: user.id, role: user.role, requestId: marker }, fn);
 
 // The matrix of SPEC-assistant §5, the four new read tools. O P B L S.
 const MATRIX: Record<string, readonly Role[]> = {
