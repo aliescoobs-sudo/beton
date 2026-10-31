@@ -110,7 +110,7 @@ export function AppShell({
               data-testid="search-box"
             />
           </form>
-          <div className="flex items-center gap-2 py-2">
+          <div className="flex items-center gap-1 py-2 md:gap-2">
             {assistant}
             {userMenu}
             <button

@@ -105,7 +105,7 @@ export function AssistantPanel({ role }: { role: string }) {
     <>
       <button
         type="button"
-        className="px-2 py-1 text-sm font-medium underline decoration-2 underline-offset-4"
+        className="shrink px-1 py-1 text-sm font-medium underline decoration-2 underline-offset-4 md:px-2"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-controls="assistant-panel"

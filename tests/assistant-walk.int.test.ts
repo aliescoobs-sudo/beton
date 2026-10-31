@@ -25,6 +25,7 @@ const marker = `aw${randomUUID()
   .replace(/\d/g, (d) => 'ghijklmnop'[Number(d)] as string)}`;
 let office: SessionUser;
 let plant: SessionUser;
+let clientCode = '';
 
 beforeAll(async () => {
   const owner = await realSessionUser(env.DATABASE_URL_MIGRATOR, 'owner');
@@ -35,7 +36,7 @@ beforeAll(async () => {
   await withRlsContext(app, { userId: owner.id, role: 'owner', requestId: marker }, (tx) =>
     tx.query('update client set name = $2 where id = $1', [master.clientId, `mc${marker}`]),
   );
-  await clientWithLoads(app, owner.id, master, scene, [[3000, 2000]]);
+  clientCode = (await clientWithLoads(app, owner.id, master, scene, [[3000, 2000]])).clientCode;
   await newDelivery(app, owner.id, marker, scene, 800);
 });
 
@@ -49,6 +50,7 @@ describe('the assistant walk of db:scenario', () => {
       env,
       today: '2026-06-02',
       users: { office, plant },
+      clientCode,
     };
     const first = await seedAssistantWalk(deps);
     expect(first.applied).toBe(true);
@@ -56,7 +58,13 @@ describe('the assistant walk of db:scenario', () => {
     const cipher = cipherFrom(parseKeyring(env.FIELD_ENCRYPTION_KEYS));
     const mine = async (user: SessionUser) =>
       listProposals({ appPool: app, cipher, today: '2026-06-02' }, user);
-    expect((await mine(office)).map((c) => c.action)).toContain('record_payment');
+    const why = await withRlsContext(app, { userId: office.id, role: 'office', requestId: marker }, (tx) =>
+      tx.query('select tool, outcome from ai_tool_call where user_id = $1 order by created_at', [office.id]),
+    );
+    expect(
+      (await mine(office)).map((c) => c.action),
+      JSON.stringify(why.rows),
+    ).toContain('record_payment');
     expect((await mine(plant)).map((c) => c.action)).toContain('record_return');
     for (const c of [...(await mine(office)), ...(await mine(plant))]) expect(c.status).toBe('pending');
     // Office's draft shows no amount.

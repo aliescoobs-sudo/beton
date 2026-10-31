@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomInt } from 'node:crypto';
 import type pg from 'pg';
 import { FakeProvider } from '@/lib/ai/fake-provider';
 import { parseKeyring } from '@/lib/crypto/keyring';
@@ -31,6 +31,8 @@ export interface WalkDeps {
   today: string;
   /** Accounts to play as instead of looking them up (tests). */
   users?: Partial<Record<'owner' | 'office' | 'plant', SessionUser>>;
+  /** The client of the invoice and payment drafts instead of the first one waiting to be invoiced (tests). */
+  clientCode?: string;
 }
 
 export interface WalkResult {
@@ -145,7 +147,9 @@ export async function seedAssistantWalk(deps: WalkDeps): Promise<WalkResult> {
     }
     queue = await getInvoiceQueue(deps.appPool, owner);
   }
-  const client = queue.find((c) => c.deliveries.length > 0);
+  const client = queue.find(
+    (c) => c.deliveries.length > 0 && (!deps.clientCode || c.clientCode === deps.clientCode),
+  );
 
   if (!owner) result.skipped.push('owner: no owner account yet (corepack pnpm user:create-owner)');
   else if ((await turnsOf(deps, owner)) > 0) result.skipped.push('owner: already played');
@@ -173,8 +177,18 @@ export async function seedAssistantWalk(deps: WalkDeps): Promise<WalkResult> {
   if (!office) result.skipped.push('office: no account');
   else if ((await turnsOf(deps, office)) > 0) result.skipped.push('office: already played');
   else {
-    await ask(office, 'Quels BL ne sont pas encore facturés ?');
-    if (client) await ask(office, `Enregistre un chèque 8451237 de 12 000 dh de ${client.clientCode}`);
+    // Of the client of the walk when there is one: the whole queue of a shared database may hold labels the leak rule stops.
+    await ask(
+      office,
+      client
+        ? `Quels BL de ${client.clientCode} ne sont pas encore facturés ?`
+        : 'Quels BL ne sont pas encore facturés ?',
+    );
+    if (client)
+      await ask(
+        office,
+        `Enregistre un chèque ${randomInt(7_000_000, 8_000_000)} de 12 000 dh de ${client.clientCode}`,
+      );
     // A money question office has no tool for: the answer is a refusal.
     await ask(office, 'Quelles factures sont impayées ?');
   }

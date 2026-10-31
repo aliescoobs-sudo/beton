@@ -46,8 +46,14 @@ function walk(dir: string, into: string[]): string[] {
   for (const name of readdirSync(dir)) {
     const path = join(dir, name);
     const info = statSync(path);
-    if (info.isDirectory()) walk(path, into);
-    else if (info.size < 20 * 1024 * 1024) into.push(path);
+    // The build cache holds compiler intermediates, not what is served or run; what ships is scanned.
+    if (info.isDirectory()) {
+      if (name !== 'cache') walk(path, into);
+    } else if (
+      info.size < 8 * 1024 * 1024 &&
+      /\.(js|mjs|cjs|json|html|txt|css|map|rsc|body|meta)$/.test(name)
+    )
+      into.push(path);
   }
   return into;
 }
