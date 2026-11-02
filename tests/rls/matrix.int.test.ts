@@ -273,6 +273,19 @@ const FIXTURES: Record<
       ),
     visible: `select created_by::text as owner from pump_job_event where client_key = $1 || '-pe'`,
   },
+  disclosure_request: {
+    // Written by request_disclosure (the offices and the plant); the figure itself is never stored.
+    writers: ['office', 'plant'],
+    seed: async (tx) => {
+      const code = (
+        await migratorPool.query<{ code: string }>('select code from sales_order where id = $1', [
+          preOrders.status,
+        ])
+      ).rows[0]?.code;
+      return tx.query(`select public.request_disclosure('order_total', $1, 'order', $1, $2)`, [code, marker]);
+    },
+    visible: `select requester::text as owner from disclosure_request where reason = $1`,
+  },
   zone: {
     writers: ['owner', 'partner'],
     seed: (tx, actor) =>

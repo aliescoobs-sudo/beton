@@ -347,6 +347,23 @@ export const TABLE_ACCESS = {
     kind: 'auth_only',
     reason: 'R4: the one phone bound to a driver; belgobeton_auth only, like sessions',
   },
+  disclosure_request: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'none',
+      office: 'none',
+      plant: 'none',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    exception:
+      'D143 (REQUIREMENTS-V1 §16.3): a request to see one figure of one data item, scoped to a person, an item and a duration. No amount is stored: view_disclosure computes it at view time and audits every view. Written only by request_disclosure, decide_disclosure and view_disclosure (SECURITY DEFINER); a requester reads its own through my_disclosures().',
+  },
   zone: {
     kind: 'rls',
     read: {

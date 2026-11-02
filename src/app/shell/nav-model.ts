@@ -29,6 +29,12 @@ const GROUPS: GroupDef[] = [
         allowed: 'documents.read',
       },
       {
+        path: '/disclosures',
+        labelKey: 'ledger.disclosure.link',
+        testId: 'disclosures-link',
+        allowed: 'disclosure.request',
+      },
+      {
         path: '/approvals',
         labelKey: 'ledger.approvals.link',
         testId: 'approvals-link',

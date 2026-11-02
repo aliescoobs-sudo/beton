@@ -80,6 +80,19 @@ export {
 } from './service/supplier-invoice-service';
 export { getOrderChain, type OrderChainRow } from './service/order-chain-service';
 export {
+  decideDisclosure,
+  DISCLOSURE_KINDS,
+  type DisclosedFigure,
+  type DisclosureError,
+  type DisclosureKind,
+  listMyDisclosures,
+  listPendingDisclosures,
+  type MyDisclosure,
+  type PendingDisclosure,
+  requestDisclosure,
+  viewDisclosure,
+} from './service/disclosure-service';
+export {
   getInvoiceForPrint,
   libraryKinds,
   type LibraryEntry,

@@ -1396,6 +1396,40 @@
       "done": "Décision enregistrée.",
       "error": "Action refusée.",
       "readOnly": "Lecture seule : {count} carte(s) en attente."
+    },
+    "disclosure": {
+      "link": "Demander un chiffre",
+      "pageTitle": "Demander un chiffre",
+      "pageIntro": "Un chiffre que votre rôle ne voit pas se demande ici. Le propriétaire ou l'administrateur décide ; par défaut vous le voyez une seule fois, dans les 15 minutes.",
+      "title": "Demandes de chiffre",
+      "card": "{who} demande : {kind} de {ref}",
+      "willDo": "Approuver montre ce chiffre à cette personne seulement, une fois, pendant 15 minutes. Chaque vue est enregistrée.",
+      "approveOnce": "Une seule vue (15 min)",
+      "approveWindow": "Fenêtre de 15 min",
+      "deny": "Refuser",
+      "done": "Décision enregistrée.",
+      "error": "Impossible d'enregistrer la décision.",
+      "ask": "Demander",
+      "ref": "Numéro (commande, facture ou code client)",
+      "reason": "Raison (facultatif)",
+      "asked": "Demande envoyée. En attente d'approbation.",
+      "view": "Voir le chiffre",
+      "kind": {
+        "order_total": "Total de la commande",
+        "invoice_total": "Total de la facture",
+        "client_balance": "Solde du client"
+      },
+      "status": {
+        "pending": "en attente d'approbation",
+        "approved": "approuvée",
+        "denied": "refusée"
+      },
+      "errors": {
+        "INVALID": "Demande invalide.",
+        "NOT_FOUND": "Numéro inconnu.",
+        "ALREADY_WAITING": "Déjà en attente.",
+        "NOT_AVAILABLE": "Plus disponible."
+      }
     }
   },
   "operations": {

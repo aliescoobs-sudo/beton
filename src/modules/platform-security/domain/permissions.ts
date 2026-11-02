@@ -155,6 +155,9 @@ export const PERMISSIONS = {
   'approvals.decide': MONEY_WRITE,
   'credit_limit.write': MONEY_WRITE,
   // Whether an order waits, and a client's standing as two flags: no figure, so the offices read them.
+  // §16.3: a person without money access asks for one figure; the owner or app_admin decides, scoped and audited.
+  'disclosure.request': ['office', 'office_sales', 'office_purchases', 'plant', 'plant_manager'],
+  'disclosure.decide': MONEY_WRITE,
   // §16.2: the document library. One key per document type; the library lists, and a download re-checks the key and the RLS.
   'documents.read': [...ALL, 'accountant'],
   'documents.invoice': [...MONEY_READ, 'accountant', 'office', 'office_sales'],
