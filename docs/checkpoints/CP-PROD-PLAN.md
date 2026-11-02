@@ -111,6 +111,20 @@ Each AC has one proving test named in the table at the end of the batch.
 - AC-PROD-32 Health endpoints report liveness and readiness (database, migrations) with no sensitive detail.
 - AC-PROD-33 `docs/RUNBOOK.md` covers install, update, backup, restore, key rotation, incident and rollback.
 
+## Information-visibility matrix (§16.1)
+Four rights per money item, stated separately. Entering or printing never grants a balance or an aggregate. Source: `src/modules/platform-security/domain/visibility-matrix.ts` (this table is printed from it and a unit test fails when they differ); the balance column is proved in the database by `tests/visibility-matrix.int.test.ts`. Known exceptions: office_sales prints invoices with amounts; office_purchases enters supplier invoices and payments; the accountant exports HT, VAT and TTC; reference prices are visible to internal non-field roles (`public.reference_prices`).
+
+| Item | Enters | Sees in a document | Sees balances and aggregates | Exports |
+|---|---|---|---|---|
+| Reference average prices (sell and buy) | owner, app_admin | owner, app_admin, office, office_sales, office_purchases, plant, plant_manager, support | — | — |
+| Order and quote prices and totals | owner, app_admin, office, office_sales | owner, app_admin, office_sales, support | owner, app_admin, support | owner, app_admin, support |
+| Sales invoices and avoirs | owner, app_admin, office, office_sales | owner, app_admin, office_sales, accountant, support | owner, app_admin, support | owner, app_admin, accountant, support |
+| Supplier invoices and purchase prices | owner, app_admin, office, office_purchases | owner, app_admin, office_purchases, support | owner, app_admin, support | owner, app_admin, accountant, support |
+| Payments in and out (cash, cheque, LCN) | owner, app_admin, office, office_sales, office_purchases | owner, app_admin, support | owner, app_admin, support | — |
+| Client and supplier balances | — | owner, app_admin, support | owner, app_admin, support | — |
+| Cash, bank, treasury, forecast | owner, app_admin | owner, app_admin, support | owner, app_admin, support | — |
+| Fuel purchases (amounts) | owner, app_admin | owner, app_admin, support | owner, app_admin, support | — |
+
 ## Interface for Codex (finance reads through the public indexes)
 Codex works in a separate worktree, branch `codex/finance`, in `src/modules/finance`, migrations 0200 and above, and never merges into main. Finance imports only from these module indexes (`src/modules/<module>/index.ts`), never from a `service/` or `domain/` file, and never reads a table directly except through a view or function granted to it. `module-map.mjs` will list `finance: ['platform-security', 'master-data', 'ledger', 'operations', 'clock']`; that line is the only change to shared files Codex may propose, through this file.
 

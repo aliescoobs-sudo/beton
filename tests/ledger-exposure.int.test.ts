@@ -106,6 +106,7 @@ describe('functions the application role can execute', () => {
     'public.ops_parameter(p_key text)',
     'public.next_doc_number(p_prefix text, p_year integer, p_width integer)',
     'public.record_receipt(p_purchase uuid, p_date date)',
+    'public.reference_prices(p_today date)',
     'public.approvals_pending()',
     'public.client_balance_status(p_today date)',
     'public.confirm_order_price(p_order uuid, p_unit_price bigint)',

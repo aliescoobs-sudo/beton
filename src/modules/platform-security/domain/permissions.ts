@@ -155,6 +155,17 @@ export const PERMISSIONS = {
   'approvals.decide': MONEY_WRITE,
   'credit_limit.write': MONEY_WRITE,
   // Whether an order waits, and a client's standing as two flags: no figure, so the offices read them.
+  // §16.1: the reference average prices (list sell, current buy) are seen by every internal non-field account.
+  'reference_prices.read': [
+    'owner',
+    'app_admin',
+    'office',
+    'office_sales',
+    'office_purchases',
+    'plant',
+    'plant_manager',
+    'support',
+  ],
   'orders.approval_state': ['owner', 'app_admin', 'office', 'office_sales', 'support'],
   'clients.balance_status': ['owner', 'app_admin', 'office', 'office_sales', 'office_purchases', 'support'],
   // Invoices
