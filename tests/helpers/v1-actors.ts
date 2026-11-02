@@ -38,9 +38,19 @@ export async function v1Actors(app: pg.Pool, migratorUrl: string, marker: string
     );
     ids[role] = id;
   }
+  const session = (role: Role) => ({
+    id: ids[role],
+    name: `${marker} ${role}`,
+    email: `${ids[role]}@belgobeton.test`,
+    role,
+    locale: 'fr' as const,
+    twoFactorEnabled: true,
+    reenrolRequired: false,
+  });
   return {
     owner,
     ids,
+    session,
     plantId,
     done: async () => {
       await updatePlant(app, owner, plantId as string, { status: 'archived' });

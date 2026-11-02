@@ -155,6 +155,9 @@ export const PERMISSIONS = {
   'approvals.decide': MONEY_WRITE,
   'credit_limit.write': MONEY_WRITE,
   // Whether an order waits, and a client's standing as two flags: no figure, so the offices read them.
+  // §16.2: the document library. One key per document type; the library lists, and a download re-checks the key and the RLS.
+  'documents.read': [...ALL, 'accountant'],
+  'documents.invoice': [...MONEY_READ, 'accountant', 'office', 'office_sales'],
   // §16.1: the reference average prices (list sell, current buy) are seen by every internal non-field account.
   'reference_prices.read': [
     'owner',

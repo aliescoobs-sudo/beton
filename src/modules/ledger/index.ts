@@ -79,6 +79,14 @@ export {
   type SupplierInvoiceView,
 } from './service/supplier-invoice-service';
 export { getOrderChain, type OrderChainRow } from './service/order-chain-service';
+export {
+  getInvoiceForPrint,
+  libraryKinds,
+  type LibraryEntry,
+  listDocumentLibrary,
+  mayOpen,
+  recordLibraryOpen,
+} from './service/document-library';
 export { getRelatedDocuments, type RelatedSubject } from './service/related-service';
 export { searchDocuments, type SearchError } from './service/search-service';
 export { getCompanyProfile, listCompanyProfiles, saveCompanyProfile } from './service/company-service';

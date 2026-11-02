@@ -2554,5 +2554,20 @@
       "sent": "Instruction envoyée.",
       "error": "Action refusée."
     }
+  },
+  "library": {
+    "link": "Documents",
+    "title": "Bibliothèque de documents",
+    "intro": "Les documents que votre rôle peut ouvrir, par type. Chaque ouverture est vérifiée de nouveau et enregistrée.",
+    "all": "Tous",
+    "empty": "Aucun document.",
+    "open": "Ouvrir",
+    "kind": {
+      "invoice": "Factures",
+      "avoir": "Avoirs",
+      "quote": "Devis",
+      "bl": "Bons de livraison",
+      "supplier_invoice_file": "Pièces des factures fournisseurs"
+    }
   }
 }

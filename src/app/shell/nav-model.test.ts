@@ -46,7 +46,7 @@ describe('sidebar navigation by role', () => {
       buildNav('plant', 'fr', t)
         .find((g) => g.id === 'sales')
         ?.links.map((l) => l.href),
-    ).toEqual(['/fr/orders/chain']);
+    ).toEqual(['/fr/documents', '/fr/orders/chain']);
     expect(groups).not.toContain('purchases');
   });
 

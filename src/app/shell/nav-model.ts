@@ -23,6 +23,12 @@ const GROUPS: GroupDef[] = [
     id: 'sales',
     items: [
       {
+        path: '/documents',
+        labelKey: 'library.link',
+        testId: 'documents-link',
+        allowed: 'documents.read',
+      },
+      {
         path: '/approvals',
         labelKey: 'ledger.approvals.link',
         testId: 'approvals-link',
