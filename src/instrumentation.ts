@@ -9,4 +9,6 @@ export async function register() {
   await syncSimClockOrExit();
   const { jobTimeOf } = await import('./app/job-time-of');
   await startJobSchedulerOrExit(jobTimeOf);
+  const { startPushLoop } = await import('./app/push-loop');
+  startPushLoop();
 }

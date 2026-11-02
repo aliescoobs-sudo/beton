@@ -45,3 +45,23 @@ self.addEventListener('fetch', (event) => {
     })(),
   );
 });
+
+// R5: a push is a bare wake-up (no content); tapping it opens the driver app.
+self.addEventListener('push', (event) => {
+  event.waitUntil(
+    self.registration.showNotification('BELGOBETON', {
+      body: 'لديك تنبيه جديد',
+      tag: 'bb-driver-alert',
+      renotify: true,
+    }),
+  );
+});
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((wins) => {
+      if (wins[0]) return wins[0].focus();
+      return self.clients.openWindow('/ar/driver');
+    }),
+  );
+});

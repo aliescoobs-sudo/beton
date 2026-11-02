@@ -39,6 +39,7 @@ export default defineConfig({
         ASSISTANT_ENABLED: 'true',
         ASSISTANT_PROVIDER: 'fake',
         FIELD_APP_ENABLED: 'true',
+        NOTIFICATIONS_ENABLED: 'true',
       },
     },
     {

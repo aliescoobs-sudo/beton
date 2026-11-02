@@ -89,6 +89,8 @@ const envObject = z.object({
   // fake data, a development or test build and a key. The key lives in .env.local only and is never sent to the client.
   // Module flag of the driver and pump phone app (R4, D122): off, its pages and endpoints answer 404.
   FIELD_APP_ENABLED: flag,
+  // R5: the bell, the notification centre and push. Off: no entry point renders and the endpoints answer 404 (the database still records).
+  NOTIFICATIONS_ENABLED: flag,
   ASSISTANT_ENABLED: flag,
   ASSISTANT_PROVIDER: z
     .enum(['fake', 'anthropic'], { error: 'must be "fake" or "anthropic"' })
@@ -98,6 +100,10 @@ const envObject = z.object({
     .string()
     .optional()
     .transform((value) => (value === undefined || value.trim() === '' ? undefined : value.trim())),
+  // R5: web push (VAPID). Optional: without a key pair the in-app centre still works and nothing is pushed. The push carries no content.
+  VAPID_PUBLIC_KEY: z.string().trim().min(80).max(100).optional(),
+  VAPID_PRIVATE_KEY: z.string().trim().min(40).max(60).optional(),
+  VAPID_SUBJECT: z.string().trim().max(200).optional(),
   // Test servers (e2e) that share a database being recreated must not run the pg-boss cron scheduler.
   JOB_SCHEDULER_DISABLED: flag,
   // Reverse proxies in front of the app that each append the address they received the request from to

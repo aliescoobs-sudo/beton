@@ -2588,6 +2588,13 @@
       "send": "Envoyer",
       "sent": "Instruction envoyée.",
       "error": "Action refusée."
+    },
+    "push": {
+      "enable": "Activer les alertes",
+      "enabled": "Alertes activées.",
+      "unsupported": "Ajoutez l'application à l'écran d'accueil pour activer les alertes.",
+      "denied": "Alertes refusées dans les réglages.",
+      "unavailable": "Alertes indisponibles."
     }
   },
   "library": {
@@ -2603,6 +2610,48 @@
       "quote": "Devis",
       "bl": "Bons de livraison",
       "supplier_invoice_file": "Pièces des factures fournisseurs"
+    }
+  },
+  "notifications": {
+    "link": "Notifications",
+    "title": "Notifications",
+    "intro": "Vos alertes, de la plus récente à la plus ancienne. Elles ne contiennent jamais de montant.",
+    "readAll": "Tout marquer comme lu",
+    "sendTest": "M'envoyer un test",
+    "empty": "Aucune notification.",
+    "open": "Ouvrir",
+    "bell": "Notifications : {count} non lues",
+    "kind": {
+      "emergency": "Urgence d'un chauffeur",
+      "driver_instruction": "Instruction du bureau",
+      "approval_pending": "Approbation en attente",
+      "stock_low": "Stock bas",
+      "stock_shortage": "Rupture de stock prévue",
+      "cheque_bounced": "Chèque impayé",
+      "receivable_due": "Échéance client à venir",
+      "receivable_overdue": "Échéance client en retard",
+      "payable_due": "Paiement fournisseur à venir",
+      "cash_deficit": "Trésorerie : manque prévu",
+      "invoice_month_end": "Factures à émettre avant la fin du mois",
+      "law6921": "Délai légal de paiement (loi 69-21)",
+      "day_conflict": "Conflit dans le planning du jour",
+      "shipment_delay": "Retard de livraison",
+      "receipt_late": "Réception en retard",
+      "order_cancelled": "Commande annulée",
+      "cancel_do_not_load": "Annulé : ne pas charger",
+      "redirect_proposal": "Proposition de redirection à décider",
+      "loss_recorded": "Perte enregistrée",
+      "transfer": "Transfert entre centrales",
+      "day_close_blocking": "Clôture de journée bloquée",
+      "document_request": "Demande de document",
+      "test": "Notification de test"
+    },
+    "push": {
+      "enable": "Activer les alertes sur ce téléphone",
+      "enabled": "Alertes activées sur ce téléphone.",
+      "unsupported": "Ce navigateur ne gère pas les alertes. Sur iPhone, ajoutez d'abord l'application à l'écran d'accueil.",
+      "denied": "Les alertes sont refusées dans les réglages du téléphone.",
+      "unavailable": "Les alertes ne sont pas disponibles pour le moment."
     }
   }
 }

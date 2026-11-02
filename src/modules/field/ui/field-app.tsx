@@ -2,6 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { PushSetup } from '@/modules/platform-security/ui/push-setup';
 import {
   applyOutcomes,
   EMERGENCY_OPTIONS,
@@ -320,6 +321,19 @@ export function FieldApp({ locale }: { locale: string }) {
           {t('signOut')}
         </button>
       </header>
+      <PushSetup
+        publicKey={null}
+        keyUrl="/api/field/push"
+        workerUrl="/driver-sw.js"
+        subscribeUrl="/api/field/push"
+        labels={{
+          enable: t('push.enable'),
+          enabled: t('push.enabled'),
+          unsupported: t('push.unsupported'),
+          denied: t('push.denied'),
+          unavailable: t('push.unavailable'),
+        }}
+      />
       {!online && (
         <p
           role="status"

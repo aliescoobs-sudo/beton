@@ -364,6 +364,39 @@ export const TABLE_ACCESS = {
     exception:
       'D143 (REQUIREMENTS-V1 §16.3): a request to see one figure of one data item, scoped to a person, an item and a duration. No amount is stored: view_disclosure computes it at view time and audits every view. Written only by request_disclosure, decide_disclosure and view_disclosure (SECURITY DEFINER); a requester reads its own through my_disclosures().',
   },
+  notification: {
+    kind: 'rls',
+    read: {
+      owner: 'own',
+      partner: 'own',
+      office: 'own',
+      plant: 'own',
+      system: 'none',
+      anonymous: 'none',
+      support: 'own',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    exception:
+      'R5 (REQUIREMENTS-V1 §13): one row per recipient; a person reads only their own (support too: it reads its own bell, not the others). Written only by notify() (SECURITY DEFINER, never granted) from triggers and doors; no amount can be in the parameters (check constraint). The sender reads nothing here, it uses push_outbox().',
+  },
+  push_subscription: {
+    kind: 'rls',
+    read: {
+      owner: 'none',
+      partner: 'none',
+      office: 'none',
+      plant: 'none',
+      system: 'none',
+      anonymous: 'none',
+      support: 'none',
+    },
+    force: true,
+    audited: true,
+    exception:
+      'R5: the endpoint of an installed PWA is a bearer capability, so nobody reads this table. A person registers and drops their own through save_push_subscription and drop_push_subscription; the sender (system role) uses push_outbox() and push_result().',
+  },
   zone: {
     kind: 'rls',
     read: {

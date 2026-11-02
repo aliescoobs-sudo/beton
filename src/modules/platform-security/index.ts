@@ -26,6 +26,22 @@ export {
 // Field-level hiding for role-restricted entities: declare with defineVisibility() next to the entity type and pass
 // every outgoing row through project(); assert absence in tests with tests/helpers/expect-no-fields.ts.
 export { defineVisibility, project, projectMany, type Visibility } from './domain/projection';
+export {
+  NOTIFICATION_CATALOGUE,
+  NOTIFICATION_KINDS,
+  type NotificationKind,
+  type NotificationSeverity,
+} from './domain/notification-catalogue';
+export {
+  dropSubscription,
+  listMyNotifications,
+  markRead,
+  type NotificationView,
+  saveSubscription,
+  sendTestNotification,
+  unreadCount,
+} from './service/notification-service';
+export { flushPush, vapidFromEnv, vapidJwt, type VapidKeys } from './service/web-push';
 export { DOCUMENT_KINDS, type DocumentKind, isDocumentKind } from './domain/document-kinds';
 export { recordMoneyExport, recordMoneyView } from './service/money-view';
 export { auditDenied, authorize, type Authorization } from './auth/guards';

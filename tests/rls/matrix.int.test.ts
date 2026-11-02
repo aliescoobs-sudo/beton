@@ -286,6 +286,22 @@ const FIXTURES: Record<
     },
     visible: `select requester::text as owner from disclosure_request where reason = $1`,
   },
+  notification: {
+    // Every role sends itself a test notification; each reads only its own.
+    writers: ['owner', 'partner', 'office', 'plant', 'support'],
+    seed: (tx) => tx.query(`select public.send_test_notification()`),
+    visible: `select distinct recipient::text as owner from notification where kind = 'test' and $1::text is not null`,
+  },
+  push_subscription: {
+    // Written by save_push_subscription; nobody reads the table.
+    writers: ['owner', 'partner', 'office', 'plant', 'support'],
+    seed: (tx, actor) =>
+      tx.query(`select public.save_push_subscription($1 || '/' || $2::text, 'k', 'a')`, [
+        `https://web.push.apple.com/${marker}`,
+        actor,
+      ]),
+    visible: `select user_id::text as owner from push_subscription where endpoint like $1 || '%'`,
+  },
   zone: {
     writers: ['owner', 'partner'],
     seed: (tx, actor) =>

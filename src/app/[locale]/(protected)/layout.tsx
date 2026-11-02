@@ -8,6 +8,7 @@ import { SecurityAlertBanner } from '@/modules/platform-security/ui/alerts/secur
 import { AppShell } from '../../shell/app-shell';
 import { buildNav } from '../../shell/nav-model';
 import { SimBand } from '../../shell/sim-band';
+import { NotificationBell } from '../../shell/notification-bell';
 import { UserMenu } from '../../shell/user-menu';
 
 /** Every page in this group needs a fully authenticated (password + 2FA) session. */
@@ -42,12 +43,15 @@ export default async function ProtectedLayout({
       // With the flag off there is no entry point at all (AC-ASSIST-01).
       assistant={getEnv().ASSISTANT_ENABLED ? <AssistantPanel role={state.user.role} /> : null}
       userMenu={
-        <UserMenu
-          name={state.user.name}
-          roleLabel={t(`admin.roles.${state.user.role}` as never)}
-          menuLabel={t('shell.userMenu')}
-          locale={locale}
-        />
+        <>
+          <NotificationBell user={state.user} locale={locale} />
+          <UserMenu
+            name={state.user.name}
+            roleLabel={t(`admin.roles.${state.user.role}` as never)}
+            menuLabel={t('shell.userMenu')}
+            locale={locale}
+          />
+        </>
       }
     >
       <SecurityAlertBanner user={state.user} locale={locale} />

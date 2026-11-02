@@ -3,6 +3,7 @@ import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { parseKeyring } from '../src/lib/crypto/keyring';
 import { withRlsContext } from '../src/lib/db/rls-context';
+import { listMyNotifications } from '../src/modules/platform-security';
 import {
   createFieldAccount,
   createPumpJob,
@@ -326,6 +327,13 @@ describe('emergency and the office instructions (AC-PROD-22, 23)', () => {
       driverName: expect.stringContaining(marker),
     });
     expect(JSON.stringify(list)).not.toMatch(/price|centimes|amount|total/i);
+    // R5: the emergency reaches the office's bell as an urgent notification, with the option and no amount
+    const bell = await listMyNotifications(app, office, 50);
+    expect(
+      bell.some(
+        (n) => n.kind === 'emergency' && n.severity === 'urgent' && n.params.option === 'load_not_enough',
+      ),
+    ).toBe(true);
     // a driver cannot list emergencies
     await expect(listEmergencies(app, s.user)).rejects.toThrow();
   });
@@ -369,6 +377,12 @@ describe('emergency and the office instructions (AC-PROD-22, 23)', () => {
     const ins = day.instructions.find((i) => i.id === made.value.id);
     expect(ins).toMatchObject({ kind: 'redirect', address: '12 rue Exemple, Martil', acknowledgedAt: null });
     expect(ins?.mapUrl).toMatch(/^https:\/\/www\.google\.com\/maps\/search/);
+    // R5: the instruction reaches that driver's own notifications, and nobody else's
+    expect(
+      (await listMyNotifications(app, s.user, 20)).some(
+        (n) => n.kind === 'driver_instruction' && n.params.instruction === 'redirect',
+      ),
+    ).toBe(true);
     const ack = {
       kind: 'ack' as const,
       key: randomUUID().replace(/-/g, ''),

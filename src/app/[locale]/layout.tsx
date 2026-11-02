@@ -8,6 +8,8 @@ import { ToastProvider } from '@/ui';
 import { fontClasses } from '../fonts';
 import '../globals.css';
 
+export const metadata = { manifest: '/app.webmanifest' };
+
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
 }
