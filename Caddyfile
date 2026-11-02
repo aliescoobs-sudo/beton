@@ -1,0 +1,11 @@
+# Reverse proxy (R9). HTTPS with automatic certificates for the domain in APP_DOMAIN, security headers are set by the app itself.
+# Another reverse proxy (nginx, Traefik) works too: it must append the client address to X-Forwarded-For (TRUSTED_PROXY_HOPS=1).
+{$APP_DOMAIN:localhost} {
+	encode zstd gzip
+	# Never expose the maintenance surface; the monitor reads /api/health/ready from the server itself.
+	@internal path /api/health/*
+	respond @internal 404
+	reverse_proxy app:3000 {
+		header_up X-Forwarded-For {remote_host}
+	}
+}

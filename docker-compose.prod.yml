@@ -1,0 +1,82 @@
+# BELGOBETON production stack (R9). The database is on an INTERNAL network: no host port, no route to or from the internet.
+# Only the reverse proxy publishes ports (80 and 443). Secrets come from .env.prod and .env.ops.prod on the server (never in git).
+#   docker compose -f docker-compose.prod.yml --env-file .env.ops.prod up -d --wait db
+#   docker compose -f docker-compose.prod.yml run --rm ops corepack pnpm db:bootstrap && ... db:migrate    (see docs/RUNBOOK.md)
+#   docker compose -f docker-compose.prod.yml up -d app proxy
+name: belgobeton
+
+services:
+  db:
+    image: postgres:17.11-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?set POSTGRES_SUPERUSER_PASSWORD in .env.ops.prod}
+      POSTGRES_DB: postgres
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks: [internal]
+
+  app:
+    build: .
+    image: belgobeton:current
+    restart: unless-stopped
+    env_file: .env.prod
+    environment:
+      NODE_ENV: production
+      REAL_DATA: 'true'
+      SIMULATION_ENABLED: 'false'
+      TRUSTED_PROXY_HOPS: '1'
+      FILE_STORE_DIR: /data/file-store
+    volumes:
+      - filestore:/data/file-store
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [internal, edge]
+
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on: [app]
+    networks: [edge]
+
+  # Maintenance container: migrations, bootstrap, backup, restore test, Excel import. Started on demand, never by `up`.
+  ops:
+    build: .
+    image: belgobeton:current
+    profiles: [ops]
+    env_file: [.env.prod, .env.ops.prod]
+    environment:
+      NODE_ENV: production
+      REAL_DATA: 'true'
+      SIMULATION_ENABLED: 'false'
+    volumes:
+      - filestore:/data/file-store
+      - ./backups:/app/backups
+      - ./imports:/app/imports:ro
+    command: ['sh', '-c', 'echo "run a command: docker compose run --rm ops corepack pnpm <script>"']
+    networks: [internal]
+
+networks:
+  # internal: true = containers on it cannot reach the outside, and nothing outside reaches them.
+  internal:
+    internal: true
+  edge: {}
+
+volumes:
+  pgdata: {}
+  filestore: {}
+  caddy_data: {}

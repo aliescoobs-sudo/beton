@@ -23,6 +23,7 @@
     "db:bootstrap": "node --import ./scripts/register-ts-paths.mjs scripts/db-bootstrap.ts",
     "db:seed": "node --import ./scripts/register-ts-paths.mjs scripts/seed-pilot.ts",
     "db:scenario": "node --import ./scripts/register-ts-paths.mjs scripts/seed-scenario.ts",
+    "import:excel": "node --import ./scripts/register-ts-paths.mjs scripts/import-excel.ts",
     "assistant:purge": "node --import ./scripts/register-ts-paths.mjs scripts/assistant-purge.ts",
     "db:migrate": "node --import ./scripts/register-ts-paths.mjs scripts/db-migrate.ts",
     "test:unit": "vitest run --project unit",

@@ -15,6 +15,8 @@ export const moduleDependencies = {
   // The in-app assistant (SPEC-assistant): tools over the services of these modules, under the caller's own row-level security.
   // The driver and pump phone app (R4): reads and writes through database doors, depends on operations' tracking and master data.
   field: ['platform-security', 'master-data', 'operations', 'clock'],
+  // Excel importers (R9): they call the services of master data and the ledger, like the screens do.
+  importer: ['platform-security', 'master-data', 'ledger'],
   assistant: ['platform-security', 'master-data', 'ledger', 'operations', 'rules-engine', 'clock'],
 };
 
