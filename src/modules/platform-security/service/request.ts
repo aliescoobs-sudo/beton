@@ -33,11 +33,16 @@ export const inRequest = <T>(pool: pg.Pool, actor: SessionUser, fn: (tx: pg.Pool
       userId: actor.id,
       role: actor.role,
       requestId: uuidv7(realClock.now()),
+      plantId: actor.plantId ?? undefined,
       aiProposalId: aiConfirmation.getStore()?.proposalId,
       rollback: dryRun.getStore() === true ? true : undefined,
     },
     fn,
   );
+
+/** The same person acting in a plant: what they insert without naming a plant goes to this one (R1). */
+export const inPlant = (actor: SessionUser, plantId: string | null | undefined): SessionUser =>
+  plantId ? { ...actor, plantId } : actor;
 
 /** Layer 2 of SPEC-platform-security §4: the service checks the permission again, whatever the route did. */
 export async function require(pool: pg.Pool, actor: SessionUser, permission: Permission): Promise<void> {

@@ -22,11 +22,19 @@ export function countedToBase(text: string, baseUnit: string): number | null {
 export function CountForm({
   componentId,
   baseUnit,
+  plantId,
   count,
 }: {
   componentId: string;
   baseUnit: string;
-  count: (input: { componentId: string; countedBase: number; reason: string }) => Promise<CountResult>;
+  /** The plant being counted (R1); absent while no plant is set up. */
+  plantId?: string;
+  count: (input: {
+    componentId: string;
+    countedBase: number;
+    reason: string;
+    plantId?: string;
+  }) => Promise<CountResult>;
 }) {
   const t = useTranslations('operations.stock');
   const router = useRouter();
@@ -55,7 +63,14 @@ export function CountForm({
     const base = countedToBase(String(data.get('counted') ?? ''), baseUnit);
     if (base === null) return setMessage(t('countErrors.INVALID'));
     setMessage(null);
-    void run(() => count({ componentId, countedBase: base, reason: String(data.get('reason') ?? '') }));
+    void run(() =>
+      count({
+        componentId,
+        countedBase: base,
+        reason: String(data.get('reason') ?? ''),
+        ...(plantId ? { plantId } : {}),
+      }),
+    );
   }
 
   if (!open)

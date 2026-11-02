@@ -25,7 +25,9 @@ export {
   type StockAdjustment,
   type StockCountError,
   type StockCountResult,
+  getReorderThresholds,
   getStockLevels,
+  type ReorderThreshold,
   type OpeningStockError,
   setOpeningStock,
   setStockThreshold,
@@ -40,6 +42,8 @@ export {
 } from './service/plant-views';
 export { type DeliveryNote, getDeliveryNote, recordNotePrint } from './service/delivery-note';
 export {
+  type ArrivalError,
+  confirmArrivalAtPlant,
   listReceivable,
   type ReceivableLine,
   type ReceivablePurchase,
@@ -96,7 +100,13 @@ export {
   recordFuelFill,
   recordFuelPurchase,
 } from './service/fuel-service';
-export { getVolumeAnalytics, type VolumeAnalytics } from './service/analytics-service';
+export {
+  getVolumeAnalytics,
+  getVolumeByPlant,
+  type PlantVolume,
+  type VolumeAnalytics,
+  type VolumeByPlant,
+} from './service/analytics-service';
 export { seedOperationsWave2, type Wave2Result } from './service/pilot-ops2';
 export { type IntegrationScenarioResult, seedIntegrationScenario } from './service/pilot-integration';
 export { deliveryNotePdf } from './pdf/delivery-note-pdf';

@@ -102,6 +102,24 @@ export {
   resolveSellingPriceFor,
   type SellingPriceError,
 } from './service/selling-price-service';
+export { parsePlantInput, type Plant, type PlantInput } from './domain/plant';
+export {
+  createPlant,
+  listPlants,
+  plantIdOf,
+  type PlantError,
+  updatePlant,
+  usePlant,
+} from './service/plant-service';
+export {
+  PAY_BASES,
+  STOPPED_DECISIONS,
+  TRUCK_CODE_PREFIX,
+  TRUCK_KINDS,
+  type PayBasis,
+  type StoppedDecision,
+  type TruckKind,
+} from './domain/truck';
 export {
   DEFAULT_TRUCK_CAPACITY_L,
   formatCapacityM3,

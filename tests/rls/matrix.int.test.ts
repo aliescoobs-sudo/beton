@@ -138,6 +138,32 @@ const FIXTURES: Record<
       ),
     visible: `select run_by::text as owner from scheduled_job_run where job_key = 'matrix-' || right($1, 12)`,
   },
+  plant: {
+    // Archived on purpose: an active plant would change the plant rule for every other test sharing this database.
+    writers: ['owner', 'partner'],
+    seed: (tx, actor) =>
+      tx.query(
+        `insert into plant (id, code, name, status, created_by)
+         values (gen_random_uuid(), upper(translate(substr(md5($1 || $2::text), 1, 8), '0123456789', 'ghijklmnop')), $1 || ':' || $2::text, 'archived', $2::uuid)`,
+        [marker, actor],
+      ),
+    visible: `select split_part(name, ':', 2) as owner from plant where name like $1 || ':%'`,
+  },
+  receipt_plant_confirmation: {
+    // Only confirm_receipt_at_plant() writes it (owner, partner, plant); every writer confirms a purchase of its own.
+    writers: ['owner', 'partner', 'plant'],
+    seed: async (tx, actor) => {
+      const pm = await purchaseMaster(app, actors.owner, marker);
+      const p = await newReceivablePurchase(
+        app,
+        actors.owner,
+        pm,
+        `${marker}c${actor.replace(/-/g, '').slice(-8)}`,
+      );
+      return tx.query(`select public.confirm_receipt_at_plant($1, $2)`, [p.id, `${marker}:${actor}`]);
+    },
+    visible: `select split_part(note, ':', 2) as owner from receipt_plant_confirmation where note like $1 || ':%'`,
+  },
   zone: {
     writers: ['owner', 'partner'],
     seed: (tx, actor) =>

@@ -1,12 +1,14 @@
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { getPool } from '@/lib/db/pools';
+import { listPlants } from '@/modules/master-data';
 import { listReceivable } from '@/modules/operations';
+import { ConfirmArrivalButton } from '@/modules/operations/ui/confirm-arrival-button';
 import { formatM3 } from '@/modules/operations/ui/format';
 import { ReceiveButton } from '@/modules/operations/ui/receive-button';
 import { can } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/next';
 import { EmptyState, PageHeader, StatusPill, Table, Td, Th } from '@/ui';
-import { receiveAction } from './actions';
+import { confirmArrivalAction, receiveAction } from './actions';
 
 /** Purchases with stocked lines: what is expected (receive it) and what came in. Quantities only, no price. */
 export default async function ReceiptsPage({ params }: { params: Promise<{ locale: string }> }) {
@@ -14,7 +16,10 @@ export default async function ReceiptsPage({ params }: { params: Promise<{ local
   setRequestLocale(locale);
   const user = await requirePagePermission(locale, 'receipts.read');
   const purchases = (await listReceivable(getPool('app'), user)).filter((p) => !p.cancelled);
-  const canReceive = can(user.role, 'receipts.write');
+  // With plants set up a receipt has two steps: the plant confirms the arrival, then the office records it (D133).
+  const twoStep = (await listPlants(getPool('app'), user)).some((p) => p.status === 'active');
+  const canConfirm = twoStep && can(user.role, 'receipts.confirm_arrival');
+  const canReceive = can(user.role, 'receipts.write') && !(twoStep && user.role === 'plant');
   const t = await getTranslations('operations.receipts');
   return (
     <div>
@@ -68,7 +73,19 @@ export default async function ReceiptsPage({ params }: { params: Promise<{ local
                           {t('partialState', { count: p.receipts })}
                         </StatusPill>
                       )}
-                      {canReceive ? (
+                      {canConfirm && !p.arrivalConfirmed && (
+                        <ConfirmArrivalButton
+                          purchaseId={p.purchaseId}
+                          code={p.code}
+                          confirm={confirmArrivalAction}
+                        />
+                      )}
+                      {twoStep && p.arrivalConfirmed && (
+                        <StatusPill status="due" data-testid={`arrival-confirmed-${p.code}`}>
+                          {t('arrivalConfirmed')}
+                        </StatusPill>
+                      )}
+                      {canReceive && (!twoStep || p.arrivalConfirmed) ? (
                         <ReceiveButton
                           purchaseId={p.purchaseId}
                           code={p.code}
@@ -82,7 +99,7 @@ export default async function ReceiptsPage({ params }: { params: Promise<{ local
                           }))}
                           receive={receiveAction}
                         />
-                      ) : p.status === 'expected' ? (
+                      ) : p.status === 'expected' && !canConfirm ? (
                         <StatusPill status="due">{t('expected')}</StatusPill>
                       ) : null}
                     </div>

@@ -286,6 +286,7 @@ describe('visibility (DECISIONS 81)', () => {
           'component_id',
           'factor_to_base',
           'is_reversed',
+          'plant_id',
           'line_id',
           'name_ar',
           'name_fr',

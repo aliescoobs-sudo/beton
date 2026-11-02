@@ -443,6 +443,27 @@
       },
       "statusColumn": "Statut",
       "codeColumn": "Code"
+    },
+    "plants": {
+      "title": "Centrales",
+      "link": "Centrales",
+      "intro": "Les centrales de l'entreprise. Le stock, les commandes, les chargements et les réceptions sont suivis par centrale et au total.",
+      "readOnly": "Lecture seule : seuls le propriétaire et l'associé modifient les centrales.",
+      "code": "Code",
+      "name": "Nom",
+      "status": "État",
+      "statuses": {
+        "active": "Active",
+        "archived": "Archivée"
+      },
+      "actions": "Actions",
+      "add": "Ajouter la centrale",
+      "archive": "Archiver",
+      "restore": "Réactiver",
+      "saved": "Enregistré.",
+      "invalid": "Valeur refusée (code de 2 à 8 lettres majuscules, nom obligatoire).",
+      "duplicate": "Une centrale porte déjà ce code ou ce nom.",
+      "error": "Action refusée."
     }
   },
   "history": {
@@ -1462,7 +1483,9 @@
       "adjustmentsNone": "Aucune correction pour l'instant.",
       "adjDate": "Date",
       "adjDifference": "Écart",
-      "adjReason": "Raison"
+      "adjReason": "Raison",
+      "plants": "Centrales",
+      "plantTotal": "Total"
     },
     "note": {
       "title": "Bon de livraison",
@@ -1502,14 +1525,26 @@
         "FUTURE_DATE": "Date dans le futur.",
         "FORBIDDEN": "Action non autorisée.",
         "UNAUTHENTICATED": "Session expirée.",
-        "EXCESS_NEEDS_OWNER": "Quantité supérieure à la commande : seul le propriétaire peut la confirmer."
+        "EXCESS_NEEDS_OWNER": "Quantité supérieure à la commande : seul le propriétaire peut la confirmer.",
+        "PLANT_NOT_CONFIRMED": "La centrale n'a pas encore confirmé l'arrivée.",
+        "PLANT_CONFIRMS_FIRST": "La centrale confirme l'arrivée ; le bureau enregistre ensuite la réception."
       },
       "continue": "Continuer",
       "partial": "Réception partielle",
       "remaining": "reste {qty}",
       "confirmExcess": "Confirmer une quantité supérieure à la commande (propriétaire)",
       "receivePartial": "Enregistrer cette réception",
-      "partialState": "Partiel : {count} réception(s)"
+      "partialState": "Partiel : {count} réception(s)",
+      "confirmArrival": "Confirmer l'arrivée",
+      "arrivalConfirmed": "Arrivée confirmée par la centrale",
+      "arrivalErrors": {
+        "INVALID": "Saisie invalide.",
+        "NOT_FOUND": "Achat introuvable ou annulé.",
+        "NOT_YOUR_PLANT": "Cet achat est destiné à une autre centrale.",
+        "ALREADY_CONFIRMED": "L'arrivée est déjà confirmée : le bureau doit l'enregistrer.",
+        "FORBIDDEN": "Action non autorisée.",
+        "UNAUTHENTICATED": "Session expirée."
+      }
     },
     "dispatch": {
       "link": "Planning du jour",

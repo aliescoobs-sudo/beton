@@ -28,13 +28,30 @@ export function formatCapacityM3(litres: number): string {
   return decimals ? `${whole},${decimals}` : `${whole}`;
 }
 
+export const TRUCK_KINDS = ['mixer', 'pump', 'external'] as const;
+export type TruckKind = (typeof TRUCK_KINDS)[number];
+/** The prefix of the code per kind: T1 (mixer), P1 (pump truck), X1 (hired external truck). */
+export const TRUCK_CODE_PREFIX: Record<TruckKind, string> = { mixer: 'T', pump: 'P', external: 'X' };
+export const STOPPED_DECISIONS = ['repair_use', 'repair_sell', 'sell_as_is'] as const;
+export type StoppedDecision = (typeof STOPPED_DECISIONS)[number];
+/** How a hired truck is paid; the rate itself is money and lives with finance (REQUIREMENTS-V1 §2). */
+export const PAY_BASES = ['per_trip', 'per_m3', 'per_day'] as const;
+export type PayBasis = (typeof PAY_BASES)[number];
+
 export interface Truck {
   id: string;
-  /** T1, T2...: typed once by a manager, never changes. */
+  /** T1, T2... (mixer), P1 (pump), X1 (external): typed once by a manager, never changes. */
   code: string;
   plate: string;
   capacityL: number;
   status: 'active' | 'archived';
+  kind: TruckKind;
+  /** Null for a pump truck (it moves between the plants) and for an external truck. */
+  plantId: string | null;
+  /** What the owner decided for a truck stopped by a breakdown; null until decided. */
+  stoppedDecision: StoppedDecision | null;
+  /** External trucks only. */
+  payBasis: PayBasis | null;
 }
 
 /**
@@ -61,17 +78,30 @@ const plateField = z
 
 const capacityField = z.number().int().min(TRUCK_CAPACITY_L.min).max(TRUCK_CAPACITY_L.max);
 
-const truckInputSchema = z.object({
-  code: z
-    .string()
-    .transform((value) => value.trim().toUpperCase())
-    .pipe(z.string().regex(/^T[0-9]{1,3}$/)),
-  plate: plateField,
-  capacityL: capacityField.default(DEFAULT_TRUCK_CAPACITY_L),
-});
+const truckInputSchema = z
+  .object({
+    code: z
+      .string()
+      .transform((value) => value.trim().toUpperCase())
+      .pipe(z.string().regex(/^[TPX][0-9]{1,3}$/)),
+    plate: plateField,
+    capacityL: capacityField.default(DEFAULT_TRUCK_CAPACITY_L),
+    kind: z.enum(TRUCK_KINDS).default('mixer'),
+    plantId: z.uuid().nullable().default(null),
+    payBasis: z.enum(PAY_BASES).nullable().default(null),
+  })
+  .refine((t) => t.code.startsWith(TRUCK_CODE_PREFIX[t.kind]))
+  .refine((t) => t.kind !== 'pump' || t.plantId === null)
+  .refine((t) => t.payBasis === null || t.kind === 'external');
 export type TruckInput = z.infer<typeof truckInputSchema>;
 
-const truckEditSchema = z.object({ plate: plateField, capacityL: capacityField });
+const truckEditSchema = z.object({
+  plate: plateField,
+  capacityL: capacityField,
+  plantId: z.uuid().nullable().optional(),
+  payBasis: z.enum(PAY_BASES).nullable().optional(),
+  stoppedDecision: z.enum(STOPPED_DECISIONS).nullable().optional(),
+});
 export type TruckEdit = z.infer<typeof truckEditSchema>;
 
 const reasonField = z

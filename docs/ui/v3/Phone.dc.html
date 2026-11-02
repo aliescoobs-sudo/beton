@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>BELGOBETON — التليفون</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alexandria:wght@600;700;800&amp;family=Readex+Pro:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#E6E7E3}
+button{font:inherit;color:inherit}
+button:focus-visible{outline:3px solid #2F6DB5;outline-offset:2px}
+</style>
+</helmet>
+<div dir="rtl" lang="ar" style="width: 390px; height: 844px; box-sizing: border-box; background: #E6E7E3; color: #1B1D1C; font-family: 'Readex Pro', system-ui, sans-serif; font-size: 14px; line-height: 1.5; font-variant-numeric: tabular-nums; display: flex; flex-direction: column; overflow: hidden; position: relative">
+
+<div style="background: #5B45A8; color: #FFFFFF; padding: 6px 8px; display: flex; gap: 5px; overflow-x: auto; flex: 0 0 auto">
+<sc-for list="{{roles}}" as="r" hint-placeholder-count="11"><button type="button" onClick="{{r.pick}}" style="flex: 0 0 auto; min-height: 30px; padding: 0 9px; border-radius: 15px; font-size: 12px; cursor: pointer; white-space: nowrap; {{r.style}}">{{r.label}}</button></sc-for>
+</div>
+
+<header style="background: #1B1D1C; color: #FFFFFF; padding: 12px 16px 10px 16px; display: flex; flex-direction: column; gap: 2px; flex: 0 0 auto">
+<div style="display: flex; justify-content: space-between; align-items: center">
+<bdi dir="ltr" style="font-family: 'Alexandria', sans-serif; font-weight: 800; font-size: 15px">BELGOBETON</bdi>
+<div style="display: flex; align-items: center; gap: 8px">
+<sc-if value="{{showPlants}}" hint-placeholder-val="{{true}}"><div style="display: flex; gap: 3px"><sc-for list="{{plants}}" as="p" hint-placeholder-count="3"><button type="button" onClick="{{p.pick}}" style="min-height: 26px; padding: 0 8px; font-size: 11px; cursor: pointer; border-radius: 13px; {{p.style}}">{{p.label}}</button></sc-for></div></sc-if>
+<span style="position: relative; display: inline-flex"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E6E7E3" stroke-width="2" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8"></path><path d="M10 20a2 2 0 0 0 4 0"></path></svg><sc-if value="{{hasBell}}" hint-placeholder-val="{{true}}"><span style="position: absolute; top: -4px; left: -6px; min-width: 16px; height: 16px; border-radius: 8px; background: #D23A1E; font-size: 10px; display: flex; align-items: center; justify-content: center; padding: 0 3px">{{bell}}</span></sc-if></span>
+</div>
+</div>
+<span style="font-size: 12px; color: #A3A7A2">{{who}}</span>
+</header>
+
+<main style="flex: 1 1 auto; overflow-y: auto; padding: 12px 12px 16px 12px; display: flex; flex-direction: column; gap: 12px">
+<sc-for list="{{blocks}}" as="b" hint-placeholder-count="4">
+<div style="display: flex; flex-direction: column; gap: 8px">
+
+<sc-if value="{{b.isHero}}" hint-placeholder-val="{{true}}"><div style="background: #FFFFFF; padding: 14px; display: flex; flex-direction: column; gap: 4px; border-radius: 10px"><span style="font-size: 12px; color: #5E6360">{{b.kicker}}</span><span style="font-family: 'Alexandria', sans-serif; font-weight: 700; font-size: 19px; line-height: 1.35">{{b.title}}</span><span style="font-size: 13px; color: #3A3E3B">{{b.sub}}</span></div></sc-if>
+
+<sc-if value="{{b.isKpis}}" hint-placeholder-val="{{false}}"><div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px"><sc-for list="{{b.items}}" as="k" hint-placeholder-count="4"><div style="background: #F4F4F1; padding: 10px 12px; border-radius: 10px; display: flex; flex-direction: column; gap: 1px"><span style="font-size: 11px; color: #5E6360">{{k.k}}</span><span style="font-family: 'Alexandria', sans-serif; font-weight: 700; font-size: 17px; {{k.style}}"><bdi dir="ltr">{{k.v}}</bdi></span><span style="font-size: 11px; color: #5E6360">{{k.s}}</span></div></sc-for></div></sc-if>
+
+<sc-if value="{{b.isList}}" hint-placeholder-val="{{false}}"><div style="background: #FFFFFF; border-radius: 10px; padding: 4px 12px"><div style="font-family: 'Alexandria', sans-serif; font-weight: 700; font-size: 14px; padding: 8px 0 4px 0">{{b.title}}</div><sc-for list="{{b.rows}}" as="r" hint-placeholder-count="3"><div style="display: grid; grid-template-columns: 10px 1fr auto; gap: 10px; align-items: center; padding: 9px 0; border-top: 1px solid #E6E7E3"><span style="width: 10px; height: 10px; border-radius: 5px; {{r.dot}}"></span><span style="display: flex; flex-direction: column; line-height: 1.35; min-width: 0"><bdi style="font-weight: 600; font-size: 13px">{{r.a}}</bdi><span style="font-size: 12px; color: #5E6360">{{r.b}}</span></span><span style="font-size: 12px; font-weight: 600; text-align: left; {{r.cs}}"><bdi dir="ltr">{{r.c}}</bdi></span></div></sc-for></div></sc-if>
+
+<sc-if value="{{b.isActions}}" hint-placeholder-val="{{false}}"><div style="display: flex; gap: 8px; flex-wrap: wrap"><sc-for list="{{b.items}}" as="a" hint-placeholder-count="2"><button type="button" onClick="{{a.run}}" style="flex: 1 1 140px; min-height: 44px; border-radius: 10px; cursor: pointer; font-size: 13px; font-weight: 600; {{a.style}}">{{a.label}}</button></sc-for></div></sc-if>
+
+<sc-if value="{{b.isApprovals}}" hint-placeholder-val="{{false}}"><div style="display: flex; flex-direction: column; gap: 8px"><sc-for list="{{b.cards}}" as="c" hint-placeholder-count="3"><div style="background: #FFFFFF; border-radius: 10px; padding: 12px; border-inline-start: 5px solid; display: flex; flex-direction: column; gap: 6px; {{c.border}}"><span style="font-size: 11px; color: #5E6360">{{c.kind}}</span><span style="font-weight: 600; font-size: 14px">{{c.title}}</span><span style="font-size: 12px; color: #3A3E3B">{{c.detail}}</span><sc-if value="{{c.open}}" hint-placeholder-val="{{true}}"><div style="display: flex; gap: 8px"><button type="button" onClick="{{c.yes}}" style="flex: 1 1 0; min-height: 40px; border: 0; border-radius: 8px; background: #1B1D1C; color: #FFFFFF; font-weight: 600; cursor: pointer">{{c.yesLabel}}</button><button type="button" onClick="{{c.no}}" style="flex: 1 1 0; min-height: 40px; border-radius: 8px; background: transparent; border: 1px solid #8D918C; cursor: pointer">{{c.noLabel}}</button></div></sc-if><sc-if value="{{c.done}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; font-weight: 600; {{c.doneStyle}}">{{c.doneText}}</span></sc-if></div></sc-for></div></sc-if>
+
+<sc-if value="{{b.isTrip}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 10px">
+<div style="background: #1B1D1C; color: #FFFFFF; border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 3px">
+<span style="font-size: 12px; color: #A3A7A2">{{trip.kicker}}</span>
+<span style="font-family: 'Alexandria', sans-serif; font-weight: 700; font-size: 22px">{{trip.load}}</span>
+<span style="font-size: 13px; color: #D5D7D2">{{trip.site}}</span>
+<span style="font-size: 12px; color: #A3A7A2">{{trip.contact}}</span>
+<span style="font-size: 12px; color: #8FB7E8; text-decoration: underline">فتح الخريطة</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 5px">
+<sc-for list="{{trip.steps}}" as="s" hint-placeholder-count="6"><div style="display: grid; grid-template-columns: 26px 1fr auto; gap: 10px; align-items: center; padding: 7px 10px; border-radius: 8px; {{s.box}}"><span style="width: 24px; height: 24px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; {{s.dot}}">{{s.n}}</span><span style="font-size: 13px; font-weight: 600">{{s.label}}</span><bdi dir="ltr" style="font-size: 12px; color: #5E6360">{{s.time}}</bdi></div></sc-for>
+</div>
+<sc-if value="{{trip.instr}}" hint-placeholder-val="{{false}}"><div style="background: #FFF4D6; border: 2px solid #C08A12; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 6px"><span style="font-size: 11px; color: #5E6360">تعليمات من المكتب</span><span style="font-weight: 700; font-size: 15px">{{trip.instrTitle}}</span><span style="font-size: 13px">{{trip.instrText}}</span><button type="button" onClick="{{trip.ack}}" style="min-height: 46px; border: 0; border-radius: 10px; background: #1B1D1C; color: #FFFFFF; font-weight: 700; cursor: pointer">توصلت</button></div></sc-if>
+<sc-if value="{{trip.waiting}}" hint-placeholder-val="{{false}}"><div style="background: #F4F4F1; border-radius: 12px; padding: 12px; font-size: 13px; text-align: center">تصيفط الطارئ: «{{trip.chosen}}». المكتب والمدير توصلو. تسنى التعليمات…<br><button type="button" onClick="{{trip.simulate}}" style="margin-top: 8px; min-height: 34px; padding: 0 12px; border-radius: 8px; border: 1px dashed #5B45A8; background: transparent; color: #5B45A8; font-size: 12px; cursor: pointer">(نموذج) المكتب جاوب</button></div></sc-if>
+<sc-if value="{{trip.normal}}" hint-placeholder-val="{{true}}"><button type="button" onClick="{{trip.next}}" style="min-height: 64px; border: 0; border-radius: 14px; background: #2F6B4F; color: #FFFFFF; font-family: 'Alexandria', sans-serif; font-weight: 700; font-size: 19px; cursor: pointer">{{trip.nextLabel}}</button></sc-if>
+<sc-if value="{{trip.normal}}" hint-placeholder-val="{{true}}"><button type="button" onClick="{{trip.sos}}" style="min-height: 46px; border-radius: 12px; border: 2px solid #D23A1E; background: #FFFFFF; color: #8F2A1F; font-weight: 700; cursor: pointer">طارئ</button></sc-if>
+<span style="font-size: 11px; color: #5E6360; text-align: center">بلا شبكة؟ الضغطات كتتسجل بالساعة وكتمشي ملي ترجع الشبكة.</span>
+</div>
+</sc-if>
+
+<sc-if value="{{b.isChat}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<sc-for list="{{chat}}" as="m" hint-placeholder-count="2"><div style="display: flex; flex-direction: column; gap: 5px"><span style="align-self: flex-start; background: #1B1D1C; color: #FFFFFF; border-radius: 12px 12px 12px 2px; padding: 7px 11px; font-size: 13px; max-width: 85%">{{m.q}}</span><span style="align-self: flex-end; background: #FFFFFF; border-radius: 12px 12px 2px 12px; padding: 9px 11px; font-size: 13px; max-width: 92%; line-height: 1.55">{{m.a}}</span><sc-if value="{{m.card}}" hint-placeholder-val="{{false}}"><span style="align-self: flex-end; background: #FFF4D6; border: 1px solid #C08A12; border-radius: 10px; padding: 8px 10px; font-size: 12px; max-width: 92%">{{m.cardText}}</span></sc-if></div></sc-for>
+<div style="display: flex; flex-wrap: wrap; gap: 6px"><sc-for list="{{sugg}}" as="s" hint-placeholder-count="4"><button type="button" onClick="{{s.ask}}" style="min-height: 34px; padding: 4px 10px; border-radius: 17px; border: 1px solid #8D918C; background: #FFFFFF; font-size: 12px; cursor: pointer; text-align: start">{{s.q}}</button></sc-for></div>
+<span style="font-size: 11px; color: #5E6360">{{chatNote}}</span>
+</div>
+</sc-if>
+
+<sc-if value="{{b.isNote}}" hint-placeholder-val="{{false}}"><div style="background: #F4F4F1; border-inline-start: 4px solid #8D918C; border-radius: 6px; padding: 10px 12px; font-size: 12px; color: #3A3E3B">{{b.text}}</div></sc-if>
+
+</div>
+</sc-for>
+</main>
+
+<nav style="flex: 0 0 auto; background: #FFFFFF; border-top: 1px solid #BFC2BD; display: flex; padding: 4px 4px 10px 4px">
+<sc-for list="{{tabs}}" as="t" hint-placeholder-count="4"><button type="button" onClick="{{t.pick}}" style="flex: 1 1 0; min-height: 48px; background: transparent; border: 0; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 11px; {{t.style}}"><span style="width: 22px; height: 4px; border-radius: 2px; {{t.bar}}"></span>{{t.label}}</button></sc-for>
+</nav>
+
+<sc-if value="{{sheet.open}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; inset: 0; background: rgba(27,29,28,.55); display: flex; align-items: flex-end">
+<div style="background: #FFFFFF; width: 100%; border-radius: 16px 16px 0 0; padding: 16px; display: flex; flex-direction: column; gap: 8px">
+<span style="font-family: 'Alexandria', sans-serif; font-weight: 700; font-size: 16px">طارئ: {{sheet.stage}}</span>
+<sc-if value="{{sheet.hasPct}}" hint-placeholder-val="{{false}}"><span style="font-size: 13px; color: #3A3E3B">تفرغ حتى لدابا: <bdi dir="ltr" style="font-weight: 700">{{sheet.pct}}</bdi></span></sc-if>
+<sc-for list="{{sheet.opts}}" as="o" hint-placeholder-count="4"><button type="button" onClick="{{o.pick}}" style="min-height: 46px; border-radius: 10px; border: 1px solid #D23A1E; background: #FFFFFF; color: #8F2A1F; font-weight: 600; cursor: pointer; text-align: start; padding: 0 14px">{{o.label}}</button></sc-for>
+<button type="button" onClick="{{sheet.close}}" style="min-height: 40px; border: 0; background: transparent; color: #5E6360; cursor: pointer">رجوع</button>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{toast.show}}" hint-placeholder-val="{{false}}"><div style="position: absolute; left: 12px; right: 12px; bottom: 76px; background: #1B1D1C; color: #FFFFFF; border-radius: 10px; padding: 10px 12px; font-size: 13px; display: flex; justify-content: space-between; gap: 8px; align-items: center"><span>{{toast.text}}</span><button type="button" onClick="{{toast.close}}" style="background: transparent; border: 0; color: #A3A7A2; cursor: pointer">✕</button></div></sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const RED = '#D23A1E', GREEN = '#2F6B4F', AMBER = '#C08A12', BLUE = '#2F6DB5', GREY = '#8D918C';
+    const init = () => ({ init: true, role: 'owner', tab: 0, plant: 'all', appr: {}, step: 0, sos: false, chosen: '', waiting: false, instr: null, pstep: 0, chat: [], toast: '' });
+    const st = (this.state && this.state.init) ? this.state : init();
+    const commit = (fn) => { const S = JSON.parse(JSON.stringify(st)); fn(S); this.setState(S); };
+    const dot = (c) => 'background: ' + c;
+    const toast = (S, t) => { S.toast = t; };
+    const P = st.plant;
+    const pl = (all, tet, chf) => P === 'tet' ? tet : (P === 'chf' ? chf : all);
+    const money = st.role === 'owner' || st.role === 'admin';
+
+    // ---------- shared content
+    const kOwner = { t: 'kpis', items: [
+      { k: 'خرج اليوم', v: pl('214 m³', '152 m³', '62 m³'), s: pl('من 260 مبرمجين', 'من 180', 'من 80'), style: '' },
+      { k: 'الشاحنات خدامة', v: pl('8 / 9', '5 / 5', '3 / 4'), s: '1 فالإصلاح، 3 پومپات', style: '' },
+      { k: 'الإسمنت كيكفي', v: pl('1,4 نهار', '1,2 نهار', '2,1 نهار'), s: 'Holcim: اطلب قبل الأربعاء', style: 'color: ' + AMBER },
+      { k: 'السيولة 7 أيام', v: money ? '−38 400' : '•••', s: 'الخميس كيحتاج قرار', style: 'color: ' + RED }
+    ] };
+    const live = { t: 'list', title: 'الشحنات دابا', rows: [
+      { a: 'CAM-T02 ← Promotion Al Amal', b: '16 m³ B25، كتفرغ (60%)', c: '10:42', dot: dot(BLUE), cs: '' },
+      { a: 'CAM-C01 ← Chantier Kitane', b: '11 m³ B20، متأخرة 25 د فالطريق', c: '⚠', dot: dot(AMBER), cs: 'color: ' + AMBER },
+      { a: 'POMP-2 ← Résidence Wifak', b: 'كيضخ، الطابق 6', c: '11:05', dot: dot(BLUE), cs: '' },
+      { a: 'Holcim ← سونطرال تطوان', b: '30 t إسمنت، متوقعة 14:00', c: 'شراء', dot: dot(GREY), cs: '' }
+    ] };
+    const apprCards = [
+      { id: 'p1', kind: 'ثمن مؤقت', title: '3 طلبيات بالثمن المؤقت', detail: money ? 'CMD-0412 (24 m³ B25) و CMD-0415 و CMD-0416 بالثمن المرجعي 790 / m³' : '', yes: 'أكد الثمن', no: 'بدّل', ok: 'تأكد. الفاتورة ولات ممكنة.' },
+      { id: 'c1', kind: 'سقف الكريدي', title: 'Bâtir Nord: طلبية جديدة 40 m³', detail: 'الزبون فات السقف وعندو فاتورة متأخرة. الطلبية معلقة.', yes: 'وافق', no: 'رفض', ok: 'توافق. الطلبية دخلات للبرمجة.' },
+      { id: 'd1', kind: 'طلب رقم', title: 'الإدارة طلبات الرصيد ديال CLT-017', detail: 'السبب: الزبون كيعيط على الحساب ديالو.', yes: 'أظهر ليها الرقم', no: 'رفض', ok: 'الرقم بان ليها مرة وحدة، وتسجل.' },
+      { id: 'f1', kind: 'إلغاء فاتورة', title: 'FAC-2026-0318: طلب إلغاء', detail: 'السبب: غلط فالكمية (8 بلاصة 6 m³). كيتصاوب avoir.', yes: 'أصدر avoir (2FA)', no: 'رفض', ok: 'Avoir AV-0041 تصاوب.' },
+      { id: 'r1', kind: 'طلب وثيقة', title: 'Promotion Al Amal طلب relevé de situation', detail: 'من الحساب ديال الزبون.', yes: 'وافق وصيفط', no: 'رفض', ok: 'الوثيقة بانت للزبون.' }
+    ];
+    const approvals = (ids) => ({ t: 'approvals', cards: apprCards.filter((c) => ids.indexOf(c.id) >= 0).map((c) => {
+      const s = st.appr[c.id];
+      return { kind: c.kind, title: c.title, detail: c.detail, yesLabel: c.yes, noLabel: c.no, open: !s, done: !!s, doneText: s === 'yes' ? c.ok : 'ترفض، وتسجل.', doneStyle: s === 'yes' ? 'color: ' + GREEN : 'color: #5E6360', border: 'border-color: ' + (s ? '#BFC2BD' : AMBER),
+        yes: () => commit((S) => { S.appr[c.id] = 'yes'; toast(S, c.ok); }), no: () => commit((S) => { S.appr[c.id] = 'no'; }) };
+    }) });
+    const pendingCount = apprCards.filter((c) => !st.appr[c.id]).length;
+
+    // ---------- assistant
+    const QA = {
+      owner: [
+        ['شحال خرج اليوم ولمن؟', 'حتى 11:00 خرجو 214 m³: تطوان 152 (Al Amal 64، Bâtir Nord 48…)، الشاون 62.', ''],
+        ['كيف داير الخميس فالسيولة؟', 'الخميس ناقص 38 400 درهم بسبب شيك Holcim. الحلول: تأجيل الحديد ديال كازا أسبوع، ولا تحصيل LCN ديال Al Amal قبل الأجل.', 'كاين مسودة: رسالة لـ Holcim لتأجيل الشيك. تأكدها؟'],
+        ['واش نحتاج شحنة حديد هاد الشهر؟', 'التوقع كيبين ثغرة 120 000 من 20 حتى 27 نونبر. شحنة حديد وحدة كتغطيها، والتكلفة التقديرية ديالها 4 800 درهم.', ''],
+        ['شكون ما خلصش؟', '3 زبناء فاتو الأجل: Bâtir Nord (52 400)، Kitane (17 280، شيك راجع)، Smir (9 600).', '']
+      ],
+      office: [
+        ['واش نقدرو نخلصو شيك Holcim الخميس؟', 'الشيك CHQ-2219 ديال الخميس: مزيّر. خاصو تدبير، والمدير على علم.', ''],
+        ['شحال عند Bâtir Nord فالرصيد؟', 'هاد المعلومة فيها رقم. صيفطت طلب للمدير ولا لعلي باش يوافقو يبان ليك.', 'طلب الرقم تصيفط ← كتسنا الموافقة'],
+        ['شنو الشحنات المتأخرة دابا؟', 'CAM-C01 لـ Kitane متأخرة 25 دقيقة فالطريق (زحام). عيط للزبون.', ''],
+        ['شنو باقي ما تفوترش؟', '7 بونات تسلمو: Al Amal (4)، Wifak (3). 2 منهم بالثمن المؤقت، كيتسناو تأكيد المدير.', '']
+      ],
+      plant: [
+        ['شحال باقي فالسيلو ديال الإسمنت؟', 'سونطرال تطوان: 38 t، كيكفي تقريبا نهار و5 ساعات حسب البرمجة. Holcim متوقعة 14:00.', ''],
+        ['شنو الشحنة الجاية؟', '11:20: CAM-T03، 16 m³ B25 لـ Résidence Wifak. الخلطة: إسمنت 5 600 kg، رملة 12 480 kg…', '']
+      ]
+    };
+    const qaFor = st.role === 'owner' || st.role === 'admin' ? 'owner' : (st.role === 'sales' || st.role === 'purch' ? 'office' : 'plant');
+    const chatBlock = { t: 'chat' };
+
+    // ---------- driver / pump
+    const STEPS = ['بدا الشحن', 'خرجت من السونطرال', 'وصلت للورش', 'بديت نفرغ', 'ساليت التفريغ', 'رجعت للسونطرال'];
+    const PSTEPS = ['وصلت للورش', 'ركبت الپومپ', 'بدا الضخ', 'سالا الضخ', 'خرجت من الورش'];
+    const EMO = [['عطب فالشاحنة', 'الطلبية تلغات', 'مشكل فالخلطة'], ['عطب فالشاحنة', 'الطلبية تلغات', 'مشكل فالخلطة'], ['زحام كبير', 'حادثة', 'عطب', 'الزبون لغا'], ['الورش ماشي واجد', 'الزبون رفض البيطون', 'ما كاينش فين نفرغ'], ['الشحنة ما كافياش', 'الزبون وقف التفريغ', 'رفض الجودة', 'عطب فالپومپ'], ['عطب فالشاحنة', 'حادثة']];
+    const isPump = st.role === 'pump';
+    const steps = isPump ? PSTEPS : STEPS, cur = isPump ? st.pstep : st.step;
+    const times = ['09:12', '09:31', '09:58', '10:04', '10:41', '11:06'];
+    const trip = {
+      kicker: isPump ? 'الخدمة ديال دابا: POMP-2' : 'الرحلة ديال دابا: CAM-T02، BL-2026-0533',
+      load: isPump ? 'ضخ 32 m³ B25، الطابق 6' : '16 m³ B25',
+      site: 'Résidence Wifak، Tétouan، lotissement 14', contact: 'الشخص فالورش: السي أحمد (المسؤول ديال الورش)',
+      steps: steps.map((l, i) => ({ n: String(i + 1), label: l, time: i < cur ? times[i] : '', box: i === cur ? 'background: #FFFFFF; border: 2px solid #1B1D1C' : (i < cur ? 'background: #F4F4F1; border: 2px solid transparent' : 'border: 2px dashed #BFC2BD; color: #8D918C'), dot: i < cur ? 'background: #2F6B4F; color: #FFFFFF' : (i === cur ? 'background: #1B1D1C; color: #FFFFFF' : 'background: #D5D7D2; color: #4A4E4B') })),
+      normal: !st.waiting && !st.instr,
+      nextLabel: cur >= steps.length ? 'بدا الطلبية الجاية' : steps[cur],
+      next: () => commit((S) => { if (isPump) { S.pstep = S.pstep >= PSTEPS.length ? 0 : S.pstep + 1; } else { if (S.step >= STEPS.length) { S.step = 0; toast(S, 'الطلبية الجاية: CAM-T02 ← Bâtir Nord، 16 m³ B20'); } else { S.step += 1; if (S.step === 5) toast(S, 'دخل شحال تفرّغ: 16 m³ ✓، وصورة البون الموقع (اختيارية)'); } } }),
+      sos: () => commit((S) => { S.sos = true; }),
+      waiting: st.waiting, chosen: st.chosen,
+      simulate: () => commit((S) => { S.waiting = false; S.instr = S.chosen === 'الشحنة ما كافياش' ? { t: 'رجع للسونطرال لشحنة زايدة', x: 'CAM-T04 غتجيب 4 m³ اللي ناقصين. ولا رجع نتا: الشحن واجد ليك فـ 11:30.' } : { t: 'سير لورش آخر', x: 'Bâtir Nord، Martil، lotissement Nour. نفس النوع B25، الوقت كافي. فتح الخريطة.' }; }),
+      instr: !!st.instr, instrTitle: st.instr ? st.instr.t : '', instrText: st.instr ? st.instr.x : '',
+      ack: () => commit((S) => { S.instr = null; toast(S, 'تسجل «توصلت». المكتب شاف.'); })
+    };
+    const sheet = { open: st.sos, stage: (steps[Math.min(cur, steps.length - 1)] || ''), hasPct: !isPump && cur === 4, pct: '62%', opts: (EMO[Math.min(cur, 5)] || []).map((o) => ({ label: o, pick: () => commit((S) => { S.sos = false; S.waiting = true; S.chosen = o; }) })), close: () => commit((S) => { S.sos = false; }) };
+
+    // ---------- roles
+    const R = {
+      owner: { label: 'المدير', who: 'المدير، كلشي', plants: true, tabs: [
+        ['اليوم', [{ t: 'hero', kicker: 'صباح الخير، هادا اليوم ديالك', title: pl('214 m³ خرجو من 260. الخميس كيحتاج قرار فالسيولة.', '152 m³ خرجو فتطوان. الإسمنت خاصو طلب.', '62 m³ خرجو فالشاون، كلشي فالوقت.'), sub: pendingCount + ' حوايج كيتسناو الموافقة ديالك.' }, kOwner, live]],
+        ['الموافقات', [approvals(['p1', 'c1', 'd1', 'f1', 'r1'])]],
+        ['المساعد', [chatBlock]],
+        ['الفلوس', [{ t: 'kpis', items: [{ k: 'الكاسة', v: '24 600', s: 'عند المدير 15 000، الإدارة 9 600', style: '' }, { k: 'البنك', v: '168 900', s: 'حساب الشركة', style: '' }, { k: 'شيكات داخلين', v: '+212 400', s: 'فالمحفظة', style: 'color: ' + GREEN }, { k: 'شيكات خارجين', v: '−265 000', s: 'منها Holcim الخميس', style: 'color: ' + RED }] }, { t: 'list', title: 'أكتوبر: الربح', rows: [{ a: 'المداخيل', b: 'بيطون 2 140 m³ + پومپ', c: '1 712 000', dot: dot(GREEN), cs: '' }, { a: 'المصاريف', b: 'مواد، ليزينغ، صاليرات، كازوال، كراء', c: '−1 498 000', dot: dot(RED), cs: '' }, { a: 'تكلفة التمويل بالحديد', b: '2 صفقات', c: '−9 600', dot: dot(AMBER), cs: '' }, { a: 'الربح الصافي', b: 'تطوان 71%، الشاون 29%', c: '204 400', dot: dot(BLUE), cs: 'color: ' + GREEN }] }]]
+      ] },
+      admin: { label: 'علي (المسير)', who: 'مسير التطبيق: كلشي + الإعدادات', plants: true, tabs: [
+        ['اليوم', [kOwner, live]],
+        ['الموافقات', [approvals(['p1', 'c1', 'd1', 'f1', 'r1'])]],
+        ['المساعد', [chatBlock]],
+        ['الإعدادات', [{ t: 'list', title: 'الأقسام (زر التشغيل)', rows: [{ a: 'البرمجة والرحلات', b: 'الاختبارات دازو', c: 'شاعل', dot: dot(GREEN), cs: 'color: ' + GREEN }, { a: 'المالية والحديد', b: 'المراجعة ديال Codex', c: 'طافي', dot: dot(GREY), cs: '' }, { a: 'حسابات الزبناء', b: 'من بعد المراجعة الأمنية', c: 'طافي', dot: dot(GREY), cs: '' }] }, { t: 'list', title: 'المستعملين', rows: [{ a: '14 حساب نشيط', b: 'سائقين 9، پومپ 3، إدارة 2…', c: 'إدارة', dot: dot(BLUE), cs: '' }, { a: 'آخر عملية حساسة', b: 'avoir AV-0041 من طرف المدير', c: 'السجل', dot: dot(GREY), cs: '' }] }, { t: 'note', text: 'كل عملية ديالك مسجلة وكيشوفها المدير. ما تقدرش تمسح السجل ولا تنقص من صلاحيات المدير.' }]]
+      ] },
+      sales: { label: 'الإدارة: مبيعات', who: 'الإدارة، المبيعات', plants: true, tabs: [
+        ['اليوم', [{ t: 'actions', items: [{ label: '+ طلبية جديدة', style: 'border: 0; background: #1B1D1C; color: #FFFFFF', run: () => commit((S) => toast(S, 'الطلبية تسجلات بالثمن المؤقت. الدوفي واجد.')) }, { label: 'طباعة بون', style: 'background: #FFFFFF; border: 1px solid #1B1D1C', run: () => commit((S) => toast(S, 'BL-2026-0533.pdf')) }] }, { t: 'list', title: 'تنبيهات', rows: [{ a: 'طارئ: CAM-C01 زحام كبير', b: 'Kitane كيتسنا. عيط ليه.', c: 'عيط', dot: dot(AMBER), cs: 'color: ' + AMBER }, { a: 'Bâtir Nord: طلبية معلقة', b: 'كتسنا موافقة المدير (السقف)', c: 'كتسنا', dot: dot(GREY), cs: '' }] }, live]],
+        ['الزبناء', [{ t: 'list', title: 'الحالة ديال الزبناء', rows: [{ a: 'Promotion Al Amal', b: 'عليه، فالوقت', c: 'عليه', dot: dot(BLUE), cs: '' }, { a: 'Bâtir Nord SARL', b: 'فات الأجل', c: 'متأخر', dot: dot(RED), cs: 'color: ' + RED }, { a: 'Coopérative Wifak', b: 'ما عليه والو', c: 'خالص', dot: dot(GREEN), cs: 'color: ' + GREEN }] }, { t: 'note', text: 'كتشوفي غير الحالة. المبلغ كيبان غير بموافقة المدير ولا علي.' }]],
+        ['المساعد', [chatBlock]]
+      ] },
+      purch: { label: 'الإدارة: شراء', who: 'الإدارة، الشراء والخلاص', plants: true, tabs: [
+        ['اليوم', [{ t: 'list', title: 'الشحنات ديال الشراء', rows: [{ a: 'Holcim: 30 t إسمنت', b: 'سونطرال تطوان، متوقعة 14:00', c: 'فالطريق', dot: dot(BLUE), cs: '' }, { a: 'Sablière Nord: 120 t رملة', b: 'الشاون، تأخرات نهار', c: 'متأخرة', dot: dot(RED), cs: 'color: ' + RED }, { a: 'كازوال: 2 000 L', b: 'خزان تطوان، السونطرال أكد الاستلام', c: 'دخل التفاصيل', dot: dot(AMBER), cs: 'color: ' + AMBER }] }, { t: 'actions', items: [{ label: '+ طلب شراء', style: 'border: 0; background: #1B1D1C; color: #FFFFFF', run: () => commit((S) => toast(S, 'طلب الشراء تسجل. المورد والتاريخ المتوقع.')) }, { label: 'فاتورة مورد', style: 'background: #FFFFFF; border: 1px solid #1B1D1C', run: () => commit((S) => toast(S, 'الفاتورة كتتقارن مع الطلب والاستلام.')) }] }]],
+        ['الموردين', [{ t: 'list', title: 'الحالة', rows: [{ a: 'Holcim', b: 'علينا، شيك الخميس', c: 'علينا', dot: dot(AMBER), cs: '' }, { a: 'Sablière Nord', b: 'ما علينا والو', c: '—', dot: dot(GREEN), cs: '' }] }]],
+        ['المساعد', [chatBlock]]
+      ] },
+      plantT: { label: 'سونطرال تطوان', who: 'مسؤول سونطرال تطوان', plants: false, tabs: [
+        ['اليوم', [{ t: 'kpis', items: [{ k: 'الإسمنت', v: '38 t', s: 'كيكفي 1,2 نهار', style: 'color: ' + AMBER }, { k: 'الرملة', v: '214 t', s: '3 أيام', style: '' }, { k: 'الحصى 15/25', v: '160 t', s: '2,5 أيام', style: '' }, { k: 'الكازوال', v: '3 400 L', s: 'الخزان', style: '' }] }, { t: 'list', title: 'الشحن الجاي', rows: [{ a: '11:20 CAM-T03', b: '16 m³ B25 ← Wifak', c: 'الوصفة', dot: dot(BLUE), cs: '' }, { a: '11:45 CAM-T01', b: '16 m³ B20 ← Bâtir Nord', c: 'الوصفة', dot: dot(GREY), cs: '' }] }]],
+        ['الاستلام', [{ t: 'actions', items: [{ label: 'أكد استلام Holcim (30 t)', style: 'border: 0; background: #1B1D1C; color: #FFFFFF', run: () => commit((S) => toast(S, 'تأكد الاستلام. الإدارة غتكمل التفاصيل مع المورد.')) }] }, { t: 'actions', items: [{ label: 'عمّر الكازوال لشاحنة', style: 'background: #FFFFFF; border: 1px solid #1B1D1C', run: () => commit((S) => toast(S, 'CAM-T02: 180 L تسجلات.')) }, { label: 'جرد السطوك', style: 'background: #FFFFFF; border: 1px solid #1B1D1C', run: () => commit((S) => toast(S, 'الجرد: السبب إجباري إلا كان فرق.')) }] }]],
+        ['المساعد', [chatBlock]]
+      ] },
+      plantC: { label: 'سونطرال الشاون', who: 'مسؤول سونطرال الشاون', plants: false, tabs: [
+        ['اليوم', [{ t: 'kpis', items: [{ k: 'الإسمنت', v: '61 t', s: '2,1 أيام', style: '' }, { k: 'الرملة', v: '48 t', s: 'نهار واحد', style: 'color: ' + AMBER }, { k: 'الحصى 8/15', v: '90 t', s: '2 أيام', style: '' }, { k: 'الكازوال', v: '1 900 L', s: 'الخزان', style: '' }] }, { t: 'list', title: 'الشحن الجاي', rows: [{ a: '11:10 CAM-C02', b: '11 m³ B20 ← Kitane', c: 'الوصفة', dot: dot(BLUE), cs: '' }] }]],
+        ['المساعد', [chatBlock]]
+      ] },
+      driver: { label: 'السائق', who: 'Hamid، CAM-T02', plants: false, tabs: [['الرحلة', [{ t: 'trip' }]], ['اليوم', [{ t: 'list', title: 'الرحلات ديالي اليوم', rows: [{ a: 'Al Amal', b: '16 m³، سالات 08:40', c: '✓', dot: dot(GREEN), cs: '' }, { a: 'Wifak', b: '16 m³، دابا', c: '…', dot: dot(BLUE), cs: '' }, { a: 'Bâtir Nord', b: '16 m³، الجاية', c: '', dot: dot(GREY), cs: '' }] }]]] },
+      pump: { label: 'مول الپومپ', who: 'Youssef، POMP-2', plants: false, tabs: [['الخدمة', [{ t: 'trip' }]]] },
+      acct: { label: 'المحاسب', who: 'المحاسب', plants: false, tabs: [['الملفات', [{ t: 'actions', items: [{ label: 'دفتر المبيعات (Excel)', style: 'border: 0; background: #1B1D1C; color: #FFFFFF', run: () => commit((S) => toast(S, 'ventes-2026-10.xlsx')) }, { label: 'ملخص TVA', style: 'background: #FFFFFF; border: 1px solid #1B1D1C', run: () => commit((S) => toast(S, 'tva-2026-10.xlsx')) }] }, { t: 'list', title: 'الفواتير ديال أكتوبر', rows: [{ a: 'FAC-2026-0301 → 0347', b: '47 فاتورة، 3 avoirs', c: 'HT/TVA/TTC', dot: dot(BLUE), cs: '' }] }, { t: 'note', text: 'ما كتبانش الخزينة ولا الربح ولا الحديد لهاد الحساب (مؤقت، خاصو تأكيد المدير).' }]]] },
+      client: { label: 'زبون', who: 'Promotion Al Amal (الحساب ديالو)', plants: false, tabs: [['الطلبيات', [{ t: 'hero', kicker: 'الطلبية CMD-0412', title: '24 m³ B25: تسلمو 16، الباقي 8 الساعة 13:00', sub: 'الشاحنة CAM-T02 خرجات من السونطرال.' }, { t: 'actions', items: [{ label: 'طلب relevé de situation', style: 'border: 0; background: #1B1D1C; color: #FFFFFF', run: () => commit((S) => toast(S, 'الطلب تصيفط. كيبان ليك من بعد الموافقة.')) }, { label: 'طلب الفاتورة', style: 'background: #FFFFFF; border: 1px solid #1B1D1C', run: () => commit((S) => toast(S, 'الطلب تصيفط للموافقة.')) }] }, { t: 'note', text: 'هاد الحساب كيتشعل آخر وحدة، من بعد المراجعة الأمنية.' }]]] },
+      supplier: { label: 'مورد', who: 'Sablière Nord (الحساب ديالو)', plants: false, tabs: [['الطلبات', [{ t: 'list', title: 'الطلبات ديالي', rows: [{ a: 'BC-2026-0231: 120 t رملة', b: 'الشاون، كان متوقع البارح', c: 'متأخرة', dot: dot(RED), cs: 'color: ' + RED }] }, { t: 'actions', items: [{ label: 'أكد تاريخ التسليم', style: 'border: 0; background: #1B1D1C; color: #FFFFFF', run: () => commit((S) => toast(S, 'التاريخ الجديد وصل للإدارة.')) }] }, { t: 'note', text: 'هاد الحساب كيتشعل آخر وحدة، من بعد المراجعة الأمنية.' }]]] }
+    };
+    const role = R[st.role], tabIdx = Math.min(st.tab, role.tabs.length - 1);
+    const blocks = role.tabs[tabIdx][1].map((b) => Object.assign({ isHero: b.t === 'hero', isKpis: b.t === 'kpis', isList: b.t === 'list', isActions: b.t === 'actions', isApprovals: b.t === 'approvals', isTrip: b.t === 'trip', isChat: b.t === 'chat', isNote: b.t === 'note', items: [], rows: [], cards: [] }, b));
+    const qa = QA[qaFor] || [];
+    return {
+      roles: Object.keys(R).map((k) => ({ label: R[k].label, style: k === st.role ? 'background: #FFFFFF; color: #3C2C80; border: 0; font-weight: 600' : 'background: transparent; color: #FFFFFF; border: 1px solid rgba(255,255,255,.5)', pick: () => commit((S) => { S.role = k; S.tab = 0; S.chat = []; S.toast = ''; }) })),
+      who: role.who, showPlants: role.plants,
+      plants: [['all', 'المجموع'], ['tet', 'تطوان'], ['chf', 'الشاون']].map((p) => ({ label: p[1], style: P === p[0] ? 'background: #FFFFFF; color: #1B1D1C; border: 0' : 'background: transparent; color: #E6E7E3; border: 1px solid #5E6360', pick: () => commit((S) => { S.plant = p[0]; }) })),
+      hasBell: money && pendingCount > 0, bell: String(pendingCount),
+      blocks: blocks, trip: trip, sheet: sheet,
+      chat: st.chat.map((m) => ({ q: m.q, a: m.a, card: !!m.c, cardText: m.c })),
+      sugg: qa.filter((x) => !st.chat.some((m) => m.q === x[0])).map((x) => ({ q: x[0], ask: () => commit((S) => { S.chat.push({ q: x[0], a: x[1], c: x[2] }); }) })),
+      chatNote: qaFor === 'office' ? 'المساعد كيجاوبك بالحالة بلا أرقام. الرقم كيبان غير بموافقة.' : 'فهاد المرحلة الأجوبة كيحسبها التطبيق، بلا ذكاء اصطناعي خارجي، حتى يجي إذن CNDP.',
+      tabs: role.tabs.map((t, i) => ({ label: t[0] + (t[0] === 'الموافقات' && pendingCount ? ' (' + pendingCount + ')' : ''), style: i === tabIdx ? 'color: #1B1D1C; font-weight: 700' : 'color: #5E6360', bar: i === tabIdx ? 'background: #D23A1E' : 'background: transparent', pick: () => commit((S) => { S.tab = i; }) })),
+      toast: { show: !!st.toast, text: st.toast, close: () => commit((S) => { S.toast = ''; }) }
+    };
+  }
+}
+</script>
+</body>
+</html>

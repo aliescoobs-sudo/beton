@@ -84,7 +84,12 @@ export async function readDispatchParams(tx: pg.PoolClient): Promise<DispatchPar
 }
 
 /** The live orders due on `date` with what is still to load, in code order. */
-async function dayOrders(tx: pg.PoolClient, date: string, withOverdue: boolean): Promise<DispatchOrder[]> {
+async function dayOrders(
+  tx: pg.PoolClient,
+  date: string,
+  withOverdue: boolean,
+  plantId: string | null = null,
+): Promise<DispatchOrder[]> {
   const { rows } = await tx.query<{
     id: string;
     code: string;
@@ -104,8 +109,9 @@ async function dayOrders(tx: pg.PoolClient, date: string, withOverdue: boolean):
        left join zone z on z.id = o.zone_id
       where o.reverses_id is null and not o.is_reversed
         and (o.delivery_date = $1 or ($2::boolean and o.delivery_date < $1 and o.delivery_date >= $1::date - 14))
+        and ($3::uuid is null or o.plant_id = $3)
       order by o.delivery_date, o.code`,
-    [date, withOverdue],
+    [date, withOverdue, plantId],
   );
   return rows
     .map((r) => ({
@@ -122,14 +128,27 @@ async function dayOrders(tx: pg.PoolClient, date: string, withOverdue: boolean):
     .filter((o) => o.remainingL > 0);
 }
 
-async function dayTrucks(tx: pg.PoolClient, date: string): Promise<DispatchTruck[]> {
+/**
+ * The trucks of a day. With a plant: its own mixers and the hired external trucks (no plant); never the other plant's
+ * mixers, and never a pump truck, which is dispatched by its own flow. A stopped truck (breakdown in the log) is listed
+ * as not available, so it cannot be planned.
+ */
+async function dayTrucks(
+  tx: pg.PoolClient,
+  date: string,
+  plantId: string | null = null,
+): Promise<DispatchTruck[]> {
   const trucks = await tx.query<{
     id: string;
     code: string;
     capacity_l: number;
     status: 'active' | 'archived';
     default_driver_id: string | null;
-  }>(`select id, code, capacity_l, status, default_driver_id from truck order by code`);
+  }>(
+    `select id, code, capacity_l, status, default_driver_id from truck
+      where kind <> 'pump' and ($1::uuid is null or plant_id = $1 or plant_id is null) order by code`,
+    [plantId],
+  );
   const log = await tx.query<{
     id: string;
     truck_id: string;
@@ -233,7 +252,7 @@ export async function getDispatchDay(
   actor: SessionUser,
   date: string,
   /** The business day: from today on, the orders overdue in the last two weeks and still to load are planned with the day's. */
-  deps: { today?: string } = {},
+  deps: { today?: string; plantId?: string | null } = {},
 ): Promise<Result<DispatchDay, 'INVALID'>> {
   await require(appPool, actor, 'dispatch.read');
   if (!isRealDate(date)) return err('INVALID');
@@ -241,8 +260,8 @@ export async function getDispatchDay(
     await inRequest(appPool, actor, async (tx) => ({
       date,
       params: await readDispatchParams(tx),
-      orders: await dayOrders(tx, date, deps.today !== undefined && date >= deps.today),
-      trucks: await dayTrucks(tx, date),
+      orders: await dayOrders(tx, date, deps.today !== undefined && date >= deps.today, deps.plantId ?? null),
+      trucks: await dayTrucks(tx, date, deps.plantId ?? null),
       drivers: await activeDrivers(tx),
       saved: await liveRotations(tx, date),
     })),

@@ -47,6 +47,9 @@ export const PERMISSIONS = {
   'selling_prices.read': MONEY_READ,
   'selling_prices.write': MONEY_WRITE,
   'client_price_override.write': MONEY_WRITE,
+  // Plants (REQUIREMENTS-V1 §1): every internal role reads; managers write
+  'plants.read': ALL,
+  'plants.write': MANAGERS,
   // Trucks, zones
   'trucks.read': ALL,
   'trucks.write': MANAGERS,
@@ -152,6 +155,8 @@ export const PERMISSIONS = {
   // Receiving a purchase puts its stocked lines into the stock; quantities only, no amount
   'receipts.read': PLANT_READ,
   'receipts.write': PLANT,
+  // First step of the two-step receipt: the plant confirms an arrival (nothing enters the stock yet)
+  'receipts.confirm_arrival': PLANT,
   'reconciliation.close': MANAGERS,
   // Derived figures
   'margins.read': MONEY_READ,

@@ -62,6 +62,7 @@ describe('functions the application role can execute', () => {
     'audit.is_money_table(p_table text)',
     'audit.record(p_action text, p_table text, p_row_id text, p_before jsonb, p_after jsonb, p_reason text)',
     'ctx.ai_proposal_id()',
+    'ctx.plant_id()',
     'ctx.request_id()',
     'ctx.role()',
     'ctx.sim_at()',
@@ -92,6 +93,7 @@ describe('functions the application role can execute', () => {
     'public.ops_parameter(p_key text)',
     'public.next_doc_number(p_prefix text, p_year integer, p_width integer)',
     'public.record_receipt(p_purchase uuid, p_date date)',
+    'public.confirm_receipt_at_plant(p_purchase uuid, p_note text)',
     'public.record_receipt_lines(p_purchase uuid, p_date date, p_lines jsonb, p_confirm_excess boolean)',
     'public.reject_supplier_invoice(p_si uuid, p_reason text)',
     'public.resolve_selling_price(p_type uuid, p_client uuid, p_date date)',
@@ -214,6 +216,7 @@ describe('views the application role can read', () => {
     'site_label',
     'reverses_id',
     'is_reversed',
+    'plant_id',
   ];
 
   it("there are exactly three, sales_order_ops, purchase_line_ops and delivered_load; all are security barriers, and delivered_load runs with the caller's rights", async () => {
@@ -238,7 +241,7 @@ describe('views the application role can read', () => {
     );
     expect(fields.map((f) => f.name).sort()).toEqual([...OPS_COLUMNS].sort());
     for (const name of OPS_COLUMNS)
-      expect(name).not.toMatch(/price|total|amount|centimes|vat|ttc|plan|\bht\b/i);
+      expect(name).not.toMatch(/price|total|amount|centimes|vat|ttc|plan(?!t)|\bht\b/i);
     expect(rows).toHaveLength(1);
   });
 

@@ -23,15 +23,23 @@ interface TruckRow {
   plate: string;
   capacity_l: number;
   status: Truck['status'];
+  kind: Truck['kind'];
+  plant_id: string | null;
+  stopped_decision: Truck['stoppedDecision'];
+  pay_basis: Truck['payBasis'];
 }
 
-const COLUMNS = 'id, code, plate, capacity_l, status';
+const COLUMNS = 'id, code, plate, capacity_l, status, kind, plant_id, stopped_decision, pay_basis';
 const toTruck = (row: TruckRow): Truck => ({
   id: row.id,
   code: row.code,
   plate: row.plate,
   capacityL: row.capacity_l,
   status: row.status,
+  kind: row.kind,
+  plantId: row.plant_id,
+  stoppedDecision: row.stopped_decision,
+  payBasis: row.pay_basis,
 });
 
 interface EntryRow {
@@ -77,18 +85,34 @@ export async function createTruck(
   try {
     const { rows } = await inRequest(appPool, actor, (tx) =>
       tx.query<TruckRow>(
-        `insert into truck (id, code, plate, capacity_l) values ($1, $2, $3, $4) returning ${COLUMNS}`,
-        [uuidv7(realClock.now()), parsed.value.code, parsed.value.plate, parsed.value.capacityL],
+        `insert into truck (id, code, plate, capacity_l, kind, plant_id, pay_basis) values ($1, $2, $3, $4, $5, $6, $7)
+         returning ${COLUMNS}`,
+        [
+          uuidv7(realClock.now()),
+          parsed.value.code,
+          parsed.value.plate,
+          parsed.value.capacityL,
+          parsed.value.kind,
+          parsed.value.plantId,
+          parsed.value.payBasis,
+        ],
       ),
     );
     return ok(toTruck(rows[0] as TruckRow));
   } catch (error) {
     if (isUniqueViolation(error)) return err('DUPLICATE');
+    if (isPlantRuleViolation(error)) return err('INVALID');
     throw error;
   }
 }
 
-/** Plate, capacity and status (archive); the code is immutable (trigger). Managers only. */
+/** A refusal by the plant rules of the database (plant required, unknown or archived, kind). */
+function isPlantRuleViolation(error: unknown): boolean {
+  const e = error as { code?: string };
+  return e.code === '23514' || e.code === '23503' || e.code === '23502';
+}
+
+/** Plate, capacity, plant, pay basis, the decision for a stopped truck and status (archive); the code is immutable (trigger). Managers only. */
 export async function updateTruck(
   appPool: pg.Pool,
   actor: SessionUser,
@@ -102,15 +126,30 @@ export async function updateTruck(
   try {
     const { rows } = await inRequest(appPool, actor, (tx) =>
       tx.query<TruckRow>(
-        `update truck set plate = $2, capacity_l = $3, status = coalesce($4, status)
+        `update truck set plate = $2, capacity_l = $3, status = coalesce($4, status),
+                plant_id = case when $5::boolean then $6 else plant_id end,
+                pay_basis = case when $7::boolean then $8 else pay_basis end,
+                stopped_decision = case when $9::boolean then $10 else stopped_decision end
           where id = $1 returning ${COLUMNS}`,
-        [id, parsed.value.plate, parsed.value.capacityL, status ?? null],
+        [
+          id,
+          parsed.value.plate,
+          parsed.value.capacityL,
+          status ?? null,
+          parsed.value.plantId !== undefined,
+          parsed.value.plantId ?? null,
+          parsed.value.payBasis !== undefined,
+          parsed.value.payBasis ?? null,
+          parsed.value.stoppedDecision !== undefined,
+          parsed.value.stoppedDecision ?? null,
+        ],
       ),
     );
     return rows[0] ? ok(toTruck(rows[0])) : err('NOT_FOUND');
   } catch (error) {
     if (isMalformedId(error)) return err('NOT_FOUND');
     if (isUniqueViolation(error)) return err('DUPLICATE');
+    if (isPlantRuleViolation(error)) return err('INVALID');
     throw error;
   }
 }

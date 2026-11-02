@@ -9,8 +9,15 @@ import {
   require,
   type SessionUser,
 } from '@/modules/platform-security';
+import { plantIdOf, usePlant } from '@/modules/master-data';
 import { parseOpeningStockInput, parseThresholdInput } from '../domain/load-input';
-import { stockStatus, type StockStatus } from '../domain/stock';
+import {
+  DEFAULT_LEAD_DAYS,
+  DEFAULT_SAFETY_DAYS,
+  reorderThreshold,
+  stockStatus,
+  type StockStatus,
+} from '../domain/stock';
 
 export interface StockLevel {
   componentId: string;
@@ -24,9 +31,18 @@ export interface StockLevel {
   status: StockStatus;
 }
 
-/** The stock of every component and where it stands against its threshold. Plant, owner, partner and support read it. */
-export async function getStockLevels(appPool: pg.Pool, actor: SessionUser): Promise<StockLevel[]> {
+/**
+ * The stock of every component and where it stands against its threshold. Plant, owner, partner and support read it.
+ * With `plantId` it is the stock of that plant and its own threshold; without, the total of all plants (the sum of the
+ * movements, and the sum of each plant's latest threshold). The total always equals the sum of the plants.
+ */
+export async function getStockLevels(
+  appPool: pg.Pool,
+  actor: SessionUser,
+  opts: { plantId?: string | null } = {},
+): Promise<StockLevel[]> {
   await require(appPool, actor, 'stock.read');
+  const plantId = opts.plantId ?? null;
   const { rows } = await inRequest(appPool, actor, (tx) =>
     tx.query<{
       id: string;
@@ -37,10 +53,13 @@ export async function getStockLevels(appPool: pg.Pool, actor: SessionUser): Prom
       low: string | null;
     }>(
       `select c.id, c.name_fr, c.name_ar, c.base_unit, coalesce(sum(m.qty_base), 0)::text as level,
-              coalesce((select t.low_qty_base::text from stock_threshold t where t.component_id = c.id
-                order by t.created_at desc, t.id desc limit 1)) as low
-         from component c left join stock_movement m on m.component_id = c.id
+              (select sum(x.low)::text from (
+                 select distinct on (t.plant_id) t.low_qty_base as low from stock_threshold t
+                  where t.component_id = c.id and ($1::uuid is null or t.plant_id = $1)
+                  order by t.plant_id, t.created_at desc, t.id desc) x) as low
+         from component c left join stock_movement m on m.component_id = c.id and ($1::uuid is null or m.plant_id = $1)
         where c.status = 'active' group by c.id order by c.code`,
+      [plantId],
     ),
   );
   return rows.map((r) => ({
@@ -67,19 +86,23 @@ export async function setOpeningStock(
   if (!parsed.ok) return err('INVALID');
   const v = parsed.value;
   const id = randomUUID();
+  const plantId = plantIdOf(input);
   try {
-    await inRequest(appPool, actor, (tx) =>
-      tx.query(
-        `insert into stock_movement (id, component_id, movement_date, qty_base, source, source_id, created_by)
-         values ($1, $2, $3, $4, 'opening', $2, $5)`,
-        [id, v.componentId, v.date, v.qtyBase, actor.id],
-      ),
-    );
+    await inRequest(appPool, actor, async (tx) => {
+      await usePlant(tx, plantId);
+      // One opening per component and plant: with a plant named, its id is the source id.
+      await tx.query(
+        `insert into stock_movement (id, component_id, movement_date, qty_base, source, source_id, plant_id, created_by)
+         values ($1, $2, $3, $4, 'opening', coalesce($6::uuid, $2), $6, $5)`,
+        [id, v.componentId, v.date, v.qtyBase, actor.id, plantId],
+      );
+    });
     return ok({ id });
   } catch (error) {
     if (isUniqueViolation(error)) return err('ALREADY_ENTERED');
     const e = error as { code?: string };
     if (e.code === '23503' || isMalformedId(error)) return err('NOT_FOUND');
+    if (e.code === '23514') return err('INVALID');
     throw error;
   }
 }
@@ -96,17 +119,20 @@ export async function setStockThreshold(
   const parsed = parseThresholdInput(input);
   if (!parsed.ok) return err('INVALID');
   const id = randomUUID();
+  const plantId = plantIdOf(input);
   try {
-    await inRequest(appPool, actor, (tx) =>
-      tx.query(
-        `insert into stock_threshold (id, component_id, low_qty_base, created_by) values ($1, $2, $3, $4)`,
-        [id, parsed.value.componentId, parsed.value.lowQtyBase, actor.id],
-      ),
-    );
+    await inRequest(appPool, actor, async (tx) => {
+      await usePlant(tx, plantId);
+      await tx.query(
+        `insert into stock_threshold (id, component_id, low_qty_base, plant_id, created_by) values ($1, $2, $3, $4, $5)`,
+        [id, parsed.value.componentId, parsed.value.lowQtyBase, plantId, actor.id],
+      );
+    });
     return ok({ id });
   } catch (error) {
     const e = error as { code?: string };
     if (e.code === '23503' || isMalformedId(error)) return err('NOT_FOUND');
+    if (e.code === '23514') return err('INVALID');
     throw error;
   }
 }
@@ -147,31 +173,37 @@ export async function adjustStockAfterCount(
   if (!parsed.success) return err('INVALID');
   const v = parsed.data;
   const id = randomUUID();
+  const plantId = plantIdOf(input);
   try {
     return await inRequest(appPool, actor, async (tx): Promise<Result<StockCountResult, StockCountError>> => {
-      // Serialize two counts of the same component: the level read below is the one the correction is computed from.
-      await tx.query(`select pg_advisory_xact_lock(hashtextextended('stock:count:' || $1::text, 0))`, [
-        v.componentId,
-      ]);
+      await usePlant(tx, plantId);
+      // Serialize two counts of the same component and plant: the level read below is the one the correction is computed from.
+      await tx.query(
+        `select pg_advisory_xact_lock(hashtextextended('stock:count:' || $1::text || coalesce($2::text, ''), 0))`,
+        [v.componentId, plantId],
+      );
+      // A count measures one plant's stock: the level is that plant's movements only.
       const known = await tx.query<{ level: string }>(
         `select coalesce(sum(m.qty_base), 0)::text as level from component c
-           left join stock_movement m on m.component_id = c.id where c.id = $1 group by c.id`,
-        [v.componentId],
+           left join stock_movement m on m.component_id = c.id and ($2::uuid is null or m.plant_id = $2)
+          where c.id = $1 group by c.id`,
+        [v.componentId, plantId],
       );
       if (!known.rows[0]) return err('NOT_FOUND');
       const before = Number(known.rows[0].level);
       const difference = v.countedBase - before;
       if (difference === 0) return err('NO_DIFFERENCE');
       await tx.query(
-        `insert into stock_movement (id, component_id, movement_date, qty_base, source, source_id, reason, created_by)
-         values ($1, $2, $3, $4, 'count_adjustment', $1, $5, $6)`,
-        [id, v.componentId, deps.today, difference, v.reason, actor.id],
+        `insert into stock_movement (id, component_id, movement_date, qty_base, source, source_id, reason, plant_id, created_by)
+         values ($1, $2, $3, $4, 'count_adjustment', $1, $5, $7, $6)`,
+        [id, v.componentId, deps.today, difference, v.reason, actor.id, plantId],
       );
       return ok({ id, before, counted: v.countedBase, difference });
     });
   } catch (error) {
     const e = error as { code?: string };
     if (e.code === '23503' || isMalformedId(error)) return err('NOT_FOUND');
+    if (e.code === '23514') return err('INVALID');
     throw error;
   }
 }
@@ -217,4 +249,68 @@ export async function listStockAdjustments(appPool: pg.Pool, actor: SessionUser)
     difference: Number(r.qty),
     reason: r.reason,
   }));
+}
+
+export interface ReorderThreshold {
+  componentId: string;
+  nameFr: string;
+  nameAr: string;
+  baseUnit: string;
+  leadDays: number;
+  /** Net quantity consumed over the window at this plant. */
+  consumedBase: number;
+  windowDays: number;
+  /** Derived (null until there is consumption). */
+  derived: number | null;
+  /** The threshold a person set, when there is one: it wins over the derived one. */
+  set: number | null;
+}
+
+/**
+ * The reorder threshold per component for one plant, derived from the component's lead time and the average daily
+ * consumption of the last `windowDays` days (the loads the plant made, net of cancellations). A threshold set by hand
+ * (`setStockThreshold`) wins. Quantities only. Plant, owner, partner and support read.
+ */
+export async function getReorderThresholds(
+  appPool: pg.Pool,
+  actor: SessionUser,
+  input: { plantId: string; today: string; windowDays?: number },
+): Promise<ReorderThreshold[]> {
+  await require(appPool, actor, 'stock.read');
+  const windowDays = input.windowDays ?? 30;
+  const { rows } = await inRequest(appPool, actor, (tx) =>
+    tx.query<{
+      id: string;
+      name_fr: string;
+      name_ar: string;
+      base_unit: string;
+      lead_time_days: number | null;
+      used: string;
+      low: string | null;
+    }>(
+      `select c.id, c.name_fr, c.name_ar, c.base_unit, c.lead_time_days,
+              coalesce((select -sum(m.qty_base) from stock_movement m
+                         where m.component_id = c.id and m.plant_id = $1 and m.source in ('delivery', 'reversal')
+                           and m.movement_date > $2::date - $3::int and m.movement_date <= $2::date), 0)::text as used,
+              (select t.low_qty_base::text from stock_threshold t where t.component_id = c.id and t.plant_id = $1
+                order by t.created_at desc, t.id desc limit 1) as low
+         from component c where c.status = 'active' order by c.code`,
+      [input.plantId, input.today, windowDays],
+    ),
+  );
+  return rows.map((r) => {
+    const leadDays = r.lead_time_days ?? DEFAULT_LEAD_DAYS;
+    const consumedBase = Number(r.used);
+    return {
+      componentId: r.id,
+      nameFr: r.name_fr,
+      nameAr: r.name_ar,
+      baseUnit: r.base_unit,
+      leadDays,
+      consumedBase,
+      windowDays,
+      derived: reorderThreshold({ consumedBase, windowDays, leadDays, safetyDays: DEFAULT_SAFETY_DAYS }),
+      set: r.low === null ? null : Number(r.low),
+    };
+  });
 }

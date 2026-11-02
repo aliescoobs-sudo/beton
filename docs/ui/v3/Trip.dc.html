@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>BELGOBETON — الرحلة ديال السائق</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alexandria:wght@700;800&amp;family=Readex+Pro:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#E6E7E3}
+button{font:inherit;color:inherit}
+button:focus-visible{outline:3px solid #2F6DB5;outline-offset:2px}
+</style>
+</helmet>
+<div dir="rtl" lang="ar" style="width: 390px; height: 844px; box-sizing: border-box; background: #E6E7E3; color: #1B1D1C; font-family: 'Readex Pro', system-ui, sans-serif; display: flex; flex-direction: column; overflow: hidden">
+
+<div style="background: #1B1D1C; color: #FFFFFF; padding: 16px 18px 14px 18px; display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; justify-content: space-between; align-items: center">
+<bdi dir="ltr" style="font-family: 'Alexandria', sans-serif; font-weight: 800; font-size: 16px">BELGOBETON</bdi>
+<span style="font-size: 12px; color: #A3A7A2">CAM-03، Rachid (fictif)</span>
+</div>
+<span style="font-size: 12px; color: #A3A7A2">الرحلة ديال دابا</span>
+<span style="font-family: 'Alexandria', sans-serif; font-weight: 700; font-size: 22px">8 m³ B25 لمرتيل</span>
+<span style="font-size: 13px; color: #D5D7D2">BL-2026-0322، CLT-017، lotissement Nour</span>
+</div>
+
+<div style="flex: 1 1 auto; padding: 16px 16px 10px 16px; display: flex; flex-direction: column; gap: 8px">
+<sc-for list="{{steps}}" as="s" hint-placeholder-count="5">
+<div style="display: grid; grid-template-columns: 30px 1fr auto; gap: 12px; align-items: center; padding: 10px 12px; {{s.box}}">
+<span style="width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; {{s.dot}}">{{s.n}}</span>
+<span style="display: flex; flex-direction: column; line-height: 1.35"><span style="font-size: 15px; font-weight: 600">{{s.label}}</span><span style="font-size: 12px; opacity: .8">{{s.sub}}</span></span>
+<bdi dir="ltr" style="font-size: 13px; font-weight: 600">{{s.time}}</bdi>
+</div>
+</sc-for>
+</div>
+
+<div style="padding: 0 16px 16px 16px; display: flex; flex-direction: column; gap: 10px">
+<sc-if value="{{notDone}}" hint-placeholder-val="{{true}}">
+<button type="button" onClick="{{next}}" style="min-height: 64px; border: 0; background: #1B1D1C; color: #FFFFFF; font-family: 'Alexandria', sans-serif; font-weight: 700; font-size: 19px; cursor: pointer">{{nextLabel}}</button>
+</sc-if>
+<sc-if value="{{done}}" hint-placeholder-val="{{false}}">
+<div style="background: #DCE8E0; padding: 14px; font-size: 14px; line-height: 1.6">الرحلة سالات. البون الموقع خاصو يرجع للمكتب. التسنية فالورش: 12 دقيقة.</div>
+</sc-if>
+<div style="display: flex; gap: 8px">
+<button type="button" onClick="{{reset}}" style="flex: 1 1 0; min-height: 44px; background: transparent; border: 1px solid #8D918C; cursor: pointer; font-size: 13px">بدا من الأول</button>
+<button type="button" style="flex: 1 1 0; min-height: 44px; background: transparent; border: 1px solid #D23A1E; color: #8F2A1F; cursor: pointer; font-size: 13px">مشكل: رجوع ولا رفض</button>
+</div>
+<span style="font-size: 11px; color: #5E6360; line-height: 1.5">كل ضغطة كتسجل الساعة. المالك كيشوف الشاحنة فين وصلات، بلا ما يعيط.</span>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const step = (this.state && typeof this.state.step === 'number') ? this.state.step : 1;
+    const S = [
+      ['خرجت من المعمل', 'الشحن سالى، الخلطة على حساب الوصفة', '09:24'],
+      ['وصلت للورش', '25 دقيقة طريق', '09:49'],
+      ['بديت نفرغ', 'التسنية كتتحسب من الوصول', '10:01'],
+      ['ساليت التفريغ', 'الزبون وقّع على البون', '10:25'],
+      ['رجعت للمعمل', 'الشاحنة واجدة للرحلة الجاية', '10:50']
+    ];
+    const steps = S.map((s, i) => {
+      const doneS = i < step, cur = i === step;
+      return {
+        n: String(i + 1), label: s[0], sub: s[1], time: doneS ? s[2] : '',
+        box: cur ? 'background: #FFFFFF; border: 2px solid #1B1D1C' : (doneS ? 'background: #F4F4F1; border: 2px solid transparent' : 'background: transparent; border: 2px dashed #BFC2BD; color: #5E6360'),
+        dot: doneS ? 'background: #2F6B4F; color: #FFFFFF' : (cur ? 'background: #1B1D1C; color: #FFFFFF' : 'background: #D5D7D2; color: #4A4E4B')
+      };
+    });
+    const labels = ['خرجت', 'وصلت للورش', 'بديت نفرغ', 'ساليت التفريغ', 'رجعت للمعمل'];
+    return {
+      steps: steps, notDone: step < S.length, done: step >= S.length, nextLabel: step < S.length ? labels[step] : '',
+      next: () => this.setState({ step: Math.min(S.length, step + 1) }),
+      reset: () => this.setState({ step: 0 })
+    };
+  }
+}
+</script>
+</body>
+</html>

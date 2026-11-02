@@ -7,6 +7,8 @@ export interface SessionUser {
   name: string;
   email: string;
   role: UserRole;
+  /** The plant this request acts in (a plant manager's own, or the one picked on a screen); not a right (R1). */
+  plantId?: string | null;
   locale: 'fr' | 'ar';
   twoFactorEnabled: boolean;
   /** Logged in with a recovery code: must enrol a new authenticator before any sensitive action. */

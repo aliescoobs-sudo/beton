@@ -37,7 +37,7 @@ export interface VolumeAnalytics {
 export async function getVolumeAnalytics(
   appPool: pg.Pool,
   actor: SessionUser,
-  input: { from: string; to: string; period: ReportPeriod; dimension: Dimension },
+  input: { from: string; to: string; period: ReportPeriod; dimension: Dimension; plantId?: string | null },
 ): Promise<Result<VolumeAnalytics, 'INVALID'>> {
   await require(appPool, actor, 'analytics.read');
   const { from, to, period, dimension } = input;
@@ -64,8 +64,8 @@ export async function getVolumeAnalytics(
            join sales_order_ops o on o.id = d.order_id
            join concrete_type t on t.id = o.concrete_type_id
            left join zone z on z.id = o.zone_id
-          where coalesce(orig.load_date, d.load_date) between $1 and $2`,
-        [from, to],
+          where coalesce(orig.load_date, d.load_date) between $1 and $2 and ($3::uuid is null or d.plant_id = $3)`,
+        [from, to, input.plantId ?? null],
       );
       const sold = rows.map((r) => ({
         orderId: r.order_id,
@@ -106,4 +106,56 @@ export async function getVolumeAnalytics(
       return result;
     }),
   );
+}
+
+export interface PlantVolume {
+  plantId: string | null;
+  code: string | null;
+  name: string | null;
+  /** Litres loaded in the period, net of cancellations (a cancellation counts on the date of its load). */
+  volumeL: number;
+  loads: number;
+}
+
+export interface VolumeByPlant {
+  from: string;
+  to: string;
+  plants: PlantVolume[];
+  /** Always the sum of the plants (rows with no plant, from before plants existed, are one more row). */
+  totalL: number;
+}
+
+/** m³ per plant and in total (REQUIREMENTS-V1 §1). Quantities only: no money key. */
+export async function getVolumeByPlant(
+  appPool: pg.Pool,
+  actor: SessionUser,
+  input: { from: string; to: string },
+): Promise<Result<VolumeByPlant, 'INVALID'>> {
+  await require(appPool, actor, 'analytics.read');
+  if (!isRealDate(input.from) || !isRealDate(input.to) || input.to < input.from) return err('INVALID');
+  const { rows } = await inRequest(appPool, actor, (tx) =>
+    tx.query<{
+      plant_id: string | null;
+      code: string | null;
+      name: string | null;
+      volume_l: string;
+      loads: string;
+    }>(
+      `select d.plant_id, p.code, p.name, sum(d.volume_l)::text as volume_l, count(*) filter (where d.reverses_id is null)::text as loads
+         from delivery d
+         left join delivery orig on orig.id = d.reverses_id
+         left join plant p on p.id = d.plant_id
+        where coalesce(orig.load_date, d.load_date) between $1 and $2
+        group by d.plant_id, p.code, p.name order by p.code nulls last`,
+      [input.from, input.to],
+    ),
+  );
+  const plants = rows.map((r) => ({
+    plantId: r.plant_id,
+    code: r.code,
+    name: r.name,
+    volumeL: Number(r.volume_l),
+    loads: Number(r.loads),
+  }));
+  return ok({ from: input.from, to: input.to, plants, totalL: plants.reduce((n, p) => n + p.volumeL, 0) });
 }

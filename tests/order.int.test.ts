@@ -499,6 +499,7 @@ describe('visibility and immutability (AC-SEC-04, AC-SEC-05, DECISIONS 81)', () 
           'delivery_date',
           'id',
           'is_reversed',
+          'plant_id',
           'reverses_id',
           'site_id',
           'site_label',

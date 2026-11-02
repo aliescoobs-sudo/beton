@@ -1,0 +1,899 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>BELGOBETON — التطبيق المتكامل</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alexandria:wght@500;700;800&amp;family=Readex+Pro:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#E6E7E3}
+button{font:inherit;color:inherit}
+button:focus-visible,input:focus-visible{outline:3px solid #2F6DB5;outline-offset:2px}
+button:disabled{opacity:.4;cursor:not-allowed}
+</style>
+</helmet>
+<div dir="rtl" lang="ar" style="min-height: 100vh; background: #E6E7E3; color: #1B1D1C; font-family: 'Readex Pro', system-ui, sans-serif; font-size: 15px; line-height: 1.6; font-variant-numeric: tabular-nums; display: flex; flex-direction: column">
+
+<div role="status" style="background: #C08A12; color: #1B1D1C; font-size: 12px; font-weight: 600; padding: 4px 16px; text-align: center">معطيات وهمية فقط. نموذج للعرض، ماشي التطبيق الحقيقي.</div>
+
+<header style="background: #1B1D1C; color: #E6E7E3; padding: 0 20px; display: flex; flex-wrap: wrap; align-items: stretch; gap: 0 22px; min-height: 56px">
+<div style="display: flex; align-items: center; gap: 10px">
+<svg width="22" height="30" viewBox="0 0 26 34" aria-hidden="true"><rect x="3" y="1.5" width="20" height="21" rx="2" fill="none" stroke="#D23A1E" stroke-width="2.5"></rect><path d="M3 22.5 L10 31 H16 L23 22.5" fill="none" stroke="#D23A1E" stroke-width="2.5" stroke-linejoin="round"></path><rect x="7" y="12" width="12" height="7.5" fill="#D23A1E"></rect></svg>
+<bdi dir="ltr" style="font-family: 'Alexandria', sans-serif; font-weight: 800; font-size: 17px; color: #FFFFFF">BELGOBETON</bdi>
+</div>
+<nav aria-label="الأقسام" style="display: flex; flex-wrap: nowrap; overflow-x: auto; align-items: stretch; flex: 1 1 auto; min-width: 0; max-width: 100%">
+<sc-for list="{{groups}}" as="g" hint-placeholder-count="6">
+<button type="button" onClick="{{g.pick}}" aria-current="{{g.current}}" style="flex: 0 0 auto; white-space: nowrap; background: transparent; border: 0; padding: 0 13px; min-height: 54px; cursor: pointer; font-size: 15px; display: inline-flex; align-items: center; gap: 7px; {{g.style}}">
+<span>{{g.label}}</span>
+<sc-if value="{{g.hasCount}}" hint-placeholder-val="{{false}}"><span style="min-width: 20px; height: 20px; padding: 0 5px; background: #D23A1E; color: #FFFFFF; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center">{{g.count}}</span></sc-if>
+</button>
+</sc-for>
+</nav>
+<div role="group" aria-label="الدور" style="display: flex; align-items: center; gap: 4px">
+<span style="font-size: 12px; color: #A3A7A2; margin-inline-end: 4px">داخل بحال:</span>
+<sc-for list="{{roles}}" as="r" hint-placeholder-count="3">
+<button type="button" onClick="{{r.pick}}" aria-pressed="{{r.pressed}}" style="min-height: 36px; padding: 0 11px; cursor: pointer; font-size: 13px; {{r.style}}">{{r.label}}</button>
+</sc-for>
+</div>
+</header>
+
+<div style="background: #D5D7D2; padding: 0 20px; display: flex; flex-wrap: wrap; align-items: stretch; gap: 0 18px; min-height: 46px">
+<nav aria-label="الصفحات" style="display: flex; flex-wrap: nowrap; overflow-x: auto; align-items: stretch; flex: 1 1 auto; min-width: 0">
+<sc-for list="{{subs}}" as="s" hint-placeholder-count="4">
+<button type="button" onClick="{{s.pick}}" aria-current="{{s.current}}" style="flex: 0 0 auto; white-space: nowrap; background: transparent; border: 0; padding: 0 12px; min-height: 46px; cursor: pointer; font-size: 14px; {{s.style}}">{{s.label}}</button>
+</sc-for>
+</nav>
+<div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 4px 0">
+<span style="background: #5B45A8; color: #FFFFFF; font-size: 12px; font-weight: 600; padding: 3px 9px">محاكاة</span>
+<span style="font-size: 14px; font-weight: 600">الإثنين 23/11، <bdi dir="ltr">{{clock}}</bdi></span>
+<button type="button" onClick="{{plus30}}" disabled="{{endOfDay}}" style="min-height: 36px; padding: 0 12px; border: 0; background: #1B1D1C; color: #FFFFFF; font-weight: 600; cursor: pointer; font-size: 13px">+30 د</button>
+<button type="button" onClick="{{plus120}}" disabled="{{endOfDay}}" style="min-height: 36px; padding: 0 12px; background: transparent; border: 2px solid #1B1D1C; font-weight: 600; cursor: pointer; font-size: 13px">+2 س</button>
+<button type="button" onClick="{{reset}}" style="min-height: 36px; background: transparent; border: 0; font-size: 12px; color: #4A4E4B; text-decoration: underline; text-underline-offset: 3px; cursor: pointer">من البداية</button>
+</div>
+</div>
+
+<div style="display: flex; flex-wrap: wrap; align-items: stretch; flex: 1 1 auto">
+<main style="flex: 999 1 640px; min-width: 0; padding: 20px 22px 40px 22px; box-sizing: border-box; display: flex; flex-direction: column; gap: 22px">
+
+<sc-if value="{{fx.show}}" hint-placeholder-val="{{false}}">
+<section role="status" aria-label="شنو بدلات العملية" style="background: #F4F4F1; border-inline-start: 6px solid; padding: 12px 16px; display: flex; gap: 14px; align-items: flex-start; justify-content: space-between; {{fx.border}}">
+<div style="display: flex; flex-direction: column; gap: 4px; min-width: 0">
+<span style="font-family: 'Alexandria', sans-serif; font-weight: 700; font-size: 16px">{{fx.title}}</span>
+<sc-for list="{{fx.lines}}" as="l" hint-placeholder-count="3"><span style="font-size: 14px; line-height: 1.55; {{l.style}}">{{l.t}}</span></sc-for>
+</div>
+<button type="button" onClick="{{closeFx}}" aria-label="سد" style="flex: 0 0 auto; min-width: 38px; min-height: 38px; background: transparent; border: 1px solid #BFC2BD; cursor: pointer"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+</section>
+</sc-if>
+
+<sc-if value="{{t.today}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; flex-direction: column; gap: 22px">
+<section aria-label="ملخص الصباح" style="background: #F4F4F1; padding: 20px 22px; display: flex; flex-direction: column; gap: 12px">
+<span style="font-size: 13px; color: #5E6360">ملخص كيكتبو المساعد، الأرقام من البرنامج</span>
+<h1 style="margin: 0; font-family: 'Alexandria', sans-serif; font-weight: 800; font-size: clamp(24px, 3.2vw, 36px); line-height: 1.3; max-width: 28ch">{{brief.title}}</h1>
+<div style="display: flex; flex-direction: column">
+<sc-for list="{{brief.lines}}" as="l" hint-placeholder-count="5">
+<div style="display: grid; grid-template-columns: 12px 1fr auto; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid #D5D7D2">
+<span style="width: 12px; height: 12px; {{l.dot}}"></span>
+<span style="font-size: 15px; line-height: 1.55">{{l.text}}</span>
+<button type="button" onClick="{{l.go}}" style="min-height: 36px; padding: 0 12px; background: transparent; border: 1px solid #8D918C; cursor: pointer; font-size: 13px; white-space: nowrap">{{l.btn}}</button>
+</div>
+</sc-for>
+</div>
+</section>
+<dl style="margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); border-top: 3px solid #1B1D1C">
+<sc-for list="{{kpis}}" as="k" hint-placeholder-count="5">
+<div style="padding: 12px 14px 6px 14px; border-inline-start: 1px solid #BFC2BD; display: flex; flex-direction: column; gap: 2px">
+<dt style="font-size: 13px; color: #5E6360">{{k.label}}</dt>
+<dd style="margin: 0; font-family: 'Alexandria', sans-serif; font-weight: 700; font-size: 23px; {{k.style}}"><bdi dir="ltr">{{k.value}}</bdi></dd>
+<span style="font-size: 12px; color: #5E6360">{{k.sub}}</span>
+</div>
+</sc-for>
+</dl>
+<sc-if value="{{owner}}" hint-placeholder-val="{{true}}">
+<section aria-label="الفلوس 7 أيام" style="background: #F4F4F1; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 16px">
+<h2 style="margin: 0; font-family: 'Alexandria', sans-serif; font-weight: 700; font-size: 20px">{{fc.title}}</h2>
+<span style="font-size: 13px; color: #5E6360">من الشيكات والديون المسجلين. فوق الخط عندك، تحت الخط ناقص.</span>
+</div>
+<div style="display: grid; grid-template-columns: repeat(7, minmax(70px, 1fr)); gap: 0 4px; overflow-x: auto">
+<sc-for list="{{fc.bars}}" as="b" hint-placeholder-count="7">
+<div style="display: flex; flex-direction: column; min-width: 70px">
+<span style="height: 22px; font-size: 12px; font-weight: 700; display: flex; align-items: flex-end; {{b.vs}}"><bdi dir="ltr">{{b.v}}</bdi></span>
+<div style="height: 90px; display: flex; align-items: flex-end"><div style="width: 100%; {{b.pos}}"></div></div>
+<div style="height: 3px; background: #1B1D1C"></div>
+<div style="height: 50px; display: flex; align-items: flex-start"><div style="width: 100%; {{b.neg}}"></div></div>
+<span style="font-size: 12px; {{b.ls}}">{{b.d}}</span>
+</div>
+</sc-for>
+</div>
+<sc-for list="{{fc.opts}}" as="o" hint-placeholder-count="2">
+<div style="display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center; padding: 9px 0; border-top: 1px solid #D5D7D2">
+<span style="font-size: 14px; line-height: 1.5">{{o.t}}</span>
+<bdi dir="ltr" style="font-weight: 700; color: #2F6B4F; white-space: nowrap">{{o.cover}}</bdi>
+<button type="button" onClick="{{o.run}}" style="min-height: 36px; padding: 0 12px; border: 0; background: #1B1D1C; color: #FFFFFF; font-weight: 600; cursor: pointer; font-size: 13px; white-space: nowrap">{{o.btn}}</button>
+</div>
+</sc-for>
+</section>
+</sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{t.dispatch}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 20px">
+<section aria-label="الشاحنات اليوم" style="background: #F4F4F1; padding: 16px 16px 12px 16px; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 18px">
+<h2 style="margin: 0; font-family: 'Alexandria', sans-serif; font-weight: 700; font-size: 21px">الشاحنات اليوم</h2>
+<div style="display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 12px; color: #4A4E4B">
+<span style="display: inline-flex; align-items: center; gap: 5px"><span style="width: 14px; height: 10px; background: #1B1D1C"></span>الشحن</span>
+<span style="display: inline-flex; align-items: center; gap: 5px"><span style="width: 14px; height: 10px; background: #6E8AA6"></span>الطريق</span>
+<span style="display: inline-flex; align-items: center; gap: 5px"><span style="width: 14px; height: 10px; background: #C08A12"></span>التفريغ</span>
+<span style="display: inline-flex; align-items: center; gap: 5px"><span style="width: 14px; height: 10px; background: #B9BCB7"></span>الرجوع</span>
+<span style="display: inline-flex; align-items: center; gap: 5px"><span style="width: 2px; height: 12px; background: #D23A1E"></span>دابا</span>
+</div>
+</div>
+<div style="overflow-x: auto">
+<div dir="ltr" style="min-width: 860px; display: flex; flex-direction: column; gap: 6px">
+<div style="display: grid; grid-template-columns: 170px 1fr; gap: 10px"><span></span>
+<div style="position: relative; height: 18px"><sc-for list="{{ticks}}" as="tk" hint-placeholder-count="12"><span style="position: absolute; top: 0; font-size: 11px; color: #5E6360; transform: translateX(-50%); {{tk.pos}}">{{tk.label}}</span></sc-for></div>
+</div>
+<sc-for list="{{lanes}}" as="ln" hint-placeholder-count="6">
+<div style="display: grid; grid-template-columns: 170px 1fr; gap: 10px; align-items: center">
+<div dir="rtl" style="display: flex; flex-direction: column; line-height: 1.3; text-align: right">
+<span style="font-size: 14px; font-weight: 600"><bdi dir="ltr">{{ln.id}}</bdi> <span style="font-weight: 400; font-size: 12px; color: #5E6360"><bdi dir="ltr">{{ln.cap}}</bdi></span></span>
+<span style="font-size: 12px; {{ln.stStyle}}">{{ln.st}}</span>
+</div>
+<div style="position: relative; height: 40px; background: #E6E7E3">
+<sc-for list="{{ln.blocks}}" as="b" hint-placeholder-count="3">
+<div title="{{b.tip}}" style="position: absolute; top: 5px; height: 30px; display: flex; overflow: hidden; {{b.box}}">
+<span style="height: 100%; background: #1B1D1C; {{b.w1}}"></span><span style="height: 100%; background: #6E8AA6; {{b.w2}}"></span><span style="height: 100%; background: #C08A12; color: #1B1D1C; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center; white-space: nowrap; overflow: hidden; {{b.w3}}">{{b.label}}</span><span style="height: 100%; background: #B9BCB7; {{b.w4}}"></span>
+</div>
+</sc-for>
+<sc-if value="{{ln.broken}}" hint-placeholder-val="{{false}}"><div dir="rtl" style="position: absolute; inset: 5px 0; background: repeating-linear-gradient(135deg, #D5D7D2 0 8px, #C9CCC7 8px 16px); display: flex; align-items: center; justify-content: center; font-size: 12px; color: #4A4E4B">فالإصلاح من 21/11 (سجل الأعطال)</div></sc-if>
+<span style="position: absolute; top: 0; bottom: 0; width: 2px; background: #D23A1E; {{nowPos}}"></span>
+</div>
+</div>
+</sc-for>
+</div>
+</div>
+</section>
+<section aria-label="طلبيات اليوم للبرمجة" style="border-top: 3px solid #1B1D1C; padding-top: 12px; display: flex; flex-direction: column">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 18px; padding-bottom: 6px">
+<h2 style="margin: 0; font-family: 'Alexandria', sans-serif; font-weight: 700; font-size: 19px">البرمجة ديال الطلبيات</h2>
+<span style="font-size: 13px; color: #4A4E4B">«برمج» كيقسم الطلبية على الشاحنات حسب الحمولة، والطريق، والدور فالمعمل.</span>
+</div>
+<sc-for list="{{planRows}}" as="o" hint-placeholder-count="5">
+<div style="display: grid; grid-template-columns: minmax(180px, 1.5fr) minmax(160px, 1.6fr) 100px; gap: 12px; padding: 10px 0; border-bottom: 1px solid #BFC2BD; align-items: center; font-size: 14px">
+<span style="display: flex; flex-direction: column; line-height: 1.35"><bdi dir="ltr" style="font-weight: 600">{{o.name}}</bdi><span style="font-size: 12px; color: #5E6360">{{o.sub}}</span></span>
+<span style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; line-height: 1.4"><span style="width: 10px; height: 10px; flex: 0 0 auto; {{o.dot}}"></span>{{o.st}}</span>
+<span><sc-if value="{{o.canPlan}}" hint-placeholder-val="{{false}}"><button type="button" onClick="{{o.plan}}" style="min-height: 38px; padding: 0 14px; border: 0; background: #1B1D1C; color: #FFFFFF; font-weight: 600; cursor: pointer">برمج</button></sc-if></span>
+</div>
+</sc-for>
+</section>
+</div>
+</sc-if>
+
+<sc-if value="{{t.stock}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 22px">
+<section aria-label="السيلوات" style="border-top: 3px solid #1B1D1C; padding-top: 12px; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 18px">
+<h2 style="margin: 0; font-family: 'Alexandria', sans-serif; font-weight: 700; font-size: 21px">السطوك دابا، وشحال كيكفي</h2>
+<span style="font-size: 13px; color: #4A4E4B">{{stockNote}}</span>
+</div>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px">
+<sc-for list="{{silos}}" as="s" hint-placeholder-count="5">
+<div style="display: flex; gap: 12px; align-items: flex-end">
+<div aria-hidden="true" style="flex: 0 0 auto; display: flex; flex-direction: column; align-items: center">
+<div style="width: 50px; height: 130px; border: 3px solid #1B1D1C; border-bottom: 0; border-radius: 5px 5px 0 0; background: #F4F4F1; display: flex; align-items: flex-end; overflow: hidden"><div style="width: 100%; {{s.fill}}"></div></div>
+<div style="width: 50px; height: 18px; background: #1B1D1C; clip-path: polygon(0 0, 100% 0, 62% 100%, 38% 100%)"></div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 3px; line-height: 1.3; padding-bottom: 4px">
+<span style="font-size: 13px; color: #4A4E4B">{{s.name}}</span>
+<span style="font-family: 'Alexandria', sans-serif; font-weight: 700; font-size: 18px"><bdi dir="ltr">{{s.qty}}</bdi></span>
+<span style="font-size: 13px; font-weight: 600; {{s.coverStyle}}">{{s.cover}}</span>
+</div>
+</div>
+</sc-for>
+</div>
+</section>
+<div style="display: flex; flex-wrap: wrap; gap: 30px">
+<section aria-label="الوصفة مقابل الميزان" style="flex: 3 1 480px; min-width: 0; border-top: 3px solid #1B1D1C; padding-top: 12px; display: flex; flex-direction: column">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 16px; padding-bottom: 6px">
+<h2 style="margin: 0; font-family: 'Alexandria', sans-serif; font-weight: 700; font-size: 19px">شحنات اليوم: الوصفة مقابل الميزان ديال المعمل</h2>
+<button type="button" onClick="{{importArco}}" style="min-height: 38px; padding: 0 12px; background: transparent; border: 2px solid #1B1D1C; font-weight: 600; cursor: pointer; font-size: 13px">{{arcoBtn}}</button>
+</div>
+<sc-if value="{{arcoEmpty}}" hint-placeholder-val="{{true}}"><span style="font-size: 14px; color: #4A4E4B">استورد الملف ديال برنامج المعمل (ARCO) باش تقارن شحال توزن فعلا من الإسمنت مع شحال كتقول الوصفة.</span></sc-if>
+<sc-if value="{{arcoShow}}" hint-placeholder-val="{{false}}">
+<div style="overflow-x: auto"><div style="min-width: 520px">
+<div style="display: grid; grid-template-columns: 120px 80px 1fr 1fr 90px; gap: 10px; padding: 8px 0; border-bottom: 2px solid #1B1D1C; font-size: 13px; color: #4A4E4B"><span>البون</span><span>الشحنة</span><span>إسمنت الوصفة</span><span>إسمنت الميزان</span><span>الفرق</span></div>
+<sc-for list="{{arco}}" as="a" hint-placeholder-count="5">
+<div style="display: grid; grid-template-columns: 120px 80px 1fr 1fr 90px; gap: 10px; padding: 8px 0; border-bottom: 1px solid #BFC2BD; font-size: 14px"><bdi dir="ltr">{{a.bl}}</bdi><bdi dir="ltr">{{a.load}}</bdi><bdi dir="ltr">{{a.th}}</bdi><bdi dir="ltr">{{a.ac}}</bdi><bdi dir="ltr" style="font-weight: 700; {{a.style}}">{{a.gap}}</bdi></div>
+</sc-for>
+</div></div>
+</sc-if>
+</section>
+<section aria-label="الاستهلاك ديال الشهر" style="flex: 2 1 340px; min-width: 0; border-top: 3px solid #1B1D1C; padding-top: 12px; display: flex; flex-direction: column">
+<h2 style="margin: 0 0 4px 0; font-family: 'Alexandria', sans-serif; font-weight: 700; font-size: 19px">نونبر: النظري مقابل الحقيقي</h2>
+<span style="font-size: 12px; color: #4A4E4B; padding-bottom: 6px">الحد المقبول 2%.</span>
+<sc-for list="{{variance}}" as="v" hint-placeholder-count="5">
+<div style="display: grid; grid-template-columns: 1fr auto auto; gap: 12px; padding: 8px 0; border-bottom: 1px solid #BFC2BD; font-size: 14px"><span>{{v.name}}</span><bdi dir="ltr" style="color: #4A4E4B">{{v.pair}}</bdi><bdi dir="ltr" style="font-weight: 700; {{v.style}}">{{v.gap}}</bdi></div>
+</sc-for>
+<span style="padding-top: 8px; font-size: 13px; color: #4A4E4B">{{returnsLine}}</span>
+</section>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{t.quality}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 22px">
+<section aria-label="العينات" style="border-top: 3px solid #1B1D1C; padding-top: 12px; display: flex; flex-direction: column">
+<h2 style="margin: 0 0 6px 0; font-family: 'Alexandria', sans-serif; font-weight: 700; font-size: 21px">مراقبة الجودة: العينات</h2>
+<div style="overflow-x: auto"><div style="min-width: 760px">
+<div style="display: grid; grid-template-columns: 80px 110px minmax(170px, 1.5fr) 56px 64px 80px 80px minmax(130px, 1fr); gap: 10px; padding: 8px 0; border-bottom: 2px solid #1B1D1C; font-size: 13px; color: #4A4E4B"><span>العينة</span><span>البون</span><span>الزبون</span><span>النوع</span><span>Slump</span><span>7 أيام</span><span>28 يوم</span><span>الحالة</span></div>
+<sc-for list="{{samples}}" as="q" hint-placeholder-count="6">
+<div style="display: grid; grid-template-columns: 80px 110px minmax(170px, 1.5fr) 56px 64px 80px 80px minmax(130px, 1fr); gap: 10px; padding: 9px 0; border-bottom: 1px solid #BFC2BD; font-size: 14px; align-items: center"><bdi dir="ltr" style="font-weight: 600">{{q.id}}</bdi><bdi dir="ltr">{{q.bl}}</bdi><bdi dir="ltr">{{q.client}}</bdi><bdi dir="ltr">{{q.type}}</bdi><bdi dir="ltr">{{q.slump}}</bdi><bdi dir="ltr">{{q.d7}}</bdi><bdi dir="ltr" style="font-weight: 600">{{q.d28}}</bdi><span style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px"><span style="width: 10px; height: 10px; flex: 0 0 auto; {{q.dot}}"></span>{{q.st}}</span></div>
+</sc-for>
+</div></div>
+</section>
+<section aria-label="التتبع" style="background: #F4F4F1; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-family: 'Alexandria', sans-serif; font-weight: 700; font-size: 19px">العينة Q-1175 ما وصلاتش للمقاومة: منين جات؟</h2>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<sc-for list="{{trace}}" as="tr" hint-placeholder-count="6"><div style="flex: 1 1 130px; background: #FFFFFF; border-top: 3px solid; padding: 9px 11px; display: flex; flex-direction: column; gap: 2px; line-height: 1.4; {{tr.border}}"><span style="font-size: 12px; color: #5E6360">{{tr.k}}</span><bdi dir="ltr" style="font-size: 14px; font-weight: 600">{{tr.v}}</bdi><span style="font-size: 12px; color: #4A4E4B">{{tr.sub}}</span></div></sc-for>
+</div>
+</section>
+</div>
+</sc-if>
+
+<sc-if value="{{t.orders}}" hint-placeholder-val="{{false}}">
+<section aria-label="الطلبيات" style="border-top: 3px solid #1B1D1C; padding-top: 12px; display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 16px">
+<h2 style="margin: 0; font-family: 'Alexandria', sans-serif; font-weight: 700; font-size: 21px">الطلبيات: من الطلب حتى الخلاص</h2>
+<span style="font-size: 13px; color: #4A4E4B">كل طلبية كتبين فين وصلات فالسلسلة.</span>
+</div>
+<sc-for list="{{chains}}" as="c" hint-placeholder-count="5">
+<div style="padding: 12px 0; border-bottom: 1px solid #BFC2BD; display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; align-items: baseline">
+<span><bdi dir="ltr" style="font-weight: 600">{{c.name}}</bdi> <span style="font-size: 13px; color: #5E6360"><bdi dir="ltr">{{c.code}}</bdi>، {{c.sub}}</span></span>
+<sc-if value="{{c.hasValue}}" hint-placeholder-val="{{true}}"><bdi dir="ltr" style="font-size: 14px; font-weight: 600">{{c.value}}</bdi></sc-if>
+</div>
+<div style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px">
+<sc-for list="{{c.steps}}" as="s" hint-placeholder-count="6">
+<div style="padding: 6px 8px; display: flex; flex-direction: column; line-height: 1.3; {{s.box}}"><span style="font-size: 11px">{{s.k}}</span><span style="font-size: 13px; font-weight: 600"><bdi dir="ltr">{{s.v}}</bdi></span></div>
+</sc-for>
+</div>
+</div>
+</sc-for>
+</section>
+</sc-if>
+
+<sc-if value="{{t.docs}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start">
+<section aria-label="الوثائق" style="flex: 2 1 330px; min-width: 0; display: flex; flex-direction: column; gap: 20px">
+<sc-if value="{{showToInvoice}}" hint-placeholder-val="{{false}}">
+<div style="border-top: 3px solid #1B1D1C; padding-top: 12px; display: flex; flex-direction: column">
+<h2 style="margin: 0 0 6px 0; font-family: 'Alexandria', sans-serif; font-weight: 700; font-size: 18px">بونات تسلمو وباقي ما تفوترو</h2>
+<sc-if value="{{toInvoiceEmpty}}" hint-placeholder-val="{{false}}"><span style="font-size: 14px; color: #4A4E4B">والو دابا. البون كيدخل هنا ملي كتسالي الشاحنة التفريغ.</span></sc-if>
+<sc-for list="{{toInvoice}}" as="ti" hint-placeholder-count="2">
+<div style="display: flex; flex-wrap: wrap; gap: 8px 12px; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #BFC2BD">
+<span style="display: flex; flex-direction: column; line-height: 1.4"><bdi dir="ltr" style="font-weight: 600">{{ti.name}}</bdi><span style="font-size: 13px; color: #4A4E4B">{{ti.detail}}</span></span>
+<button type="button" onClick="{{ti.issue}}" style="min-height: 40px; padding: 0 14px; border: 0; background: #1B1D1C; color: #FFFFFF; font-weight: 600; cursor: pointer">أصدر الفاتورة</button>
+</div>
+</sc-for>
+</div>
+</sc-if>
+<div style="border-top: 3px solid #1B1D1C; padding-top: 12px; display: flex; flex-direction: column">
+<h2 style="margin: 0 0 6px 0; font-family: 'Alexandria', sans-serif; font-weight: 700; font-size: 18px">{{docListTitle}}</h2>
+<sc-for list="{{docList}}" as="d" hint-placeholder-count="6">
+<div style="display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; border-bottom: 1px solid #BFC2BD; {{d.rowStyle}}">
+<button type="button" onClick="{{d.pick}}" aria-pressed="{{d.pressed}}" style="display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 9px 8px; border: 0; background: transparent; color: inherit; text-align: start; cursor: pointer; line-height: 1.35">
+<span style="font-size: 14px; font-weight: 600"><bdi dir="ltr">{{d.id}}</bdi> <span style="font-weight: 400; font-size: 12px; opacity: .8">{{d.when}}</span></span>
+<bdi dir="ltr" style="font-size: 12px; opacity: .85">{{d.who}}</bdi>
+</button>
+<span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding-inline-end: 8px"><span style="width: 9px; height: 9px; {{d.dot}}"></span>{{d.st}}</span>
+</div>
+</sc-for>
+</div>
+</section>
+<section aria-label="معاينة الوثيقة" style="flex: 3 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between">
+<span style="font-size: 13px; color: #4A4E4B">{{doc.hint}}</span>
+<div style="display: flex; gap: 6px; flex-wrap: wrap">
+<sc-for list="{{doc.actions}}" as="a" hint-placeholder-count="3"><button type="button" onClick="{{a.run}}" style="min-height: 38px; padding: 0 12px; background: transparent; border: 1px solid #1B1D1C; cursor: pointer; font-size: 13px">{{a.label}}</button></sc-for>
+</div>
+</div>
+<sc-if value="{{doc.locked}}" hint-placeholder-val="{{false}}"><div style="background: #F4F4F1; border-inline-start: 6px solid #8D918C; padding: 16px; font-size: 15px; line-height: 1.7">هاد الوثيقة فيها الأثمنة والمبالغ، وما كتبانش لهاد الدور.</div></sc-if>
+<sc-if value="{{doc.show}}" hint-placeholder-val="{{true}}">
+<article dir="ltr" lang="fr" style="background: #FFFFFF; box-shadow: 0 0 0 1px #D5D7D2; padding: 32px 36px; color: #1B1D1C; font-size: 13px; line-height: 1.55; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap">
+<div style="display: flex; flex-direction: column"><span style="font-family: 'Alexandria', sans-serif; font-weight: 800; font-size: 17px">BELGOBETON SARL (fictif)</span><span>Béton prêt à l'emploi, Zone industrielle, Tétouan</span><span style="font-size: 11px; color: #5E6360">ICE 000000000000000 (fictif), IF 00000000, RC 0000, TP 00000000</span></div>
+<div style="text-align: right; display: flex; flex-direction: column"><span style="font-family: 'Alexandria', sans-serif; font-weight: 700; font-size: 16px">{{doc.title}}</span><span style="font-weight: 600">N° {{doc.number}}</span><span>{{doc.date}}</span></div>
+</div>
+<div style="border-top: 2px solid #1B1D1C; padding-top: 10px; display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px 22px">
+<sc-for list="{{doc.meta}}" as="m" hint-placeholder-count="4"><div><div style="color: #5E6360; font-size: 11px">{{m.k}}</div><div style="font-weight: 600">{{m.v}}</div></div></sc-for>
+</div>
+<div style="display: flex; flex-direction: column">
+<div style="display: flex; gap: 10px; padding: 7px 0; border-bottom: 2px solid #1B1D1C; font-size: 11px; color: #5E6360"><sc-for list="{{doc.cols}}" as="c" hint-placeholder-count="5"><span style="{{c.style}}">{{c.t}}</span></sc-for></div>
+<sc-for list="{{doc.rows}}" as="r" hint-placeholder-count="3"><div style="display: flex; gap: 10px; padding: 7px 0; border-bottom: 1px solid #BFC2BD"><sc-for list="{{r.cells}}" as="c" hint-placeholder-count="5"><span style="{{c.style}}">{{c.t}}</span></sc-for></div></sc-for>
+</div>
+<sc-if value="{{doc.hasTotals}}" hint-placeholder-val="{{false}}">
+<div style="align-self: flex-end; width: min(320px, 100%); display: flex; flex-direction: column">
+<sc-for list="{{doc.totals}}" as="tt" hint-placeholder-count="3"><div style="display: flex; justify-content: space-between; padding: 6px 0; {{tt.style}}"><span>{{tt.k}}</span><span>{{tt.v}}</span></div></sc-for>
+</div>
+</sc-if>
+<span style="font-size: 11px; color: #5E6360">{{doc.note}}</span>
+<sc-if value="{{doc.sign}}" hint-placeholder-val="{{false}}">
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 22px; padding-top: 10px"><div style="border-top: 1px solid #1B1D1C; padding-top: 6px; height: 50px; font-size: 12px">Signature chauffeur</div><div style="border-top: 1px solid #1B1D1C; padding-top: 6px; height: 50px; font-size: 12px">Réception client (nom, signature, heure)</div></div>
+</sc-if>
+</article>
+</sc-if>
+</section>
+</div>
+</sc-if>
+
+<sc-if value="{{t.clients}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start">
+<section aria-label="اللائحة" style="flex: 2 1 300px; min-width: 0; border-top: 3px solid #1B1D1C; padding-top: 12px; display: flex; flex-direction: column">
+<h2 style="margin: 0 0 6px 0; font-family: 'Alexandria', sans-serif; font-weight: 700; font-size: 20px">{{party.listTitle}}</h2>
+<sc-for list="{{party.list}}" as="p" hint-placeholder-count="5">
+<button type="button" onClick="{{p.pick}}" aria-pressed="{{p.pressed}}" style="display: grid; grid-template-columns: 10px 1fr auto; gap: 10px; align-items: center; padding: 10px 8px; border: 0; border-bottom: 1px solid #BFC2BD; text-align: start; cursor: pointer; {{p.style}}">
+<span style="width: 10px; height: 10px; {{p.dot}}"></span>
+<span style="display: flex; flex-direction: column; line-height: 1.35; min-width: 0"><bdi dir="ltr" style="font-weight: 600; font-size: 14px">{{p.name}}</bdi><span style="font-size: 12px; opacity: .8">{{p.st}}</span></span>
+<bdi dir="ltr" style="font-family: 'Alexandria', sans-serif; font-weight: 700; font-size: 14px; white-space: nowrap">{{p.bal}}</bdi>
+</button>
+</sc-for>
+</section>
+<section aria-label="كشف الحساب" style="flex: 3 1 520px; min-width: 0; border-top: 3px solid #1B1D1C; padding-top: 12px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 16px">
+<h2 style="margin: 0; font-family: 'Alexandria', sans-serif; font-weight: 700; font-size: 20px">كشف الحساب: <bdi dir="ltr">{{party.name}}</bdi></h2>
+<div style="display: flex; gap: 6px"><sc-for list="{{party.exports}}" as="x" hint-placeholder-count="2"><button type="button" onClick="{{x.run}}" style="min-height: 36px; padding: 0 12px; background: transparent; border: 1px solid #1B1D1C; cursor: pointer; font-size: 13px">{{x.label}}</button></sc-for></div>
+</div>
+<sc-if value="{{party.blind}}" hint-placeholder-val="{{false}}"><div style="background: #F4F4F1; border-inline-start: 6px solid #8D918C; padding: 12px 14px; font-size: 14px; line-height: 1.7">كشف الحساب فيه المبالغ، وما كيبانش لهاد الدور. تقدر تسجّل الخلاص اللي توصلتي بيه.</div></sc-if>
+<sc-if value="{{party.showRows}}" hint-placeholder-val="{{true}}">
+<div style="overflow-x: auto"><div style="min-width: 560px">
+<div style="display: grid; grid-template-columns: 60px minmax(200px, 2fr) 1fr 1fr 1fr; gap: 10px; padding: 8px 0; border-bottom: 2px solid #1B1D1C; font-size: 13px; color: #4A4E4B"><span>التاريخ</span><span>العملية</span><span>{{party.debitLabel}}</span><span>{{party.creditLabel}}</span><span>الرصيد</span></div>
+<sc-for list="{{party.rows}}" as="r" hint-placeholder-count="4">
+<div style="display: grid; grid-template-columns: 60px minmax(200px, 2fr) 1fr 1fr 1fr; gap: 10px; padding: 8px 0; border-bottom: 1px solid #BFC2BD; font-size: 14px; align-items: baseline"><bdi dir="ltr" style="color: #5E6360">{{r.d}}</bdi><span>{{r.label}}</span><bdi dir="ltr">{{r.debit}}</bdi><bdi dir="ltr" style="color: #2F6B4F">{{r.credit}}</bdi><bdi dir="ltr" style="font-weight: 600">{{r.run}}</bdi></div>
+</sc-for>
+</div></div>
+</sc-if>
+<div style="background: #F4F4F1; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px">
+<span style="font-family: 'Alexandria', sans-serif; font-weight: 700; font-size: 16px">{{party.payTitle}}</span>
+<div style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center"><span style="font-size: 13px; color: #4A4E4B; min-width: 54px">المبلغ</span><sc-for list="{{party.amts}}" as="c" hint-placeholder-count="3"><button type="button" onClick="{{c.pick}}" aria-pressed="{{c.pressed}}" style="min-height: 40px; padding: 0 11px; cursor: pointer; font-size: 13px; {{c.style}}"><bdi dir="ltr">{{c.label}}</bdi></button></sc-for></div>
+<div style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center"><span style="font-size: 13px; color: #4A4E4B; min-width: 54px">كيفاش</span><sc-for list="{{party.meths}}" as="c" hint-placeholder-count="4"><button type="button" onClick="{{c.pick}}" aria-pressed="{{c.pressed}}" style="min-height: 40px; padding: 0 11px; cursor: pointer; font-size: 13px; {{c.style}}">{{c.label}}</button></sc-for></div>
+<div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center"><button type="button" onClick="{{party.pay}}" disabled="{{party.payDisabled}}" style="min-height: 44px; padding: 0 18px; border: 0; background: #1B1D1C; color: #FFFFFF; font-weight: 600; cursor: pointer">سجّل</button><span style="font-size: 13px; color: #4A4E4B">{{party.payHint}}</span></div>
+</div>
+</section>
+</div>
+</sc-if>
+
+<sc-if value="{{t.purchases}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 22px">
+<section aria-label="طلبات الشراء" style="border-top: 3px solid #1B1D1C; padding-top: 12px; display: flex; flex-direction: column">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 16px; padding-bottom: 6px">
+<h2 style="margin: 0; font-family: 'Alexandria', sans-serif; font-weight: 700; font-size: 21px">المشتريات: الطلب، الاستلام، الفاتورة</h2>
+<span style="font-size: 13px; color: #4A4E4B">الاستلام كيزيد فالسطوك. الفاتورة كتتقارن مع الطلب والاستلام.</span>
+</div>
+<sc-for list="{{poRows}}" as="p" hint-placeholder-count="2">
+<div style="padding: 12px 0; border-bottom: 1px solid #BFC2BD; display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; align-items: baseline">
+<span><bdi dir="ltr" style="font-weight: 600">{{p.id}}</bdi> <span style="font-size: 13px; color: #5E6360"><bdi dir="ltr">{{p.sup}}</bdi>، {{p.what}}</span></span>
+<span style="font-size: 13px; {{p.stStyle}}">{{p.st}}</span>
+</div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px">
+<sc-for list="{{p.steps}}" as="s" hint-placeholder-count="3"><div style="padding: 6px 8px; display: flex; flex-direction: column; line-height: 1.3; {{s.box}}"><span style="font-size: 11px">{{s.k}}</span><span style="font-size: 13px; font-weight: 600"><bdi dir="ltr">{{s.v}}</bdi></span></div></sc-for>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 6px">
+<sc-for list="{{p.acts}}" as="a" hint-placeholder-count="2"><button type="button" onClick="{{a.run}}" style="min-height: 38px; padding: 0 12px; cursor: pointer; font-size: 13px; {{a.style}}">{{a.label}}</button></sc-for>
+</div>
+</div>
+</sc-for>
+</section>
+</div>
+</sc-if>
+
+<sc-if value="{{t.cash}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 22px">
+<dl style="margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); border-top: 3px solid #1B1D1C">
+<sc-for list="{{cashFig}}" as="k" hint-placeholder-count="5"><div style="padding: 12px 14px 6px 14px; border-inline-start: 1px solid #BFC2BD; display: flex; flex-direction: column; gap: 2px"><dt style="font-size: 13px; color: #5E6360">{{k.label}}</dt><dd style="margin: 0; font-family: 'Alexandria', sans-serif; font-weight: 700; font-size: 20px; {{k.style}}"><bdi dir="ltr">{{k.value}}</bdi></dd></div></sc-for>
+</dl>
+<section aria-label="الشيكات" style="border-top: 3px solid #1B1D1C; padding-top: 12px; display: flex; flex-direction: column">
+<h2 style="margin: 0 0 6px 0; font-family: 'Alexandria', sans-serif; font-weight: 700; font-size: 19px">الشيكات، الـ LCN والخلاص</h2>
+<div style="overflow-x: auto"><div style="min-width: 840px">
+<div style="display: grid; grid-template-columns: 70px 120px minmax(190px, 1.6fr) 130px 90px 150px minmax(180px, 1.3fr); gap: 10px; padding: 8px 0; border-bottom: 2px solid #1B1D1C; font-size: 13px; color: #4A4E4B"><span>الاتجاه</span><span>النوع</span><span>مع من</span><span>المبلغ</span><span>التاريخ</span><span>فين وصل</span><span>دير</span></div>
+<sc-for list="{{instRows}}" as="r" hint-placeholder-count="5">
+<div style="display: grid; grid-template-columns: 70px 120px minmax(190px, 1.6fr) 130px 90px 150px minmax(180px, 1.3fr); gap: 10px; padding: 9px 0; border-bottom: 1px solid #BFC2BD; font-size: 14px; align-items: center"><span style="font-weight: 600; {{r.dirStyle}}">{{r.dir}}</span><bdi dir="ltr">{{r.kind}}</bdi><bdi dir="ltr" style="font-weight: 600">{{r.party}}</bdi><bdi dir="ltr" style="font-weight: 600">{{r.amount}}</bdi><bdi dir="ltr">{{r.due}}</bdi><span style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px"><span style="width: 10px; height: 10px; flex: 0 0 auto; {{r.dot}}"></span>{{r.st}}</span><span style="display: flex; flex-wrap: wrap; gap: 6px"><sc-for list="{{r.acts}}" as="a" hint-placeholder-count="2"><button type="button" onClick="{{a.run}}" style="min-height: 36px; padding: 0 10px; background: transparent; border: 1px solid #8D918C; cursor: pointer; font-size: 13px">{{a.label}}</button></sc-for></span></div>
+</sc-for>
+</div></div>
+</section>
+</div>
+</sc-if>
+
+<sc-if value="{{t.sales}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; flex-direction: column; gap: 22px">
+<section aria-label="المبيعات" style="background: #F4F4F1; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 16px"><h2 style="margin: 0; font-family: 'Alexandria', sans-serif; font-weight: 700; font-size: 21px">المبيعات بالـ m³، 14 يوم</h2><span style="font-size: 14px; color: #4A4E4B">{{salesTotal}}</span></div>
+<div style="display: flex; gap: 6px; align-items: flex-end; height: 160px; overflow-x: auto">
+<sc-for list="{{salesBars}}" as="b" hint-placeholder-count="14"><div style="flex: 1 1 0; min-width: 32px; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end"><span style="font-size: 11px; font-weight: 600; {{b.vs}}"><bdi dir="ltr">{{b.v}}</bdi></span><div style="width: 70%; {{b.bar}}"></div><bdi dir="ltr" style="font-size: 11px; color: #5E6360">{{b.d}}</bdi></div></sc-for>
+</div>
+</section>
+<section aria-label="التصدير للمحاسب" style="border-top: 3px solid #1B1D1C; padding-top: 12px; display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-family: 'Alexandria', sans-serif; font-weight: 700; font-size: 19px">التصدير للمحاسب، نونبر</h2>
+<sc-if value="{{owner}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; flex-wrap: wrap; gap: 8px"><sc-for list="{{exports}}" as="x" hint-placeholder-count="4"><button type="button" onClick="{{x.run}}" style="min-height: 40px; padding: 0 14px; background: transparent; border: 2px solid #1B1D1C; font-weight: 600; cursor: pointer; font-size: 13px">{{x.label}}</button></sc-for></div>
+<span style="font-size: 13px; color: #4A4E4B">كيترفض التصدير إلا كانت الدفاتر ما متطابقينش. كل تصدير كيتسجل فالسجل.</span>
+</sc-if>
+<sc-if value="{{notOwner}}" hint-placeholder-val="{{false}}"><span style="font-size: 14px; color: #4A4E4B">التصدير كيديرو المالك.</span></sc-if>
+</section>
+</div>
+</sc-if>
+
+</main>
+
+<aside aria-label="المساعد" style="flex: 1 1 340px; max-width: 100%; box-sizing: border-box; background: #232624; color: #E6E7E3; padding: 18px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; flex-direction: column; gap: 2px">
+<span style="font-family: 'Alexandria', sans-serif; font-weight: 700; font-size: 20px; color: #FFFFFF">المساعد</span>
+<span style="font-size: 13px; color: #A3A7A2">كيجاوب حسب الصلاحيات ديال <span style="color: #FFFFFF; font-weight: 600">{{roleName}}</span>. كيحضّر، ونتا اللي كتأكد.</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 14px; flex: 1 1 auto">
+<sc-if value="{{chatEmpty}}" hint-placeholder-val="{{true}}"><p style="margin: 0; font-size: 14px; color: #C9CCC7; line-height: 1.7">سولني على الشاحنات، السطوك، البونات، الفواتير، الزبناء ولا الفلوس. فالنموذج اختار سؤال من الاقتراحات.</p></sc-if>
+<sc-for list="{{chat}}" as="c" hint-placeholder-count="2">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div style="align-self: flex-start; max-width: 92%; background: #3A3E3B; color: #FFFFFF; padding: 8px 12px; font-size: 14px; line-height: 1.55">{{c.q}}</div>
+<div style="background: #F4F4F1; color: #1B1D1C; padding: 12px 14px; display: flex; flex-direction: column; gap: 7px">
+<sc-for list="{{c.lines}}" as="l" hint-placeholder-count="3"><span style="font-size: 14px; line-height: 1.6; {{l.style}}">{{l.t}}</span></sc-for>
+<sc-if value="{{c.hasCard}}" hint-placeholder-val="{{false}}">
+<div style="border: 2px solid #1B1D1C; background: #FFFFFF; padding: 10px 12px; display: flex; flex-direction: column; gap: 5px">
+<span style="font-size: 12px; color: #5E6360">مسودة، ما كتسجل حتى تأكد</span>
+<span style="font-family: 'Alexandria', sans-serif; font-weight: 700; font-size: 15px">{{c.cardTitle}}</span>
+<sc-for list="{{c.cardLines}}" as="cl" hint-placeholder-count="2"><span style="font-size: 13px; line-height: 1.5">{{cl.t}}</span></sc-for>
+<sc-if value="{{c.cardOpen}}" hint-placeholder-val="{{true}}"><div style="display: flex; gap: 8px; flex-wrap: wrap; padding-top: 4px"><button type="button" onClick="{{c.confirm}}" style="min-height: 40px; padding: 0 16px; border: 0; background: #1B1D1C; color: #FFFFFF; font-weight: 600; cursor: pointer">{{c.confirmLabel}}</button><button type="button" onClick="{{c.cancel}}" style="min-height: 40px; padding: 0 12px; background: transparent; border: 1px solid #8D918C; cursor: pointer">لغي</button></div></sc-if>
+<sc-if value="{{c.cardDone}}" hint-placeholder-val="{{false}}"><span style="font-size: 13px; font-weight: 600; {{c.doneStyle}}">{{c.doneText}}</span></sc-if>
+</div>
+</sc-if>
+<div style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center">
+<sc-for list="{{c.tools}}" as="tl" hint-placeholder-count="2"><span style="font-size: 11px; background: #E6E7E3; color: #3A3E3B; padding: 2px 8px">{{tl.t}}</span></sc-for>
+<button type="button" onClick="{{c.toggle}}" aria-expanded="{{c.openStr}}" style="min-height: 30px; padding: 0 6px; background: transparent; border: 0; font-size: 12px; color: #2F6DB5; text-decoration: underline; cursor: pointer">شنو مشا للذكاء الاصطناعي؟</button>
+</div>
+<sc-if value="{{c.open}}" hint-placeholder-val="{{false}}"><div style="background: #1B1D1C; color: #D5D7D2; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px"><span style="font-size: 12px; color: #A3A7A2">رموز بلاصة الأسماء والمبالغ. التطبيق كيرجع القيم الحقيقية فالجواب.</span><code dir="ltr" style="font-family: ui-monospace, Menlo, monospace; font-size: 12px; white-space: pre-wrap; word-break: break-word; text-align: left">{{c.payload}}</code></div></sc-if>
+</div>
+</div>
+</sc-for>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span style="font-size: 12px; color: #A3A7A2">اقتراحات لـ {{roleName}}</span>
+<div style="display: flex; flex-wrap: wrap; gap: 6px"><sc-for list="{{suggest}}" as="s" hint-placeholder-count="6"><button type="button" onClick="{{s.ask}}" style="min-height: 36px; padding: 4px 10px; background: transparent; border: 1px solid #5E6360; color: #FFFFFF; font-size: 13px; text-align: start; cursor: pointer">{{s.q}}</button></sc-for></div>
+<label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #A3A7A2">سؤالك<input type="text" disabled placeholder="فالتطبيق الحقيقي كتكتب بالدارجة، بالعربية ولا بالفرنسية" style="min-height: 42px; padding: 0 12px; background: #2E312F; border: 1px solid #5E6360; color: #FFFFFF; font: inherit; font-size: 14px"></label>
+<button type="button" onClick="{{clearChat}}" style="align-self: flex-start; min-height: 30px; padding: 0 4px; background: transparent; border: 0; color: #A3A7A2; font-size: 12px; text-decoration: underline; cursor: pointer">مسح المحادثة</button>
+</div>
+</aside>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1500}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const INK = '#1B1D1C', RED = '#D23A1E', GREEN = '#2F6B4F', AMBER = '#C08A12', BLUE = '#2F6DB5', GREY = '#8D918C';
+    const T0 = 420, T1 = 1080, LOAD = 15, UNL = 3, TODAY = '23/11';
+    const ZONES = { center: ['تطوان المركز', 20], martil: ['مرتيل', 25], mdiq: ['المضيق', 30], fnideq: ['الفنيدق', 45] };
+    const TRUCKS = [{ id: 'CAM-01', cap: 8, dr: 'Hamid' }, { id: 'CAM-02', cap: 8, dr: 'Youssef' }, { id: 'CAM-03', cap: 8, dr: 'Rachid' }, { id: 'CAM-04', cap: 10, dr: 'Karim' }, { id: 'CAM-05', cap: 8, dr: 'Said' }, { id: 'CAM-06', cap: 8, dr: 'Omar', broken: true }];
+    const RECIPE = { B12: { cem: 250, sand: 850, g1: 450, g2: 600, adj: 2000 }, B20: { cem: 300, sand: 820, g1: 420, g2: 620, adj: 3000 }, B25: { cem: 350, sand: 780, g1: 410, g2: 620, adj: 3500 } };
+    const PU = { B12: 62000, B20: 72000, B25: 79000 };
+    const COMP = [{ k: 'cem', name: 'الإسمنت', cap: 90000 }, { k: 'sand', name: 'الرملة', cap: 300000 }, { k: 'g1', name: 'الحصى 8/15', cap: 250000 }, { k: 'g2', name: 'الحصى 15/25', cap: 250000 }, { k: 'adj', name: 'المادة المضافة', cap: 1500000 }];
+    const OPEN = { cem: 52000, sand: 260000, g1: 180000, g2: 220000, adj: 900000 };
+    const AVG = { B25: 70, B20: 50, B12: 20 };
+    const CL = {
+      'CLT-003': { name: 'Promotion Al Amal (fictif)', site: 'Résidence Al Amal, Tétouan', terms: 'Chèque ou LCN à 30 jours' },
+      'CLT-005': { name: 'Travaux Smir (fictif)', site: 'Fnideq, route de Sebta', terms: 'Virement à 30 jours' },
+      'CLT-009': { name: 'Résidence Martil Plage (fictif)', site: 'M\'diq, front de mer', terms: 'LCN à 60 jours' },
+      'CLT-017': { name: 'Bâtir Nord SARL (fictif)', site: 'Martil, lotissement Nour', terms: '4 échéances mensuelles' },
+      'CLT-021': { name: 'Chantier Kitane (fictif)', site: 'Kitane', terms: 'Chèque à la livraison' },
+      'CLT-031': { name: 'Coopérative Wifak (fictif)', site: 'Tétouan, quartier Wifak', terms: 'Espèces à la livraison' }
+    };
+    const SUP = { 'FRN-01': 'Ciments du Détroit (fictif)', 'FRN-02': 'Carrière Rif Granulats (fictif)', 'FRN-03': 'Sablière Nord (fictif)', 'FRN-05': 'Transport Smir (fictif)', 'FRN-07': 'Station Tétouan Carburant (fictif)' };
+    const ORD = [
+      { id: 'CMD-2026-0142', c: 'CLT-017', type: 'B25', m3: 60, zone: 'martil', start: 450 },
+      { id: 'CMD-2026-0139', c: 'CLT-003', type: 'B20', m3: 36, zone: 'center', start: 480 },
+      { id: 'CMD-2026-0145', c: 'CLT-009', type: 'B25', m3: 24, zone: 'mdiq', start: 600 },
+      { id: 'CMD-2026-0144', c: 'CLT-031', type: 'B12', m3: 18, zone: 'center', start: 660 },
+      { id: 'CMD-2026-0147', c: 'CLT-005', type: 'B20', m3: 32, zone: 'fnideq', start: 780 }
+    ];
+    const ordOf = (id) => ORD.find((o) => o.id === id);
+    const hm = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+    const grp = (n) => String(Math.abs(Math.trunc(n))).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    const dec1 = (x) => (Math.round(x * 10) / 10).toFixed(1).replace('.', ',');
+    const tq = (k, b) => k === 'adj' ? grp(b / 1000) + ' L' : dec1(b / 1000) + ' t';
+    const money = (c) => (c < 0 ? '−' : '') + grp(Math.abs(c) / 100) + ',' + String(Math.abs(Math.round(c)) % 100).padStart(2, '0') + ' MAD';
+    const smoney = (c) => (c > 0 ? '+' : '') + money(c);
+    const fr = (c) => grp(c / 100) + ',' + String(Math.round(c) % 100).padStart(2, '0');
+    const dkey = (s) => { const p = s.split('/'); const d = +p[0], m = +p[1]; const y = p[2] ? +p[2] : (m >= 6 ? 2026 : 2027); return y * 10000 + m * 100 + d; };
+    const kToday = dkey(TODAY);
+    const phases = (tr) => { const o = ordOf(tr.order), t = ZONES[o.zone][1]; const le = tr.s + LOAD, ae = le + t, ue = ae + tr.m3 * UNL, re = ue + t; return { o: o, t: t, le: le, ae: ae, ue: ue, re: re }; };
+    const fitPlant = (trips, t) => { let mv = true; while (mv) { mv = false; trips.forEach((x) => { if (t < x.s + LOAD && t + LOAD > x.s) { t = x.s + LOAD; mv = true; } }); } return t; };
+    const planMany = (trips, ids, now) => {
+      const out = trips.slice(); let n = out.length, guard = 0;
+      const remOf = (id) => ordOf(id).m3 - out.filter((x) => x.order === id).reduce((a, x) => a + x.m3, 0);
+      while (ids.some((id) => remOf(id) > 0) && guard < 60) {
+        guard += 1; let pick = null;
+        ids.filter((id) => remOf(id) > 0).forEach((id) => { const o = ordOf(id), tr = ZONES[o.zone][1]; const mine = out.filter((x) => x.order === id).map((x) => phases(x)); const want = mine.length ? Math.max.apply(null, mine.map((p) => p.ue)) - tr - LOAD : o.start - LOAD - tr; if (!pick || want < pick.want) pick = { id: id, want: want }; });
+        let best = null;
+        TRUCKS.filter((k) => !k.broken).forEach((k) => { const free = out.filter((x) => x.truck === k.id).reduce((a, x) => Math.max(a, phases(x).re), 0); const cand = fitPlant(out, Math.max(pick.want, now, free)); if (!best || cand < best.s) best = { s: cand, truck: k.id, cap: k.cap }; });
+        n += 1; out.push({ id: 'T' + n, order: pick.id, truck: best.truck, m3: Math.min(best.cap, remOf(pick.id)), s: best.s });
+      }
+      return out;
+    };
+
+    const initial = () => ({
+      init: true, now: 570, role: 'owner', tab: 'today', fx: null, chat: [], seq: 0,
+      trips: planMany([], ['CMD-2026-0142', 'CMD-2026-0139'], T0), signed: [], invBL: [], arco: false, returns: [],
+      invs: [
+        { id: 'FAC-2026-0281', c: 'CLT-003', date: '21/11', due: '21/12', lines: [{ bl: 'BL-2026-0301 à 0317', type: 'B20', m3: 84 }] },
+        { id: 'FAC-2026-0270', c: 'CLT-009', date: '21/09', due: '20/11', lines: [{ bl: 'BL-2026-0255 à 0259', type: 'B25', m3: 40 }] },
+        { id: 'FAC-2026-0262', c: 'CLT-021', date: '05/10', due: '04/11', lines: [{ bl: 'BL-2026-0231 à 0233', type: 'B20', m3: 20 }] }
+      ],
+      inst: [
+        { id: 'I1', dir: 'in', kind: 'Chèque', party: 'CLT-003', amount: 4000000, due: '21/11', st: 'cleared' },
+        { id: 'I2', dir: 'in', kind: 'LCN', party: 'CLT-003', amount: 3257600, due: '30/11', st: 'portfolio' },
+        { id: 'I3', dir: 'in', kind: 'Chèque', party: 'CLT-021', amount: 1728000, due: '04/11', st: 'bounced' },
+        { id: 'I4', dir: 'in', kind: 'Espèces (avance)', party: 'CLT-017', amount: 1422000, due: '16/11', st: 'cleared' },
+        { id: 'O1', dir: 'out', kind: 'Chèque', party: 'FRN-01', amount: 21000000, due: '27/11', st: 'issued' }
+      ],
+      pays: [
+        { id: 'P1', sup: 'FRN-01', label: 'إسمنت 120 t (R-108)', amount: 21000000, due: '27/11', st: 'covered' },
+        { id: 'P2', sup: 'FRN-07', label: 'كازوال الشاحنات', amount: 980000, due: '25/11', st: 'open' },
+        { id: 'P3', sup: 'FRN-03', label: 'رملة 240 t (R-110)', amount: 4000000, due: '27/11', st: 'open' },
+        { id: 'P4', sup: 'FRN-05', label: 'نقل الحصى', amount: 1240000, due: '30/11', st: 'open' },
+        { id: 'P5', sup: 'FRN-02', label: 'حصى 250 t (R-111)', amount: 4680000, due: '02/12', st: 'open' }
+      ],
+      pos: [
+        { id: 'BC-2026-0118', sup: 'FRN-01', comp: 'cem', qty: 25, price: 174000, eta: 840, recs: [], inv: false },
+        { id: 'BC-2026-0119', sup: 'FRN-03', comp: 'sand', qty: 120, price: 16800, eta: 960, recs: [], inv: false }
+      ],
+      cash: { caisse: 2260000, banque: 16890000 },
+      moves: [{ d: '21/11', label: 'شيك CLT-003 تحصّل', acct: 'البنك', amt: 4000000 }],
+      selC: 'CLT-017', selS: 'FRN-01', payF: { amt: 'full', meth: 'chq' }, docSel: null
+    });
+    const st = (this.state && this.state.init) ? this.state : initial();
+    const commit = (fn) => { const S = JSON.parse(JSON.stringify(st)); fn(S); this.setState(S); };
+    const now = st.now, role = st.role, owner = role === 'owner', office = role === 'office', plant = role === 'plant';
+    const fxSet = (S, title, lines, bad) => { S.fx = { title: title, lines: lines, bad: !!bad }; };
+    const L = (t, m) => ({ t: t, m: !!m });
+
+    // ---------- operations, derived
+    const derive = (S) => {
+      const P = S.trips.map((x) => Object.assign({}, x, phases(x)));
+      const loaded = P.filter((x) => x.le <= S.now).sort((a, b) => a.le - b.le);
+      loaded.forEach((x, i) => { x.bl = 'BL-2026-0' + (318 + i); });
+      const recQty = (k) => S.pos.filter((p) => p.comp === k).reduce((a, p) => a + p.recs.reduce((b, r) => b + r.q, 0), 0) * 1000;
+      const stock = {};
+      COMP.forEach((c) => { stock[c.k] = OPEN[c.k] - loaded.reduce((a, x) => a + RECIPE[x.o.type][c.k] * x.m3, 0) + recQty(c.k); });
+      return { P: P, loaded: loaded, stock: stock };
+    };
+    const D = derive(st);
+    const P = D.P, loaded = D.loaded, stock = D.stock;
+    const stateOf = (x, t) => t < x.s ? 'planned' : t < x.le ? 'loading' : t < x.ae ? 'go' : t < x.ue ? 'unload' : t < x.re ? 'back' : 'done';
+    const unplanned = ORD.filter((o) => !st.trips.some((x) => x.order === o.id));
+    const needLeft = (k) => P.filter((x) => x.le > now).reduce((a, x) => a + RECIPE[x.o.type][k] * x.m3, 0) + unplanned.reduce((a, o) => a + RECIPE[o.type][k] * o.m3, 0);
+    const expected = (k) => st.pos.filter((p) => p.comp === k).reduce((a, p) => a + (p.qty - p.recs.reduce((b, r) => b + r.q, 0)), 0) * 1000;
+    const daily = (k) => Object.keys(AVG).reduce((a, t) => a + RECIPE[t][k] * AVG[t], 0);
+    const cover = (k) => (stock[k] + expected(k) - needLeft(k)) / daily(k);
+    const m3Today = loaded.reduce((a, x) => a + x.m3, 0), m3Planned = ORD.reduce((a, o) => a + o.m3, 0);
+    const delivered = loaded.filter((x) => x.ue <= now);
+
+    // ---------- money, derived
+    const ttc = (lines) => { const ht = lines.reduce((a, l) => a + l.m3 * PU[l.type], 0); return { ht: ht, tva: ht / 5, ttc: ht + ht / 5 }; };
+    const invStatus = (S) => {
+      const out = {};
+      Object.keys(CL).forEach((c) => {
+        const ins = S.inst.filter((i) => i.dir === 'in' && i.party === c && i.st !== 'bounced');
+        let cleared = ins.filter((i) => i.st === 'cleared').reduce((a, i) => a + i.amount, 0);
+        let pending = ins.filter((i) => i.st !== 'cleared').reduce((a, i) => a + i.amount, 0);
+        S.invs.filter((f) => f.c === c).sort((a, b) => dkey(a.date) - dkey(b.date)).forEach((f) => {
+          const total = ttc(f.lines).ttc; let need = total;
+          const fromC = Math.min(need, cleared); cleared -= fromC; need -= fromC;
+          const fromP = Math.min(need, pending); pending -= fromP; need -= fromP;
+          let s = need === 0 ? (fromP > 0 ? 'covered' : 'paid') : (need < total ? 'partial' : 'unpaid');
+          if (need > 0 && dkey(f.due) < kToday) s = 'late';
+          out[f.id] = { s: s, total: total, left: need };
+        });
+      });
+      return out;
+    };
+    const IS = invStatus(st);
+    const balOf = (S, c) => S.invs.filter((f) => f.c === c).reduce((a, f) => a + ttc(f.lines).ttc, 0) - S.inst.filter((i) => i.dir === 'in' && i.party === c && i.st !== 'bounced').reduce((a, i) => a + i.amount, 0);
+    const forecast = (S) => {
+      const real = S.cash.caisse + S.cash.banque; const days = ['23/11', '24/11', '25/11', '26/11', '27/11', '30/11', '01/12'];
+      return days.map((d) => { const k = dkey(d); let b = real; S.inst.forEach((i) => { if (dkey(i.due) > k) return; if (i.dir === 'in' && (i.st === 'portfolio' || i.st === 'deposited')) b += i.amount; if (i.dir === 'out' && i.st === 'issued') b -= i.amount; }); S.pays.forEach((p) => { if (p.st === 'open' && dkey(p.due) <= k) b -= p.amount; }); return { d: d, bal: b }; });
+    };
+    const FC = forecast(st); let iMin = 0; FC.forEach((x, i) => { if (x.bal < FC[iMin].bal) iMin = i; });
+
+    // ---------- actions
+    const issueInvoice = (cid) => commit((S) => {
+      const Ds = derive(S); const bls = Ds.loaded.filter((x) => x.ue <= S.now && x.o.c === cid && S.invBL.indexOf(x.bl) < 0);
+      if (!bls.length) return;
+      const by = {}; bls.forEach((x) => { by[x.o.type] = by[x.o.type] || { type: x.o.type, m3: 0, ids: [] }; by[x.o.type].m3 += x.m3; by[x.o.type].ids.push(x.bl); });
+      const lines = Object.keys(by).map((t) => ({ type: t, m3: by[t].m3, bl: by[t].ids.join(', ') }));
+      const id = 'FAC-2026-0' + (290 + S.invs.filter((f) => f.date === TODAY).length);
+      S.invs.push({ id: id, c: cid, date: TODAY, due: cid === 'CLT-031' ? TODAY : '23/12', lines: lines });
+      bls.forEach((x) => S.invBL.push(x.bl));
+      S.docSel = { kind: 'inv', id: id }; S.tab = 'invoices';
+      const tt = ttc(lines), after = invStatus(S)[id];
+      fxSet(S, 'تصاوبات الفاتورة ' + id, [L(bls.length + ' بون تقفلو كمفوترين لـ ' + CL[cid].name), L('المجموع ' + money(tt.ttc) + ' TTC، منها TVA ' + money(tt.tva), true), L(after.s === 'paid' ? 'التسبيق ديال الزبون غطاها كاملة.' : (after.left < tt.ttc ? 'التسبيق غطى جزء، باقي ' + money(after.left) + '.' : 'باقي ' + money(after.left) + ' للتحصيل، الأجل ' + (cid === 'CLT-031' ? 'اليوم (نقدا)' : '23/12') + '.'), true)]);
+    });
+    const recordPay = () => commit((S) => {
+      const c = S.selC, b = balOf(S, c);
+      const amt = S.role !== 'owner' ? (S.payF.amt === 'a25' ? 2500000 : 1000000) : (S.payF.amt === 'half' ? Math.round(b / 2) : (S.payF.amt === 'a10' ? Math.min(1000000, b) : b));
+      if (amt <= 0) return;
+      const m = S.payF.meth, lines = [];
+      if (m === 'cash') { S.inst.push({ id: 'I' + (S.inst.length + 1), dir: 'in', kind: 'Espèces', party: c, amount: amt, due: TODAY, st: 'cleared' }); S.cash.caisse += amt; S.moves.unshift({ d: TODAY, label: 'خلاص نقدا ' + c, acct: 'الكاسة', amt: amt }); lines.push(L('الكاسة ' + smoney(amt), true)); }
+      if (m === 'chq' || m === 'lcn') { S.inst.push({ id: 'I' + (S.inst.length + 1), dir: 'in', kind: m === 'chq' ? 'Chèque' : 'LCN', party: c, amount: amt, due: m === 'chq' ? TODAY : '22/01/2027', st: 'portfolio' }); lines.push(L((m === 'chq' ? 'شيك ' : 'LCN ') + money(amt) + ' دخل للمحفظة. ما كيتحسبش فالبنك حتى يتحصّل.', true)); }
+      if (m === 'split') { const part = Math.floor(amt / 300) * 100; ['23/12', '23/01/2027', '23/02/2027'].forEach((d, i) => S.inst.push({ id: 'I' + (S.inst.length + 1), dir: 'in', kind: 'Chèque ' + (i + 1) + '/3', party: c, amount: i < 2 ? part : amt - 2 * part, due: d, st: 'portfolio' })); lines.push(L('3 شيكات مؤجلة دخلو للمحفظة (23/12، 23/01، 23/02).', true)); }
+      const after = invStatus(S), paidNow = S.invs.filter((f) => f.c === c && after[f.id] && (after[f.id].s === 'paid' || after[f.id].s === 'covered')).map((f) => f.id);
+      lines.push(L(paidNow.length ? 'الفواتير المغطية: ' + paidNow.join('، ') + '.' : 'الخلاص تسجل على الفواتير من القديمة للجديدة.', true));
+      lines.push(L('الرصيد ديال الزبون ولا ' + money(balOf(S, c)), true));
+      fxSet(S, 'تسجل الخلاص', S.role === 'owner' ? lines : [L('تسجل. المبالغ والرصيد كيشوفهم غير المالك.')]);
+    });
+    const instAct = (id, act) => commit((S) => {
+      const i = S.inst.find((x) => x.id === id); if (!i) return; const lines = [];
+      if (act === 'deposit') { i.st = 'deposited'; lines.push(L(i.kind + ' تودع فالبنك، كيتقيد من بعد نهار خدمة.', true)); }
+      if (act === 'clear') { i.st = 'cleared'; S.cash.banque += i.amount; S.moves.unshift({ d: TODAY, label: i.kind + ' ' + i.party + ' تحصّل', acct: 'البنك', amt: i.amount }); lines.push(L('البنك ' + smoney(i.amount), true)); }
+      if (act === 'bounce') { i.st = 'bounced'; lines.push(L(i.kind + ' ديال ' + i.party + ' رجع. الفواتير اللي كان كيغطي رجعو مفتوحين، وعندو 30 يوم باش يسوي (القانون 71.24).', true)); }
+      if (act === 'present') { i.st = 'paid'; S.cash.banque -= i.amount; S.moves.unshift({ d: TODAY, label: i.kind + ' لـ ' + i.party + ' تقدم', acct: 'البنك', amt: -i.amount }); lines.push(L('البنك ' + smoney(-i.amount) + '، ولا ' + money(S.cash.banque), true)); }
+      fxSet(S, 'تبدلات الحالة', lines, act === 'bounce' || S.cash.banque < 0);
+    });
+    const receive = (poId, part) => commit((S) => {
+      const p = S.pos.find((x) => x.id === poId); const left = p.qty - p.recs.reduce((a, r) => a + r.q, 0); if (left <= 0) return;
+      const q = part ? Math.round(left / 2) : left; p.recs.push({ q: q, at: S.now });
+      const amount = q * p.price; const rid = 'R-' + (120 + S.pos.reduce((a, x) => a + x.recs.length, 0));
+      S.pays.push({ id: 'P' + (S.pays.length + 1), sup: p.sup, label: (p.comp === 'cem' ? 'إسمنت ' : 'رملة ') + q + ' t (' + rid + ')', amount: amount, due: '23/12', st: 'open', po: p.id });
+      const Ds = derive(S);
+      fxSet(S, 'تسجل الاستلام ' + rid, [L((p.comp === 'cem' ? 'الإسمنت' : 'الرملة') + ' +' + q + ',0 t، ولا ' + tq(p.comp, Ds.stock[p.comp])), L('دين للمورد ' + SUP[p.sup] + ': ' + money(amount) + '، الأجل 23/12', true), L(left - q > 0 ? 'باقي ' + (left - q) + ' t ما توصلوش من هاد الطلب.' : 'الطلب توصل كامل.')]);
+    });
+    const scanInvoice = (poId) => commit((S) => {
+      const p = S.pos.find((x) => x.id === poId); p.inv = true;
+      const got = p.recs.reduce((a, r) => a + r.q, 0);
+      fxSet(S, 'فاتورة المورد تقرات من الصورة', [L('الذكاء الاصطناعي قرا: ' + SUP[p.sup] + '، ' + got + ' t، ' + money(got * p.price) + ' TTC.', true), L('مقارنة ثلاثية: الطلب ' + p.qty + ' t، الاستلام ' + got + ' t، الفاتورة ' + got + ' t. ' + (got === p.qty ? 'كلشي مطابق.' : 'مطابقة للاستلام، والطلب باقي ما كملش.')), L('تأكد من الحقول قبل الحفظ. الصورة ما كتمشيش للنموذج بلا التصريح ديال CNDP.')]);
+    });
+    const payPayable = (pid, how) => commit((S) => {
+      const p = S.pays.find((x) => x.id === pid); if (!p || p.st !== 'open') return; const lines = [];
+      if (how === 'transfer') { S.cash.banque -= p.amount; p.st = 'paid'; S.moves.unshift({ d: TODAY, label: 'تحويل لـ ' + p.sup, acct: 'البنك', amt: -p.amount }); lines.push(L('البنك ' + smoney(-p.amount), true)); }
+      if (how === 'cheque') { S.inst.push({ id: 'O' + (S.inst.length + 1), dir: 'out', kind: 'Chèque', party: p.sup, amount: p.amount, due: p.due, st: 'issued' }); p.st = 'covered'; lines.push(L('شيك ' + money(p.amount) + ' خرج لـ ' + p.sup + '، تاريخو ' + p.due + '. كيتحسب فالتوقع.', true)); }
+      if (how === 'split') { const h = Math.floor(p.amount / 200) * 100; S.inst.push({ id: 'O' + (S.inst.length + 1), dir: 'out', kind: 'Chèque 1/2', party: p.sup, amount: h, due: p.due, st: 'issued' }); S.inst.push({ id: 'O' + (S.inst.length + 2), dir: 'out', kind: 'Chèque 2/2', party: p.sup, amount: p.amount - h, due: '30/12', st: 'issued' }); p.st = 'covered'; lines.push(L('جوج شيكات خرجو لـ ' + p.sup + ' (' + p.due + ' و 30/12).', true)); }
+      fxSet(S, 'تسجل الخلاص ديال المورد', lines);
+    });
+    const postpone = (pid, nd) => commit((S) => { const p = S.pays.find((x) => x.id === pid); p.due = nd; fxSet(S, 'تأجل الخلاص', [L(p.label + ' (' + p.sup + ') ولا الأجل ديالو ' + nd + '. البرنامج حضّر الرسالة للمورد.', true)]); });
+    const discount = (iid) => commit((S) => { const i = S.inst.find((x) => x.id === iid); const n = Math.round(i.amount * 0.99); i.st = 'cleared'; S.cash.banque += n; S.moves.unshift({ d: TODAY, label: 'خصم ' + i.kind + ' ' + i.party + ' (مصاريف 1%)', acct: 'البنك', amt: n }); fxSet(S, 'تخصمات فالبنك', [L('البنك ' + smoney(n) + '، المصاريف التقديرية ' + money(i.amount - n), true)]); });
+
+    // ---------- assistant
+    const A = (t, k) => ({ t: t, k: k || '' });
+    const answer = (intent, S) => {
+      const Ds = derive(S), ld = Ds.loaded, dv = ld.filter((x) => x.ue <= S.now), isS = invStatus(S);
+      if (intent === 'out') { const by = {}; ld.forEach((x) => { by[CL[x.o.c].name] = (by[CL[x.o.c].name] || 0) + x.m3; }); return { lines: [A('حتى ' + hm(S.now) + ' خرجو ' + ld.reduce((a, x) => a + x.m3, 0) + ' m³ فـ ' + ld.length + ' بونات.')].concat(Object.keys(by).map((n) => A(n + ': ' + by[n] + ' m³'))), tools: ['البونات ديال اليوم'], payload: '{"until":"' + hm(S.now) + '","by_client":[' + Object.keys(by).map((n, i) => '{"client":"C' + (i + 1) + '","m3":' + by[n] + '}').join(',') + ']}' }; }
+      if (intent === 'cement') { const c = (Ds.stock.cem + expected('cem') - needLeft('cem')) / daily('cem'); return { lines: [A('فالسيلو ' + tq('cem', Ds.stock.cem) + '، والطلبيات اللي باقيين اليوم كيحتاجو ' + tq('cem', needLeft('cem')) + '.'), A('الطلب BC-2026-0118 ديال 25 t مازال ما توصلش' + (S.now >= 840 ? '، والشاحنة ديال المورد وصلات: سجّل الاستلام فـ «المشتريات».' : '، متوقع مع 14:00.')), A('من بعد اليوم كيكفي تقريبا ' + dec1(Math.max(0, c)) + ' نهار.', c < 1 ? 'w' : '')], tools: ['السطوك', 'الطلبيات المبرمجة', 'طلبات الشراء'], payload: '{"component":"cement","stock":"Q1","need_today":"Q2","open_po":"Q3"}', card: c < 1 ? { kind: 'po', title: 'طلب شراء 30 t إسمنت من FRN-01', lines: ['التسليم: غدا الصباح', 'الخلاص: LCN 60 يوم'], label: 'أكّد الطلب' } : null }; }
+      if (intent === 'toinv') { const by = {}; dv.filter((x) => S.invBL.indexOf(x.bl) < 0).forEach((x) => { by[x.o.c] = (by[x.o.c] || 0) + 1; }); const ks = Object.keys(by); return { lines: ks.length ? [A(ks.length + ' زبناء عندهم بونات تسلمو وما تفوترو:')].concat(ks.map((c) => A(CL[c].name + ': ' + by[c] + ' بون'))) : [A('ما كاين حتى بون مسلم باقي ما تفوترش.')], tools: ['البونات', 'الفواتير'], payload: '{"uninvoiced_bl_by_client":[' + ks.map((c, i) => '{"client":"C' + (i + 1) + '","count":' + by[c] + '}').join(',') + ']}', card: ks.length ? { kind: 'inv', c: ks[0], title: 'فاتورة لـ ' + CL[ks[0]].name, lines: [by[ks[0]] + ' بون، الأثمنة من لائحة الأثمنة'], label: 'أصدر الفاتورة' } : null }; }
+      if (intent === 'unpaid') { const rows = S.invs.filter((f) => isS[f.id] && (isS[f.id].s === 'late' || isS[f.id].s === 'unpaid' || isS[f.id].s === 'partial')); return { lines: rows.length ? rows.map((f) => A(f.id + '، ' + CL[f.c].name + ': باقي ' + money(isS[f.id].left) + (isS[f.id].s === 'late' ? '، فات الأجل ' + f.due : ''), isS[f.id].s === 'late' ? 'w' : '')) : [A('كلشي مخلص ولا مغطي.')], tools: ['الفواتير', 'الخلاص'], payload: '{"open_invoices":[' + rows.map((f, i) => '{"inv":"F' + (i + 1) + '","client":"C' + (i + 1) + '","left":"A' + (i + 1) + '"}').join(',') + ']}' }; }
+      if (intent === 'week') { const F2 = forecast(S); let m = 0; F2.forEach((x, i) => { if (x.bal < F2[m].bal) m = i; }); return { lines: [A('أدنى نهار: ' + F2[m].d + '، الرصيد المتوقع ' + money(F2[m].bal) + '.', F2[m].bal < 0 ? 'w' : ''), A('السبب الكبير: شيك الإسمنت FRN-01 ديال 210 000,00 MAD نهار 27/11، معاه الرملة FRN-03.'), A('الحلول اللي كيحسبهم البرنامج كاينين فـ «اليوم»، تحت الشريط.')], tools: ['الخزينة', 'الشيكات', 'الديون', 'محرك القواعد'], payload: '{"min_day":"' + F2[m].d + '","balance":"A1","largest_out":{"supplier":"S1","amount":"A2"}}' }; }
+      if (intent === 'plan') { const o = ORD.find((x) => !S.trips.some((t) => t.order === x.id)); if (!o) return { lines: [A('جميع الطلبيات مبرمجين.')], tools: ['البرمجة'], payload: '{}' }; const pre = planMany(S.trips, [o.id], S.now).filter((x) => x.order === o.id).map((x) => Object.assign({}, x, phases(x))); return { lines: [A('حضّرت البرمجة ديال ' + CL[o.c].name + ' (' + o.m3 + ' m³ ' + o.type + ').')], tools: ['البرمجة', 'الشاحنات', 'المناطق'], payload: '{"order":"O1","m3":' + o.m3 + ',"zone_minutes":' + ZONES[o.zone][1] + '}', card: { kind: 'plan', order: o.id, title: o.m3 + ' m³ فـ ' + pre.length + ' رحلات', lines: pre.map((x) => x.truck + ': شحن ' + hm(x.s) + '، وصول ' + hm(x.ae) + '، ' + x.m3 + ' m³').concat(pre[0].ae > o.start ? ['تنبيه: تأخير ' + (pre[0].ae - o.start) + ' دقيقة على الوقت ديال الزبون.'] : []), label: 'أكّد البرمجة' } }; }
+      if (intent === 'bl') { const un = dv.filter((x) => S.signed.indexOf(x.bl) < 0); return { lines: [A(un.length + ' بونات تسلمو اليوم وباقي ما رجعوش موقعين.'), A(un.length ? un.slice(0, 4).map((x) => x.bl + ' (' + x.truck + ')').join('، ') : 'كلشي رجع.')], tools: ['البونات'], payload: '{"unsigned":' + un.length + '}' }; }
+      if (intent === 'pay') return { lines: [A('حضّرت التسجيل ديال الشيك.')], tools: ['تسجيل الخلاص (إدخال أعمى)'], payload: '{"client":"C1","instrument":"cheque","amount":"A1"}', card: { kind: 'pay', title: 'شيك من Promotion Al Amal (fictif)', lines: ['المبلغ: 20 000,00 MAD', 'من بعد التسجيل ما كيبان حتى رصيد لحسابك.'], label: 'سجّل' } };
+      if (intent === 'deny') return { lines: [A('هاد المعلومة فيها المبالغ، وما كتبانش لحساب المكتب.')], tools: ['الصلاحيات'], payload: '(ما تصيفط والو: الأداة رجعات 0 سطر بسبب الصلاحيات)' };
+      if (intent === 'next') { const nx = Ds.P.filter((x) => x.s >= S.now).sort((a, b) => a.s - b.s)[0]; if (!nx) return { lines: [A('ما كاين حتى شحنة مبرمجة من دابا.')], tools: ['البرمجة'], payload: '{}' }; const r = RECIPE[nx.o.type]; return { lines: [A('الجاية ' + hm(nx.s) + ': ' + nx.truck + '، ' + nx.m3 + ' m³ ' + nx.o.type + ' لـ ' + ZONES[nx.o.zone][0] + '.'), A('الخلطة: إسمنت ' + grp(r.cem * nx.m3) + ' kg، رملة ' + grp(r.sand * nx.m3) + ' kg، حصى 8/15 ' + grp(r.g1 * nx.m3) + ' kg، حصى 15/25 ' + grp(r.g2 * nx.m3) + ' kg، مادة مضافة ' + dec1(r.adj * nx.m3 / 1000) + ' L.')], tools: ['البرمجة', 'الوصفة السارية'], payload: '{"next":{"truck":"' + nx.truck + '","type":"' + nx.o.type + '","m3":' + nx.m3 + '}}' }; }
+      if (intent === 'silo') return { lines: [A('الإسمنت فالسيلو ' + tq('cem', Ds.stock.cem) + '.')], tools: ['السطوك'], payload: '{"stock":"Q1"}' };
+      if (intent === 'ret') return { lines: [A('حضّرت التسجيل ديال الرجوع.')], tools: ['الرجوعات'], payload: '{"truck":"CAM-03","m3":2,"type":"B20"}', card: { kind: 'ret', title: 'رجوع 2 m³ B20 من CAM-03', lines: ['السبب: الزبون رفض (slump عالي)', 'كيتحسب خسارة فالاستهلاك.'], label: 'سجّل الرجوع' } };
+      return { lines: [A('ما فهمتش.')], tools: [], payload: '{}' };
+    };
+    const SUG = {
+      owner: [['out', 'شحال خرج اليوم ولمن؟'], ['cement', 'واش الإسمنت كافي؟'], ['toinv', 'شنو خاصو يتفوتر؟'], ['unpaid', 'شكون ما خلصش؟'], ['plan', 'برمج الطلبية اللي باقية'], ['week', 'كيف داير الخزينة هاد السيمانة؟']],
+      office: [['bl', 'شنو البونات اللي ما رجعوش موقعين؟'], ['pay', 'سجّل شيك من Promotion Al Amal ديال 20 000'], ['deny', 'شحال كاين فالبنك؟'], ['plan', 'برمج الطلبية اللي باقية']],
+      plant: [['next', 'شنو الشحنة الجاية؟'], ['silo', 'شحال باقي فالسيلو ديال الإسمنت؟'], ['bl', 'شنو البونات اللي ما رجعوش موقعين؟'], ['ret', 'سجّل رجوع 2 m³ ديال B20 من CAM-03']]
+    };
+    const ask = (intent, q) => commit((S) => { S.seq += 1; const r = answer(intent, S); S.chat.push({ id: S.seq, q: q, lines: r.lines, tools: r.tools, payload: r.payload, card: r.card || null, cs: r.card ? 'open' : '', open: false }); if (S.chat.length > 5) S.chat.shift(); });
+    const confirmCard = (id) => commit((S) => {
+      const c = S.chat.find((x) => x.id === id); if (!c || !c.card) return;
+      if (c.card.kind === 'plan') { S.trips = planMany(S.trips, [c.card.order], S.now); c.done = 'تبرمجات. شوفها فـ «البرمجة».'; }
+      if (c.card.kind === 'po') { S.pos.push({ id: 'BC-2026-0' + (118 + S.pos.length), sup: 'FRN-01', comp: 'cem', qty: 30, price: 174000, eta: 1500, recs: [], inv: false }); c.done = 'طلب الشراء تصاوب فـ «المشتريات».'; }
+      if (c.card.kind === 'pay') { S.inst.push({ id: 'I' + (S.inst.length + 1), dir: 'in', kind: 'Chèque', party: 'CLT-003', amount: 2000000, due: TODAY, st: 'portfolio' }); c.done = 'تسجل. المبالغ كيشوفهم غير المالك.'; }
+      if (c.card.kind === 'ret') { S.returns.push({ m3: 2 }); c.done = 'تسجل الرجوع كخسارة.'; }
+      if (c.card.kind === 'inv') { c.done = 'شوف «الفواتير» باش تصدرها.'; S.tab = 'invoices'; }
+      c.cs = 'done';
+    });
+
+    // ---------- navigation
+    const GROUPS = [
+      { k: 'today', label: 'اليوم', subs: [['today', 'ملخص اليوم']] },
+      { k: 'ops', label: 'العمليات', subs: [['dispatch', 'البرمجة والشاحنات'], ['stock', 'السطوك والاستهلاك'], ['quality', 'الجودة']] },
+      { k: 'sales', label: 'المبيعات', subs: [['orders', 'الطلبيات'], ['bls', 'البونات'], ['invoices', 'الفواتير'], ['clients', 'الزبناء']] },
+      { k: 'buy', label: 'المشتريات', subs: [['purchases', 'الطلب والاستلام'], ['suppliers', 'الموردين']] },
+      { k: 'cash', label: 'الخزينة', subs: [['cash', 'الشيكات والخلاص']] },
+      { k: 'reports', label: 'التقارير', subs: [['sales', 'المبيعات والتصدير']] }
+    ];
+    const ALLOW = { owner: null, office: ['today', 'orders', 'bls', 'invoices', 'clients', 'purchases', 'sales'], plant: ['dispatch', 'stock', 'quality', 'bls', 'purchases'] };
+    const ok = (k) => !ALLOW[role] || ALLOW[role].indexOf(k) >= 0;
+    const allTabs = []; GROUPS.forEach((g) => g.subs.forEach((s) => { if (ok(s[0])) allTabs.push(s[0]); }));
+    const tab = allTabs.indexOf(st.tab) >= 0 ? st.tab : allTabs[0];
+    const curG = GROUPS.find((g) => g.subs.some((s) => s[0] === tab));
+    const late = Object.keys(IS).filter((k) => IS[k].s === 'late').length;
+    const groups = GROUPS.filter((g) => g.subs.some((s) => ok(s[0]))).map((g) => ({ label: g.label, current: g === curG ? 'page' : 'false', style: g === curG ? 'color: #FFFFFF; font-weight: 600; box-shadow: inset 0 -4px 0 ' + RED : 'color: #A3A7A2; box-shadow: none', hasCount: owner && g.k === 'sales' && late > 0, count: String(late), pick: () => commit((S) => { S.tab = g.subs.find((s) => ok(s[0]))[0]; }) }));
+    const subs = curG.subs.filter((s) => ok(s[0])).map((s) => ({ label: s[1], current: s[0] === tab ? 'page' : 'false', style: s[0] === tab ? 'font-weight: 600; box-shadow: inset 0 -3px 0 #1B1D1C' : 'color: #4A4E4B; box-shadow: none', pick: () => commit((S) => { S.tab = s[0]; }) }));
+    const chipD = (on) => on ? 'background: #FFFFFF; color: #1B1D1C; border: 1px solid #FFFFFF' : 'background: transparent; color: #E6E7E3; border: 1px solid #5E6360';
+    const chip = (on) => on ? 'background: #1B1D1C; color: #FFFFFF; border: 2px solid #1B1D1C' : 'background: transparent; color: #1B1D1C; border: 2px solid #8D918C';
+    const roles = [['owner', 'المالك'], ['office', 'المكتب'], ['plant', 'المعمل']].map((r) => ({ label: r[1], pressed: role === r[0] ? 'true' : 'false', style: chipD(role === r[0]), pick: () => commit((S) => { S.role = r[0]; S.chat = []; S.fx = null; }) }));
+    const roleName = owner ? 'المالك' : (office ? 'المكتب' : 'المعمل');
+    const t = { today: tab === 'today', dispatch: tab === 'dispatch', stock: tab === 'stock', quality: tab === 'quality', orders: tab === 'orders', docs: tab === 'bls' || tab === 'invoices', clients: tab === 'clients' || tab === 'suppliers', purchases: tab === 'purchases', cash: tab === 'cash', sales: tab === 'sales' };
+
+    let fx = { show: false, title: '', lines: [], border: '' };
+    if (st.fx) { const ls = st.fx.lines.filter((l) => owner || !l.m); fx = { show: true, title: st.fx.title, border: 'border-color: ' + (st.fx.bad ? RED : GREEN), lines: (ls.length ? ls : [L('تسجل.')]).map((l) => ({ t: l.t, style: l.m ? 'font-weight: 600' : 'color: #3A3E3B' })) }; }
+
+    // ---------- today
+    const cc = cover('cem');
+    const toInvCount = delivered.filter((x) => st.invBL.indexOf(x.bl) < 0).length;
+    const unsigned = delivered.filter((x) => st.signed.indexOf(x.bl) < 0).length;
+    const poArrived = st.pos.find((p) => p.eta <= now && p.recs.reduce((a, r) => a + r.q, 0) < p.qty);
+    const briefLines = [
+      { text: 'الإسمنت كيكفي تقريبا ' + dec1(Math.max(0, cc)) + ' نهار من بعد طلبيات اليوم.' + (poArrived && poArrived.comp === 'cem' ? ' الشاحنة ديال FRN-01 وصلات: سجّل الاستلام.' : ''), dot: 'background: ' + (cc < 1 ? AMBER : GREEN), btn: poArrived ? 'الاستلام' : 'السطوك', go: () => commit((S) => { S.tab = poArrived ? 'purchases' : 'stock'; }) },
+      { text: unplanned.length ? unplanned.length + ' طلبيات باقي ما تبرمجوش، وCAM-06 فالإصلاح.' : 'جميع الطلبيات مبرمجين، وCAM-06 فالإصلاح.', dot: 'background: ' + (unplanned.length ? AMBER : GREEN), btn: 'البرمجة', go: () => commit((S) => { S.tab = 'dispatch'; }) },
+      { text: toInvCount + ' بونات تسلمو وباقي ما تفوترو، و' + unsigned + ' باقي ما رجعوش موقعين.', dot: 'background: ' + (toInvCount ? AMBER : GREEN), btn: 'البونات', go: () => commit((S) => { S.tab = 'bls'; }) },
+      { text: 'عينة Q-1175 (B25، CLT-021) عطات 22,4 MPa فـ 28 يوم، تحت 25.', dot: 'background: ' + RED, btn: 'الجودة', go: () => commit((S) => { S.tab = 'quality'; }) }
+    ].concat(owner ? [{ text: late + ' فواتير فات الأجل ديالهم. أدنى رصيد فالأيام الجاية: ' + money(FC[iMin].bal) + ' نهار ' + FC[iMin].d + '.', dot: 'background: ' + (FC[iMin].bal < 0 ? RED : GREEN), btn: 'الزبناء', go: () => commit((S) => { S.tab = 'clients'; }) }] : []);
+    const brief = { title: m3Today + ' m³ خرجو حتى ' + hm(now) + ' من ' + m3Planned + ' مبرمجين.' + (owner && FC[iMin].bal < 0 ? ' والجمعة كتحتاج قرار.' : (cc < 1 ? ' الإسمنت خاصو انتباه.' : '')), lines: briefLines };
+    const kpis = [
+      { label: 'خرج اليوم', value: m3Today + ' m³', sub: 'من ' + m3Planned + ' مبرمجين', style: '' },
+      { label: 'شاحنات فالخدمة', value: TRUCKS.filter((k) => !k.broken && P.some((x) => x.truck === k.id && x.s <= now && now < x.re)).length + ' / 5', sub: 'CAM-06 فالإصلاح', style: '' },
+      { label: 'الإسمنت كيكفي', value: dec1(Math.max(0, cc)) + ' نهار', sub: 'من بعد طلبيات اليوم', style: cc < 1 ? 'color: ' + AMBER : '' },
+      { label: 'بونات خاصها تتفوتر', value: String(toInvCount), sub: unsigned + ' باقي ما رجعوش موقعين', style: '' }
+    ].concat(owner ? [{ label: 'للتحصيل، فات الأجل', value: money(Object.keys(IS).filter((k) => IS[k].s === 'late').reduce((a, k) => a + IS[k].left, 0)), sub: late + ' فواتير', style: late ? 'color: ' + RED : '' }] : []);
+    const fcScale = Math.max(20000000, ...FC.map((x) => Math.abs(x.bal)));
+    const fcOpts = [];
+    if (FC[iMin].bal < 0) {
+      const kM = dkey(FC[iMin].d), nd = '02/12';
+      st.pays.filter((p) => p.st === 'open' && dkey(p.due) <= kM).sort((a, b) => b.amount - a.amount).slice(0, 1).forEach((p) => fcOpts.push({ t: 'أجّل ' + p.label + ' (' + SUP[p.sup] + ') لـ ' + nd + '، بموافقة المورد.', cover: '+' + grp(p.amount / 100), btn: 'المورد وافق', run: () => postpone(p.id, nd) }));
+      st.inst.filter((i) => i.dir === 'in' && i.st === 'portfolio' && dkey(i.due) > kM).slice(0, 1).forEach((i) => fcOpts.push({ t: 'خصم ' + i.kind + ' ديال ' + CL[i.party].name + ' فالبنك قبل الأجل (مصاريف تقريبا 1%).', cover: '+' + grp(Math.round(i.amount * 0.99) / 100), btn: 'طلب الخصم', run: () => discount(i.id) }));
+    }
+    const fc = { title: FC[iMin].bal < 0 ? 'نهار ' + FC[iMin].d + ' ناقص ' + grp(-FC[iMin].bal / 100) + ' درهم' : 'الفلوس فـ 7 أيام: حتى نهار ما ناقص', bars: FC.map((x, i) => { const pos = x.bal >= 0, h = Math.max(3, Math.round(Math.abs(x.bal) / fcScale * (pos ? 90 : 100))); return { d: i === 0 ? 'اليوم' : x.d, v: (x.bal < 0 ? '−' : '') + grp(Math.abs(x.bal) / 100), pos: pos ? 'height: ' + h + 'px; background: ' + (i === 0 ? '#474B48' : '#999D98') : 'height: 0', neg: pos ? 'height: 0' : 'height: ' + Math.min(50, h) + 'px; background: repeating-linear-gradient(135deg, ' + RED + ' 0 6px, #E98A74 6px 11px)', vs: pos ? 'color: ' + INK : 'color: ' + RED, ls: i === 0 ? 'font-weight: 700' : 'color: #5E6360' }; }), opts: fcOpts };
+
+    // ---------- dispatch
+    const ticks = []; for (let h = 7; h <= 18; h++) ticks.push({ label: String(h).padStart(2, '0') + ':00', pos: 'left: ' + ((h * 60 - T0) / (T1 - T0) * 100) + '%' });
+    const pct = (m) => Math.max(0, Math.min(100, (m - T0) / (T1 - T0) * 100));
+    const lanes = TRUCKS.map((k) => {
+      const ts = P.filter((x) => x.truck === k.id).sort((a, b) => a.s - b.s), cur = ts.find((x) => x.s <= now && now < x.re);
+      let stT = 'فالمعمل', stS = 'color: #5E6360';
+      if (k.broken) { stT = 'فالإصلاح'; stS = 'color: ' + RED; } else if (cur) { const s = stateOf(cur, now); stT = { loading: 'كتشحن', go: 'فالطريق، ' + ZONES[cur.o.zone][0], unload: 'كتفرغ عند ' + cur.o.c, back: 'راجعة' }[s]; stS = 'font-weight: 600'; } else { const nx = ts.find((x) => x.s > now); if (nx) stT = 'الجاية ' + hm(nx.s); }
+      return { id: k.id, cap: k.cap + ' m³', st: stT, stStyle: stS, broken: !!k.broken, blocks: ts.map((x) => { const tot = x.re - x.s, w = (m) => 'width: ' + (m / tot * 100) + '%'; return { box: 'left: ' + pct(x.s) + '%; width: ' + (tot / (T1 - T0) * 100) + '%;' + (x.re <= now ? ' opacity: .45' : ''), w1: w(LOAD), w2: w(x.t), w3: w(x.m3 * UNL), w4: w(x.t), label: x.m3 + 'm³', tip: CL[x.o.c].name + ': ' + x.m3 + ' m³ ' + x.o.type + '، شحن ' + hm(x.s) + '، وصول ' + hm(x.ae) }; }) };
+    });
+    const orderInfo = (o) => { const ts = P.filter((x) => x.order === o.id).sort((a, b) => a.s - b.s); if (!ts.length) return null; let gap = 0; for (let i = 1; i < ts.length; i++) gap = Math.max(gap, ts[i].ae - ts[i - 1].ue); return { n: ts.length, delay: ts[0].ae - o.start, gap: gap, loaded: ts.filter((x) => x.le <= now).reduce((a, x) => a + x.m3, 0) }; };
+    const planRows = ORD.map((o) => { const i = orderInfo(o); let s, d; if (!i) { s = o.start < now + 30 ? 'ماشي مبرمجة، والوقت قرب' : 'ماشي مبرمجة'; d = o.start < now + 30 ? RED : GREY; } else if (i.loaded >= o.m3) { s = 'خرجات كاملة'; d = GREEN; } else { const b = [i.n + ' رحلات، ' + i.loaded + '/' + o.m3 + ' m³ خرجو']; if (i.delay > 0) b.push('تأخير ' + i.delay + ' د'); if (i.gap > 30) b.push('فراغ ' + i.gap + ' د فالصب'); s = b.join('، '); d = i.delay > 0 || i.gap > 30 ? AMBER : BLUE; } return { name: CL[o.c].name, sub: o.id + '، ' + o.m3 + ' m³ ' + o.type + '، ' + ZONES[o.zone][0] + '، ' + hm(o.start), st: s, dot: 'background: ' + d, canPlan: !i, plan: () => commit((S) => { S.trips = planMany(S.trips, [o.id], S.now); }) }; });
+
+    // ---------- stock
+    const silos = COMP.map((c) => { const v = Math.max(0, stock[c.k]), cv = cover(c.k), low = cv < 1; return { name: c.name, qty: tq(c.k, v), fill: 'height: ' + Math.max(2, Math.min(100, Math.round(v / c.cap * 100))) + '%; background: ' + (low ? 'repeating-linear-gradient(135deg, ' + AMBER + ' 0 6px, #E2C27A 6px 11px)' : 'radial-gradient(#767A75 1px, transparent 1.6px) 0 0 / 9px 9px, radial-gradient(#B7BAB5 1px, transparent 1.6px) 4px 5px / 11px 11px, #999D98'), cover: 'كيكفي ' + dec1(Math.max(0, cv)) + ' نهار', coverStyle: low ? 'color: ' + AMBER : 'color: ' + GREEN }; });
+    const stockNote = 'خرج اليوم ' + tq('cem', loaded.reduce((a, x) => a + RECIPE[x.o.type].cem * x.m3, 0)) + ' إسمنت. الاستلامات كتزيد من «المشتريات».';
+    const arco = loaded.slice(0, 8).map((x, i) => { const th = RECIPE[x.o.type].cem * x.m3, f = [1.012, 1.004, 1.038, 0.998, 1.021, 1.009, 1.047, 1.002][i % 8], ac = Math.round(th * f / 5) * 5, g = (ac - th) / th * 100; return { bl: x.bl, load: x.m3 + ' m³ ' + x.o.type, th: grp(th) + ' kg', ac: grp(ac) + ' kg', gap: (g >= 0 ? '+' : '−') + dec1(Math.abs(g)) + '%', style: g > 3 ? 'color: ' + RED : (g > 2 ? 'color: ' + AMBER : 'color: ' + GREEN) }; });
+    const VAR = [['الإسمنت', 412.6, 431.9, 't'], ['الرملة', 1063, 1071.5, 't'], ['الحصى 8/15', 556, 562.1, 't'], ['الحصى 15/25', 821, 817.7, 't'], ['المادة المضافة', 4210, 4332, 'L']];
+    const variance = VAR.map((v) => { const g = (v[2] - v[1]) / v[1] * 100; return { name: v[0], pair: dec1(v[1]) + ' / ' + dec1(v[2]) + ' ' + v[3], gap: (g > 0 ? '+' : '−') + dec1(Math.abs(g)) + '%', style: Math.abs(g) > 2 ? 'color: ' + RED : 'color: ' + GREEN }; });
+    const returnsLine = 'الرجوعات هاد الشهر: ' + dec1(6.5 + st.returns.reduce((a, r) => a + r.m3, 0)) + ' m³، محسوبة كخسارة.';
+
+    // ---------- quality
+    const QS = [['Q-1182', 'BL-2026-0301', 'Promotion Al Amal (fictif)', 'B20', '18 cm', '17,9 MPa', '03/12', 'p'], ['Q-1179', 'BL-2026-0288', 'Bâtir Nord SARL (fictif)', 'B25', '16 cm', '19,1 MPa', '30/11', 'p'], ['Q-1175', 'BL-2026-0262', 'Chantier Kitane (fictif)', 'B25', '21 cm', '15,0 MPa', '22,4 MPa', 'f'], ['Q-1171', 'BL-2026-0255', 'Résidence Martil Plage (fictif)', 'B25', '17 cm', '18,6 MPa', '27,8 MPa', 'o'], ['Q-1168', 'BL-2026-0249', 'Coopérative Wifak (fictif)', 'B12', '15 cm', '9,2 MPa', '14,1 MPa', 'o']];
+    const QST = { p: ['كتسنا 28 يوم', BLUE], o: ['مطابقة', GREEN], f: ['ما وصلاتش للمقاومة', RED] };
+    const samples = QS.map((q) => ({ id: q[0], bl: q[1], client: q[2], type: q[3], slump: q[4], d7: q[5], d28: q[6], st: QST[q[7]][0], dot: 'background: ' + QST[q[7]][1] }));
+    const trace = [['الزبون', 'Chantier Kitane (fictif)', 'CLT-021، Kitane', GREY], ['البون والشاحنة', 'BL-2026-0262', 'CAM-02، 05/10 10:40', GREY], ['الوصفة', 'B25، النسخة 2', '340 kg إسمنت فالـ m³', GREY], ['الإسمنت', 'R-114، FRN-01', 'دخل 02/10', GREY], ['الـ slump', '21 cm', 'عالي (المعتاد 16 إلى 18)', AMBER], ['النتيجة', '22,4 MPa', 'المطلوب 25', RED]].map((x) => ({ k: x[0], v: x[1], sub: x[2], border: 'border-color: ' + x[3] }));
+
+    // ---------- orders chain
+    const chains = ORD.map((o) => {
+      const ts = P.filter((x) => x.order === o.id), pl = ts.reduce((a, x) => a + x.m3, 0), ld = ts.filter((x) => x.le <= now).reduce((a, x) => a + x.m3, 0), dl = ts.filter((x) => x.ue <= now).reduce((a, x) => a + x.m3, 0);
+      const mine = loaded.filter((x) => x.order === o.id), blIds = mine.map((x) => x.bl), invd = mine.filter((x) => st.invBL.indexOf(x.bl) >= 0).reduce((a, x) => a + x.m3, 0);
+      const invsOf = st.invs.filter((f) => f.date === TODAY && f.lines.some((l) => blIds.some((b) => l.bl.indexOf(b) >= 0)));
+      const paid = invsOf.length ? invsOf.every((f) => IS[f.id] && (IS[f.id].s === 'paid' || IS[f.id].s === 'covered')) : false;
+      const box = (done, part) => done ? 'background: #1B1D1C; color: #FFFFFF' : (part ? 'background: #D5D7D2; color: #1B1D1C' : 'background: transparent; color: #5E6360; outline: 1px dashed #BFC2BD; outline-offset: -1px');
+      return { name: CL[o.c].name, code: o.id, sub: o.m3 + ' m³ ' + o.type + '، ' + ZONES[o.zone][0], hasValue: owner, value: money(o.m3 * PU[o.type] * 1.2) + ' TTC',
+        steps: [{ k: 'طلبية', v: o.m3 + ' m³', box: box(true) }, { k: 'مبرمجة', v: pl + ' m³', box: box(pl >= o.m3, pl > 0) }, { k: 'خرجات', v: ld + ' m³', box: box(ld >= o.m3, ld > 0) }, { k: 'تسلمات', v: dl + ' m³', box: box(dl >= o.m3, dl > 0) }, { k: 'تفوترات', v: invd + ' m³', box: box(invd >= o.m3, invd > 0) }, { k: 'تخلصات', v: owner ? (paid ? 'نعم' : (invsOf.length ? 'لا' : '—')) : '•••', box: box(paid, invsOf.length > 0) }] };
+    });
+
+    // ---------- documents
+    const isBLtab = tab === 'bls';
+    const showToInvoice = tab === 'invoices';
+    const toInvoice = Object.keys(CL).map((c) => { const xs = delivered.filter((x) => x.o.c === c && st.invBL.indexOf(x.bl) < 0); return xs.length ? { name: CL[c].name, detail: xs.length + ' بون، ' + xs.reduce((a, x) => a + x.m3, 0) + ' m³' + (owner ? '، ' + money(xs.reduce((a, x) => a + x.m3 * PU[x.o.type], 0)) + ' HT' : ''), issue: () => issueInvoice(c) } : null; }).filter((x) => x);
+    const ISTL = { paid: ['مخلصة', GREEN], covered: ['مغطية بشيك ما تحصلش', BLUE], partial: ['مخلصة جزئيا', AMBER], unpaid: ['ما تخلصاتش', GREY], late: ['فات الأجل', RED] };
+    let docList, docListTitle;
+    if (isBLtab) {
+      docListTitle = 'بونات التسليم';
+      docList = loaded.slice().reverse().map((x) => { const s = stateOf(x, now), signed = st.signed.indexOf(x.bl) >= 0, inv = st.invBL.indexOf(x.bl) >= 0; const stT = s === 'loading' || s === 'go' ? 'فالطريق' : (s === 'unload' ? 'كيتفرغ' : (inv ? 'مفوتر' : (signed ? 'رجع موقع' : 'تسلم، ما رجعش موقع'))); const dt = s === 'loading' || s === 'go' || s === 'unload' ? BLUE : (inv || signed ? GREEN : AMBER); const sel = st.docSel && st.docSel.id === x.bl; return { id: x.bl, when: hm(x.le), who: (plant ? x.o.c : CL[x.o.c].name) + '، ' + x.m3 + ' m³ ' + x.o.type, st: stT, dot: 'background: ' + dt, pressed: sel ? 'true' : 'false', rowStyle: sel ? 'background: #1B1D1C; color: #FFFFFF' : '', pick: () => commit((S) => { S.docSel = { kind: 'bl', id: x.bl }; }) }; });
+    } else {
+      docListTitle = 'الفواتير';
+      docList = st.invs.slice().reverse().map((f) => { const s = IS[f.id] ? IS[f.id].s : 'unpaid', sel = st.docSel && st.docSel.id === f.id; return { id: f.id, when: f.date, who: CL[f.c].name + (owner ? '، ' + money(ttc(f.lines).ttc) : ''), st: owner ? ISTL[s][0] : '', dot: owner ? 'background: ' + ISTL[s][1] : 'background: transparent', pressed: sel ? 'true' : 'false', rowStyle: sel ? 'background: #1B1D1C; color: #FFFFFF' : '', pick: () => commit((S) => { S.docSel = { kind: 'inv', id: f.id }; }) }; });
+    }
+    const col = (tx, f, a) => ({ t: tx, style: 'flex: ' + f + '; min-width: 0; text-align: ' + (a || 'left') + ';' });
+    const actsFor = (kind, id) => {
+      const out = [{ label: 'طبع', run: () => commit((S) => fxSet(S, 'الطبع', [L('فالتطبيق الحقيقي كيتحل الطبع ولا PDF، وكيتسجل فالسجل.')])) }, { label: 'PDF', run: () => commit((S) => fxSet(S, 'PDF', [L(id + '.pdf تصاوب (فالنموذج غير مثال).')])) }];
+      if (kind === 'bl' && st.signed.indexOf(id) < 0 && delivered.some((x) => x.bl === id)) out.push({ label: 'رجع موقع', run: () => commit((S) => { S.signed.push(id); fxSet(S, 'البون رجع موقع', [L(id + ' تقيد كموقع.')]); }) });
+      if (kind === 'inv' && owner) out.push({ label: 'صيفط للزبون', run: () => commit((S) => fxSet(S, 'تحضرات الرسالة', [L('الإيميل مع ' + id + '.pdf واجد. كتصيفطو نتا من التطبيق.')])) });
+      return out;
+    };
+    let doc = { show: false, locked: false, hint: isBLtab ? 'باقي ما خرج حتى بون اليوم. قدّم الوقت.' : 'اختار وثيقة من اللائحة.', actions: [], meta: [], cols: [], rows: [], totals: [], hasTotals: false, note: '', sign: false, title: '', number: '', date: '' };
+    const sel = st.docSel;
+    const selBL = sel && sel.kind === 'bl' ? loaded.find((x) => x.bl === sel.id) : (isBLtab && loaded.length ? loaded[loaded.length - 1] : null);
+    const selInv = sel && sel.kind === 'inv' ? st.invs.find((f) => f.id === sel.id) : null;
+    const invShown = !isBLtab ? (selInv || st.invs[st.invs.length - 1]) : null;
+    if (isBLtab && selBL) {
+      doc = { show: true, locked: false, hint: 'البون كيتصاوب بوحدو ملي كتشحن الشاحنة. بلا أثمنة.', actions: actsFor('bl', selBL.bl), title: 'BON DE LIVRAISON', number: selBL.bl, date: '23/11/2026 ' + hm(selBL.le), meta: [{ k: 'Client', v: CL[selBL.o.c].name + ' (' + selBL.o.c + ')' }, { k: 'Chantier', v: CL[selBL.o.c].site }, { k: 'Commande', v: selBL.order }, { k: 'Camion / chauffeur', v: selBL.truck + ', ' + TRUCKS.find((k) => k.id === selBL.truck).dr + ' (fictif)' }], cols: [col('Désignation', 2), col('Quantité', 1), col('Départ', 1), col('Arrivée prévue', 1)], rows: [{ cells: [col('Béton ' + selBL.o.type, 2), col(selBL.m3 + ' m³', 1), col(hm(selBL.le), 1), col(hm(selBL.ae), 1)] }], totals: [], hasTotals: false, note: 'Document sans prix. Recette ' + selBL.o.type + ' en vigueur.', sign: true };
+    } else if (invShown) {
+      if (!owner) doc = Object.assign({}, doc, { locked: true, hint: 'الفاتورة كيطبعها المالك.' });
+      else { const tt = ttc(invShown.lines), s = IS[invShown.id]; doc = { show: true, locked: false, hint: 'الحالة: ' + ISTL[s.s][0] + (s.left ? '، باقي ' + money(s.left) : '') + '.', actions: actsFor('inv', invShown.id), title: 'FACTURE', number: invShown.id, date: invShown.date + '/2026, échéance ' + invShown.due + (invShown.due.length === 5 ? '/2026' : ''), meta: [{ k: 'Facturé à', v: CL[invShown.c].name + ' (' + invShown.c + ')' }, { k: 'Règlement', v: CL[invShown.c].terms }], cols: [col('Désignation', 1.3), col('Bons de livraison', 2), col('Qté m³', .7, 'right'), col('PU HT', .9, 'right'), col('Montant HT', 1.1, 'right')], rows: invShown.lines.map((l) => ({ cells: [col('Béton ' + l.type, 1.3), col(l.bl, 2), col(String(l.m3), .7, 'right'), col(fr(PU[l.type]), .9, 'right'), col(fr(l.m3 * PU[l.type]), 1.1, 'right')] })), totals: [{ k: 'Total HT', v: fr(tt.ht) + ' MAD', style: 'border-bottom: 1px solid #BFC2BD' }, { k: 'TVA 20 %', v: fr(tt.tva) + ' MAD', style: 'border-bottom: 1px solid #1B1D1C' }, { k: 'Total TTC', v: fr(tt.ttc) + ' MAD', style: 'border-bottom: 4px double #1B1D1C; font-weight: 700' }], hasTotals: true, note: 'Numérotation séquentielle annuelle. Délai de paiement conforme à la loi 69-21.', sign: false }; }
+    }
+
+    // ---------- clients and suppliers
+    const isSup = tab === 'suppliers';
+    let party;
+    if (!isSup) {
+      const c = st.selC, b = balOf(st, c);
+      const rows = []; let run = 0;
+      const ev = st.invs.filter((f) => f.c === c).map((f) => ({ k: dkey(f.date), d: f.date, label: 'فاتورة ' + f.id, debit: ttc(f.lines).ttc, credit: 0 })).concat(st.inst.filter((i) => i.dir === 'in' && i.party === c).map((i) => ({ k: dkey(i.due.length > 5 ? TODAY : i.due) + (i.st === 'portfolio' ? 0.5 : 0), d: i.due.length > 5 ? TODAY : i.due, label: i.kind + (i.st === 'portfolio' ? ' فالمحفظة' : (i.st === 'bounced' ? ' (رجع)' : '')), debit: 0, credit: i.st === 'bounced' ? 0 : i.amount })));
+      ev.sort((a, b2) => a.k - b2.k).forEach((e) => { run += e.debit - e.credit; rows.push({ d: e.d, label: e.label, debit: e.debit ? money(e.debit) : '', credit: e.credit ? money(e.credit) : '', run: money(run) }); });
+      const amts = owner ? [['full', 'الباقي كامل'], ['half', 'النص'], ['a10', '10 000 MAD']] : [['a10', '10 000 MAD'], ['a25', '25 000 MAD']];
+      const curA = amts.some((a) => a[0] === st.payF.amt) ? st.payF.amt : amts[0][0];
+      party = {
+        listTitle: 'الزبناء', name: CL[c].name, blind: !owner, showRows: owner, rows: rows.length ? rows : [{ d: '', label: 'ما كاين حتى حركة', debit: '', credit: '', run: '' }], debitLabel: 'عليه', creditLabel: 'خلّص',
+        exports: owner ? [{ label: 'PDF', run: () => commit((S) => fxSet(S, 'كشف الحساب', [L('كشف الحساب ديال ' + CL[c].name + ' تصاوب PDF.')])) }, { label: 'CSV', run: () => commit((S) => fxSet(S, 'كشف الحساب', [L('ملف CSV تصاوب.')])) }] : [],
+        list: Object.keys(CL).map((k) => { const bb = balOf(st, k), late2 = st.invs.some((f) => f.c === k && IS[f.id] && IS[f.id].s === 'late'); return { name: CL[k].name, st: owner ? (late2 ? 'فات الأجل' : (bb > 0 ? 'فالوقت' : (bb < 0 ? 'عندو تسبيق' : 'مخلص'))) : k, dot: owner ? 'background: ' + (late2 ? RED : (bb > 0 ? BLUE : GREEN)) : 'background: #BFC2BD', bal: owner ? money(bb) : '', pressed: k === c ? 'true' : 'false', style: k === c ? 'background: #1B1D1C; color: #FFFFFF' : 'background: transparent; color: #1B1D1C', pick: () => commit((S) => { S.selC = k; }) }; }),
+        payTitle: 'تسجيل خلاص من هاد الزبون', amts: amts.map((a) => ({ label: a[1], pressed: curA === a[0] ? 'true' : 'false', style: chip(curA === a[0]), pick: () => commit((S) => { S.payF.amt = a[0]; }) })),
+        meths: [['cash', 'نقدا'], ['chq', 'شيك'], ['lcn', 'LCN 60 يوم'], ['split', '3 شيكات']].map((m) => ({ label: m[1], pressed: st.payF.meth === m[0] ? 'true' : 'false', style: chip(st.payF.meth === m[0]), pick: () => commit((S) => { S.payF.meth = m[0]; }) })),
+        pay: recordPay, payDisabled: owner && b <= 0, payHint: owner ? (b <= 0 ? 'ما عليه والو دابا.' : 'المبلغ: ' + money(curA === 'half' ? Math.round(b / 2) : (curA === 'a10' ? Math.min(1000000, b) : b))) : 'إدخال أعمى.'
+      };
+    } else {
+      const s = st.selS; let run = 0; const rows = [];
+      st.pays.filter((p) => p.sup === s).forEach((p) => { run += p.amount; rows.push({ d: p.due, label: p.label, debit: '', credit: money(p.amount), run: money(run) }); if (p.st === 'paid') { run -= p.amount; rows.push({ d: TODAY, label: 'تخلص بتحويل', debit: money(p.amount), credit: '', run: money(run) }); } if (p.st === 'covered') rows.push({ d: p.due, label: 'مغطي بشيك (ما تقدمش)', debit: '', credit: '', run: money(run) }); });
+      const openP = st.pays.filter((p) => p.sup === s && p.st === 'open');
+      party = {
+        listTitle: 'الموردين', name: SUP[s], blind: false, showRows: true, rows: rows.length ? rows : [{ d: '', label: 'ما كاين حتى حركة', debit: '', credit: '', run: '' }], debitLabel: 'خلصنا', creditLabel: 'علينا',
+        exports: [{ label: 'PDF', run: () => commit((S) => fxSet(S, 'كشف الحساب', [L('كشف الحساب ديال ' + SUP[s] + ' تصاوب PDF.')])) }],
+        list: Object.keys(SUP).map((k) => { const due = st.pays.filter((p) => p.sup === k && p.st !== 'paid').reduce((a, p) => a + p.amount, 0); return { name: SUP[k], st: k, dot: 'background: ' + (st.pays.some((p) => p.sup === k && p.st === 'open' && dkey(p.due) <= dkey('25/11')) ? RED : BLUE), bal: money(due), pressed: k === s ? 'true' : 'false', style: k === s ? 'background: #1B1D1C; color: #FFFFFF' : 'background: transparent; color: #1B1D1C', pick: () => commit((S) => { S.selS = k; }) }; }),
+        payTitle: openP.length ? 'خلّص: ' + openP[0].label + ' (' + money(openP[0].amount) + '، الأجل ' + openP[0].due + ')' : 'ما كاين حتى دين مفتوح عند هاد المورد',
+        amts: [], meths: openP.length ? [['transfer', 'تحويل'], ['cheque', 'شيك'], ['split', 'جوج شيكات']].map((m) => ({ label: m[1], pressed: 'false', style: chip(false), pick: () => payPayable(openP[0].id, m[0]) })) : [],
+        pay: () => {}, payDisabled: true, payHint: openP.length ? 'اختار الطريقة باش تخلص مباشرة.' : ''
+      };
+    }
+
+    // ---------- purchases
+    const poRows = st.pos.map((p) => {
+      const got = p.recs.reduce((a, r) => a + r.q, 0), left = p.qty - got, arrived = now >= p.eta;
+      const box = (done, part) => done ? 'background: #1B1D1C; color: #FFFFFF' : (part ? 'background: #D5D7D2' : 'background: transparent; color: #5E6360; outline: 1px dashed #BFC2BD; outline-offset: -1px');
+      const acts = [];
+      if (left > 0) { acts.push({ label: 'استلم الكل (' + left + ' t)', run: () => receive(p.id, false), style: 'border: 0; background: #1B1D1C; color: #FFFFFF; font-weight: 600' }); if (left > 1) acts.push({ label: 'استلام جزئي', run: () => receive(p.id, true), style: 'background: transparent; border: 1px solid #1B1D1C' }); }
+      if (got > 0 && !p.inv && !plant) acts.push({ label: 'دخل فاتورة المورد بالصورة', run: () => scanInvoice(p.id), style: 'background: transparent; border: 1px solid #1B1D1C' });
+      return { id: p.id, sup: SUP[p.sup], what: (p.comp === 'cem' ? 'إسمنت ' : 'رملة ') + p.qty + ' t' + (owner ? '، ' + money(p.qty * p.price) : ''), st: left <= 0 ? 'توصل كامل' : (arrived ? 'الشاحنة وصلات، خاص الاستلام' : 'متوقع ' + (p.eta > T1 ? 'غدا' : hm(p.eta))), stStyle: left > 0 && arrived ? 'color: ' + RED + '; font-weight: 600' : 'color: #4A4E4B', steps: [{ k: 'الطلب', v: p.qty + ' t', box: box(true) }, { k: 'الاستلام', v: got + ' / ' + p.qty + ' t', box: box(left <= 0, got > 0) }, { k: 'فاتورة المورد', v: p.inv ? 'مطابقة' : '—', box: box(p.inv, false) }], acts: acts };
+    });
+
+    // ---------- cash
+    const portIn = st.inst.filter((i) => i.dir === 'in' && (i.st === 'portfolio' || i.st === 'deposited')).reduce((a, i) => a + i.amount, 0);
+    const outIss = st.inst.filter((i) => i.dir === 'out' && i.st === 'issued').reduce((a, i) => a + i.amount, 0);
+    const cashFig = [{ label: 'فالكاسة', value: money(st.cash.caisse), style: '' }, { label: 'فالبنك', value: money(st.cash.banque), style: st.cash.banque < 0 ? 'color: ' + RED : '' }, { label: 'شيكات داخلين ما تحصلوش', value: smoney(portIn), style: 'color: ' + GREEN }, { label: 'شيكات خارجين ما تقدموش', value: smoney(-outIss), style: 'color: ' + RED }, { label: 'إلا تحصل وتقدم كلشي', value: money(st.cash.caisse + st.cash.banque + portIn - outIss), style: '' }];
+    const IST = { portfolio: ['فالمحفظة', BLUE], deposited: ['فالبنك، كيتسنا', BLUE], cleared: ['تحصّل', GREEN], bounced: ['رجع', RED], issued: ['خرج، ما تقدمش', AMBER], paid: ['تقدم وتخلص', GREEN] };
+    const instRows = st.inst.slice().reverse().map((i) => { const a = []; if (i.st === 'portfolio') a.push({ label: 'أودع', run: () => instAct(i.id, 'deposit') }); if (i.st === 'deposited') { a.push({ label: 'تحصّل', run: () => instAct(i.id, 'clear') }); a.push({ label: 'رجع', run: () => instAct(i.id, 'bounce') }); } if (i.st === 'issued') a.push({ label: 'تقدم للبنك', run: () => instAct(i.id, 'present') }); return { dir: i.dir === 'in' ? 'داخل' : 'خارج', dirStyle: i.dir === 'in' ? 'color: ' + GREEN : 'color: ' + RED, kind: i.kind, party: i.dir === 'in' ? CL[i.party].name : SUP[i.party], amount: money(i.amount), due: i.due, st: IST[i.st][0], dot: 'background: ' + IST[i.st][1], acts: a }; });
+
+    // ---------- sales
+    const SALES = [['09/11', 96], ['10/11', 104], ['11/11', 88], ['12/11', 112], ['13/11', 120], ['14/11', 64], ['16/11', 96], ['17/11', 118], ['18/11', 124], ['19/11', 98], ['20/11', 106], ['21/11', 92], ['22/11', 58], ['23/11', m3Today]];
+    const salesBars = SALES.map((s, i) => ({ d: s[0], v: String(s[1]), bar: 'height: ' + Math.max(2, Math.round(s[1] / 130 * 120)) + 'px; background: ' + (i === SALES.length - 1 ? INK : '#999D98'), vs: i === SALES.length - 1 ? 'color: ' + INK : 'color: #5E6360' }));
+    const sum14 = SALES.reduce((a, s) => a + s[1], 0);
+    const salesTotal = sum14 + ' m³ فـ 14 يوم' + (owner ? '، تقريبا ' + money(sum14 * 74000) + ' HT' : '');
+    const exports = ['دفتر المبيعات', 'دفتر المشتريات', 'الخلاص والحركات', 'الأعمار ديال الديون'].map((n) => ({ label: n + ' (CSV)', run: () => commit((S) => fxSet(S, 'التصدير', [L(n + ': الملف تصاوب ومسجل فالسجل.')])) }));
+
+    // ---------- chat view
+    const chat = st.chat.map((c) => ({ q: c.q, lines: c.lines.map((l) => ({ t: l.t, style: l.k === 'w' ? 'font-weight: 600; color: #8F2A1F' : '' })), tools: c.tools.map((x) => ({ t: 'الأداة: ' + x })), payload: c.payload, hasCard: !!c.card, cardTitle: c.card ? c.card.title : '', cardLines: c.card ? c.card.lines.map((x) => ({ t: x })) : [], confirmLabel: c.card ? c.card.label : '', cardOpen: c.cs === 'open', cardDone: c.cs === 'done' || c.cs === 'cancel', doneText: c.cs === 'cancel' ? 'تلغات. ما تسجل والو.' : (c.done || ''), doneStyle: c.cs === 'cancel' ? 'color: #5E6360' : 'color: ' + GREEN, confirm: () => confirmCard(c.id), cancel: () => commit((S) => { const x = S.chat.find((y) => y.id === c.id); if (x) x.cs = 'cancel'; }), open: !!c.open, openStr: c.open ? 'true' : 'false', toggle: () => commit((S) => { const x = S.chat.find((y) => y.id === c.id); if (x) x.open = !x.open; }) }));
+
+    return {
+      groups: groups, subs: subs, roles: roles, roleName: roleName, owner: owner, notOwner: !owner, clock: hm(now), endOfDay: now >= T1,
+      plus30: () => commit((S) => { S.now = Math.min(T1, S.now + 30); }), plus120: () => commit((S) => { S.now = Math.min(T1, S.now + 120); }), reset: () => this.setState(initial()),
+      t: t, fx: fx, closeFx: () => commit((S) => { S.fx = null; }),
+      brief: brief, kpis: kpis, fc: fc, ticks: ticks, lanes: lanes, nowPos: 'left: ' + pct(now) + '%', planRows: planRows,
+      silos: silos, stockNote: stockNote, arco: arco, arcoShow: st.arco && arco.length > 0, arcoEmpty: !st.arco, arcoBtn: st.arco ? 'الملف ديال ARCO مستورد' : 'استورد الملف ديال ARCO', importArco: () => commit((S) => { S.arco = true; fxSet(S, 'تستورد الملف ديال المعمل', [L('الشحنات تربطو مع البونات. كاين شحنات فيهم الإسمنت كثر من 3% على الوصفة.')]); }),
+      variance: variance, returnsLine: returnsLine, samples: samples, trace: trace, chains: chains,
+      showToInvoice: showToInvoice, toInvoice: toInvoice, toInvoiceEmpty: toInvoice.length === 0, docList: docList, docListTitle: docListTitle, doc: doc,
+      party: party, poRows: poRows, cashFig: cashFig, instRows: instRows, salesBars: salesBars, salesTotal: salesTotal, exports: exports,
+      chat: chat, chatEmpty: chat.length === 0, suggest: SUG[role].map((s) => ({ q: s[1], ask: () => ask(s[0], s[1]) })), clearChat: () => commit((S) => { S.chat = []; })
+    };
+  }
+}
+</script>
+</body>
+</html>

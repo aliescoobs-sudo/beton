@@ -443,6 +443,27 @@
       },
       "statusColumn": "الحالة",
       "codeColumn": "الرمز"
+    },
+    "plants": {
+      "title": "المحطات",
+      "link": "المحطات",
+      "intro": "محطات الشركة. المخزون والطلبات والتحميلات والاستلامات تُتابَع لكل محطة وفي المجموع.",
+      "readOnly": "للقراءة فقط: المالك والشريك وحدهما يعدّلان المحطات.",
+      "code": "الرمز",
+      "name": "الاسم",
+      "status": "الحالة",
+      "statuses": {
+        "active": "نشطة",
+        "archived": "مؤرشفة"
+      },
+      "actions": "إجراءات",
+      "add": "إضافة المحطة",
+      "archive": "أرشفة",
+      "restore": "إعادة التفعيل",
+      "saved": "تم الحفظ.",
+      "invalid": "قيمة مرفوضة (رمز من 2 إلى 8 أحرف لاتينية كبيرة والاسم إلزامي).",
+      "duplicate": "توجد محطة بهذا الرمز أو الاسم.",
+      "error": "تم رفض الإجراء."
     }
   },
   "history": {
@@ -1462,7 +1483,9 @@
       "adjustmentsNone": "لا توجد تصحيحات بعد.",
       "adjDate": "التاريخ",
       "adjDifference": "الفارق",
-      "adjReason": "السبب"
+      "adjReason": "السبب",
+      "plants": "المحطات",
+      "plantTotal": "المجموع"
     },
     "note": {
       "title": "سند التسليم",
@@ -1502,14 +1525,26 @@
         "FUTURE_DATE": "تاريخ في المستقبل.",
         "FORBIDDEN": "إجراء غير مسموح.",
         "UNAUTHENTICATED": "انتهت الجلسة.",
-        "EXCESS_NEEDS_OWNER": "كمية تفوق الطلبية: المالك وحده يؤكدها."
+        "EXCESS_NEEDS_OWNER": "كمية تفوق الطلبية: المالك وحده يؤكدها.",
+        "PLANT_NOT_CONFIRMED": "لم تؤكد المحطة الوصول بعد.",
+        "PLANT_CONFIRMS_FIRST": "المحطة تؤكد الوصول ثم يسجّل المكتب الاستلام."
       },
       "continue": "متابعة",
       "partial": "استلام جزئي",
       "remaining": "المتبقي {qty}",
       "confirmExcess": "تأكيد كمية تفوق الطلبية (المالك)",
       "receivePartial": "تسجيل هذا الاستلام",
-      "partialState": "جزئي: {count} استلام"
+      "partialState": "جزئي: {count} استلام",
+      "confirmArrival": "تأكيد الوصول",
+      "arrivalConfirmed": "وصول مؤكَّد من المحطة",
+      "arrivalErrors": {
+        "INVALID": "إدخال غير صالح.",
+        "NOT_FOUND": "الشراء غير موجود أو ملغى.",
+        "NOT_YOUR_PLANT": "هذا الشراء موجّه إلى محطة أخرى.",
+        "ALREADY_CONFIRMED": "الوصول مؤكَّد من قبل: على المكتب تسجيله.",
+        "FORBIDDEN": "إجراء غير مسموح.",
+        "UNAUTHENTICATED": "انتهت الجلسة."
+      }
     },
     "dispatch": {
       "link": "برنامج اليوم",

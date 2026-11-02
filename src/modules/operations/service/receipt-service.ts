@@ -20,7 +20,9 @@ export type ReceiptError =
   | 'NOTHING_TO_RECEIVE'
   | 'FRACTIONAL_QUANTITY'
   | 'FUTURE_DATE'
-  | 'EXCESS_NEEDS_OWNER';
+  | 'EXCESS_NEEDS_OWNER'
+  | 'PLANT_NOT_CONFIRMED'
+  | 'PLANT_CONFIRMS_FIRST';
 
 export function receiptFailure(error: unknown): ReceiptError {
   const e = error as { code?: string; message?: string };
@@ -30,10 +32,12 @@ export function receiptFailure(error: unknown): ReceiptError {
     if (/cancelled/.test(m)) return 'PURCHASE_CANCELLED';
     if (/movements are missing|lines or the stock movements/.test(m)) return 'NOTHING_TO_RECEIVE';
     if (/more than ordered/.test(m)) return 'EXCESS_NEEDS_OWNER';
+    if (/plant has not confirmed/.test(m)) return 'PLANT_NOT_CONFIRMED';
     if (/whole number of base units/.test(m)) return 'FRACTIONAL_QUANTITY';
     if (/unknown purchase/.test(m)) return 'NOT_FOUND';
     return 'INVALID';
   }
+  if (e.code === '42501' && /plant confirms the arrival/.test(m)) return 'PLANT_CONFIRMS_FIRST';
   if (e.code === '23503' || isMalformedId(error)) return 'NOT_FOUND';
   throw error;
 }
@@ -120,6 +124,8 @@ export interface ReceivablePurchase {
   /** expected: nothing yet; partial: some lines short; complete: every line reached its ordered quantity. */
   status: 'expected' | 'partial' | 'complete';
   cancelled: boolean;
+  /** The plant has confirmed an arrival that the office has not recorded yet (first step of the two-step receipt). */
+  arrivalConfirmed: boolean;
 }
 
 /** Purchases with stocked lines, newest first: what is still to receive and what came in. Quantities only (no price). */
@@ -140,12 +146,14 @@ export async function listReceivable(appPool: pg.Pool, actor: SessionUser): Prom
       is_reversed: boolean;
       received_on: string | null;
       receipts: string;
+      arrival_confirmed: boolean;
     }>(
       `select o.purchase_id, o.code, o.supplier_code, to_char(o.order_date, 'YYYY-MM-DD') as order_date, o.line_id, o.name_fr, o.name_ar,
               o.unit_label, o.qty_milli::text, o.is_reversed,
               coalesce((select sum(x.qty_milli) from purchase_receipt_line x where x.purchase_line_id = o.line_id), 0)::text as received_milli,
               (select to_char(max(r.received_date), 'YYYY-MM-DD') from purchase_receipt r where r.purchase_id = o.purchase_id) as received_on,
-              (select count(*) from purchase_receipt r where r.purchase_id = o.purchase_id)::text as receipts
+              (select count(*) from purchase_receipt r where r.purchase_id = o.purchase_id)::text as receipts,
+              exists (select 1 from receipt_plant_confirmation c where c.purchase_id = o.purchase_id and c.receipt_id is null) as arrival_confirmed
          from purchase_line_ops o order by o.order_date desc, o.code desc, o.seq`,
     ),
   );
@@ -163,6 +171,7 @@ export async function listReceivable(appPool: pg.Pool, actor: SessionUser): Prom
         receipts: Number(r.receipts),
         status: 'expected',
         cancelled: r.is_reversed,
+        arrivalConfirmed: r.arrival_confirmed,
       };
       byPurchase.set(r.purchase_id, p);
     }
@@ -180,4 +189,36 @@ export async function listReceivable(appPool: pg.Pool, actor: SessionUser): Prom
     p.status = reached ? 'complete' : p.receipts > 0 ? 'partial' : 'expected';
   }
   return [...byPurchase.values()];
+}
+
+export type ArrivalError = 'NOT_FOUND' | 'NOT_YOUR_PLANT' | 'ALREADY_CONFIRMED' | 'INVALID';
+
+/**
+ * First step of a receipt (REQUIREMENTS-V1 §6, D133): the plant confirms that a delivery arrived. Nothing enters the stock
+ * yet; the office confirms with the supplier and enters the details (`recordReceipt`), which uses this confirmation.
+ * Owner, partner and the plant. No quantity and no price is written or returned.
+ */
+export async function confirmArrivalAtPlant(
+  appPool: pg.Pool,
+  actor: SessionUser,
+  input: { purchaseId: string; note?: string | null },
+): Promise<Result<{ confirmationId: string }, ArrivalError>> {
+  await require(appPool, actor, 'receipts.confirm_arrival');
+  const note = input.note?.trim() || null;
+  if (note !== null && note.length > 300) return err('INVALID');
+  try {
+    const { rows } = await inRequest(appPool, actor, (tx) =>
+      tx.query<{ id: string }>('select public.confirm_receipt_at_plant($1, $2) as id', [
+        input.purchaseId,
+        note,
+      ]),
+    );
+    return ok({ confirmationId: rows[0]?.id as string });
+  } catch (error) {
+    const e = error as { code?: string };
+    if (isUniqueViolation(error)) return err('ALREADY_CONFIRMED');
+    if (e.code === '42501') return err('NOT_YOUR_PLANT');
+    if (e.code === '23514' || isMalformedId(error)) return err('NOT_FOUND');
+    throw error;
+  }
 }

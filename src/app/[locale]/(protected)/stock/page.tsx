@@ -1,5 +1,7 @@
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { getPool } from '@/lib/db/pools';
+import Link from 'next/link';
+import { listPlants } from '@/modules/master-data';
 import { getStockLevels, listStockAdjustments } from '@/modules/operations';
 import { CountForm } from '@/modules/operations/ui/count-form';
 import { formatStockQty } from '@/modules/operations/ui/format';
@@ -10,11 +12,21 @@ import { EmptyState, PageHeader, StatusPill, Table, Td, Th } from '@/ui';
 import { countAction, thresholdAction } from './actions';
 
 /** Stock of every component, summed from its movements, with its status against the low threshold. Quantities only. */
-export default async function StockPage({ params }: { params: Promise<{ locale: string }> }) {
+export default async function StockPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ locale: string }>;
+  searchParams: Promise<{ plant?: string }>;
+}) {
   const { locale } = await params;
+  const { plant } = await searchParams;
   setRequestLocale(locale);
   const user = await requirePagePermission(locale, 'stock.read');
-  const levels = await getStockLevels(getPool('app'), user);
+  // With plants set up, the stock is read per plant (one tab each) and in total; without, as before.
+  const plants = (await listPlants(getPool('app'), user)).filter((p) => p.status === 'active');
+  const picked = plants.find((p) => p.id === plant) ?? null;
+  const levels = await getStockLevels(getPool('app'), user, { plantId: picked?.id ?? null });
   const canSet = can(user.role, 'stock.threshold');
   const canCount = can(user.role, 'stock.count');
   const adjustments = await listStockAdjustments(getPool('app'), user);
@@ -22,6 +34,23 @@ export default async function StockPage({ params }: { params: Promise<{ locale: 
   return (
     <div>
       <PageHeader title={t('title')} description={t('intro')} />
+      {plants.length > 0 && (
+        <nav aria-label={t('plants')} className="mb-4 flex flex-wrap gap-2" data-testid="stock-plants">
+          {[{ id: null, label: t('plantTotal') }, ...plants.map((p) => ({ id: p.id, label: p.name }))].map(
+            (p) => (
+              <Link
+                key={p.id ?? 'total'}
+                href={p.id ? `/stock?plant=${p.id}` : '/stock'}
+                aria-current={(picked?.id ?? null) === p.id ? 'page' : undefined}
+                className={(picked?.id ?? null) === p.id ? 'btn' : 'btn btn-secondary'}
+                data-testid={`stock-plant-${p.id ?? 'total'}`}
+              >
+                {p.label}
+              </Link>
+            ),
+          )}
+        </nav>
+      )}
       {levels.length === 0 ? (
         <EmptyState title={t('none')} data-testid="stock-none" />
       ) : (
@@ -32,8 +61,8 @@ export default async function StockPage({ params }: { params: Promise<{ locale: 
               <Th numeric>{t('level')}</Th>
               <Th numeric>{t('threshold')}</Th>
               <Th>{t('status')}</Th>
-              {canSet && <Th>{t('setThreshold')}</Th>}
-              {canCount && <Th>{t('count')}</Th>}
+              {canSet && (plants.length === 0 || picked) && <Th>{t('setThreshold')}</Th>}
+              {canCount && (plants.length === 0 || picked) && <Th>{t('count')}</Th>}
             </tr>
           </thead>
           <tbody>
@@ -52,18 +81,24 @@ export default async function StockPage({ params }: { params: Promise<{ locale: 
                       {t(`statuses.${l.status}`)}
                     </StatusPill>
                   </Td>
-                  {canSet && (
+                  {canSet && (plants.length === 0 || picked) && (
                     <Td>
                       <ThresholdForm
                         componentId={l.componentId}
                         baseUnit={l.baseUnit}
+                        plantId={picked?.id}
                         save={thresholdAction}
                       />
                     </Td>
                   )}
-                  {canCount && (
+                  {canCount && (plants.length === 0 || picked) && (
                     <Td>
-                      <CountForm componentId={l.componentId} baseUnit={l.baseUnit} count={countAction} />
+                      <CountForm
+                        componentId={l.componentId}
+                        baseUnit={l.baseUnit}
+                        plantId={picked?.id}
+                        count={countAction}
+                      />
                     </Td>
                   )}
                 </tr>

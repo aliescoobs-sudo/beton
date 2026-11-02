@@ -265,6 +265,12 @@ const GROUPS: GroupDef[] = [
     id: 'masterData',
     items: [
       {
+        path: '/master-data/plants',
+        labelKey: 'masterData.plants.link',
+        testId: 'plants-link',
+        allowed: 'plants.read',
+      },
+      {
         path: '/master-data/zones',
         labelKey: 'masterData.zones.link',
         testId: 'zones-link',

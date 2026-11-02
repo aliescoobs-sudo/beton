@@ -24,6 +24,7 @@ export { ForbiddenError } from './service/user-admin';
 export {
   asAiConfirmation,
   asDryRun,
+  inPlant,
   inRequest,
   inRequestRolledBack,
   isMalformedId,

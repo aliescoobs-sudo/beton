@@ -167,6 +167,40 @@ export const TABLE_ACCESS = {
     audited: true,
     exception: 'SPEC-clock §3 idempotency ledger; written only by the system actor (job runner).',
   },
+  plant: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'all',
+      plant: 'all',
+      system: 'all',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    exception:
+      "R1 (DECISIONS 124): the company's plants (Tétouan, Chefchaouen). Read by every internal role; written by the owner and partner (app_admin joins in R2); archived, never deleted.",
+  },
+  receipt_plant_confirmation: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'none',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    exception:
+      "R1 (DECISIONS 133): the plant's confirmation that a delivery arrived, first step of the two-step receipt. Written only by confirm_receipt_at_plant (SECURITY DEFINER), consumed by the office's receipt. No quantity, no price. Office reads receipts through the purchases, not this table.",
+  },
   zone: {
     kind: 'rls',
     read: {

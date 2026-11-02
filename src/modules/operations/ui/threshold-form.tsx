@@ -12,10 +12,13 @@ export type ThresholdResult = { ok: true } | { ok: false; error: string };
 export function ThresholdForm({
   componentId,
   baseUnit,
+  plantId,
   save,
 }: {
   componentId: string;
   baseUnit: string;
+  /** The plant whose threshold this is (R1); absent while no plant is set up. */
+  plantId?: string;
   save: (input: unknown) => Promise<ThresholdResult>;
 }) {
   const t = useTranslations('operations.stock');
@@ -31,7 +34,7 @@ export function ThresholdForm({
     const qty = milli.ok ? (big ? milli.value : milli.value % 1000 === 0 ? milli.value / 1000 : NaN) : NaN;
     if (!Number.isFinite(qty) || qty < 1) return setMessage(t('thresholdInvalid'));
     setMessage(null);
-    const result = await save({ componentId, lowQtyBase: qty });
+    const result = await save({ componentId, lowQtyBase: qty, ...(plantId ? { plantId } : {}) });
     if (result.ok) return router.refresh();
     setMessage(t('thresholdInvalid'));
   }
