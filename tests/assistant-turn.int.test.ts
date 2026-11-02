@@ -494,3 +494,43 @@ describe('a turn that cannot reach a draft or a business table (AC-ASSIST-10 for
     expect(await Promise.all(tables.map(count))).toEqual(before);
   });
 });
+
+describe('a user-chosen amount is refused (§16.4)', () => {
+  it('refuses, for every role, before any gate, tool or model, and records the refusal', async () => {
+    for (const role of ROLES) {
+      const provider = scripted([], () => 'Oui.');
+      const out = await runTurn(deps(provider), users[role], {
+        question: 'Can we pay 50k to the supplier on Thursday?',
+      });
+      expect(out, role).toMatchObject({
+        outcome: 'refused',
+        refusal: 'chosen_amount',
+        answer: null,
+        sent: null,
+        chips: [],
+      });
+      expect(provider.calls, role).toBe(0);
+    }
+    const row = (
+      await inCtx(users.owner, (tx) =>
+        tx.query(
+          `select outcome, provider from ai_interaction where outcome = 'refused' order by created_at desc limit 1`,
+        ),
+      )
+    ).rows[0];
+    expect(row).toMatchObject({ outcome: 'refused', provider: 'none' });
+  });
+
+  it('refuses the follow-up that bisects ("and 40k?") and answers a question about a recorded operation', async () => {
+    const provider = scripted([], () => 'Rien à signaler.');
+    const out = await runTurn(deps(provider), users.office, {
+      question: 'et 40k ?',
+      history: [{ question: 'peut-on payer 50k ?', answer: 'Je ne réponds pas à un montant choisi.' }],
+    });
+    expect(out).toMatchObject({ outcome: 'refused', refusal: 'chosen_amount' });
+    const ok = await runTurn(deps(provider), users.owner, {
+      question: 'Le chèque CHQ-000123 échoit jeudi : couvert ?',
+    });
+    expect(ok.refusal).toBeNull();
+  });
+});

@@ -2331,7 +2331,8 @@
       "rate_limited": "Vous avez posé trop de questions en peu de temps. Réessayez dans quelques minutes.",
       "budget_stop": "Le budget mensuel de l'assistant est atteint. Il reprendra le mois prochain, ou quand le propriétaire le relève.",
       "blocked_leak": "Votre question contient un nom ou un numéro que je ne peux pas envoyer à l'IA. Reformulez-la avec un code (CLT-…, BL-…) ou sans nom.",
-      "unavailable": "L'assistant n'est pas disponible. Réessayez plus tard."
+      "unavailable": "L'assistant n'est pas disponible. Réessayez plus tard.",
+      "chosen_amount": "Je ne réponds pas à un montant choisi (« peut-on payer 50 000 ? »). Je réponds sur les opérations enregistrées : par exemple « le chèque CHQ-… échoit jeudi : couvert, juste, ou à traiter ? »."
     },
     "error": {
       "generic": "Une erreur est survenue. Réessayez.",

@@ -4,6 +4,7 @@ import { realClock } from '@/modules/clock';
 import type { SessionUser } from '@/modules/platform-security';
 import type { EngineParams } from '@/modules/rules-engine';
 import { costMicroUsd } from '../domain/cost';
+import { isChosenAmountQuestion } from '../domain/chosen-amount';
 import { prepareForModel, toDataBlock } from '../domain/data-block';
 import { displayResult, isPlainText } from '../domain/display';
 import { type LeakIndex, scanForLeaks } from '../domain/leak-scan';
@@ -59,7 +60,8 @@ export interface SentPayload {
   messages: LlmMessage[];
 }
 
-export type Refusal = 'disabled' | 'rate_limited' | 'budget_stop' | 'blocked_leak' | 'unavailable';
+export type Refusal =
+  'disabled' | 'rate_limited' | 'budget_stop' | 'blocked_leak' | 'unavailable' | 'chosen_amount';
 
 export interface TurnResult {
   interactionId: string;
@@ -139,6 +141,25 @@ export async function runTurn(deps: TurnDeps, actor: SessionUser, input: TurnInp
       },
       { cipher: deps.cipher, hmacKey: deps.hmacKey },
     );
+
+  // §16.4: a question about an amount the person picked is refused, for every role, before the gate, any tool or any model.
+  if (
+    isChosenAmountQuestion({
+      question: input.question,
+      previous: (input.history ?? []).map((h) => h.question),
+    })
+  ) {
+    await store({
+      provider: 'none',
+      maskedQuestion: '',
+      output: '',
+      outcome: 'refused',
+      toolCalls: [],
+      tokensIn: 0,
+      tokensOut: 0,
+    });
+    return empty({ interactionId, outcome: 'refused', refusal: 'chosen_amount' });
+  }
 
   const gate = await (deps.gate ?? ((a: SessionUser) => passGate(deps, a)))(actor);
   if (gate.refusal) {
