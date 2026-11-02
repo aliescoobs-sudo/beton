@@ -34,7 +34,12 @@ export default defineConfig({
       // Wait on the port only: pages query the e2e database, which globalSetup may still be creating.
       port: E2E_PORT,
       reuseExistingServer: false,
-      env: { ...serverEnv(E2E_BASE_URL), ASSISTANT_ENABLED: 'true', ASSISTANT_PROVIDER: 'fake' },
+      env: {
+        ...serverEnv(E2E_BASE_URL),
+        ASSISTANT_ENABLED: 'true',
+        ASSISTANT_PROVIDER: 'fake',
+        FIELD_APP_ENABLED: 'true',
+      },
     },
     {
       // The same application with the assistant OFF (its default): only the 404 and the absent entry are checked here.

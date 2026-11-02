@@ -2443,5 +2443,116 @@
         "generic": "Une erreur est survenue. Réessayez."
       }
     }
+  },
+  "field": {
+    "title": "Chauffeur",
+    "code": "Code chauffeur (CH-…)",
+    "pin": "Code PIN",
+    "signIn": "Entrer",
+    "signOut": "Sortir",
+    "errors": {
+      "WRONG": "Code ou PIN incorrect.",
+      "LOCKED": "Compte verrouillé. Appelez le bureau.",
+      "OTHER_DEVICE": "Ce n'est pas votre téléphone enregistré. Appelez le bureau.",
+      "network": "Pas de réseau.",
+      "volume": "Entrez les m³ déchargés (ex. 9,5)."
+    },
+    "offline": "Hors ligne : vos actions sont gardées et seront envoyées.",
+    "queued": "{count} action(s) à envoyer",
+    "noTrips": "Aucune livraison aujourd'hui.",
+    "idle": "Au repos à la centrale.",
+    "waitLoad": "En attente du chargement par la centrale.",
+    "steps": {
+      "loading_started": "Chargement commencé",
+      "departed": "Camion parti de la centrale",
+      "arrived": "Arrivé sur le chantier",
+      "unloading_started": "Déchargement commencé",
+      "unloading_finished": "Déchargement terminé",
+      "back": "De retour à la centrale"
+    },
+    "unloadedAsk": "Combien de m³ déchargés ?",
+    "confirm": "Valider",
+    "cancel": "Annuler",
+    "emergency": "Urgence",
+    "emergencyTitle": "Que se passe-t-il ?",
+    "emergencySent": "Alerte envoyée au bureau.",
+    "pctUnloaded": "Déchargé : {pct} %",
+    "options": {
+      "breakdown": "Panne",
+      "accident": "Accident",
+      "wrong_load": "Mauvais chargement",
+      "heavy_delay": "Gros retard",
+      "client_cancelled": "Client annulé",
+      "site_closed": "Chantier fermé",
+      "site_not_ready": "Chantier pas prêt",
+      "load_not_enough": "Charge insuffisante pour le client",
+      "client_stopped": "Le client a arrêté",
+      "quality_refused": "Qualité refusée"
+    },
+    "instruction": {
+      "continue": "Continuez la livraison",
+      "extra_load": "Retournez chercher un complément",
+      "redirect": "Nouvelle destination",
+      "join": "Rejoignez un autre camion",
+      "joinTruck": "Camion {code}"
+    },
+    "acknowledge": "J'ai bien compris",
+    "openMap": "Ouvrir la carte",
+    "plannedM3": "Prévu : {m3} m³",
+    "pumpedAsk": "m³ pompés",
+    "pump": {
+      "arrived": "Arrivé",
+      "set_up": "Installé",
+      "pumping_started": "Pompage commencé",
+      "pumping_ended": "Pompage terminé",
+      "left": "Parti"
+    },
+    "admin": {
+      "link": "Chauffeurs (téléphones)",
+      "title": "Comptes chauffeur et pompiste",
+      "intro": "Chaque chauffeur entre avec son code et un PIN, sur un seul téléphone. Une décision demande le second facteur.",
+      "driver": "Chauffeur",
+      "kind": "Type",
+      "kinds": {
+        "driver": "Chauffeur",
+        "pump_operator": "Pompiste"
+      },
+      "account": "Compte",
+      "pin": "PIN",
+      "phone": "Téléphone",
+      "yes": "Oui",
+      "create": "Créer le compte",
+      "set": "Définir",
+      "reset": "Changer",
+      "locked": "Verrouillé",
+      "bound": "Lié",
+      "release": "Libérer",
+      "done": "Enregistré.",
+      "tooEasy": "PIN trop simple (pas de suite ni de répétition).",
+      "invalidPin": "PIN de 4 à 6 chiffres.",
+      "error": "Action refusée."
+    },
+    "board": {
+      "link": "Urgences chauffeurs",
+      "title": "Urgences des chauffeurs",
+      "intro": "Le bouton d'urgence arrive ici : qui, où, à quelle étape. Répondez au chauffeur.",
+      "none": "Aucune urgence.",
+      "open": "À traiter",
+      "handled": "Traitée",
+      "at": "à l'étape {step}",
+      "pct": "{pct} % déchargé",
+      "instruct": "Répondre au chauffeur",
+      "kind": "Instruction",
+      "kinds": {
+        "continue": "Continuer",
+        "extra_load": "Revenir pour un complément",
+        "redirect": "Rediriger vers une autre adresse"
+      },
+      "address": "Nouvelle adresse",
+      "note": "Message",
+      "send": "Envoyer",
+      "sent": "Instruction envoyée.",
+      "error": "Action refusée."
+    }
   }
 }

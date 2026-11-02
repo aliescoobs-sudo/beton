@@ -15,7 +15,7 @@ export {
   type ClientRef,
   type SavedClient,
 } from './service/client-service';
-export { fieldCipherFrom, type FieldCipher } from './service/field-cipher';
+export { defaultFieldCipher, fieldCipherFrom, type FieldCipher } from './service/field-cipher';
 export { parseSiteInput, type ClientSite, type SiteInput } from './domain/site';
 export { createSite, listSiteOptions, listSites, updateSite, type SiteError } from './service/site-service';
 export {

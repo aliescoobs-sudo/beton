@@ -14,7 +14,8 @@ const config = [
   {
     // Business time comes only from the clock module (SPEC-clock §4, AC-CLK-07).
     files: ['src/**/*.{ts,tsx}', 'scripts/**/*.ts'],
-    ignores: ['src/modules/clock/**'],
+    // The phone app stamps each tap with the device's own clock on purpose (offline-first, REQUIREMENTS-V1 §7): the browser has no application clock.
+    ignores: ['src/modules/clock/**', 'src/modules/field/ui/**'],
     rules: {
       'no-restricted-syntax': [
         'error',

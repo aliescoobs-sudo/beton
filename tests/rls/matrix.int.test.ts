@@ -39,6 +39,7 @@ const app = new pg.Pool({ connectionString: env.DATABASE_URL_APP, max: 2 });
 const migratorPool = new pg.Pool({ connectionString: env.DATABASE_URL_MIGRATOR, max: 1 });
 /** Orders made before any fixture runs (a fixture must not open a second transaction that waits for the first one's counters). */
 const preOrders = {} as { status: string; hold: string };
+const preField = {} as { trip: string; job: string; driver: string };
 const system = new pg.Pool({ connectionString: env.DATABASE_URL_SYSTEM, max: 1 });
 afterAll(async () => {
   await resetSimClock();
@@ -201,6 +202,76 @@ const FIXTURES: Record<
         ),
       ),
     visible: `select created_by::text as owner from order_hold where note = $1`,
+  },
+  trip_driver_report: {
+    // Written by driver_report (the driver of the rotation); the fixture writes the row as the definer would, on a rotation of its own.
+    writers: ['owner'],
+    seed: (_tx, actor) =>
+      withRlsContext(migratorPool, { userId: actor, role: 'owner', requestId: marker }, (m) =>
+        m.query(
+          `insert into trip_driver_report (id, trip_id, driver_id, kind, at, client_key) values (gen_random_uuid(), $1, $2, 'loading_started', now(), $3)`,
+          [preField.trip, preField.driver, `${marker}:${actor}`],
+        ),
+      ),
+    visible: `select split_part(client_key, ':', 2) as owner from trip_driver_report where client_key like $1 || ':%'`,
+  },
+  trip_emergency: {
+    writers: ['owner'],
+    seed: (_tx, actor) =>
+      withRlsContext(migratorPool, { userId: actor, role: 'owner', requestId: marker }, (m) =>
+        m.query(
+          `insert into trip_emergency (id, trip_id, driver_id, step, option, at, client_key) values (gen_random_uuid(), $1, $2, 'start', 'breakdown', now(), $3)`,
+          [preField.trip, preField.driver, `${marker}:${actor}`],
+        ),
+      ),
+    visible: `select split_part(client_key, ':', 2) as owner from trip_emergency where client_key like $1 || ':%'`,
+  },
+  trip_instruction: {
+    writers: ['owner'],
+    seed: (_tx, actor) =>
+      withRlsContext(migratorPool, { userId: actor, role: 'owner', requestId: marker }, async (m) => {
+        const e = await m.query<{ id: string }>(
+          `select id from trip_emergency where client_key like $1 || ':%' limit 1`,
+          [marker],
+        );
+        return m.query(
+          `insert into trip_instruction (id, emergency_id, trip_id, kind, note, created_by) values (gen_random_uuid(), $1, $2, 'continue', $3, $4)`,
+          [e.rows[0]?.id, preField.trip, marker, actor],
+        );
+      }),
+    visible: `select created_by::text as owner from trip_instruction where note = $1`,
+  },
+  pump_job: {
+    // Written by create_pump_job; every writer plans a job of its own on a pump and an operator made in the same transaction.
+    writers: ['owner', 'partner'],
+    seed: async (tx, actor) => {
+      const n = Math.floor(Math.random() * 1e9);
+      const pump = await tx.query<{ id: string }>(
+        `insert into truck (id, code, plate, kind) values (gen_random_uuid(), 'P' || ($1::int % 900 + 100), 'PJ-' || $1::text, 'pump') returning id`,
+        [n],
+      );
+      const op = await tx.query<{ id: string }>(
+        `insert into driver (id, code, name, created_by, kind) values (gen_random_uuid(), 'CH-' || ($1::int % 8000 + 1000), $2, $3, 'pump_operator') returning id`,
+        [n, `pj${marker}`, actor],
+      );
+      return tx.query(`select public.create_pump_job(current_date, $1, $2, null, $3, null, 10)`, [
+        pump.rows[0]?.id,
+        op.rows[0]?.id,
+        `${marker}:${actor}`,
+      ]);
+    },
+    visible: `select split_part(site_label, ':', 2) as owner from pump_job where site_label like $1 || ':%'`,
+  },
+  pump_job_event: {
+    writers: ['owner'],
+    seed: (_tx, actor) =>
+      withRlsContext(migratorPool, { userId: actor, role: 'owner', requestId: marker }, (m) =>
+        m.query(
+          `insert into pump_job_event (id, job_id, step, at, client_key, created_by) values (gen_random_uuid(), $1, 'arrived', now(), $2, $3)`,
+          [preField.job, `${marker}-pe`, actor],
+        ),
+      ),
+    visible: `select created_by::text as owner from pump_job_event where client_key = $1 || '-pe'`,
   },
   zone: {
     writers: ['owner', 'partner'],
@@ -954,6 +1025,37 @@ const FIXTURES: Record<
 
 beforeAll(async () => {
   for (const role of POLICY_ROLES) actors[role] = (await realActor(env.DATABASE_URL_MIGRATOR, role)).id;
+  {
+    const n = Math.floor(Math.random() * 1e9);
+    const scene = await deliveryScene(app, actors.owner, `${marker}fld`);
+    await withRlsContext(app, { userId: actors.owner, role: 'owner', requestId: marker }, async (tx) => {
+      const drv = await tx.query<{ id: string }>(
+        `insert into driver (id, code, name, created_by) values (gen_random_uuid(), 'CH-' || ($1::int % 8000 + 1000), $2, $3) returning id`,
+        [n, `fd${marker}`, actors.owner],
+      );
+      preField.driver = drv.rows[0]!.id;
+      const pump = await tx.query<{ id: string }>(
+        `insert into truck (id, code, plate, kind) values (gen_random_uuid(), 'P' || ($1::int % 900 + 100), 'PF-' || $1::text, 'pump') returning id`,
+        [n],
+      );
+      const op = await tx.query<{ id: string }>(
+        `insert into driver (id, code, name, created_by, kind) values (gen_random_uuid(), 'CH-' || (($1::int + 7) % 8000 + 1000), $2, $3, 'pump_operator') returning id`,
+        [n, `fo${marker}`, actors.owner],
+      );
+      const job = await tx.query<{ id: string }>(
+        `select public.create_pump_job(current_date, $1, $2, null, $3, null, 10) as id`,
+        [pump.rows[0]?.id, op.rows[0]?.id, `pre${marker}`],
+      );
+      preField.job = job.rows[0]!.id;
+      const trip = await tx.query<{ id: string }>(
+        `insert into trip_plan (id, batch_id, trip_date, order_id, seq, truck_id, volume_l, load_min, depart_min, arrive_min,
+                                unload_end_min, back_min, created_by)
+         values (gen_random_uuid(), gen_random_uuid(), '2095-03-02', $1, 1, $2, 1000, 420, 430, 455, 485, 520, $3) returning id`,
+        [scene.orderId, scene.truckId, actors.owner],
+      );
+      preField.trip = trip.rows[0]!.id;
+    });
+  }
   for (const key of ['status', 'hold'] as const) {
     preOrders[key] = (
       await withRlsContext(app, { userId: actors.owner, role: 'owner', requestId: marker }, async (tx) =>

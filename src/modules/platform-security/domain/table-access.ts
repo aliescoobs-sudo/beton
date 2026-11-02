@@ -254,6 +254,99 @@ export const TABLE_ACCESS = {
     exception:
       'R3 (DECISIONS 131): an order held for the credit limit or an overdue instalment. No amount. Written only by create_order and release_order_hold; the offices learn that an order waits through order_approval_state(), never from this table.',
   },
+  trip_driver_report: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'all',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    exception:
+      'R4 (DECISIONS 141): what the driver reports that tracking does not hold (loading started, the m3 unloaded). Written only by driver_report (SECURITY DEFINER, the driver of the rotation); read by the company roles, never by another driver. No price.',
+  },
+  trip_emergency: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'all',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    exception:
+      'R4 (DECISIONS 141): the driver emergency button. Written only by driver_emergency; read by the owner, partner, office, plant and support. No price.',
+  },
+  trip_instruction: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'all',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    exception:
+      'R4 (DECISIONS 141): what the office told the driver (continue, extra load, redirect, join) and the driver acknowledgement. Written by emergency_instruct and driver_ack only; the address is sealed. No price.',
+  },
+  pump_job: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'all',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    exception:
+      'R4 (DECISIONS 141): a pump job planned for a pump operator. Written by create_pump_job only; no price.',
+  },
+  pump_job_event: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'all',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    exception:
+      'R4 (DECISIONS 141): the five steps of a pump job and the m3 pumped. Written by pump_report only (the operator of the job); no price.',
+  },
+  driver_pin: {
+    kind: 'auth_only',
+    reason: 'R4: the short PIN of a driver (hash, failed attempts, lock), belgobeton_auth only like sessions',
+  },
+  driver_device: {
+    kind: 'auth_only',
+    reason: 'R4: the one phone bound to a driver; belgobeton_auth only, like sessions',
+  },
   zone: {
     kind: 'rls',
     read: {

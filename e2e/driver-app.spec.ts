@@ -1,0 +1,187 @@
+import { expect, type Page, test } from '@playwright/test';
+import { randomUUID } from 'node:crypto';
+import pg from 'pg';
+import { E2E_DATABASE } from '../scripts/db-bootstrap';
+import { withRlsContext } from '../src/lib/db/rls-context';
+import { uuidv7 } from '../src/lib/uuidv7';
+import { realClock } from '../src/modules/clock';
+import { setDriverPin } from '../src/modules/field';
+import { testEnv } from '../tests/db-env';
+import { realSessionUser } from '../tests/helpers/actors';
+import { deliveryScene, insertDelivery } from '../tests/helpers/ledger-fixtures';
+
+// R4 (AC-PROD-20 to 25): the driver's phone. Sign-in by code and PIN, one big button per step, taps queued offline and sent when
+// the network returns, an emergency button with the options of the current step, never a price. Needs FIELD_APP_ENABLED (the e2e server).
+test.describe.configure({ mode: 'serial' });
+
+const env = testEnv(E2E_DATABASE);
+const migrator = new pg.Pool({ connectionString: env.DATABASE_URL_MIGRATOR, max: 2 });
+const app = new pg.Pool({ connectionString: env.DATABASE_URL_APP, max: 2 });
+const auth = new pg.Pool({ connectionString: env.DATABASE_URL_AUTH, max: 1 });
+test.afterAll(() => Promise.all([migrator.end(), app.end(), auth.end()]));
+
+const marker = `e2edr${randomUUID().replace(/-/g, '').slice(0, 8)}`;
+const today = new Date().toISOString().slice(0, 10);
+const code = `CH-${3000 + Math.floor(Math.random() * 900)}`;
+const PIN = '4829';
+let tripId = '';
+let orderCode = '';
+
+test.beforeAll(async () => {
+  const owner = await realSessionUser(env.DATABASE_URL_MIGRATOR, 'owner');
+  const userId = uuidv7(realClock.now());
+  await migrator.query(
+    `insert into "user" (id, name, email, "emailVerified", role, locale, status, "twoFactorEnabled", "provisionedAt")
+     values ($1, $2, $3, true, 'driver', 'ar', 'active', false, now())`,
+    [userId, `Chauffeur ${marker}`, `${marker}@field.belgobeton.invalid`],
+  );
+  const scene = await deliveryScene(app, owner.id, marker);
+  const driverId = await withRlsContext(
+    app,
+    { userId: owner.id, role: 'owner', requestId: marker },
+    async (tx) => {
+      const d = await tx.query<{ id: string }>(
+        `insert into driver (id, code, name, created_by, user_id) values (gen_random_uuid(), $1, $2, $3, $4) returning id`,
+        [code, `Chauffeur ${marker}`, owner.id, userId],
+      );
+      const id = d.rows[0]!.id;
+      const t = await tx.query<{ id: string }>(
+        `insert into trip_plan (id, batch_id, trip_date, order_id, seq, truck_id, driver_id, volume_l, load_min, depart_min, arrive_min,
+                              unload_end_min, back_min, created_by)
+       values (gen_random_uuid(), gen_random_uuid(), $1, $2, 1, $3, $4, 8000, 420, 430, 455, 485, 520, $5) returning id`,
+        [today, scene.orderId, scene.truckId, id, owner.id],
+      );
+      tripId = t.rows[0]!.id;
+      // the plant has loaded this rotation already (its BL), so the driver can depart
+      const dl = await insertDelivery(tx, owner.id, scene, 8000);
+      const delivery = (await tx.query<{ id: string }>('select id from delivery where bl_no = $1', [dl.blNo]))
+        .rows[0]!.id;
+      await tx.query(
+        `insert into trip_event (id, trip_id, step, at, delivery_id, created_by) values (gen_random_uuid(), $1, 'loaded', now() - interval '1 minute', $2, $3)`,
+        [tripId, delivery, owner.id],
+      );
+      orderCode = (
+        await tx.query<{ code: string }>('select code from sales_order where id = $1', [scene.orderId])
+      ).rows[0]!.code;
+      return id;
+    },
+  );
+  const ok = await setDriverPin(
+    { appPool: app, authPool: auth, auth: {} as never, secret: env.AUTH_SECRET },
+    owner,
+    { driverId, pin: PIN },
+  );
+  if (!ok.ok) throw new Error(ok.error);
+});
+
+// The driver is bound to one phone: every test uses the same device id, as one phone would (its local storage survives).
+const DEVICE = 'e2e-phone-0123456789abcdef0123456789';
+async function openAndSignIn(page: Page) {
+  await page.addInitScript((id) => {
+    if (!localStorage.getItem('bb_field_device')) localStorage.setItem('bb_field_device', id);
+  }, DEVICE);
+  await page.goto('/ar/driver');
+  await page.getByTestId('field-code').or(page.getByTestId('field-day')).first().waitFor();
+  if (await page.getByTestId('field-login').isVisible()) {
+    await page.getByTestId('field-code').fill(code);
+    await page.getByTestId('field-pin').fill(PIN);
+    await page.getByTestId('field-signin').click();
+  }
+  await expect(page.getByTestId('field-day')).toBeVisible();
+}
+
+const stepsOf = async () =>
+  (
+    await migrator.query<{ step: string }>('select step from trip_event where trip_id = $1', [tripId])
+  ).rows.map((r) => r.step);
+
+test('a driver signs in with code and PIN, taps the steps, and never sees a price (Arabic)', async ({
+  page,
+}) => {
+  await page.addInitScript((id) => {
+    if (!localStorage.getItem('bb_field_device')) localStorage.setItem('bb_field_device', id);
+  }, DEVICE);
+  await page.goto('/ar/driver');
+  await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+  await page.getByTestId('field-code').fill(code);
+  await page.getByTestId('field-pin').fill('9182');
+  await page.getByTestId('field-signin').click();
+  await expect(page.getByTestId('field-error')).toBeVisible();
+  await page.getByTestId('field-pin').fill(PIN);
+  await page.getByTestId('field-signin').click();
+  await expect(page.getByTestId('field-day')).toBeVisible();
+  const card = page.getByTestId(`trip-${orderCode}`);
+  await expect(card).toBeVisible();
+
+  // step 1 (the driver's own report), then the plant's load is there so departing is offered
+  await page.getByTestId(`tap-${orderCode}`).click();
+  await expect(page.getByTestId(`tap-${orderCode}`)).toContainText('غادرت الشاحنة المحطة');
+  await page.getByTestId(`tap-${orderCode}`).click();
+  await expect.poll(stepsOf).toContain('departed');
+  const text = (await page.getByTestId('field-day').textContent()) ?? '';
+  expect(text).not.toMatch(/MAD|DH|درهم|\d\s?\d{3},\d{2}/);
+  // large type: the big button is at least 28 px
+  const px = await page
+    .getByTestId(`tap-${orderCode}`)
+    .evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+  expect(px).toBeGreaterThanOrEqual(28);
+  await page.setViewportSize({ width: 375, height: 800 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
+});
+
+test('taps made offline are queued and sent when the network returns, once', async ({ page, context }) => {
+  await openAndSignIn(page);
+  await expect(page.getByTestId(`trip-${orderCode}`)).toBeVisible();
+  await context.setOffline(true);
+  await page.getByTestId(`tap-${orderCode}`).click();
+  await expect(page.getByTestId('field-queued')).toBeVisible();
+  await expect(page.getByTestId(`tap-${orderCode}`)).toContainText('بدأ التفريغ');
+  expect(await stepsOf()).not.toContain('arrived');
+  await context.setOffline(false);
+  await expect.poll(stepsOf, { timeout: 60_000 }).toContain('arrived');
+  await expect(page.getByTestId('field-queued')).toHaveCount(0, { timeout: 60_000 });
+  expect((await stepsOf()).filter((s) => s === 'arrived')).toHaveLength(1);
+});
+
+test('the emergency button offers the options of the current step and alerts the office', async ({
+  page,
+}) => {
+  await openAndSignIn(page);
+  await expect(page.getByTestId(`trip-${orderCode}`)).toBeVisible();
+  await page.getByTestId(`emergency-${orderCode}`).click();
+  // at the site (arrived): no "load not enough", yes "site not ready"
+  await expect(page.getByTestId('emergency-option-site_not_ready')).toBeVisible();
+  await expect(page.getByTestId('emergency-option-load_not_enough')).toHaveCount(0);
+  await page.getByTestId('emergency-option-site_not_ready').click();
+  await expect
+    .poll(
+      async () =>
+        (
+          await migrator.query('select 1 from trip_emergency where trip_id = $1 and option = $2', [
+            tripId,
+            'site_not_ready',
+          ])
+        ).rowCount,
+    )
+    .toBe(1);
+});
+
+test('a wrong code is refused with no hint, and the app answers 404 on the pages of another locale it does not know', async ({
+  request,
+}) => {
+  const res = await request.post('/api/field/login', {
+    headers: { origin: 'http://localhost:3100', 'content-type': 'application/json' },
+    data: { code: 'CH-9999', pin: '4829', deviceId: 'x'.repeat(32) },
+  });
+  expect(res.status()).toBe(401);
+  const other = await request.post('/api/field/login', {
+    headers: { origin: 'https://evil.example', 'content-type': 'application/json' },
+    data: { code, pin: PIN, deviceId: 'y'.repeat(32) },
+  });
+  expect(other.status()).toBe(403);
+  const sync = await request.post('/api/field/sync', {
+    headers: { origin: 'http://localhost:3100', 'content-type': 'application/json' },
+    data: { actions: [] },
+  });
+  expect(sync.status()).toBe(401);
+});

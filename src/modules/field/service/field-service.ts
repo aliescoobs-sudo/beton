@@ -1,0 +1,414 @@
+import type pg from 'pg';
+import { z } from 'zod';
+import { err, ok, type Result } from '@/lib/result';
+import type { FieldCipher } from '@/modules/master-data';
+import { inRequest, require, type SessionUser } from '@/modules/platform-security';
+import { emergencyStage, type EmergencyStage } from '../domain/steps';
+import type { QueueAction, SyncOutcome } from '../domain/queue';
+
+// What the phone reads and writes. The doors are database functions that check the caller's own driver id; a result here never
+// carries a price, an amount or a balance (a test lists the keys).
+
+export interface DriverTrip {
+  id: string;
+  seq: number;
+  orderCode: string;
+  typeLabel: string;
+  volumeL: number;
+  clientName: string;
+  contactName: string | null;
+  phone: string | null;
+  siteLabel: string | null;
+  address: string | null;
+  /** A link to open the address in the phone's map app; built here, no call is made. */
+  mapUrl: string | null;
+  zoneName: string | null;
+  truckCode: string;
+  loadMin: number;
+  blNo: string | null;
+  loadingStartedAt: string | null;
+  steps: Record<string, string>;
+  stage: EmergencyStage;
+  unloadedL: number | null;
+}
+
+export interface DriverInstruction {
+  id: string;
+  tripId: string;
+  kind: 'continue' | 'extra_load' | 'redirect' | 'join';
+  address: string | null;
+  mapUrl: string | null;
+  note: string | null;
+  joinTruckCode: string | null;
+  createdAt: string;
+  acknowledgedAt: string | null;
+}
+
+export const mapLink = (address: string | null): string | null =>
+  address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` : null;
+
+/** The driver's rotations of a day with their steps, the instructions of the last days. */
+export async function getDriverDay(
+  appPool: pg.Pool,
+  driver: SessionUser,
+  date: string,
+  cipher: FieldCipher,
+): Promise<{ trips: DriverTrip[]; instructions: DriverInstruction[] }> {
+  return inRequest(appPool, driver, async (tx) => {
+    const trips = await tx.query<{
+      trip_id: string;
+      seq: number;
+      order_code: string;
+      type_label: string;
+      volume_l: number;
+      client_name: string;
+      contact_name: string | null;
+      phone_enc: string | null;
+      site_label: string | null;
+      address_enc: string | null;
+      zone_name: string | null;
+      truck_code: string;
+      load_min: number;
+      bl_no: string | null;
+      steps: { step: string; at: string }[];
+      loading_started_at: Date | null;
+      unloaded_l: number | null;
+    }>('select * from public.driver_trips($1)', [date]);
+    const ins = await tx.query<{
+      id: string;
+      trip_id: string;
+      kind: DriverInstruction['kind'];
+      address_enc: string | null;
+      map_url: string | null;
+      note: string | null;
+      join_truck_code: string | null;
+      created_at: Date;
+      acknowledged_at: Date | null;
+    }>('select * from public.driver_instructions()');
+    return {
+      trips: trips.rows.map((r) => {
+        const address = cipher.open(r.address_enc);
+        const steps = Object.fromEntries(r.steps.map((s) => [s.step, new Date(s.at).toISOString()]));
+        return {
+          id: r.trip_id,
+          seq: r.seq,
+          orderCode: r.order_code,
+          typeLabel: r.type_label,
+          volumeL: r.volume_l,
+          clientName: r.client_name,
+          contactName: r.contact_name,
+          phone: cipher.open(r.phone_enc),
+          siteLabel: r.site_label,
+          address,
+          mapUrl: mapLink(address),
+          zoneName: r.zone_name,
+          truckCode: r.truck_code,
+          loadMin: r.load_min,
+          blNo: r.bl_no,
+          loadingStartedAt: r.loading_started_at?.toISOString() ?? null,
+          steps,
+          stage: emergencyStage(steps),
+          unloadedL: r.unloaded_l,
+        };
+      }),
+      instructions: ins.rows.map((i) => {
+        const address = cipher.open(i.address_enc);
+        return {
+          id: i.id,
+          tripId: i.trip_id,
+          kind: i.kind,
+          address,
+          mapUrl: i.map_url ?? mapLink(address),
+          note: i.note,
+          joinTruckCode: i.join_truck_code,
+          createdAt: i.created_at.toISOString(),
+          acknowledgedAt: i.acknowledged_at?.toISOString() ?? null,
+        };
+      }),
+    };
+  });
+}
+
+const actionSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('step'),
+    key: z.string().min(8).max(80),
+    tripId: z.uuid(),
+    step: z.string(),
+    at: z.iso.datetime(),
+    volumeL: z.number().int().min(1).max(100_000).optional(),
+  }),
+  z.object({
+    kind: z.literal('emergency'),
+    key: z.string().min(8).max(80),
+    tripId: z.uuid(),
+    option: z.string(),
+    at: z.iso.datetime(),
+    pctUnloaded: z.number().int().min(0).max(100).optional(),
+    note: z.string().max(300).optional(),
+  }),
+  z.object({
+    kind: z.literal('pump'),
+    key: z.string().min(8).max(80),
+    jobId: z.uuid(),
+    step: z.string(),
+    at: z.iso.datetime(),
+    m3: z.number().int().min(1).max(500).optional(),
+  }),
+  z.object({
+    kind: z.literal('ack'),
+    key: z.string().min(8).max(80),
+    instructionId: z.uuid(),
+    at: z.iso.datetime(),
+  }),
+]);
+
+function outcomeOf(key: string, error: unknown): SyncOutcome {
+  const e = error as { code?: string; message?: string };
+  const m = e.message ?? '';
+  // The plant has not recorded the load yet: the tap is kept and sent again later.
+  if (/previous step is not recorded/.test(m))
+    return { key, status: 'rejected', code: 'wait_previous', retry: true };
+  if (e.code === '23505') return { key, status: 'replayed' };
+  if (e.code === '42501') return { key, status: 'rejected', code: 'forbidden', retry: false };
+  if (e.code === '23514') return { key, status: 'rejected', code: 'invalid', retry: false };
+  if (e.code === '22P02' || e.code === '23503')
+    return { key, status: 'rejected', code: 'unknown', retry: false };
+  throw error;
+}
+
+/**
+ * Applies the phone's queued taps in order, each in its own transaction so one refusal does not block the rest. A key stored once
+ * is never stored twice, so the same batch may be sent again after a lost answer.
+ */
+export async function syncActions(
+  appPool: pg.Pool,
+  driver: SessionUser,
+  actions: unknown,
+): Promise<Result<SyncOutcome[], 'INVALID'>> {
+  const parsed = z.array(actionSchema).max(200).safeParse(actions);
+  if (!parsed.success) return err('INVALID');
+  const out: SyncOutcome[] = [];
+  for (const a of parsed.data as QueueAction[]) {
+    try {
+      const status = await inRequest(appPool, driver, async (tx): Promise<'recorded' | 'replayed'> => {
+        if (a.kind === 'step') {
+          const r = await tx.query<{ r: 'recorded' | 'replayed' }>(
+            'select public.driver_report($1, $2, $3, $4, $5) as r',
+            [a.tripId, a.step, a.at, a.key, a.volumeL ?? null],
+          );
+          return r.rows[0]?.r ?? 'recorded';
+        }
+        if (a.kind === 'emergency') {
+          const r = await tx.query<{ r: 'recorded' | 'replayed' }>(
+            'select public.driver_emergency($1, $2, $3, $4, $5, $6) as r',
+            [a.tripId, a.option, a.pctUnloaded ?? null, a.note ?? null, a.key, a.at],
+          );
+          return r.rows[0]?.r ?? 'recorded';
+        }
+        if (a.kind === 'pump') {
+          const r = await tx.query<{ r: 'recorded' | 'replayed' }>(
+            'select public.pump_report($1, $2, $3, $4, $5) as r',
+            [a.jobId, a.step, a.at, a.key, a.m3 ?? null],
+          );
+          return r.rows[0]?.r ?? 'recorded';
+        }
+        await tx.query('select public.driver_ack($1)', [a.instructionId]);
+        return 'recorded';
+      });
+      out.push({ key: a.key, status });
+    } catch (error) {
+      out.push(outcomeOf(a.key, error));
+    }
+  }
+  return ok(out);
+}
+
+export interface PumpJobView {
+  id: string;
+  pumpCode: string;
+  clientName: string | null;
+  siteLabel: string;
+  address: string | null;
+  mapUrl: string | null;
+  plannedM3: number | null;
+  steps: string[];
+  m3Pumped: number | null;
+}
+
+export async function getPumpDay(
+  appPool: pg.Pool,
+  operator: SessionUser,
+  date: string,
+  cipher: FieldCipher,
+): Promise<PumpJobView[]> {
+  const { rows } = await inRequest(appPool, operator, (tx) =>
+    tx.query<{
+      job_id: string;
+      pump_code: string;
+      client_name: string | null;
+      site_label: string;
+      address_enc: string | null;
+      planned_m3: number | null;
+      steps: { step: string }[];
+      m3_pumped: number | null;
+    }>('select * from public.pump_jobs($1)', [date]),
+  );
+  return rows.map((r) => {
+    const address = cipher.open(r.address_enc);
+    return {
+      id: r.job_id,
+      pumpCode: r.pump_code,
+      clientName: r.client_name,
+      siteLabel: r.site_label,
+      address,
+      mapUrl: mapLink(address),
+      plannedM3: r.planned_m3,
+      steps: r.steps.map((s) => s.step),
+      m3Pumped: r.m3_pumped,
+    };
+  });
+}
+
+// ---- the office side ----
+
+export interface OpenEmergency {
+  id: string;
+  tripId: string;
+  step: string;
+  option: string;
+  pctUnloaded: number | null;
+  note: string | null;
+  at: string;
+  driverName: string;
+  truckCode: string;
+  orderCode: string;
+  clientName: string;
+  siteLabel: string | null;
+  volumeL: number;
+  resolvedAt: string | null;
+}
+
+/** The emergencies of the day and the last day's: who, where, at which step. Quantities and names, no price. */
+export async function listEmergencies(appPool: pg.Pool, actor: SessionUser): Promise<OpenEmergency[]> {
+  await require(appPool, actor, 'field.emergencies');
+  const { rows } = await inRequest(appPool, actor, (tx) =>
+    tx.query<{
+      id: string;
+      trip_id: string;
+      step: string;
+      option: string;
+      pct_unloaded: number | null;
+      note: string | null;
+      at: Date;
+      driver_name: string;
+      truck_code: string;
+      order_code: string;
+      client_name: string;
+      site_label: string | null;
+      volume_l: number;
+      resolved_at: Date | null;
+    }>('select * from public.emergencies_open()'),
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    tripId: r.trip_id,
+    step: r.step,
+    option: r.option,
+    pctUnloaded: r.pct_unloaded,
+    note: r.note,
+    at: r.at.toISOString(),
+    driverName: r.driver_name,
+    truckCode: r.truck_code,
+    orderCode: r.order_code,
+    clientName: r.client_name,
+    siteLabel: r.site_label,
+    volumeL: r.volume_l,
+    resolvedAt: r.resolved_at?.toISOString() ?? null,
+  }));
+}
+
+const instructSchema = z
+  .object({
+    emergencyId: z.uuid(),
+    kind: z.enum(['continue', 'extra_load', 'redirect', 'join']),
+    address: z.string().trim().max(300).optional(),
+    mapUrl: z.string().url().startsWith('https://').max(500).optional(),
+    note: z.string().trim().max(300).optional(),
+    joinTripId: z.uuid().optional(),
+  })
+  .refine((v) => v.kind !== 'redirect' || v.address || v.mapUrl)
+  .refine((v) => v.kind !== 'join' || v.joinTripId);
+
+/** The office tells the driver what to do next. A redirect carries the new address (sealed) and/or a map link; the driver acknowledges. */
+export async function instructDriver(
+  appPool: pg.Pool,
+  actor: SessionUser,
+  input: unknown,
+  cipher: FieldCipher,
+): Promise<Result<{ id: string }, 'INVALID' | 'NOT_FOUND'>> {
+  await require(appPool, actor, 'field.instruct');
+  const parsed = instructSchema.safeParse(input);
+  if (!parsed.success) return err('INVALID');
+  const v = parsed.data;
+  try {
+    const { rows } = await inRequest(appPool, actor, (tx) =>
+      tx.query<{ id: string }>('select public.emergency_instruct($1, $2, $3, $4, $5, $6) as id', [
+        v.emergencyId,
+        v.kind,
+        v.address ? cipher.seal(v.address) : null,
+        v.mapUrl ?? null,
+        v.note ?? null,
+        v.joinTripId ?? null,
+      ]),
+    );
+    return ok({ id: rows[0]?.id as string });
+  } catch (error) {
+    const e = error as { code?: string };
+    if (e.code === '23514' || e.code === '22P02' || e.code === '23503') return err('NOT_FOUND');
+    throw error;
+  }
+}
+
+/** Plans a pump job for an operator. */
+export async function createPumpJob(
+  appPool: pg.Pool,
+  actor: SessionUser,
+  input: {
+    date: string;
+    pumpId: string;
+    operatorId: string;
+    clientId?: string | null;
+    siteLabel: string;
+    address?: string | null;
+    plannedM3?: number | null;
+  },
+  cipher: FieldCipher,
+): Promise<Result<{ id: string }, 'INVALID'>> {
+  await require(appPool, actor, 'field.pump_plan');
+  const ok_ =
+    /^\d{4}-\d{2}-\d{2}$/.test(input.date) &&
+    z.uuid().safeParse(input.pumpId).success &&
+    z.uuid().safeParse(input.operatorId).success &&
+    input.siteLabel.trim().length >= 1 &&
+    input.siteLabel.trim().length <= 120;
+  if (!ok_) return err('INVALID');
+  try {
+    const { rows } = await inRequest(appPool, actor, (tx) =>
+      tx.query<{ id: string }>('select public.create_pump_job($1, $2, $3, $4, $5, $6, $7) as id', [
+        input.date,
+        input.pumpId,
+        input.operatorId,
+        input.clientId ?? null,
+        input.siteLabel,
+        input.address ? cipher.seal(input.address) : null,
+        input.plannedM3 ?? null,
+      ]),
+    );
+    return ok({ id: rows[0]?.id as string });
+  } catch (error) {
+    const e = error as { code?: string };
+    if (e.code === '23514' || e.code === '23503' || e.code === '22P02') return err('INVALID');
+    throw error;
+  }
+}

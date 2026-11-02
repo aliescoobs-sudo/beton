@@ -103,6 +103,21 @@ export const PERMISSIONS = {
   // Plants (REQUIREMENTS-V1 §1): every internal role reads; managers write
   'plants.read': ALL,
   'plants.write': MANAGERS,
+  // The driver and pump phone app (R4): accounts, PINs and phones are the owner's and app_admin's; the office handles emergencies
+  'field.admin': ['owner', 'app_admin'],
+  'field.emergencies': [
+    'owner',
+    'app_admin',
+    'partner',
+    'office',
+    'office_sales',
+    'office_purchases',
+    'plant',
+    'plant_manager',
+    'support',
+  ],
+  'field.instruct': ['owner', 'app_admin', 'partner', 'office', 'office_sales', 'plant', 'plant_manager'],
+  'field.pump_plan': ['owner', 'app_admin', 'partner', 'office', 'office_sales', 'plant', 'plant_manager'],
   // Trucks, zones
   'trucks.read': ALL,
   'trucks.write': MANAGERS,

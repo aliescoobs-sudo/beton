@@ -200,6 +200,12 @@ const GROUPS: GroupDef[] = [
     id: 'production',
     items: [
       {
+        path: '/emergencies',
+        labelKey: 'field.board.link',
+        testId: 'emergencies-link',
+        allowed: 'field.emergencies',
+      },
+      {
         path: '/dispatch',
         labelKey: 'operations.dispatch.link',
         testId: 'dispatch-link',
@@ -304,6 +310,12 @@ const GROUPS: GroupDef[] = [
         labelKey: 'admin.link',
         testId: 'admin-link',
         allowed: 'users.manage',
+      },
+      {
+        path: '/admin/field',
+        labelKey: 'field.admin.link',
+        testId: 'field-admin-link',
+        allowed: 'field.admin',
       },
       {
         path: '/parameters',

@@ -87,6 +87,8 @@ const envObject = z.object({
   // The in-app assistant (SPEC-assistant). OFF by default; refused next to real data or in production until the CNDP has
   // authorized the transfer (D114). `ASSISTANT_PROVIDER` is `fake` unless the real adapter is asked for, which needs the flag on,
   // fake data, a development or test build and a key. The key lives in .env.local only and is never sent to the client.
+  // Module flag of the driver and pump phone app (R4, D122): off, its pages and endpoints answer 404.
+  FIELD_APP_ENABLED: flag,
   ASSISTANT_ENABLED: flag,
   ASSISTANT_PROVIDER: z
     .enum(['fake', 'anthropic'], { error: 'must be "fake" or "anthropic"' })

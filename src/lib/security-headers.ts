@@ -19,6 +19,9 @@ export function contentSecurityPolicy(options: CspOptions): string {
     "img-src 'self' data: blob:",
     "font-src 'self'",
     "connect-src 'self'",
+    // The driver app's service worker and manifest (R4). 'strict-dynamic' makes script-src ignore 'self', so workers are named.
+    "worker-src 'self'",
+    "manifest-src 'self'",
     "object-src 'none'",
     "base-uri 'none'",
     "form-action 'self'",

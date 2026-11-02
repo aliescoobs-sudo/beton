@@ -13,6 +13,8 @@ export const moduleDependencies = {
   'owner-dashboard': ['rules-engine', 'reconciliation', 'notifications'],
   'ai-layer': ['rules-engine', 'reconciliation', 'ledger', 'owner-dashboard'],
   // The in-app assistant (SPEC-assistant): tools over the services of these modules, under the caller's own row-level security.
+  // The driver and pump phone app (R4): reads and writes through database doors, depends on operations' tracking and master data.
+  field: ['platform-security', 'master-data', 'operations', 'clock'],
   assistant: ['platform-security', 'master-data', 'ledger', 'operations', 'rules-engine', 'clock'],
 };
 
