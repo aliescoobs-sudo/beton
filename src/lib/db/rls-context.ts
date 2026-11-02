@@ -6,11 +6,24 @@ import { z } from 'zod';
  * `anonymous` is only for auditing failed logins and is granted nothing.
  */
 export const DB_ROLES = ['owner', 'partner', 'office', 'plant', 'support', 'system', 'anonymous'] as const;
+/** The V1 accounts (migration 0082): the database maps each to a policy role in `DB_ROLES`, or to none (default deny). */
+export const V1_ACTOR_ROLES = [
+  'app_admin',
+  'office_sales',
+  'office_purchases',
+  'plant_manager',
+  'driver',
+  'pump_operator',
+  'accountant',
+  'client_portal',
+  'supplier_portal',
+] as const;
+export const REQUEST_ROLES = [...DB_ROLES, ...V1_ACTOR_ROLES] as const;
 
 const contextSchema = z.object({
   userId: z.uuid({ error: 'userId must be a UUID' }),
-  role: z.enum(DB_ROLES, {
-    error: 'role must be one of owner, partner, office, plant, support, system, anonymous',
+  role: z.enum(REQUEST_ROLES, {
+    error: 'role must be a known account role, system or anonymous',
   }),
   requestId: z.string().min(1).max(100),
   simAt: z.date().optional(),

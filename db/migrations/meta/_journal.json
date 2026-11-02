@@ -575,6 +575,13 @@
       "when": 1793111647023,
       "tag": "0081_plant_support_read",
       "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1793198047023,
+      "tag": "0082_roles_v1",
+      "breakpoints": true
     }
   ]
 }

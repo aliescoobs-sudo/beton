@@ -41,17 +41,17 @@ let planClient: { name: string; code: string };
 let sold: { name: string; code: string; blNos: string[]; invoice?: string };
 const names = new Map<string, string>();
 
-const ctxOf = (role: Role, today = DAY): ToolContext => ({
+const ctxOf = (role: keyof typeof users, today = DAY): ToolContext => ({
   appPool: app,
   actor: users[role],
   today,
   engine: engineParams(defaultParameters()),
   codeOfName: (n) => names.get(n) ?? null,
 });
-const call = (role: Role, tool: string, args: unknown = {}, today = DAY) =>
+const call = (role: keyof typeof users, tool: string, args: unknown = {}, today = DAY) =>
   runTool(ctxOf(role, today), tool, args);
 const ROTATION_TOOLS = ['deliveries_today', 'next_load'];
-const callOn = (role: Role, tool: string, args: unknown = {}) =>
+const callOn = (role: keyof typeof users, tool: string, args: unknown = {}) =>
   call(role, tool, args, ROTATION_TOOLS.includes(tool) ? ROT_DAY : DAY);
 const inCtx = <T>(user: SessionUser, fn: (tx: pg.PoolClient) => Promise<T>) =>
   withRlsContext(app, { userId: user.id, role: user.role, requestId: marker }, fn);

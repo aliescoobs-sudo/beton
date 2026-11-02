@@ -3,31 +3,84 @@
  * read this one table. Default deny: a permission not listed here is granted to nobody.
  * Field-level restrictions inside a permission (e.g. plant sees orders without prices) live in field-visibility.ts.
  */
-export const USER_ROLES = ['owner', 'partner', 'office', 'plant', 'support'] as const;
+export const USER_ROLES = [
+  'owner',
+  'partner',
+  'office',
+  'plant',
+  'support',
+  // V1 (DECISIONS 126): mapped to a policy role by the database (ctx.role()), see migration 0082.
+  'app_admin',
+  'office_sales',
+  'office_purchases',
+  'plant_manager',
+  'driver',
+  'pump_operator',
+  'accountant',
+  'client_portal',
+  'supplier_portal',
+] as const;
+/** The five roles every RLS policy of the pilot is written for; a V1 role is mapped to one of them (or to none). */
+export const POLICY_ROLES = ['owner', 'partner', 'office', 'plant', 'support'] as const;
+export type PolicyRole = (typeof POLICY_ROLES)[number];
+export const V1_POLICY_ROLE: Partial<Record<(typeof USER_ROLES)[number], PolicyRole>> = {
+  app_admin: 'owner',
+  office_sales: 'office',
+  office_purchases: 'office',
+  plant_manager: 'plant',
+};
 export type Role = (typeof USER_ROLES)[number];
+
+/** The policy role an account is read as (the database does the same in ctx.role()); null when it has none. */
+export function policyRoleOf(role: Role): PolicyRole | null {
+  return (POLICY_ROLES as readonly string[]).includes(role)
+    ? (role as PolicyRole)
+    : (V1_POLICY_ROLE[role] ?? null);
+}
 
 // DECISIONS 81 (provisional): `support` reads everything and writes nothing, so it joins every read list and no write
 // list. Money (prices, balances, totals, instruments, invoices) is read by the owner and support only; the partner has
 // no money access for now; office writes money blind (it never reads it back); plant sees no money.
-const ALL = ['owner', 'partner', 'office', 'plant', 'support'] as const;
-const MANAGERS = ['owner', 'partner'] as const;
-const MANAGERS_READ = ['owner', 'partner', 'support'] as const;
-const OFFICE = ['owner', 'partner', 'office'] as const;
-const OFFICE_READ = ['owner', 'partner', 'office', 'support'] as const;
-const PLANT_READ = ['owner', 'partner', 'plant', 'support'] as const;
-const PLANT = ['owner', 'partner', 'plant'] as const;
+const ALL = [
+  'owner',
+  'app_admin',
+  'partner',
+  'office',
+  'office_sales',
+  'office_purchases',
+  'plant',
+  'plant_manager',
+  'support',
+] as const;
+const MANAGERS = ['owner', 'app_admin', 'partner'] as const;
+const MANAGERS_READ = ['owner', 'app_admin', 'partner', 'support'] as const;
+const OFFICE = ['owner', 'app_admin', 'partner', 'office', 'office_sales', 'office_purchases'] as const;
+const OFFICE_READ = [
+  'owner',
+  'app_admin',
+  'partner',
+  'office',
+  'office_sales',
+  'office_purchases',
+  'support',
+] as const;
+const PLANT_READ = ['owner', 'app_admin', 'partner', 'plant', 'plant_manager', 'support'] as const;
+const PLANT = ['owner', 'app_admin', 'partner', 'plant', 'plant_manager'] as const;
 /** Money: read by the owner and support; written by the owner. */
-const MONEY_READ = ['owner', 'support'] as const;
-const MONEY_WRITE = ['owner'] as const;
+const MONEY_READ = ['owner', 'app_admin', 'support'] as const;
+const MONEY_WRITE = ['owner', 'app_admin'] as const;
 /** Blind entry: office (and the owner) create money records and never read them back. */
-const BLIND_WRITE = ['owner', 'office'] as const;
+/** Sales and purchases are two offices (DECISIONS 128): each writes its own documents, blind, and never the other's. */
+const BLIND_SALES = ['owner', 'app_admin', 'office', 'office_sales'] as const;
+const BLIND_PURCHASES = ['owner', 'app_admin', 'office', 'office_purchases'] as const;
+const BLIND_WRITE = ['owner', 'app_admin', 'office', 'office_sales', 'office_purchases'] as const;
 
 export const PERMISSIONS = {
   // Users, roles, 2FA reset
-  'users.manage': ['owner'],
+  'users.manage': ['owner', 'app_admin'],
   // Parameters
   'parameters.read': MANAGERS_READ,
-  'parameters.write': ['owner'],
+  'parameters.write': ['owner', 'app_admin'],
   // Clients / suppliers
   'parties.read': OFFICE_READ,
   'parties.write': OFFICE,
@@ -58,13 +111,13 @@ export const PERMISSIONS = {
   'zones.write': MANAGERS,
   // Orders + payment plan: operational fields (code, type, m³, date, site/zone) for the partner and the plant, amounts
   // for the owner and support; office writes blind (field-visibility.ts)
-  'orders.read': ['owner', 'partner', 'plant', 'support'],
+  'orders.read': ['owner', 'app_admin', 'partner', 'plant', 'plant_manager', 'support'],
   'orders.read_money': MONEY_READ,
   // The order chain: quantities and stages for every role of the company; the payment stage only for the money roles.
   'orders.chain': ALL,
   // Search by document number: every role; what it finds is whatever its row-level security lets it read.
   'search.number': ALL,
-  'orders.write': BLIND_WRITE,
+  'orders.write': BLIND_SALES,
   'orders.price_override': MONEY_WRITE,
   // Caisse and bank accounts with their opening balances (owner writes; owner and support read)
   'money_accounts.read': MONEY_READ,
@@ -81,31 +134,31 @@ export const PERMISSIONS = {
   'instruments.manage': MONEY_WRITE,
   // Quotes: office and the owner write (office blind), the owner and support read and print
   'quotes.read': MONEY_READ,
-  'quotes.write': BLIND_WRITE,
+  'quotes.write': BLIND_SALES,
   // Invoices
-  'invoices.read': MONEY_READ,
-  'invoices.write': BLIND_WRITE,
+  'invoices.read': [...MONEY_READ, 'accountant'],
+  'invoices.write': BLIND_SALES,
   // The supplier's invoice, its own document linked to the order and the receipts: entered blind by office, read by owner and support.
   'supplier_invoices.read': MONEY_READ,
-  'supplier_invoices.write': BLIND_WRITE,
+  'supplier_invoices.write': BLIND_PURCHASES,
   // Accept the gaps, approve for payment (the payable), reject: the owner, the first two after a fresh second factor.
   'supplier_invoices.approve': MONEY_WRITE,
   // The avoir for concrete refused or brought back after it was billed: the owner issues it (step-up), the owner and support read.
-  'avoirs.read': MONEY_READ,
+  'avoirs.read': [...MONEY_READ, 'accountant'],
   'avoirs.issue': MONEY_WRITE,
   // The delivered loads no invoice carries yet. Office reads it without any amount (the answer has no money key).
-  'invoices.queue': ['owner', 'office', 'support'],
+  'invoices.queue': ['owner', 'app_admin', 'office', 'office_sales', 'support'],
   // Purchases, supplier payments (plant: receipt lines, no amount)
-  'purchases.read': ['owner', 'plant', 'support'],
+  'purchases.read': ['owner', 'app_admin', 'plant', 'plant_manager', 'support'],
   'purchases.read_money': MONEY_READ,
-  'purchases.write': BLIND_WRITE,
+  'purchases.write': BLIND_PURCHASES,
   // Reversing entries are the owner's; office asks for a correction instead (it cannot read what it entered)
   'ledger.reverse': MONEY_WRITE,
   'ledger.reverse_old': MONEY_WRITE,
   'corrections.request': BLIND_WRITE,
-  'corrections.read': ['owner', 'support'],
+  'corrections.read': ['owner', 'app_admin', 'support'],
   // Our legal identity: printed on every document, so everyone reads it; the owner changes it
-  'company.read': ALL,
+  'company.read': [...ALL, 'accountant'],
   'company.write': MONEY_WRITE,
   // Deliveries / BL (✅ A11)
   'deliveries.read': ALL,
@@ -113,21 +166,58 @@ export const PERMISSIONS = {
   // Cancelling a load writes a reversing row and reversing stock movements: managers
   'deliveries.cancel': MANAGERS,
   // A load beyond the order volume is recorded; the owner confirms it (it will be billed at the order's price)
-  'deliveries.excess_read': ['owner', 'partner', 'support'],
+  'deliveries.excess_read': ['owner', 'app_admin', 'partner', 'support'],
   'deliveries.excess_confirm': MONEY_WRITE,
-  'deliveries.bl_return': ['owner', 'partner', 'office', 'plant'],
+  'deliveries.bl_return': [
+    'owner',
+    'app_admin',
+    'partner',
+    'office',
+    'office_sales',
+    'office_purchases',
+    'plant',
+    'plant_manager',
+  ],
   // A load made outside a rotation is marked delivered by hand; a rotation's load is delivered by its tracking step
-  'deliveries.deliver': ['owner', 'partner', 'plant'],
+  'deliveries.deliver': ['owner', 'app_admin', 'partner', 'plant', 'plant_manager'],
   // The scan of a signed BL: add it (with the return, or after), and open it. Opening re-checks RLS and is audited.
-  'delivery_files.write': ['owner', 'partner', 'office', 'plant'],
-  'delivery_files.read': ['owner', 'partner', 'office', 'plant', 'support'],
+  'delivery_files.write': [
+    'owner',
+    'app_admin',
+    'partner',
+    'office',
+    'office_sales',
+    'office_purchases',
+    'plant',
+    'plant_manager',
+  ],
+  'delivery_files.read': [
+    'owner',
+    'app_admin',
+    'partner',
+    'office',
+    'office_sales',
+    'office_purchases',
+    'plant',
+    'plant_manager',
+    'support',
+  ],
   // Concrete that came back or was refused, recorded on its load with a reason (counted as loss in the consumption report)
-  'deliveries.loss': ['owner', 'partner', 'office', 'plant'],
+  'deliveries.loss': [
+    'owner',
+    'app_admin',
+    'partner',
+    'office',
+    'office_sales',
+    'office_purchases',
+    'plant',
+    'plant_manager',
+  ],
   // Daily dispatch: the plan of the day's rotations (truck, driver, times); quantities and times only. Office is blind to orders.
   'dispatch.read': PLANT_READ,
   'dispatch.write': PLANT,
   // Office's read-only view of the day's rotations: truck, times, litres, client name, the step reached. No price, no order.
-  'dispatch.read_office': ['office'],
+  'dispatch.read_office': ['office', 'office_sales'],
   'drivers.write': MANAGERS,
   // Trip tracking: one tap per step of a rotation (the first one is the load, so the plant's rights); times and quantities only.
   'trips.read': PLANT_READ,
@@ -149,12 +239,12 @@ export const PERMISSIONS = {
   'stock.write': PLANT,
   // The opening stock of a component (entered once, with a date), and the low-stock threshold per component
   // The owner corrects the stock after a physical count (a movement with a reason)
-  'stock.count': ['owner'],
+  'stock.count': ['owner', 'app_admin'],
   'stock.opening': MANAGERS,
   'stock.threshold': MANAGERS,
   // Receiving a purchase puts its stocked lines into the stock; quantities only, no amount
-  'receipts.read': PLANT_READ,
-  'receipts.write': PLANT,
+  'receipts.read': [...PLANT_READ, 'office_purchases'],
+  'receipts.write': [...PLANT, 'office_purchases'],
   // First step of the two-step receipt: the plant confirms an arrival (nothing enters the stock yet)
   'receipts.confirm_arrival': PLANT,
   'reconciliation.close': MANAGERS,
@@ -162,7 +252,7 @@ export const PERMISSIONS = {
   'margins.read': MONEY_READ,
   'cash.read': MONEY_READ,
   // The accountant's files for a period (owner and support; every download is audited as an export)
-  'accounting.export': MONEY_READ,
+  'accounting.export': [...MONEY_READ, 'accountant'],
   // The money facts of "what did this action change" (ledger L35): the roles that read money
   'effects.money': MONEY_READ,
   // Security alerts (break-glass) are not money: owner and partner see and acknowledge them (support reads the table).
@@ -182,9 +272,9 @@ export const PERMISSIONS = {
   // The in-app assistant (SPEC-assistant, v1.1: office included). What it can read or draft is each tool's own permission; this one is the entry.
   'assistant.use': ALL,
   // Pilot operations
-  'simulation.control': ['owner'],
-  'backups.manage': ['owner'],
-  'checklist.manage': ['owner'],
+  'simulation.control': ['owner', 'app_admin'],
+  'backups.manage': ['owner', 'app_admin'],
+  'checklist.manage': ['owner', 'app_admin'],
 } as const satisfies Record<string, readonly Role[]>;
 
 export type Permission = keyof typeof PERMISSIONS;

@@ -15,6 +15,8 @@ export interface NewUser {
   password: string;
   role: UserRole;
   locale: 'fr' | 'ar';
+  /** The plant of a plant_manager (required for that role, forbidden for the others). */
+  plantId?: string | null;
 }
 
 const PASSWORD_ERRORS = {
@@ -42,6 +44,9 @@ export async function createUser(auth: Auth, authPool: pg.Pool, input: NewUser):
   );
   if (existing[0]?.provisioned) throw new Error('A user with this email already exists');
 
+  if ((input.role === 'plant_manager') !== Boolean(input.plantId)) {
+    throw new Error('A plant manager needs a plant, and nobody else has one');
+  }
   if (input.role === 'owner') {
     const { rowCount } = await authPool.query(`select 1 from "user" where role = 'owner' and email <> $1`, [
       email,
@@ -54,8 +59,8 @@ export async function createUser(auth: Auth, authPool: pg.Pool, input: NewUser):
   if (userId) {
     // Resuming an unfinished creation: align it with this request.
     await authPool.query(
-      'update "user" set name = $2, role = $3, locale = $4, "updatedAt" = $5 where id = $1',
-      [userId, name, input.role, input.locale, realClock.now()],
+      'update "user" set name = $2, role = $3, locale = $4, "plantId" = $6, "updatedAt" = $5 where id = $1',
+      [userId, name, input.role, input.locale, realClock.now(), input.plantId ?? null],
     );
   } else {
     const user = await ctx.internalAdapter.createUser(
@@ -63,6 +68,9 @@ export async function createUser(auth: Auth, authPool: pg.Pool, input: NewUser):
       { method: 'email-password' },
     );
     userId = user.id;
+    if (input.plantId) {
+      await authPool.query('update "user" set "plantId" = $2 where id = $1', [userId, input.plantId]);
+    }
   }
 
   try {

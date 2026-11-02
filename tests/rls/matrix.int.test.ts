@@ -28,7 +28,7 @@ import {
 } from '../helpers/ledger-fixtures';
 import { resetSimClock } from '../helpers/reset-sim-clock';
 import { ANONYMOUS_ACTOR_ID, SYSTEM_ACTOR_ID } from '../../src/modules/platform-security/auth/actors';
-import { USER_ROLES } from '../../src/modules/platform-security/domain/permissions';
+import { POLICY_ROLES } from '../../src/modules/platform-security/domain/permissions';
 
 // AC-SEC-04, generated from the registry: for every RLS table × every role, read exactly what the matrix allows.
 type DbRole = (typeof DB_ROLES)[number];
@@ -915,7 +915,7 @@ const FIXTURES: Record<
 };
 
 beforeAll(async () => {
-  for (const role of USER_ROLES) actors[role] = (await realActor(env.DATABASE_URL_MIGRATOR, role)).id;
+  for (const role of POLICY_ROLES) actors[role] = (await realActor(env.DATABASE_URL_MIGRATOR, role)).id;
   actors.system = SYSTEM_ACTOR_ID;
   actors.anonymous = ANONYMOUS_ACTOR_ID;
   for (const table of RLS_TABLES) {

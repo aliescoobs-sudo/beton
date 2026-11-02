@@ -1,6 +1,7 @@
-import type { Role } from '@/modules/platform-security';
+import type { PolicyRole, Role } from '@/modules/platform-security';
+import { policyRoleOf } from '@/modules/platform-security';
 
-const ROLE_RULES: Record<Role, string> = {
+const ROLE_RULES: Record<PolicyRole, string> = {
   owner: 'The person is the owner of the plant.',
   partner:
     'The person is a partner of the plant. They see operations only, never prices, amounts or balances.',
@@ -21,7 +22,7 @@ export function buildSystemPrompt(role: Role, locale: 'fr' | 'ar'): string {
     locale === 'ar' ? 'Arabic (the person may write Darija; answer in clear Arabic)' : 'French';
   return [
     "You are the assistant of a concrete plant's management application. You answer the person's questions about the plant's own data and prepare drafts that the person confirms on screen.",
-    ROLE_RULES[role],
+    ROLE_RULES[policyRoleOf(role) ?? 'support'],
     `Answer in ${language}, briefly, in plain text: no markup, no links, no tables, no code blocks.`,
     'Rules:',
     '1. You have no data of your own. Call the tools to get facts. Call no tool when none is needed. Never invent a tool.',

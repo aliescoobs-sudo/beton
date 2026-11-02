@@ -15,7 +15,19 @@ import {
 type Pending = () => Promise<AdminActionResult>;
 
 /** Owner's user list and actions. Every action is sensitive: a stale second factor opens the step-up dialog. */
-export function UsersAdmin({ users, selfId }: { users: ManagedUser[]; selfId: string }) {
+export function UsersAdmin({
+  users,
+  selfId,
+  plants = [],
+  canMakeAdmin = false,
+}: {
+  users: ManagedUser[];
+  selfId: string;
+  /** The active plants, for a plant manager's plant (R2). */
+  plants?: { id: string; name: string }[];
+  /** Only the owner makes an app_admin. */
+  canMakeAdmin?: boolean;
+}) {
   const t = useTranslations('admin');
   const router = useRouter();
   const [retry, setRetry] = useState<Pending | null>(null);
@@ -119,9 +131,32 @@ export function UsersAdmin({ users, selfId }: { users: ManagedUser[]; selfId: st
         <label className="block">
           <span className="text-sm">{t('role')}</span>
           <select name="role" className={input} defaultValue="office">
-            {(['partner', 'office', 'plant', 'support'] as const).map((r) => (
-              <option key={r} value={r}>
-                {t(`roles.${r}`)}
+            {(
+              [
+                'office_sales',
+                'office_purchases',
+                'plant_manager',
+                'driver',
+                'pump_operator',
+                'accountant',
+              ] as const
+            )
+              .concat(canMakeAdmin ? (['app_admin'] as never[]) : [])
+              .concat(['partner', 'office', 'plant', 'support'] as never[])
+              .map((r) => (
+                <option key={r} value={r}>
+                  {t(`roles.${r}`)}
+                </option>
+              ))}
+          </select>
+        </label>
+        <label className="block">
+          <span className="text-sm">{t('plant')}</span>
+          <select name="plantId" className={input} defaultValue="" data-testid="create-user-plant">
+            <option value="">—</option>
+            {plants.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
               </option>
             ))}
           </select>

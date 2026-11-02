@@ -10,6 +10,7 @@ import { withStepUp } from '../../auth/step-up-guard';
 import { readParameters } from '../../service/parameter-service';
 import {
   createManagedUser,
+  MANAGED_ROLES,
   resetTwoFactor,
   setUserStatus,
   type UserAdminDeps,
@@ -44,7 +45,11 @@ async function ownerAction(fn: (user: SessionUser) => Promise<void>): Promise<Ad
 const newUserSchema = z.object({
   email: z.email(),
   name: z.string().trim().min(1).max(120),
-  role: z.enum(['partner', 'office', 'plant', 'support']),
+  role: z.enum(MANAGED_ROLES),
+  plantId: z
+    .uuid()
+    .nullish()
+    .or(z.literal('').transform(() => null)),
   locale: z.enum(['fr', 'ar']),
   password: z.string().min(1).max(128),
 });

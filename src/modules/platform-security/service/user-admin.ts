@@ -33,6 +33,23 @@ export interface ManagedUser {
   provisioned: boolean;
 }
 
+export const MANAGED_ROLES = [
+  'app_admin',
+  'office_sales',
+  'office_purchases',
+  'plant_manager',
+  'driver',
+  'pump_operator',
+  'accountant',
+  'client_portal',
+  'supplier_portal',
+  'partner',
+  'office',
+  'plant',
+  'support',
+] as const;
+export type ManagedRole = (typeof MANAGED_ROLES)[number];
+
 /** Service-level guard (SPEC §4, layer 2): only the owner manages users, whatever the UI did. */
 async function assertCanManage(deps: UserAdminDeps, actor: SessionUser): Promise<void> {
   if (!can(actor.role, 'users.manage')) {
@@ -78,14 +95,23 @@ export async function createManagedUser(
   input: {
     email: string;
     name: string;
-    role: 'partner' | 'office' | 'plant' | 'support';
+    role: ManagedRole;
     locale: 'fr' | 'ar';
     password: string;
+    plantId?: string | null;
   },
 ): Promise<{ id: string }> {
   await assertCanManage(deps, actor);
-  if (!['partner', 'office', 'plant', 'support'].includes(input.role))
-    throw new Error('Role must be partner, office, plant or support');
+  if (!MANAGED_ROLES.includes(input.role)) throw new Error('This role cannot be created here');
+  // The portals are defined but their flag is off (DECISIONS 123): no account can be made for them yet.
+  if (input.role === 'client_portal' || input.role === 'supplier_portal') {
+    throw new Error('The portals are switched off');
+  }
+  // Only the owner makes an app_admin (an app_admin cannot hand out its own level).
+  if (input.role === 'app_admin' && actor.role !== 'owner') {
+    await auditDenied(deps.appPool, actor, 'users.manage');
+    throw new ForbiddenError();
+  }
   return createUser(deps.auth, deps.authPool, { ...input, actor: actorOf(actor) });
 }
 
@@ -102,6 +128,7 @@ export async function setUserStatus(
   ]);
   if (!rows[0]) throw new Error('Unknown user');
   if (rows[0].role === 'owner') throw new Error('The owner account cannot be disabled');
+  if (rows[0].role === 'app_admin' && actor.role !== 'owner') throw new ForbiddenError();
 
   await deps.authPool.query('update "user" set status = $2, "updatedAt" = $3 where id = $1', [
     userId,
@@ -120,6 +147,13 @@ export async function setUserStatus(
 export async function resetTwoFactor(deps: UserAdminDeps, actor: SessionUser, userId: string): Promise<void> {
   await assertCanManage(deps, actor);
   if (userId === actor.id) throw new Error('You cannot reset your own 2FA');
+  // The owner's 2FA is reset by the break-glass CLI only (DECISIONS 75); an app_admin's, by the owner only.
+  const target = await deps.authPool.query<{ role: string }>('select role from "user" where id = $1', [
+    userId,
+  ]);
+  if (target.rows[0]?.role === 'owner')
+    throw new Error('The owner 2FA is reset by the break-glass command only');
+  if (target.rows[0]?.role === 'app_admin' && actor.role !== 'owner') throw new ForbiddenError();
 
   await clearTwoFactor(deps.authPool, userId);
   await auditAuthEvent(deps.authPool, actorOf(actor), {

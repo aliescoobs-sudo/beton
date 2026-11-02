@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { can, PERMISSIONS, rolesWith, USER_ROLES } from './permissions';
+import { can, PERMISSIONS, POLICY_ROLES, rolesWith, USER_ROLES } from './permissions';
+
+/** The pilot's five roles among the holders of a permission (the V1 roles are checked in their own tests). */
+const legacy = (permission: string) =>
+  rolesWith(permission as never).filter((r) => (POLICY_ROLES as readonly string[]).includes(r));
 
 // One row per line of SPEC-platform-security §4 (spot checks of the encoding).
 describe('permission matrix (SPEC-platform-security §4)', () => {
@@ -43,7 +47,7 @@ describe('permission matrix (SPEC-platform-security §4)', () => {
     ['simulation.control', ['owner']],
     ['backups.manage', ['owner']],
   ])('%s → %j', (permission, roles) => {
-    expect([...rolesWith(permission as never)].sort()).toEqual([...roles].sort());
+    expect([...legacy(permission)].sort()).toEqual([...roles].sort());
   });
 
   it('denies by default: an unknown permission is granted to nobody', () => {
@@ -57,7 +61,7 @@ describe('permission matrix (SPEC-platform-security §4)', () => {
   });
 
   it('only the owner may manage users', () => {
-    expect(USER_ROLES.filter((r) => can(r, 'users.manage'))).toEqual(['owner']);
+    expect(USER_ROLES.filter((r) => can(r, 'users.manage'))).toEqual(['owner', 'app_admin']);
   });
 
   // DECISIONS 81 (provisional): money visibility.
@@ -91,7 +95,7 @@ describe('permission matrix (SPEC-platform-security §4)', () => {
 
   it('only the owner and support read money; partner, office and plant read none of it', () => {
     for (const permission of MONEY) {
-      expect([...rolesWith(permission)].sort(), permission).toEqual(['owner', 'support']);
+      expect(legacy(permission).sort(), permission).toEqual(['owner', 'support']);
     }
   });
 
@@ -113,7 +117,7 @@ describe('permission matrix (SPEC-platform-security §4)', () => {
       'ledger.reverse',
       'ledger.reverse_old',
     ] as const) {
-      expect([...rolesWith(permission)], permission).toEqual(['owner']);
+      expect(legacy(permission), permission).toEqual(['owner']);
     }
   });
 
@@ -121,6 +125,52 @@ describe('permission matrix (SPEC-platform-security §4)', () => {
     for (const role of ['plant', 'partner'] as const) {
       for (const permission of MONEY) expect(can(role, permission), `${role} ${permission}`).toBe(false);
       expect(can(role, 'orders.read')).toBe(true);
+    }
+  });
+
+  // V1 (DECISIONS 126 to 128).
+  const V1_NO_MONEY = [
+    'office_sales',
+    'office_purchases',
+    'plant_manager',
+    'driver',
+    'pump_operator',
+    'client_portal',
+    'supplier_portal',
+  ] as const;
+
+  it('V1: only owner, app_admin and support read money; the accountant reads invoices, avoirs and the exports only', () => {
+    for (const permission of MONEY.filter((p) => p !== 'invoices.read')) {
+      expect(can('app_admin', permission), permission).toBe(true);
+      expect(can('accountant', permission), permission).toBe(false);
+      for (const role of V1_NO_MONEY) expect(can(role, permission), `${role} ${permission}`).toBe(false);
+    }
+    expect(can('accountant', 'invoices.read')).toBe(true);
+    expect(can('accountant', 'avoirs.read')).toBe(true);
+    expect(can('accountant', 'cash.read')).toBe(false);
+    expect(can('accountant', 'orders.write')).toBe(false);
+  });
+
+  it("V1: sales and purchases write their own documents and never the other side's", () => {
+    for (const p of ['orders.write', 'quotes.write', 'invoices.write'] as const) {
+      expect(can('office_sales', p), p).toBe(true);
+      expect(can('office_purchases', p), p).toBe(false);
+    }
+    for (const p of ['purchases.write', 'supplier_invoices.write'] as const) {
+      expect(can('office_purchases', p), p).toBe(true);
+      expect(can('office_sales', p), p).toBe(false);
+    }
+    expect(can('office_purchases', 'receipts.write')).toBe(true);
+    expect(can('office_sales', 'receipts.write')).toBe(false);
+    expect(can('plant_manager', 'receipts.confirm_arrival')).toBe(true);
+  });
+
+  it('V1: app_admin holds every owner permission, drivers, pump operators and portals hold none', () => {
+    for (const p of Object.keys(PERMISSIONS)) {
+      if (can('owner', p as never)) expect(can('app_admin', p as never), p).toBe(true);
+      for (const role of ['driver', 'pump_operator', 'client_portal', 'supplier_portal'] as const) {
+        expect(can(role, p as never), `${role} ${p}`).toBe(false);
+      }
     }
   });
 });

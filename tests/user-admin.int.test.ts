@@ -179,3 +179,99 @@ describe('authorize (route and action guard)', () => {
     });
   });
 });
+
+describe('user admin V1 (R2, DECISIONS 126 to 128)', () => {
+  const email = (r: string) => `v1-${r}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@belgobeton.test`;
+  const pw = 'correct-horse-battery-staple';
+
+  it('the owner creates an app_admin and an office_sales; the portals are refused', async () => {
+    const admin = await createManagedUser(deps(), owner, {
+      email: email('admin'),
+      name: 'Admin V1',
+      role: 'app_admin',
+      locale: 'fr',
+      password: pw,
+    });
+    const sales = await createManagedUser(deps(), owner, {
+      email: email('sales'),
+      name: 'Sales V1',
+      role: 'office_sales',
+      locale: 'ar',
+      password: pw,
+    });
+    const users = await listUsers(deps(), owner);
+    expect(users.find((u) => u.id === admin.id)?.role).toBe('app_admin');
+    expect(users.find((u) => u.id === sales.id)?.role).toBe('office_sales');
+    await expect(
+      createManagedUser(deps(), owner, {
+        email: email('portal'),
+        name: 'Portal',
+        role: 'client_portal',
+        locale: 'fr',
+        password: pw,
+      }),
+    ).rejects.toThrow(/switched off/);
+  });
+
+  it('an app_admin manages users but cannot make another app_admin, nor touch the owner', async () => {
+    const adminId = (
+      await createManagedUser(deps(), owner, {
+        email: email('admin2'),
+        name: 'Admin Two',
+        role: 'app_admin',
+        locale: 'fr',
+        password: pw,
+      })
+    ).id;
+    const admin: SessionUser = {
+      id: adminId,
+      name: 'Admin Two',
+      email: 'x@belgobeton.test',
+      role: 'app_admin',
+      locale: 'fr',
+      twoFactorEnabled: true,
+      reenrolRequired: false,
+    };
+    const driver = await createManagedUser(deps(), admin, {
+      email: email('driver'),
+      name: 'Driver V1',
+      role: 'driver',
+      locale: 'ar',
+      password: pw,
+    });
+    expect(driver.id).toBeTruthy();
+    await expect(
+      createManagedUser(deps(), admin, {
+        email: email('admin3'),
+        name: 'Admin Three',
+        role: 'app_admin',
+        locale: 'fr',
+        password: pw,
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(setUserStatus(deps(), admin, owner.id, 'disabled')).rejects.toThrow(/owner/);
+    await expect(resetTwoFactor(deps(), admin, owner.id)).rejects.toThrow(/break-glass/);
+  });
+
+  it('a plant manager needs a plant, nobody else has one', async () => {
+    await expect(
+      createManagedUser(deps(), owner, {
+        email: email('pm'),
+        name: 'PM',
+        role: 'plant_manager',
+        locale: 'fr',
+        password: pw,
+      }),
+    ).rejects.toThrow(/needs a plant/);
+    await expect(
+      createManagedUser(deps(), owner, {
+        email: email('os'),
+        name: 'OS',
+        role: 'office_sales',
+        locale: 'fr',
+        password: pw,
+        plantId: '00000000-0000-7000-8000-0000000000aa',
+      }),
+    ).rejects.toThrow(/needs a plant/);
+  });
+});

@@ -48,6 +48,8 @@ let B: Plant;
 let master: PurchaseMaster;
 let scene: Awaited<ReturnType<typeof deliveryScene>>;
 const TODAY = '2026-06-10';
+let truckNo = 100 + Math.floor(Math.random() * 300);
+const nextTruckNo = () => truckNo++;
 
 const plantOf = async (table: string, id: string) =>
   (await migrator.query<{ plant_id: string | null }>(`select plant_id from ${table} where id = $1`, [id]))
@@ -222,7 +224,7 @@ describe('stock and loads are per plant (AC-PROD-02, 03)', () => {
 
   it('a truck of the other plant cannot load an order of this one', async () => {
     const t = await createTruck(app, users.owner, {
-      code: `T${900 + Math.floor(Math.random() * 99)}`,
+      code: `T${nextTruckNo()}`,
       plate: `PL-${letters(6)}`,
       plantId: B.id,
     });
@@ -253,7 +255,7 @@ describe('stock and loads are per plant (AC-PROD-02, 03)', () => {
 });
 
 describe('the fleet (AC-PROD-04, 05)', () => {
-  const code = (p: 'T' | 'P' | 'X') => `${p}${500 + Math.floor(Math.random() * 400)}`;
+  const code = (p: 'T' | 'P' | 'X') => `${p}${nextTruckNo()}`;
   const plate = () => `FL-${letters(8)}`;
 
   it('a stopped truck stays in the fleet, carries a decision, and cannot be planned', async () => {

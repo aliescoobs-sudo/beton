@@ -307,3 +307,50 @@ One inbox with push notification. Each card shows exactly what will happen, conf
 - Driver interview (3 Nov): steps, emergencies, phones (Android or iPhone), network on sites.
 - Owner: external truck pricing, cancellation fee policy, reference price per plant or global, accountant read scope.
 - Accountant: final invoice timing (§9), legal exemptions with references, export format.
+
+## 16. Amendments after Codex's independent review (2 Nov, accepted by the lead)
+
+1. **Information-visibility matrix (replaces the loose "money only for owner and app_admin" wording).** For every money item, state four rights separately:
+   - who **enters** it;
+   - who **sees it inside a document**;
+   - who **sees balances and aggregates**;
+   - who **exports** it.
+
+   Entering or printing never grants balance or aggregate access. The known exceptions:
+   - office_sales prints invoices with amounts;
+   - office_purchases enters supplier invoices and payments;
+   - the accountant exports HT, VAT and TTC;
+   - reference prices are visible to internal non-field roles.
+
+   Write the matrix in CP-PROD-PLAN.md and enforce it in the database with exposure tests.
+2. **Document library filtered by role and document type.** Every download re-checks permission and RLS server-side.
+3. **Figure-disclosure approval is scoped:** to a user, a data item (and its document, if any), and a duration (default single view, expiry 15 minutes). Every view is audited.
+4. **Assistant financial answers** concern only recorded operations the user is allowed to follow. They never answer a user-chosen amount ("can we pay 50k?", "and 40k?"); such questions are refused, not just rate-limited.
+5. **Inter-plant flows:**
+   - transfers of materials and fuel between Tétouan and Chefchaouen (out, transit, received, variance, who is responsible at each step);
+   - an order or a truck served by the other plant: who produces, who delivers, and where the cost and revenue are booked (default: the producing plant books the material cost; revenue goes to the order's plant; *provisional*).
+6. **Pump coordination:**
+   - pump availability, travel, set-up and pumping capacity in the planning;
+   - a truck must not be dispatched to a pumped pour before the pump is scheduled to be on site;
+   - a conflict raises an alert.
+7. **Receipt states:** ordered, physically arrived, available for production, documentarily accepted. Also partial and rejected quantities, with the weighbridge ticket or delivery note attached.
+   - The plant can produce from "arrived / available" before the office completes the paperwork.
+   - Stock shows both states.
+8. **One timeline per order:**
+   - entries: recorded, planned (and every re-plan), mixed, left, arrived, unloading, unloaded, returned, BL, invoiced, collected;
+   - each entry with its actor, the device time and the server sync time, so offline taps stay traceable.
+9. **Day close per plant:**
+   - unconfirmed loads and missing BLs;
+   - stock variance and fuel variance;
+   - cash held per holder.
+   
+   Blocking items go to the owner's approvals.
+10. **Redirect proposals** need a technical compatibility check of the mix for the destination use, not only "same grade or lower". The plant manager confirms technically before the office or owner confirms commercially.
+11. **Finance report structure:**
+    - plant results first, then central costs (financing, steel cost, head office), then the total;
+    - name it **"Résultat de gestion (données enregistrées)"**, not "net profit", until the accountant validates the rules;
+    - material cost is based on **consumption**, not purchases;
+    - shared costs and pumps are allocated by an explicit, configurable key;
+    - loan principal is separated from financing cost, and leasing gets an explicit treatment;
+    - no commitment is counted twice (an installment and its cheque are one commitment).
+12. **Steel suggestion:** it must simulate the cash brought now **and** the cheques it creates later. It is proposed only if no larger gap appears in the following months.
