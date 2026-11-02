@@ -135,6 +135,13 @@ export const PERMISSIONS = {
   // Quotes: office and the owner write (office blind), the owner and support read and print
   'quotes.read': MONEY_READ,
   'quotes.write': BLIND_SALES,
+  // Approvals inbox (R3): provisional prices and held orders. Owner and app_admin decide; support reads.
+  'approvals.read': MONEY_READ,
+  'approvals.decide': MONEY_WRITE,
+  'credit_limit.write': MONEY_WRITE,
+  // Whether an order waits, and a client's standing as two flags: no figure, so the offices read them.
+  'orders.approval_state': ['owner', 'app_admin', 'office', 'office_sales', 'support'],
+  'clients.balance_status': ['owner', 'app_admin', 'office', 'office_sales', 'office_purchases', 'support'],
   // Invoices
   'invoices.read': [...MONEY_READ, 'accountant'],
   'invoices.write': BLIND_SALES,

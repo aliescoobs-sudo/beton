@@ -1373,6 +1373,29 @@
     "pdf": {
       "download": "Télécharger le PDF",
       "short": "PDF"
+    },
+    "approvals": {
+      "link": "Approbations",
+      "title": "Approbations en attente",
+      "intro": "Prix provisoires à confirmer et commandes retenues. Chaque carte dit exactement ce qui sera écrit ; une décision demande le second facteur.",
+      "none": "Rien en attente.",
+      "confirmAll": "Confirmer les {count} prix de référence",
+      "kindPrice": "Prix provisoire",
+      "kindCredit": {
+        "credit_limit": "Limite de crédit dépassée",
+        "overdue": "Échéance en retard"
+      },
+      "volume": "{m3} m³",
+      "perM3": "le m³",
+      "ht": "HT",
+      "exposure": "Encours {open} MAD · limite {limit} MAD",
+      "willConfirm": "Confirmer le prix de référence tel quel : la facture sera émise à ce prix.",
+      "willRelease": "Libérer la commande : elle pourra être chargée.",
+      "confirm": "Confirmer le prix",
+      "release": "Libérer la commande",
+      "done": "Décision enregistrée.",
+      "error": "Action refusée.",
+      "readOnly": "Lecture seule : {count} carte(s) en attente."
     }
   },
   "operations": {

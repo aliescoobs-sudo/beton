@@ -36,10 +36,13 @@ type RlsTable = (typeof RLS_TABLES)[number];
 
 const env = testEnv();
 const app = new pg.Pool({ connectionString: env.DATABASE_URL_APP, max: 2 });
+const migratorPool = new pg.Pool({ connectionString: env.DATABASE_URL_MIGRATOR, max: 1 });
+/** Orders made before any fixture runs (a fixture must not open a second transaction that waits for the first one's counters). */
+const preOrders = {} as { status: string; hold: string };
 const system = new pg.Pool({ connectionString: env.DATABASE_URL_SYSTEM, max: 1 });
 afterAll(async () => {
   await resetSimClock();
-  await Promise.all([app.end(), system.end()]);
+  await Promise.all([app.end(), system.end(), migratorPool.end()]);
 });
 
 const marker = `matrix_${randomUUID().replace(/-/g, '')}`;
@@ -164,6 +167,41 @@ const FIXTURES: Record<
     },
     visible: `select split_part(note, ':', 2) as owner from receipt_plant_confirmation where note like $1 || ':%'`,
   },
+  client_credit_limit: {
+    // Written by set_client_credit_limit only (owner); a distinctive limit marks the row.
+    writers: ['owner'],
+    seed: async (tx) => {
+      const c = await tx.query<{ id: string }>(
+        `insert into client (id, code, name, kind) values (gen_random_uuid(), public.next_code('CLT', 3), $1, 'person') returning id`,
+        [`ccl${marker}`],
+      );
+      return tx.query(`select public.set_client_credit_limit($1, 7771)`, [c.rows[0]?.id]);
+    },
+    visible: `select set_by::text as owner from client_credit_limit where limit_centimes = 7771 and $1::text is not null`,
+  },
+  order_price_status: {
+    // Written by create_order (office_sales) and confirm_order_price; the fixture writes the row as the definer would, on an order of its own.
+    writers: ['owner'],
+    seed: (_tx, actor) =>
+      withRlsContext(migratorPool, { userId: actor, role: 'owner', requestId: marker }, (m) =>
+        m.query(
+          `insert into order_price_status (order_id, provisional_unit_price_centimes, created_by) values ($1, 1234, $2)`,
+          [preOrders.status, actor],
+        ),
+      ),
+    visible: `select created_by::text as owner from order_price_status where provisional_unit_price_centimes = 1234 and $1::text is not null`,
+  },
+  order_hold: {
+    writers: ['owner'],
+    seed: (_tx, actor) =>
+      withRlsContext(migratorPool, { userId: actor, role: 'owner', requestId: marker }, (m) =>
+        m.query(
+          `insert into order_hold (order_id, reason, created_by, note) values ($1, 'credit_limit', $2, $3)`,
+          [preOrders.hold, actor, marker],
+        ),
+      ),
+    visible: `select created_by::text as owner from order_hold where note = $1`,
+  },
   zone: {
     writers: ['owner', 'partner'],
     seed: (tx, actor) =>
@@ -253,11 +291,11 @@ const FIXTURES: Record<
     visible: `select split_part(reason, ':', 2) as owner from money_movement where source = 'reversal' and reason like $1 || ':%'`,
   },
   delivery: {
-    // Numbered in the year 2099 so that the rows of this fixture are the only ones the query below finds (office cannot join orders).
+    // Numbered in the year 2077 (no other suite loads in that year, the plant-views suite uses 2099) so that the rows of this fixture are the only ones the query below finds (office cannot join orders).
     writers: ['owner', 'partner', 'plant'],
     seed: async (tx, actor) =>
-      insertDelivery(tx, actor, await deliveryScene(app, actors.owner, marker), 100, 2099),
-    visible: `select created_by::text as owner from delivery where bl_no like 'BL-2099-%' and $1::text is not null`,
+      insertDelivery(tx, actor, await deliveryScene(app, actors.owner, marker), 100, 2077),
+    visible: `select created_by::text as owner from delivery where bl_no like 'BL-2077-%' and $1::text is not null`,
   },
   driver: {
     writers: ['owner', 'partner'],
@@ -916,6 +954,13 @@ const FIXTURES: Record<
 
 beforeAll(async () => {
   for (const role of POLICY_ROLES) actors[role] = (await realActor(env.DATABASE_URL_MIGRATOR, role)).id;
+  for (const key of ['status', 'hold'] as const) {
+    preOrders[key] = (
+      await withRlsContext(app, { userId: actors.owner, role: 'owner', requestId: marker }, async (tx) =>
+        insertOrder(tx, actors.owner, await orderMaster(app, actors.owner, `${marker}${key}`)),
+      )
+    ).id;
+  }
   actors.system = SYSTEM_ACTOR_ID;
   actors.anonymous = ANONYMOUS_ACTOR_ID;
   for (const table of RLS_TABLES) {

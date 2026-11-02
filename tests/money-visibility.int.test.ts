@@ -41,6 +41,7 @@ const app = new pg.Pool({ connectionString: env.DATABASE_URL_APP, max: 2 });
 const migrator = new pg.Pool({ connectionString: env.DATABASE_URL_MIGRATOR, max: 1 });
 afterAll(() => Promise.all([app.end(), migrator.end()]));
 
+let preOrder = '';
 const marker = `money_${randomUUID().replace(/-/g, '')}`;
 const actors = {} as Record<'owner' | 'partner' | 'office' | 'plant' | 'support', TestActor>;
 const inCtx = <T>(role: string, userId: string, fn: (tx: pg.PoolClient) => Promise<T>) =>
@@ -67,6 +68,27 @@ const SEED: Record<MoneyTable, (tx: pg.PoolClient, actor: string) => Promise<unk
       [component.rows[0]?.id, supplier.rows[0]?.id, unit.rows[0]?.id, actor],
     );
   },
+  client_credit_limit: async (tx, actor) => {
+    const c = await tx.query<{ id: string }>(
+      `insert into client (id, code, name, kind) values (gen_random_uuid(), public.next_code('CLT', 3), $1, 'person') returning id`,
+      [`ccl${marker}${actor}`],
+    );
+    return tx.query(`select public.set_client_credit_limit($1, 4321)`, [c.rows[0]?.id]);
+  },
+  // The row exists only through create_order (office_sales) and confirm_order_price: for the owner the fixture writes it as those would,
+  // for every other actor it tries the plain insert, which no role has.
+  order_price_status: (tx, actor) =>
+    actor === actors.owner.id
+      ? withRlsContext(migrator, { userId: actor, role: 'owner', requestId: marker }, (m) =>
+          m.query(
+            `insert into order_price_status (order_id, provisional_unit_price_centimes, created_by) values ($1, 4321, $2)`,
+            [preOrder, actor],
+          ),
+        )
+      : tx.query(
+          `insert into order_price_status (order_id, provisional_unit_price_centimes, created_by) values ($1, 4321, $2)`,
+          [preOrder, actor],
+        ),
   sales_order: async (tx, actor) => insertOrder(tx, actor, await orderMaster(app, actors.owner.id, marker)),
   payment_plan_item: async (tx, actor) =>
     insertOrder(tx, actor, await orderMaster(app, actors.owner.id, marker)),
@@ -221,9 +243,15 @@ const SEED: Record<MoneyTable, (tx: pg.PoolClient, actor: string) => Promise<unk
 };
 
 beforeAll(async () => {
+  // (the order is made before any fixture opens a transaction: a second transaction would wait for the first one's counters)
   for (const role of ['owner', 'partner', 'office', 'plant', 'support'] as const) {
     actors[role] = await realActor(env.DATABASE_URL_MIGRATOR, role);
   }
+  preOrder = (
+    await inCtx('owner', actors.owner.id, async (tx) =>
+      insertOrder(tx, actors.owner.id, await orderMaster(app, actors.owner.id, `${marker}po`)),
+    )
+  ).id;
   for (const table of MONEY_TABLES)
     await inCtx('owner', actors.owner.id, (tx) => SEED[table](tx, actors.owner.id));
 });

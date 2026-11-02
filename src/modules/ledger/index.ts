@@ -35,6 +35,21 @@ export {
   type InvoiceView,
   listInvoices,
 } from './service/invoice-service';
+export {
+  type ApprovalCard,
+  type ApprovalError,
+  type ClientStanding,
+  confirmOrderPrice,
+  confirmPricesInBulk,
+  type CreditCard,
+  getClientStandings,
+  getOrderApprovalStates,
+  listApprovals,
+  type OrderApprovalState,
+  type PriceCard,
+  releaseOrderHold,
+  setCreditLimit,
+} from './service/approval-service';
 export { type InvoicePreview, previewInvoiceFromDeliveries } from './service/invoice-preview';
 export { getInvoiceQueue, type QueueClient, type QueueDelivery } from './service/invoice-queue-service';
 export { allocateToInvoice, listOpenInvoices, type OpenInvoice } from './service/allocation-service';

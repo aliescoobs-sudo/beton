@@ -201,6 +201,59 @@ export const TABLE_ACCESS = {
     exception:
       "R1 (DECISIONS 133): the plant's confirmation that a delivery arrived, first step of the two-step receipt. Written only by confirm_receipt_at_plant (SECURITY DEFINER), consumed by the office's receipt. No quantity, no price. Office reads receipts through the purchases, not this table.",
   },
+  client_credit_limit: {
+    kind: 'rls',
+    money: true,
+    read: {
+      owner: 'all',
+      partner: 'none',
+      office: 'none',
+      plant: 'none',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    exception:
+      'R3 (DECISIONS 131): the credit limit of a client. Money: written only by set_client_credit_limit (SECURITY DEFINER, owner and app_admin); owner and support read; its audit rows are hidden from the others.',
+  },
+  order_price_status: {
+    kind: 'rls',
+    money: true,
+    read: {
+      owner: 'all',
+      partner: 'none',
+      office: 'none',
+      plant: 'none',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    exception:
+      'R3 (DECISIONS 130): one row per provisional order, with the price the owner confirmed. Written only by create_order (office_sales) and confirm_order_price (owner and app_admin); money, owner and support read; its audit rows are hidden from the others.',
+  },
+  order_hold: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'none',
+      office: 'none',
+      plant: 'none',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    exception:
+      'R3 (DECISIONS 131): an order held for the credit limit or an overdue instalment. No amount. Written only by create_order and release_order_hold; the offices learn that an order waits through order_approval_state(), never from this table.',
+  },
   zone: {
     kind: 'rls',
     read: {
