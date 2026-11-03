@@ -31,6 +31,8 @@ export default async function StockPage({
   const canCount = can(user.role, 'stock.count');
   const adjustments = await listStockAdjustments(getPool('app'), user);
   const t = await getTranslations('operations.stock');
+  // The extra column only appears while something has arrived and is usable but not documented yet (§16.7).
+  const anyPending = levels.some((l) => l.arrivedPending > 0);
   return (
     <div>
       <PageHeader title={t('title')} description={t('intro')} />
@@ -59,6 +61,8 @@ export default async function StockPage({
             <tr>
               <Th>{t('component')}</Th>
               <Th numeric>{t('level')}</Th>
+              {anyPending && <Th numeric>{t('arrivedPending')}</Th>}
+              {anyPending && <Th numeric>{t('usable')}</Th>}
               <Th numeric>{t('threshold')}</Th>
               <Th>{t('status')}</Th>
               {canSet && (plants.length === 0 || picked) && <Th>{t('setThreshold')}</Th>}
@@ -75,6 +79,16 @@ export default async function StockPage({
                   <Td numeric>
                     {q.value} {q.unit}
                   </Td>
+                  {anyPending && (
+                    <Td numeric data-testid={`stock-pending-${l.componentId}`}>
+                      {formatStockQty(l.arrivedPending, l.baseUnit).value} {q.unit}
+                    </Td>
+                  )}
+                  {anyPending && (
+                    <Td numeric>
+                      {formatStockQty(l.usable, l.baseUnit).value} {q.unit}
+                    </Td>
+                  )}
                   <Td numeric>{low ? `${low.value} ${low.unit}` : '—'}</Td>
                   <Td>
                     <StatusPill status={l.status === 'ok' ? 'paid' : l.status === 'low' ? 'due' : 'late'}>

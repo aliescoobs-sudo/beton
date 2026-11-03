@@ -84,7 +84,7 @@ async function trip(driverId: string, unloaded: boolean) {
       `insert into trip_plan (id, batch_id, trip_date, order_id, seq, truck_id, driver_id, volume_l, load_min, depart_min, arrive_min,
                               unload_end_min, back_min, created_by)
        values (gen_random_uuid(), gen_random_uuid(), $1, $2, $3, $4, $5, 1000, 420, 430, 455, 485, 520, $6) returning id`,
-      [today, scene.orderId, n++ % 90, scene.truckId, driverId, owner.id],
+      [today, scene.orderId, 1 + (n++ % 90), scene.truckId, driverId, owner.id],
     );
     return t.rows[0]!.id;
   });

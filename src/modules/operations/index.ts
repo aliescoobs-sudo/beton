@@ -70,8 +70,18 @@ export {
 export { type DeliveryNote, getDeliveryNote, recordNotePrint } from './service/delivery-note';
 export {
   type ArrivalError,
+  type ArrivalFileError,
+  type ArrivalFileView,
+  type ArrivalLineInput,
+  attachArrivalFile,
   confirmArrivalAtPlant,
+  listArrivalFiles,
+  listReceiptStates,
   listReceivable,
+  openArrivalFile,
+  type ReceiptState,
+  type ReceiptStateLine,
+  type ReceiptStateView,
   type ReceivableLine,
   type ReceivablePurchase,
   type ReceiptError,

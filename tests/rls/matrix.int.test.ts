@@ -187,6 +187,53 @@ const FIXTURES: Record<
     },
     visible: `select split_part(note, ':', 2) as owner from receipt_plant_confirmation where note like $1 || ':%'`,
   },
+  receipt_arrival_line: {
+    // Only confirm_receipt_at_plant_lines() writes it (owner, partner, plant); every writer counts a purchase of its own.
+    writers: ['owner', 'partner', 'plant'],
+    seed: async (tx, actor) => {
+      const pm = await purchaseMaster(app, actors.owner, marker);
+      const p = await newReceivablePurchase(
+        app,
+        actors.owner,
+        pm,
+        `${marker}l${actor.replace(/-/g, '').slice(-8)}`,
+      );
+      const line = (
+        await migratorPool.query<{ id: string }>(`select id from purchase_line where purchase_id = $1`, [
+          p.id,
+        ])
+      ).rows[0]!.id;
+      return tx.query(`select public.confirm_receipt_at_plant_lines($1, $2, $3::jsonb)`, [
+        p.id,
+        `${marker}L:${actor}`,
+        JSON.stringify([{ line, arrived: 1000, rejected: 0, available: false }]),
+      ]);
+    },
+    visible: `select split_part(c.note, ':', 2) as owner from receipt_arrival_line a
+                join receipt_plant_confirmation c on c.id = a.confirmation_id where c.note like $1 || 'L:%'`,
+  },
+  receipt_arrival_file: {
+    // Inserted by the plant, owner and partner on an arrival of their own, before it is documented.
+    writers: ['owner', 'partner', 'plant'],
+    seed: async (tx, actor) => {
+      const pm = await purchaseMaster(app, actors.owner, marker);
+      const p = await newReceivablePurchase(
+        app,
+        actors.owner,
+        pm,
+        `${marker}f${actor.replace(/-/g, '').slice(-8)}`,
+      );
+      const c = await tx.query<{ id: string }>(`select public.confirm_receipt_at_plant($1, null) as id`, [
+        p.id,
+      ]);
+      return tx.query(
+        `insert into receipt_arrival_file (id, confirmation_id, kind, content_type, size_bytes, sha256, uploaded_by)
+         values (gen_random_uuid(), $1, 'weighbridge_ticket', 'image/png', 4242, repeat('b', 64), $2)`,
+        [c.rows[0]!.id, actor],
+      );
+    },
+    visible: `select uploaded_by::text as owner from receipt_arrival_file where size_bytes = 4242 and $1::text is not null`,
+  },
   client_credit_limit: {
     // Written by set_client_credit_limit only (owner); a distinctive limit marks the row.
     writers: ['owner'],

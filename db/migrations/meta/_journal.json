@@ -757,6 +757,13 @@
       "when": 1793803927023,
       "tag": "0099_case5_billed_unloaded",
       "breakpoints": true
+    },
+    {
+      "idx": 100,
+      "version": "7",
+      "when": 1793803987023,
+      "tag": "0100_receipt_states",
+      "breakpoints": true
     }
   ]
 }

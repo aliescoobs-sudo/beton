@@ -24,8 +24,15 @@ export interface StockLevel {
   nameFr: string;
   nameAr: string;
   baseUnit: string;
-  /** Integer base units: the sum of every movement. */
+  /** Integer base units: the sum of every movement (what the office has documented). */
   level: number;
+  /**
+   * Arrived at the plant and usable for production, not documented by the office yet (§16.7). Never counted twice: when the office
+   * documents the receipt it leaves this figure and goes into `level`.
+   */
+  arrivedPending: number;
+  /** What production can draw on now: `level` plus `arrivedPending`. */
+  usable: number;
   /** Below which the stock is low; null until the owner sets one. */
   lowThreshold: number | null;
   status: StockStatus;
@@ -62,14 +69,24 @@ export async function getStockLevels(
       [plantId],
     ),
   );
+  const pending = await inRequest(appPool, actor, (tx) =>
+    tx.query<{ component_id: string; qty_base: string }>(
+      'select component_id, qty_base::text from public.stock_arrived_pending($1)',
+      [plantId],
+    ),
+  );
+  const waiting = new Map(pending.rows.map((p) => [p.component_id, Number(p.qty_base)]));
   return rows.map((r) => ({
     componentId: r.id,
     nameFr: r.name_fr,
     nameAr: r.name_ar,
     baseUnit: r.base_unit,
     level: Number(r.level),
+    arrivedPending: waiting.get(r.id) ?? 0,
+    usable: Number(r.level) + (waiting.get(r.id) ?? 0),
     lowThreshold: r.low === null ? null : Number(r.low),
-    status: stockStatus(Number(r.level), r.low === null ? null : Number(r.low)),
+    // Against the threshold what production can draw on counts: booked stock plus what arrived and is usable.
+    status: stockStatus(Number(r.level) + (waiting.get(r.id) ?? 0), r.low === null ? null : Number(r.low)),
   }));
 }
 

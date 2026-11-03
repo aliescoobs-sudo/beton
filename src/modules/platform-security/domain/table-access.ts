@@ -199,7 +199,42 @@ export const TABLE_ACCESS = {
     audited: true,
     noDelete: true,
     exception:
-      "R1 (DECISIONS 133): the plant's confirmation that a delivery arrived, first step of the two-step receipt. Written only by confirm_receipt_at_plant (SECURITY DEFINER), consumed by the office's receipt. No quantity, no price. Office reads receipts through the purchases, not this table.",
+      "R1 (DECISIONS 133): the plant's confirmation that a delivery arrived, first step of the two-step receipt. Written only by confirm_receipt_at_plant (SECURITY DEFINER), consumed by the office's receipt. No price. The office purchases role (actor role office_purchases) reads it to document what the plant counted; the other offices read receipts through the purchases.",
+  },
+  receipt_arrival_line: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'none',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    exception:
+      'C3 (DECISIONS 156, REQUIREMENTS-V1 §16.7): what the plant counted on a purchase line at arrival: arrived, refused, usable now (thousandths of the purchase unit). Written only by confirm_receipt_at_plant_lines (SECURITY DEFINER). Quantities only, no price. The office purchases role reads it (actor role) to document the receipt; a plant manager reads their plant.',
+  },
+  receipt_arrival_file: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'none',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'C3 (DECISIONS 156): the weighbridge ticket or delivery note of an arrival. Metadata only (kind, type, size, SHA-256, who); the bytes are sealed in the file store and served by a route that re-checks RLS and audits each view. Plant, owner and partner add it before the receipt is documented; the office purchases role reads it.',
   },
   client_credit_limit: {
     kind: 'rls',

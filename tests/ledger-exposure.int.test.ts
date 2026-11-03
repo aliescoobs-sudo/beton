@@ -163,6 +163,9 @@ describe('functions the application role can execute', () => {
     'public.release_order_hold(p_order uuid, p_note text)',
     'public.set_client_credit_limit(p_client uuid, p_limit bigint)',
     'public.confirm_receipt_at_plant(p_purchase uuid, p_note text)',
+    'public.confirm_receipt_at_plant_lines(p_purchase uuid, p_note text, p_lines jsonb)', // C3: the plant (checked inside)
+    'public.receipt_states(p_since date)', // C3: quantities and states, no price
+    'public.stock_arrived_pending(p_plant uuid)', // C3: quantities per component
     'public.record_receipt_lines(p_purchase uuid, p_date date, p_lines jsonb, p_confirm_excess boolean)',
     'public.reject_supplier_invoice(p_si uuid, p_reason text)',
     'public.resolve_order_price(p_type uuid, p_client uuid, p_date date)', // C3: owner and system only (checked inside)
