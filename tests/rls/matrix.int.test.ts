@@ -36,6 +36,7 @@ type RlsTable = (typeof RLS_TABLES)[number];
 
 const env = testEnv();
 const app = new pg.Pool({ connectionString: env.DATABASE_URL_APP, max: 2 });
+let pumpedOrder = '00000000-0000-0000-0000-000000000000';
 const migratorPool = new pg.Pool({ connectionString: env.DATABASE_URL_MIGRATOR, max: 1 });
 /** Orders made before any fixture runs (a fixture must not open a second transaction that waits for the first one's counters). */
 const preOrders = {} as { status: string; hold: string };
@@ -340,6 +341,38 @@ const FIXTURES: Record<
       ]);
     },
     visible: `select split_part(site_label, ':', 2) as owner from pump_job where site_label like $1 || ':%'`,
+  },
+  order_pump: {
+    // Written by set_order_pumped / schedule_pump_job; the fixture writes the row as the definer would, on the order of a rotation
+    // made for the field fixtures. The row is found by that order, since other files also mark orders as pumped.
+    writers: ['owner'],
+    seed: (_tx, actor) =>
+      withRlsContext(migratorPool, { userId: actor, role: 'owner', requestId: marker }, async (m) => {
+        const o = await m.query<{ order_id: string }>(`select order_id from trip_plan where id = $1`, [
+          preField.trip,
+        ]);
+        pumpedOrder = o.rows[0]!.order_id;
+        return m.query(`insert into order_pump (order_id, pumped, updated_by) values ($1, true, $2)`, [
+          pumpedOrder,
+          actor,
+        ]);
+      }),
+    get visible() {
+      return `select updated_by::text as owner from order_pump where order_id = '${pumpedOrder}' and $1::text is not null`;
+    },
+  },
+  pump_conflict: {
+    // Written by the pump doors and triggers; the fixture writes a double-booking row on a pump job of its own.
+    writers: ['owner'],
+    seed: (_tx, actor) =>
+      withRlsContext(migratorPool, { userId: actor, role: 'owner', requestId: marker }, async (m) => {
+        const job = await m.query<{ id: string }>(`select id from pump_job limit 1`);
+        return m.query(
+          `insert into pump_conflict (id, kind, job_date, job_id, detail) values (gen_random_uuid(), 'pump_double_booked', current_date, $1, $2)`,
+          [job.rows[0]!.id, `${marker}:${actor}`],
+        );
+      }),
+    visible: `select split_part(detail, ':', 2) as owner from pump_conflict where detail like $1 || ':%'`,
   },
   pump_job_event: {
     writers: ['owner'],

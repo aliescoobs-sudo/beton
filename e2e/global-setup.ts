@@ -95,6 +95,7 @@ export default async function globalSetup() {
       [E2E_MD.queuePlant, 'plant', 'fr'],
       [E2E_MD.allocOffice, 'office', 'fr'],
       [E2E_MD.driverPhotoPlant, 'plant', 'fr'],
+      [E2E_MD.pumpOffice, 'office', 'fr'],
       [E2E_MD.avoirSupport, 'support', 'fr'],
       [E2E_MD.siOffice, 'office', 'fr'],
       [E2E_MD.chainOffice, 'office', 'fr'],

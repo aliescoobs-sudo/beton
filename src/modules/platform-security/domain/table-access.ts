@@ -357,6 +357,40 @@ export const TABLE_ACCESS = {
     exception:
       'R4 (DECISIONS 141): a pump job planned for a pump operator. Written by create_pump_job only; no price.',
   },
+  order_pump: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'all',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    exception:
+      'C3 (DECISIONS 158, REQUIREMENTS-V1 §16.6): marks an order as a pumped pour. Written only by set_order_pumped and schedule_pump_job (SECURITY DEFINER). No price.',
+  },
+  pump_conflict: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'all',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    exception:
+      'C3 (DECISIONS 158): a pump coordination conflict (a truck planned before the pump is ready, a pump booked twice). Written by the pump doors and the trip plan triggers only; times and codes, no price.',
+  },
   pump_job_event: {
     kind: 'rls',
     read: {

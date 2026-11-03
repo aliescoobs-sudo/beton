@@ -97,6 +97,19 @@ export {
 } from './service/excess-service';
 export { withinTolerance } from './service/delivery-service';
 export {
+  getPumpDay as getPumpCoordination,
+  listPumpOptions,
+  type PumpBoardRow,
+  type PumpOption,
+  type PumpConflictRow,
+  type PumpError,
+  type PumpWaitingRow,
+  reschedulePumpJob,
+  resolvePumpConflict,
+  schedulePumpJob,
+  setOrderPumped,
+} from './service/pump-service';
+export {
   archiveDriver,
   createDriver,
   type DispatchDay,

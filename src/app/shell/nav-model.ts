@@ -243,6 +243,12 @@ const GROUPS: GroupDef[] = [
         allowed: 'transfers.read',
       },
       {
+        path: '/pumps',
+        labelKey: 'pumps.link',
+        testId: 'pumps-link',
+        allowed: 'pumps.read',
+      },
+      {
         path: '/day-close',
         labelKey: 'dayClose.link',
         testId: 'day-close-link',

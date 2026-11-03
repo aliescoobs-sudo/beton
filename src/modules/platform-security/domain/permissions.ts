@@ -117,6 +117,18 @@ export const PERMISSIONS = {
     'support',
   ],
   'field.instruct': ['owner', 'app_admin', 'partner', 'office', 'office_sales', 'plant', 'plant_manager'],
+  // C3 (§16.6): a pumped pour needs a pump scheduled on site before a truck is planned; the board is read by the same roles and support
+  'pumps.plan': ['owner', 'app_admin', 'partner', 'office', 'office_sales', 'plant', 'plant_manager'],
+  'pumps.read': [
+    'owner',
+    'app_admin',
+    'partner',
+    'office',
+    'office_sales',
+    'plant',
+    'plant_manager',
+    'support',
+  ],
   'field.pump_plan': ['owner', 'app_admin', 'partner', 'office', 'office_sales', 'plant', 'plant_manager'],
   // Trucks, zones
   'trucks.read': ALL,

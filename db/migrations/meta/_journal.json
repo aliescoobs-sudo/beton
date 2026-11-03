@@ -764,6 +764,27 @@
       "when": 1793803987023,
       "tag": "0100_receipt_states",
       "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "7",
+      "when": 1793804047023,
+      "tag": "0101_pump_coordination",
+      "breakpoints": true
+    },
+    {
+      "idx": 102,
+      "version": "7",
+      "when": 1793804107023,
+      "tag": "0102_pump_options",
+      "breakpoints": true
+    },
+    {
+      "idx": 103,
+      "version": "7",
+      "when": 1793804167023,
+      "tag": "0103_pump_by_code",
+      "breakpoints": true
     }
   ]
 }

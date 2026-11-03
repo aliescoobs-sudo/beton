@@ -30,6 +30,7 @@ export type DispatchError =
   | 'NOT_FOUND'
   | 'BLOCKED'
   | 'TRUCK_UNAVAILABLE'
+  | 'PUMP_NOT_SCHEDULED'
   | 'OVER_CAPACITY'
   | 'CONFLICT'
   | 'OVERRIDE_REASON';
@@ -39,6 +40,7 @@ export function dispatchFailure(error: unknown): DispatchError {
   const m = e.message ?? '';
   if (e.code === '23514') {
     if (/truck is not available/.test(m)) return 'TRUCK_UNAVAILABLE';
+    if (/no pump is scheduled on site/.test(m)) return 'PUMP_NOT_SCHEDULED';
     if (/more than the truck/.test(m)) return 'OVER_CAPACITY';
     if (/needs a reason/.test(m)) return 'OVERRIDE_REASON';
     if (/not a live order|driver is not active/.test(m)) return 'NOT_FOUND';

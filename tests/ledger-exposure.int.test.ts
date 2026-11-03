@@ -166,6 +166,15 @@ describe('functions the application role can execute', () => {
     'public.confirm_receipt_at_plant_lines(p_purchase uuid, p_note text, p_lines jsonb)', // C3: the plant (checked inside)
     'public.receipt_states(p_since date)', // C3: quantities and states, no price
     'public.stock_arrived_pending(p_plant uuid)', // C3: quantities per component
+    'public.set_order_pumped_by_code(p_code text, p_pumped boolean)',
+    'public.set_order_pumped(p_order uuid, p_pumped boolean)', // C3: the offices that plan, the owner roles, the plant (checked inside)
+    'public.schedule_pump_job(p_date date, p_pump uuid, p_operator uuid, p_order uuid, p_on_site_min integer, p_setup_min integer, p_duration_min integer, p_site text, p_address_enc text, p_m3 integer)',
+    'public.reschedule_pump_job(p_job uuid, p_on_site_min integer)',
+    'public.resolve_pump_conflict(p_id uuid)',
+    'public.pump_board(p_date date)', // C3: times and codes, no price
+    'public.pump_waiting(p_date date)',
+    'public.pump_conflicts(p_date date)',
+    'public.pump_options()',
     'public.record_receipt_lines(p_purchase uuid, p_date date, p_lines jsonb, p_confirm_excess boolean)',
     'public.reject_supplier_invoice(p_si uuid, p_reason text)',
     'public.resolve_order_price(p_type uuid, p_client uuid, p_date date)', // C3: owner and system only (checked inside)
