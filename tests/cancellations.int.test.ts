@@ -325,7 +325,7 @@ describe('cases 6 and 7: incident and rejection on site', () => {
     const truckId = await asOwner(async (tx) => {
       const t = await tx.query<{ id: string }>(
         `insert into truck (id, code, plate)
-         select gen_random_uuid(), 'T' || n, 'CN-' || n || $1 from generate_series(700, 999) n
+         select gen_random_uuid(), 'T' || n, 'CN-' || n || $1 from generate_series(900, 999) n
           where 'T' || n not in (select code from truck) order by random() limit 1 returning id`,
         [marker.slice(2, 6)],
       );

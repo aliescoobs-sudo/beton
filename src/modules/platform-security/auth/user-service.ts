@@ -5,6 +5,7 @@ import type { Auth } from './create-auth';
 import { checkPassword } from './password-policy';
 
 import type { Role } from '../domain/permissions';
+import type { UserLocale } from '../domain/locale';
 
 export type UserRole = Role;
 
@@ -14,7 +15,7 @@ export interface NewUser {
   name: string;
   password: string;
   role: UserRole;
-  locale: 'fr' | 'ar';
+  locale: UserLocale;
   /** The plant of a plant_manager (required for that role, forbidden for the others). */
   plantId?: string | null;
 }

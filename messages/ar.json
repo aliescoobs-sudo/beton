@@ -53,7 +53,8 @@
     },
     "searchLabel": "البحث عن مستند برقمه",
     "searchPlaceholder": "رقم المستند",
-    "assistant": "المساعد"
+    "assistant": "المساعد",
+    "language": "اللغة"
   },
   "auth": {
     "login": {

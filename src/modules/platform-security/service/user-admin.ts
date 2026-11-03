@@ -6,6 +6,7 @@ import type { Auth } from '../auth/create-auth';
 import type { SessionUser } from '../auth/session-gate';
 import { createUser } from '../auth/user-service';
 import { can } from '../domain/permissions';
+import type { UserLocale } from '../domain/locale';
 
 export class ForbiddenError extends Error {
   constructor(message = 'Forbidden') {
@@ -27,7 +28,7 @@ export interface ManagedUser {
   name: string;
   email: string;
   role: SessionUser['role'];
-  locale: 'fr' | 'ar';
+  locale: UserLocale;
   status: 'active' | 'disabled';
   twoFactorEnabled: boolean;
   provisioned: boolean;
@@ -96,7 +97,7 @@ export async function createManagedUser(
     email: string;
     name: string;
     role: ManagedRole;
-    locale: 'fr' | 'ar';
+    locale: UserLocale;
     password: string;
     plantId?: string | null;
   },

@@ -17,6 +17,7 @@ function flatten(tree: Tree, prefix = ''): Map<string, string> {
   }
   return out;
 }
+const ary = JSON.parse(readFileSync('messages/ary.json', 'utf8')) as Tree;
 const frKeys = flatten(fr);
 const arKeys = flatten(ar);
 const placeholders = (text: string) => [...text.matchAll(/\{(\w+)/g)].map((m) => m[1]).sort();
@@ -41,6 +42,36 @@ describe('fr and ar catalogues', () => {
       expect(arKeys.get(key)?.trim(), `ar ${key}`).toBeTruthy();
       expect(placeholders(arKeys.get(key) ?? ''), key).toEqual(placeholders(text));
     }
+  });
+});
+
+// R8: Darija (Arabic script) overlays Arabic. It may translate less, never a key Arabic does not have, with the same placeholders.
+describe('the Darija catalogue', () => {
+  it('lists the same language codes in the routing and on the accounts', () => {
+    const routingSource = readFileSync('src/i18n/routing.ts', 'utf8');
+    const localeSource = readFileSync('src/modules/platform-security/domain/locale.ts', 'utf8');
+    const codes = (text: string, re: RegExp) =>
+      [...(re.exec(text)?.[1] ?? '').matchAll(/'(\w+)'/g)].map((m) => m[1]);
+    expect(codes(routingSource, /locales:\s*\[([^\]]*)\]/)).toEqual(
+      codes(localeSource, /USER_LOCALES = \[([^\]]*)\]/),
+    );
+  });
+  const aryKeys = flatten(ary);
+  it('only holds keys of the Arabic catalogue, with the same {placeholders} and no empty value', () => {
+    expect([...aryKeys.keys()].filter((k) => !arKeys.has(k))).toEqual([]);
+    for (const [key, text] of aryKeys) {
+      expect(text.trim(), `ary ${key}`).not.toBe('');
+      expect(placeholders(text), key).toEqual(placeholders(arKeys.get(key) ?? ''));
+    }
+  });
+  it('translates the driver app (the people who most need it)', () => {
+    for (const key of [
+      'field.steps.departed',
+      'field.emergency',
+      'field.options.breakdown',
+      'field.acknowledge',
+    ])
+      expect(aryKeys.has(key), key).toBe(true);
   });
 });
 

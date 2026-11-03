@@ -157,6 +157,8 @@ export const PERMISSIONS = {
   // Whether an order waits, and a client's standing as two flags: no figure, so the offices read them.
   // R5: the notification centre is for every signed-in internal account (a driver or pump operator reaches push only through the phone app's own session door).
   'notifications.read': [...ALL, 'accountant'],
+  // R8: every account chooses its own main language (Arabic, French, Darija)
+  'account.locale': [...ALL, 'accountant'],
   // Cancellations and incidents (R6, §8): the offices cancel, the plant reports incidents, owner and app_admin decide (the plant
   // manager only when the owner's policy allows it, checked in the database).
   // Documents (R7, §9): the gate for number-bearing documents a client asks for, the timing of the final invoice (the accountant

@@ -36,6 +36,7 @@ export {
   dropSubscription,
   listMyNotifications,
   markRead,
+  setMyLocale,
   type NotificationView,
   saveSubscription,
   sendTestNotification,
@@ -60,3 +61,5 @@ export {
 } from './service/request';
 export { parameterOrDefault, type ParameterValues } from './domain/parameters';
 export { readParameters } from './service/parameter-service';
+
+export { baseLocale, isUserLocale, USER_LOCALES, type UserLocale } from './domain/locale';

@@ -12,7 +12,7 @@ import { applyOption, computeRun, reclassifyAlert } from '@/modules/rules-engine
 
 type ApplyResult = { ok: true; draftText: string; deposited: number } | { ok: false; error: string };
 
-const LOCALES = ['fr', 'ar'] as const;
+const LOCALES = ['fr', 'ar', 'ary'] as const;
 
 // @permission cash.decide (owner) + sensitive action cash.apply_option: confirming an option records a decision with the
 // figures the engine computes now and, for an early deposit, presents the cheques; nothing is sent to anyone

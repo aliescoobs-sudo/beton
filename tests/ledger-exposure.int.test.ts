@@ -59,6 +59,7 @@ beforeAll(async () => {
 
 describe('functions the application role can execute', () => {
   const ALLOWED = [
+    'public.set_my_locale(p_locale text)',
     'public.decide_document_request(p_id uuid, p_approve boolean)',
     'public.document_requests_pending()',
     'public.invoice_timing()',

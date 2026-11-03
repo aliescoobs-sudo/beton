@@ -49,6 +49,8 @@ export default async function ProtectedLayout({
             name={state.user.name}
             roleLabel={t(`admin.roles.${state.user.role}` as never)}
             menuLabel={t('shell.userMenu')}
+            languageLabel={t('shell.language')}
+            darija={getEnv().DARIJA_ENABLED || locale === 'ary'}
             locale={locale}
           />
         </>

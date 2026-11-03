@@ -53,7 +53,8 @@
     },
     "searchLabel": "Rechercher un document par son numéro",
     "searchPlaceholder": "N° de document",
-    "assistant": "Assistant"
+    "assistant": "Assistant",
+    "language": "Langue"
   },
   "auth": {
     "login": {

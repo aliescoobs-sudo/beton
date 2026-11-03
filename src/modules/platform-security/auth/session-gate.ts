@@ -1,6 +1,7 @@
 import { APIError } from 'better-auth/api';
 import type { Auth } from './create-auth';
 import type { UserRole } from './user-service';
+import type { UserLocale } from '../domain/locale';
 
 export interface SessionUser {
   id: string;
@@ -9,7 +10,7 @@ export interface SessionUser {
   role: UserRole;
   /** The plant this request acts in (a plant manager's own, or the one picked on a screen); not a right (R1). */
   plantId?: string | null;
-  locale: 'fr' | 'ar';
+  locale: UserLocale;
   twoFactorEnabled: boolean;
   /** Logged in with a recovery code: must enrol a new authenticator before any sensitive action. */
   reenrolRequired: boolean;

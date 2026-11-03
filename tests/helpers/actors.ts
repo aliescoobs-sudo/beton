@@ -2,6 +2,7 @@ import pg from 'pg';
 import { realClock } from '../../src/modules/clock';
 import { uuidv7 } from '../../src/lib/uuidv7';
 import type { Role } from '../../src/modules/platform-security/domain/permissions';
+import type { UserLocale } from '../../src/modules/platform-security/domain/locale';
 
 export interface TestActor {
   id: string;
@@ -45,7 +46,7 @@ export async function realSessionUser(
   name: string;
   email: string;
   role: Role;
-  locale: 'fr' | 'ar';
+  locale: UserLocale;
   twoFactorEnabled: boolean;
   reenrolRequired: boolean;
 }> {

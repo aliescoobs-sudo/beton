@@ -1,7 +1,7 @@
 import type pg from 'pg';
 import type { LlmMessage, LlmProvider, LlmRequest } from '@/lib/ai/llm-provider';
 import { realClock } from '@/modules/clock';
-import type { SessionUser } from '@/modules/platform-security';
+import { baseLocale, type SessionUser } from '@/modules/platform-security';
 import type { EngineParams } from '@/modules/rules-engine';
 import { costMicroUsd } from '../domain/cost';
 import { isChosenAmountQuestion } from '../domain/chosen-amount';
@@ -125,7 +125,7 @@ export async function runTurn(deps: TurnDeps, actor: SessionUser, input: TurnInp
       actor,
       {
         id: interactionId,
-        locale: actor.locale,
+        locale: baseLocale(actor.locale),
         provider: r.provider,
         model: deps.model,
         rawQuestion: input.question,
@@ -187,7 +187,7 @@ export async function runTurn(deps: TurnDeps, actor: SessionUser, input: TurnInp
     { role: 'assistant' as const, content: ps.maskQuestion(h.answer).slice(0, MAX_HISTORY_CHARS) },
   ]);
   const messages: LlmMessage[] = [...history, { role: 'user', content: masked }];
-  const system = buildSystemPrompt(actor.role, actor.locale);
+  const system = buildSystemPrompt(actor.role, baseLocale(actor.locale));
   const tools = toolSpecsFor(actor.role);
   const ctx: ToolContext = {
     appPool: deps.appPool,

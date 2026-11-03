@@ -2,17 +2,23 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { LogoutButton } from '@/modules/platform-security/ui/logout-button';
+import { LanguageSwitch } from './language-switch';
 
 /** Name and role at the end of the top bar; the menu holds the account actions. Closes on Escape and outside click. */
 export function UserMenu({
   name,
   roleLabel,
   menuLabel,
+  languageLabel,
+  darija,
   locale,
 }: {
   name: string;
   roleLabel: string;
   menuLabel: string;
+  languageLabel: string;
+  /** Darija is offered once its module flag is on (or when the account already uses it). */
+  darija: boolean;
   locale: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -54,6 +60,7 @@ export function UserMenu({
             <span className="block font-medium">{name}</span>
             <span className="block text-xs text-muted">{roleLabel}</span>
           </p>
+          <LanguageSwitch locale={locale} label={languageLabel} darija={darija} />
           <LogoutButton locale={locale} />
         </div>
       )}

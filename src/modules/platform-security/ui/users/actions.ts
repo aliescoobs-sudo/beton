@@ -15,6 +15,7 @@ import {
   setUserStatus,
   type UserAdminDeps,
 } from '../../service/user-admin';
+import { USER_LOCALES } from '../../domain/locale';
 
 export type AdminActionResult =
   | { ok: true }
@@ -50,7 +51,7 @@ const newUserSchema = z.object({
     .uuid()
     .nullish()
     .or(z.literal('').transform(() => null)),
-  locale: z.enum(['fr', 'ar']),
+  locale: z.enum(USER_LOCALES),
   password: z.string().min(1).max(128),
 });
 

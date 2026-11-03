@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { err, ok, type Result } from '@/lib/result';
 import type { SessionUser } from '../auth/session-gate';
 import { inRequest } from './request';
+import { USER_LOCALES } from '../domain/locale';
 import type { NotificationKind, NotificationSeverity } from '../domain/notification-catalogue';
 
 // R5: the person's own notification centre. Every read is the caller's own rows (row-level security), the bell count is one
@@ -106,4 +107,16 @@ export async function dropSubscription(
     tx.query<{ d: boolean }>('select public.drop_push_subscription($1) as d', [endpoint]),
   );
   return rows[0]?.d ?? false;
+}
+
+/** An account's main language, changed by the account itself only (the database door writes the caller's own row). */
+export async function setMyLocale(
+  appPool: pg.Pool,
+  actor: SessionUser,
+  locale: unknown,
+): Promise<Result<true, 'INVALID'>> {
+  const p = z.enum(USER_LOCALES).safeParse(locale);
+  if (!p.success) return err('INVALID');
+  await inRequest(appPool, actor, (tx) => tx.query('select public.set_my_locale($1)', [p.data]));
+  return ok(true);
 }
