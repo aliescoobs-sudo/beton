@@ -2779,5 +2779,71 @@
       "open": "ouverte",
       "closed": "clôturée"
     }
+  },
+  "transfers": {
+    "link": "Transferts entre centrales",
+    "title": "Transferts entre centrales",
+    "intro": "Matériaux et carburant entre Tétouan et Chefchaouen : envoyé, en transit, reçu, avec l'écart et qui a fait chaque étape. Quantités seulement.",
+    "kind": {
+      "material": "Matériau",
+      "fuel": "Carburant"
+    },
+    "status": {
+      "sent": "envoyé",
+      "in_transit": "en transit",
+      "received": "reçu"
+    },
+    "componentId": "Identifiant du composant",
+    "qty": "Quantité",
+    "send": "Envoyer",
+    "pickUp": "Remis au transporteur",
+    "receive": "Réceptionner",
+    "receivedQty": "Quantité reçue",
+    "variance": "écart"
+  },
+  "dayClose": {
+    "link": "Clôture du jour",
+    "title": "Clôture du jour par centrale",
+    "intro": "Journée du {date}. Un point bloquant empêche la clôture et prévient le propriétaire, qui peut clôturer en connaissance de cause avec une note.",
+    "closed": "clôturé",
+    "closedForced": "clôturé par le propriétaire",
+    "blocking": "bloquant",
+    "force": "Clôturer malgré tout",
+    "note": "Note obligatoire",
+    "close": "Clôturer",
+    "item": {
+      "unconfirmed_load": "Chargements non confirmés",
+      "missing_bl": "BL signés manquants",
+      "stock_variance": "Écarts de stock corrigés"
+    }
+  },
+  "timeline": {
+    "title": "Chronologie de la commande",
+    "intro": "Chaque étape avec son auteur, l'heure du téléphone et l'heure d'arrivée sur le serveur. Aucun montant.",
+    "none": "Rien à afficher.",
+    "deviceTime": "Heure de l'appareil",
+    "syncTime": "Heure de synchronisation",
+    "step": {
+      "recorded": "Enregistrée",
+      "planned": "Planifiée",
+      "replanned": "Replanifiée",
+      "mixed": "Malaxée",
+      "left": "Partie",
+      "arrived": "Arrivée",
+      "unloading": "Déchargement",
+      "unloaded": "Déchargée",
+      "returned": "Retour",
+      "bl": "BL",
+      "invoiced": "Facturée",
+      "collected": "Encaissée"
+    }
+  },
+  "creditLimits": {
+    "link": "Plafonds de crédit",
+    "title": "Plafonds de crédit des clients",
+    "intro": "Au-delà du plafond, ou avec une facture en retard, une nouvelle commande attend l'accord du propriétaire. Laisser vide retire le plafond. Confirmation à deux facteurs.",
+    "none": "aucun plafond",
+    "placeholder": "Montant en MAD",
+    "save": "Enregistrer"
   }
 }

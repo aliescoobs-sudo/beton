@@ -60,6 +60,25 @@ const markedAt = (m: string): string =>
     Date.UTC(2001, 0, 1) + parseInt(createHash('md5').update(m).digest('hex').slice(0, 6), 16) * 1000,
   ).toISOString();
 
+/** Two plants of their own for a transfer fixture, made in the writer's own transaction; `archivePlants` puts them away again. */
+async function transferPlants(tx: pg.PoolClient, owner: string) {
+  const letters = (n: number) =>
+    Array.from({ length: n }, () => String.fromCharCode(65 + Math.floor(Math.random() * 26))).join('');
+  const ids: string[] = [];
+  for (let i = 0; i < 2; i++)
+    ids.push(
+      (
+        await tx.query<{ id: string }>(
+          `insert into plant (id, code, name, created_by) values (gen_random_uuid(), $1, $2, $3) returning id`,
+          [letters(6), `tp ${marker.slice(-8)} ${i} ${letters(5)}`, owner],
+        )
+      ).rows[0]!.id,
+    );
+  return ids as [string, string];
+}
+const archivePlants = (tx: pg.PoolClient, ids: string[]) =>
+  tx.query(`update plant set status = 'archived' where id = any($1::uuid[])`, [ids]);
+
 /**
  * Per table: which roles can write seed rows, how to write one for an actor, and a query returning the actor
  * (`owner` column) of each visible seeded row.
@@ -356,6 +375,41 @@ const FIXTURES: Record<
       return tx.query(`select public.answer_survey($1, '{"q1": true}'::jsonb)`, [id]);
     },
     visible: `select r.respondent::text as owner from survey_response r join survey s on s.id = r.survey_id where s.title like $1 || '-resp-%'`,
+  },
+  plant_transfer: {
+    writers: ['owner'],
+    seed: async (tx, actor) => {
+      const [a, b] = await transferPlants(tx, actor);
+      await tx.query(`select public.transfer_send('fuel', $1, $2, null, 100, '2096-04-05', $3)`, [
+        a,
+        b,
+        marker,
+      ]);
+      await archivePlants(tx, [a, b]);
+    },
+    visible: `select s.actor::text as owner from plant_transfer t join plant_transfer_step s on s.transfer_id = t.id and s.step = 'sent' where s.note = $1`,
+  },
+  plant_transfer_step: {
+    writers: ['owner'],
+    seed: async (tx, actor) => {
+      const [a, b] = await transferPlants(tx, actor);
+      await tx.query(`select public.transfer_send('fuel', $1, $2, null, 100, '2096-04-05', $3)`, [
+        a,
+        b,
+        `${marker}-s`,
+      ]);
+      await archivePlants(tx, [a, b]);
+    },
+    visible: `select actor::text as owner from plant_transfer_step where note = $1 || '-s'`,
+  },
+  day_close: {
+    writers: ['owner'],
+    seed: async (tx, actor) => {
+      const [a, b] = await transferPlants(tx, actor);
+      await tx.query(`select public.close_day($1, '2096-04-05', false, null)`, [a]);
+      await archivePlants(tx, [a, b]);
+    },
+    visible: `select closed_by::text as owner from day_close where close_date = '2096-04-05' and $1::text is not null`,
   },
   notification: {
     // Every role sends itself a test notification; each reads only its own.

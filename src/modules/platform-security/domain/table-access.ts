@@ -466,6 +466,57 @@ export const TABLE_ACCESS = {
     exception:
       'R10 (DECISIONS 149): one answer set per person and survey, written only by answer_survey (the person answers for themselves). Owner and app_admin read the counts and free texts through survey_results(), which names no respondent.',
   },
+  plant_transfer: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'none',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    exception:
+      'D150 (REQUIREMENTS-V1 §16.5): a transfer of material or fuel between the plants (sent, in transit, received, variance). Quantities only. Written only by transfer_send, transfer_pickup and transfer_receive (SECURITY DEFINER); a plant manager reads the transfers of their own plant through transfers_list().',
+  },
+  plant_transfer_step: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'none',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    exception:
+      'D150: who did each step of a transfer, with the quantity and the time (who is responsible at each step). Written only by the transfer doors.',
+  },
+  day_close: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'none',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    exception:
+      'D150 (REQUIREMENTS-V1 §16.9): the close of the day of a plant, with whether it was forced by the owner and why. Written only by close_day (SECURITY DEFINER).',
+  },
   notification: {
     kind: 'rls',
     read: {

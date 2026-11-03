@@ -24,6 +24,21 @@ export {
   setCancellationPolicy,
 } from './service/cancellation-service';
 export {
+  closeDay,
+  type DayClose,
+  type DayCloseItem,
+  getDayCloseStatus,
+  getOrderTimeline,
+  listDayCloses,
+  listTransfers,
+  pickUpTransfer,
+  type PlantFlowError,
+  type PlantTransfer,
+  receiveTransfer,
+  sendTransfer,
+  type TimelineEntry,
+} from './service/plant-flow-service';
+export {
   attachDeliveryScan,
   openDeliveryScan,
   type OpenedScan,

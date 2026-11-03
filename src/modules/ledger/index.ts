@@ -49,6 +49,8 @@ export {
   type PriceCard,
   releaseOrderHold,
   setCreditLimit,
+  listCreditLimits,
+  type ClientCreditLimit,
 } from './service/approval-service';
 export { type InvoicePreview, previewInvoiceFromDeliveries } from './service/invoice-preview';
 export { getInvoiceQueue, type QueueClient, type QueueDelivery } from './service/invoice-queue-service';

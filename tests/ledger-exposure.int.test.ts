@@ -59,6 +59,14 @@ beforeAll(async () => {
 
 describe('functions the application role can execute', () => {
   const ALLOWED = [
+    'public.close_day(p_plant uuid, p_date date, p_force boolean, p_note text)',
+    'public.day_close_status(p_plant uuid, p_date date)',
+    'public.day_closes_list(p_from date, p_to date)',
+    'public.order_timeline(p_order uuid)',
+    'public.transfer_pickup(p_id uuid, p_note text)',
+    'public.transfer_receive(p_id uuid, p_qty bigint, p_date date, p_note text)',
+    'public.transfer_send(p_kind text, p_from uuid, p_to uuid, p_component uuid, p_qty bigint, p_date date, p_note text)',
+    'public.transfers_list()',
     'public.anomaly_report(p_from date, p_to date, p_now timestamp with time zone)',
     'public.answer_survey(p_id uuid, p_answers jsonb)',
     'public.close_survey(p_id uuid)',

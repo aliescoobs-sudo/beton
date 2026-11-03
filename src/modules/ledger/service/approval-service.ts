@@ -221,3 +221,29 @@ export async function getClientStandings(
   );
   return rows.map((r) => ({ clientCode: r.client_code, owes: r.owes, late: r.late }));
 }
+
+export interface ClientCreditLimit {
+  clientId: string;
+  clientCode: string;
+  clientName: string;
+  /** In centimes; null when no limit is set. */
+  limitCentimes: number | null;
+}
+
+/** Every active client with its credit limit, if any (owner and app_admin: a limit is an amount). */
+export async function listCreditLimits(appPool: pg.Pool, actor: SessionUser): Promise<ClientCreditLimit[]> {
+  await require(appPool, actor, 'credit_limit.write');
+  const { rows } = await inRequest(appPool, actor, (tx) =>
+    tx.query<{ id: string; code: string; name: string; limit_centimes: string | null }>(
+      `select c.id, c.code, c.name, l.limit_centimes::text
+         from client c left join client_credit_limit l on l.client_id = c.id
+        where c.status = 'active' order by c.code limit 500`,
+    ),
+  );
+  return rows.map((r) => ({
+    clientId: r.id,
+    clientCode: r.code,
+    clientName: r.name,
+    limitCentimes: r.limit_centimes === null ? null : Number(r.limit_centimes),
+  }));
+}

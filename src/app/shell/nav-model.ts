@@ -36,6 +36,12 @@ const GROUPS: GroupDef[] = [
           can(role, 'documents.request') || can(role, 'documents.decide') || can(role, 'documents.policy'),
       },
       {
+        path: '/credit-limits',
+        labelKey: 'creditLimits.link',
+        testId: 'credit-limits-link',
+        allowed: 'credit_limit.write',
+      },
+      {
         path: '/disclosures',
         labelKey: 'ledger.disclosure.link',
         testId: 'disclosures-link',
@@ -229,6 +235,18 @@ const GROUPS: GroupDef[] = [
         labelKey: 'surveys.link',
         testId: 'surveys-link',
         allowed: 'surveys.read',
+      },
+      {
+        path: '/transfers',
+        labelKey: 'transfers.link',
+        testId: 'transfers-link',
+        allowed: 'transfers.read',
+      },
+      {
+        path: '/day-close',
+        labelKey: 'dayClose.link',
+        testId: 'day-close-link',
+        allowed: 'dayclose.read',
       },
       {
         path: '/cancellations',

@@ -1,5 +1,6 @@
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { getPool } from '@/lib/db/pools';
+import { getEnv } from '@/lib/server-env';
 import { getOrderChain, stageState, waitingFor } from '@/modules/ledger';
 import { formatM3 } from '@/modules/operations/ui/format';
 import { can, recordMoneyView } from '@/modules/platform-security';
@@ -19,6 +20,7 @@ export default async function OrderChainPage({ params }: { params: Promise<{ loc
   if (money) await recordMoneyView(pool, user, 'screen:order-chain');
   const rows = await getOrderChain(pool, user);
   const t = await getTranslations('ledger.orderChain');
+  const tl = await getTranslations('timeline');
   const stages = ['planned', 'loaded', 'delivered', 'invoiced'] as const;
   return (
     <div>
@@ -67,6 +69,15 @@ export default async function OrderChainPage({ params }: { params: Promise<{ loc
                       </a>
                     ) : (
                       <bdi dir="ltr">{r.code}</bdi>
+                    )}
+                    {getEnv().TRANSFERS_ENABLED && (
+                      <a
+                        href={`/${locale}/orders/timeline/${r.orderId}`}
+                        className="ms-2 text-xs underline"
+                        data-testid={`timeline-link-${r.code}`}
+                      >
+                        {tl('title')}
+                      </a>
                     )}
                   </Td>
                   <Td>

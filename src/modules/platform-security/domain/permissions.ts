@@ -167,6 +167,12 @@ export const PERMISSIONS = {
   'documents.decide': MONEY_WRITE,
   'documents.policy': ['owner', 'app_admin', 'accountant'],
   'documents.sequence': MONEY_WRITE,
+  // Plant flows (§16.5, §16.8, §16.9): transfers between the plants, the timeline of an order, the day close per plant.
+  'transfers.read': ['owner', 'app_admin', 'support', 'partner', 'plant', 'plant_manager'],
+  'transfers.write': ['owner', 'app_admin', 'plant_manager'],
+  'timeline.read': [...ALL, 'accountant'],
+  'dayclose.read': ['owner', 'app_admin', 'support', 'partner', 'plant', 'plant_manager'],
+  'dayclose.write': ['owner', 'app_admin', 'plant_manager'],
   'cancellations.read': ALL,
   'cancellations.open': ['owner', 'app_admin', 'partner', 'office', 'office_sales', 'plant', 'plant_manager'],
   'cancellations.decide': ['owner', 'app_admin', 'plant_manager'],
