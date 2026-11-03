@@ -10,6 +10,9 @@ import {
   openTripCase,
   setCancellationPolicy,
 } from '../src/modules/operations';
+import { getDriverDay, syncActions } from '../src/modules/field';
+import { fieldCipherFrom } from '../src/modules/master-data';
+import { parseKeyring } from '../src/lib/crypto/keyring';
 import { inRequest, listMyNotifications } from '../src/modules/platform-security';
 import type { SessionUser } from '../src/modules/platform-security/auth/session-gate';
 import { testEnv } from './db-env';
@@ -20,6 +23,7 @@ import {
   orderMaster,
   type DeliveryScene,
 } from './helpers/ledger-fixtures';
+import { realSessionUser } from './helpers/actors';
 import { v1Actors } from './helpers/v1-actors';
 
 // R6 (CP-PROD-PLAN, REQUIREMENTS-V1 §8): the seven cancellation cases, from the real state of the order, with who decides.
@@ -71,13 +75,14 @@ async function newTrip(
   upTo: 'planned' | 'loaded' | 'departed' | 'unloading_started',
   driverId: string | null = null,
   truckId: string = scene.truckId,
+  tripDate: string = DAY,
 ) {
   return asOwner(async (tx) => {
     const t = await tx.query<{ id: string }>(
       `insert into trip_plan (id, batch_id, trip_date, order_id, seq, truck_id, driver_id, volume_l, load_min, depart_min, arrive_min,
                               unload_end_min, back_min, created_by, plant_id)
        values (gen_random_uuid(), gen_random_uuid(), $4, $1, 1, $2, $5, 8000, 420, 430, 455, 485, 520, $3, $6) returning id`,
-      [orderId, truckId, u.owner!.id, DAY, driverId, plantId],
+      [orderId, truckId, u.owner!.id, tripDate, driverId, plantId],
     );
     const tripId = t.rows[0]!.id;
     const steps = ['loaded', 'departed', 'arrived', 'unloading_started'];
@@ -404,5 +409,65 @@ describe('exposure', () => {
       );
     expect((await ack(opened.value.id)).rows[0]?.ok).toBe(true);
     expect((await ack(opened.value.id)).rows[0]?.ok).toBe(false);
+  });
+});
+
+describe('the redirect reaches the driver app (C3, REQUIREMENTS-V1 §7 and §8)', () => {
+  it('shows the new address with a map link until acknowledged; the acknowledgement is recorded on the case', async () => {
+    const cipher = fieldCipherFrom(parseKeyring(env.FIELD_ENCRYPTION_KEYS));
+    const today = new Date().toISOString().slice(0, 10);
+    const drvUser = await realSessionUser(env.DATABASE_URL_MIGRATOR, 'driver');
+    const driverId = await asOwner(async (tx) => {
+      const d = await tx.query<{ id: string }>(
+        `insert into driver (id, code, name, created_by, user_id) values (gen_random_uuid(), $1, $2, $3, $4) returning id`,
+        [`CH-${5000 + Math.floor(Math.random() * 4000)}`, `rd${marker}`, u.owner!.id, drvUser.id],
+      );
+      return d.rows[0]!.id;
+    });
+    const o = await newOrder();
+    const target = await newOrder();
+    const { tripId } = await newTrip(o.id, 'departed', driverId, scene.truckId, today);
+    const opened = await openTripCase(app, u.owner!, { tripId, caseNo: 4 }, { now: NOW });
+    if (!opened.ok) throw new Error(opened.error);
+    const decided = await decideCancellation(
+      app,
+      u.owner!,
+      {
+        caseId: opened.value.id,
+        decision: 'redirect',
+        redirectOrderId: target.id,
+        addressEnc: cipher.seal('Rue des Orangers 12, Tétouan') ?? undefined,
+      },
+      { now: NOW },
+    );
+    if (!decided.ok) throw new Error(decided.error);
+
+    const before = await getDriverDay(app, drvUser, today, cipher);
+    const redirect = before.instructions.find((i) => i.id === opened.value.id);
+    expect(redirect).toMatchObject({
+      kind: 'redirect',
+      tripId,
+      address: 'Rue des Orangers 12, Tétouan',
+      acknowledgedAt: null,
+    });
+    expect(redirect?.mapUrl).toContain('google.com/maps');
+    expect(redirect?.mapUrl).toContain(encodeURIComponent('Rue des Orangers 12, Tétouan'));
+    expect(JSON.stringify(before)).not.toMatch(/price|centimes|amount/i);
+
+    // acknowledged through the phone's sync, as the queue sends it (a replay changes nothing)
+    const ack = {
+      kind: 'ack',
+      key: randomUUID().replace(/-/g, ''),
+      instructionId: opened.value.id,
+      at: NOW.toISOString(),
+    };
+    for (let i = 0; i < 2; i++) {
+      const synced = await syncActions(app, drvUser, [ack]);
+      expect(synced).toMatchObject({ ok: true, value: [{ key: ack.key }] });
+    }
+    const after = await getDriverDay(app, drvUser, today, cipher);
+    expect(after.instructions.find((i) => i.id === opened.value.id)?.acknowledgedAt).not.toBeNull();
+    const seen = await listCancellations(app, u.owner!);
+    expect(seen.find((c) => c.id === opened.value.id)).toMatchObject({ redirectAcknowledged: true });
   });
 });

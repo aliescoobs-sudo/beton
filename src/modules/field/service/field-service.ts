@@ -92,6 +92,14 @@ export async function getDriverDay(
       [date],
     );
     const photos = new Map(photoRows.rows.map((r) => [r.trip_id, r.n]));
+    // A redirect decided by the office on a cancelled or stopped load (R6, REQUIREMENTS-V1 §8) reaches the driver as one more
+    // instruction: the new address, the map link, and an acknowledgement that is recorded on the case.
+    const redirects = await tx.query<{
+      case_id: string;
+      trip_id: string;
+      address_enc: string | null;
+      acknowledged: boolean;
+    }>('select case_id, trip_id, address_enc, acknowledged from public.driver_redirects()');
     return {
       trips: trips.rows.map((r) => {
         const address = cipher.open(r.address_enc);
@@ -119,20 +127,36 @@ export async function getDriverDay(
           blPhotos: photos.get(r.trip_id) ?? 0,
         };
       }),
-      instructions: ins.rows.map((i) => {
-        const address = cipher.open(i.address_enc);
-        return {
-          id: i.id,
-          tripId: i.trip_id,
-          kind: i.kind,
-          address,
-          mapUrl: i.map_url ?? mapLink(address),
-          note: i.note,
-          joinTruckCode: i.join_truck_code,
-          createdAt: i.created_at.toISOString(),
-          acknowledgedAt: i.acknowledged_at?.toISOString() ?? null,
-        };
-      }),
+      instructions: [
+        ...redirects.rows.map((r): DriverInstruction => {
+          const address = cipher.open(r.address_enc);
+          return {
+            id: r.case_id,
+            tripId: r.trip_id,
+            kind: 'redirect',
+            address,
+            mapUrl: mapLink(address),
+            note: null,
+            joinTruckCode: null,
+            createdAt: new Date(0).toISOString(),
+            acknowledgedAt: r.acknowledged ? new Date(0).toISOString() : null,
+          };
+        }),
+        ...ins.rows.map((i): DriverInstruction => {
+          const address = cipher.open(i.address_enc);
+          return {
+            id: i.id,
+            tripId: i.trip_id,
+            kind: i.kind,
+            address,
+            mapUrl: i.map_url ?? mapLink(address),
+            note: i.note,
+            joinTruckCode: i.join_truck_code,
+            createdAt: i.created_at.toISOString(),
+            acknowledgedAt: i.acknowledged_at?.toISOString() ?? null,
+          };
+        }),
+      ],
     };
   });
 }
@@ -221,6 +245,16 @@ export async function syncActions(
           );
           return r.rows[0]?.r ?? 'recorded';
         }
+        // The id is a redirect case of the cancellation flow (R6) or an instruction of the emergency flow: the case is tried first,
+        // and a case already acknowledged is a replay.
+        const redirect = await tx.query<{ ok: boolean }>('select public.driver_ack_redirect($1) as ok', [
+          a.instructionId,
+        ]);
+        if (redirect.rows[0]?.ok) return 'recorded';
+        const known = await tx.query('select 1 from public.driver_redirects() where case_id = $1', [
+          a.instructionId,
+        ]);
+        if (known.rowCount) return 'replayed';
         await tx.query('select public.driver_ack($1)', [a.instructionId]);
         return 'recorded';
       });
