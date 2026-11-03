@@ -157,6 +157,12 @@ export const PERMISSIONS = {
   // Whether an order waits, and a client's standing as two flags: no figure, so the offices read them.
   // R5: the notification centre is for every signed-in internal account (a driver or pump operator reaches push only through the phone app's own session door).
   'notifications.read': [...ALL, 'accountant'],
+  // Cancellations and incidents (R6, §8): the offices cancel, the plant reports incidents, owner and app_admin decide (the plant
+  // manager only when the owner's policy allows it, checked in the database).
+  'cancellations.read': ALL,
+  'cancellations.open': ['owner', 'app_admin', 'partner', 'office', 'office_sales', 'plant', 'plant_manager'],
+  'cancellations.decide': ['owner', 'app_admin', 'plant_manager'],
+  'cancellations.policy': MONEY_WRITE,
   // §16.3: a person without money access asks for one figure; the owner or app_admin decides, scoped and audited.
   'disclosure.request': ['office', 'office_sales', 'office_purchases', 'plant', 'plant_manager'],
   'disclosure.decide': MONEY_WRITE,

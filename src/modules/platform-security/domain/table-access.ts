@@ -364,6 +364,40 @@ export const TABLE_ACCESS = {
     exception:
       'D143 (REQUIREMENTS-V1 §16.3): a request to see one figure of one data item, scoped to a person, an item and a duration. No amount is stored: view_disclosure computes it at view time and audits every view. Written only by request_disclosure, decide_disclosure and view_disclosure (SECURITY DEFINER); a requester reads its own through my_disclosures().',
   },
+  cancellation_policy: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'all',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    exception:
+      'R6 (DECISIONS 146): one row, who may decide redirect or loss and whether a cancelling client is charged (provisional policy, owner). Written only by set_cancellation_policy (owner, app_admin). No amount.',
+  },
+  cancellation_case: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'all',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    exception:
+      'R6 (DECISIONS 146, REQUIREMENTS-V1 §8): one row per cancellation or incident (the seven cases), quantities, times and decisions only, no amount. A plant manager reads the cases of their own plant (policy on ctx.plant_scope()). Written only by cancel_unproduced_order, open_trip_case, decide_cancellation and driver_ack_redirect (SECURITY DEFINER).',
+  },
   notification: {
     kind: 'rls',
     read: {

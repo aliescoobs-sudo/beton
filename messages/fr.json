@@ -2653,5 +2653,45 @@
       "denied": "Les alertes sont refusées dans les réglages du téléphone.",
       "unavailable": "Les alertes ne sont pas disponibles pour le moment."
     }
+  },
+  "cancellations": {
+    "link": "Annulations",
+    "title": "Annulations et incidents",
+    "intro": "Les sept cas : commande non planifiée, planifiée, chargée, en route, déchargement interrompu, incident camion, refus sur chantier. Quantités et heures seulement.",
+    "open": "À décider",
+    "decided": "Décidés",
+    "noneOpen": "Aucun cas ouvert.",
+    "surplus": "Reste {m3} m³",
+    "proposeRedirect": "Proposer une réorientation",
+    "noCandidate": "Aucune commande du jour ne peut le prendre.",
+    "case": {
+      "1": "Cas 1 · commande non planifiée",
+      "2": "Cas 2 · planifiée, non chargée",
+      "3": "Cas 3 · chargée, pas partie",
+      "4": "Cas 4 · en route",
+      "5": "Cas 5 · déchargement interrompu",
+      "6": "Cas 6 · incident camion",
+      "7": "Cas 7 · refusé sur chantier"
+    },
+    "decision": {
+      "none": "Annulée",
+      "redirect": "Réorienté",
+      "loss": "Perte",
+      "return_extra": "Retour pour un complément",
+      "join": "Un autre camion rejoint",
+      "replacement_truck": "Camion de remplacement"
+    },
+    "policy": {
+      "plantMayDecide": "Le chef de centrale peut décider réorientation ou perte",
+      "clientCharged": "Le client qui annule est facturé",
+      "save": "Enregistrer"
+    },
+    "errors": {
+      "FORBIDDEN": "Non autorisé.",
+      "NOT_FOUND": "Introuvable.",
+      "INVALID": "Saisie invalide.",
+      "MISMATCH": "Ne correspond pas à l'état réel.",
+      "CONFLICT": "Déjà fait."
+    }
   }
 }

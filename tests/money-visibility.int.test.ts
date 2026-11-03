@@ -354,7 +354,7 @@ describe('support is read-only everywhere (DECISIONS 81)', () => {
     const missing = await migrator.query<{ relname: string }>(
       `select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
         where n.nspname = 'public' and c.relkind = 'r' and c.relrowsecurity
-          and has_table_privilege('belgobeton_app', c.oid, 'SELECT') and c.relname <> 'security_alert_ack'
+          and has_table_privilege('belgobeton_app', c.oid, 'SELECT') and c.relname not in ('security_alert_ack', 'notification', 'push_subscription')  -- support reads its own bell only (R5, D145); nobody reads push endpoints
           and not exists (select 1 from pg_policies p where p.schemaname = 'public' and p.tablename = c.relname
                             and p.policyname = 'support_read')`,
     );

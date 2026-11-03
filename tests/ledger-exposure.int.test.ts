@@ -59,6 +59,15 @@ beforeAll(async () => {
 
 describe('functions the application role can execute', () => {
   const ALLOWED = [
+    'public.cancel_unproduced_order(p_order uuid, p_reason text, p_today date)',
+    'public.cancellation_trip_stage(p_trip uuid)',
+    'public.concrete_strength(p_code text)',
+    'public.decide_cancellation(p_case uuid, p_decision text, p_redirect_order uuid, p_address_enc text, p_loss_volume_l integer, p_loss_fuel_l integer, p_loss_minutes integer, p_note text, p_charge_client boolean, p_now timestamp with time zone)',
+    'public.driver_ack_redirect(p_case uuid)',
+    'public.driver_redirects()',
+    'public.open_trip_case(p_trip uuid, p_case integer, p_reason text, p_unloaded_l integer, p_sample boolean, p_now timestamp with time zone)',
+    'public.redirect_candidates(p_case uuid, p_now timestamp with time zone)',
+    'public.set_cancellation_policy(p_plant_may_decide boolean, p_client_charged boolean)',
     'audit.is_money_table(p_table text)',
     'audit.record(p_action text, p_table text, p_row_id text, p_before jsonb, p_after jsonb, p_reason text)',
     'ctx.ai_proposal_id()',

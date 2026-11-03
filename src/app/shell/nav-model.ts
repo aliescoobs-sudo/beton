@@ -212,6 +212,12 @@ const GROUPS: GroupDef[] = [
     id: 'production',
     items: [
       {
+        path: '/cancellations',
+        labelKey: 'cancellations.link',
+        testId: 'cancellations-link',
+        allowed: 'cancellations.read',
+      },
+      {
         path: '/emergencies',
         labelKey: 'field.board.link',
         testId: 'emergencies-link',

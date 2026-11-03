@@ -40,6 +40,11 @@ export default defineConfig({
         ASSISTANT_PROVIDER: 'fake',
         FIELD_APP_ENABLED: 'true',
         NOTIFICATIONS_ENABLED: 'true',
+        CANCELLATIONS_ENABLED: 'true',
+        DOCUMENTS_V1_ENABLED: 'true',
+        DARIJA_ENABLED: 'true',
+        ASSISTANT_DET_ENABLED: 'true',
+        TRANSFERS_ENABLED: 'true',
       },
     },
     {

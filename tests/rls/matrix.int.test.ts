@@ -286,6 +286,25 @@ const FIXTURES: Record<
     },
     visible: `select requester::text as owner from disclosure_request where reason = $1`,
   },
+  cancellation_policy: {
+    writers: ['owner'],
+    seed: (tx) => tx.query(`select public.set_cancellation_policy(false, false)`),
+    visible: `select updated_by::text as owner from cancellation_policy where updated_by is not null and $1::text is not null`,
+  },
+  cancellation_case: {
+    // One case per writer on the preset rotation's order (the database allows one per order and case number).
+    writers: ['owner'],
+    seed: (_tx, actor) =>
+      withRlsContext(migratorPool, { userId: actor, role: 'owner', requestId: marker }, (m) =>
+        m.query(
+          `insert into cancellation_case (order_id, case_no, reason, opened_by, status, decision, decided_by, decided_role, decided_at)
+           select order_id, 1 + (select count(*)::int from cancellation_case c where c.order_id = t.order_id and c.trip_id is null), $2, $1, 'decided', 'none', $1, 'owner', now()
+             from trip_plan t where t.id = $3`,
+          [actor, `${marker}:${actor}`, preField.trip],
+        ),
+      ),
+    visible: `select split_part(reason, ':', 2) as owner from cancellation_case where reason like $1 || ':%'`,
+  },
   notification: {
     // Every role sends itself a test notification; each reads only its own.
     writers: ['owner', 'partner', 'office', 'plant', 'support'],

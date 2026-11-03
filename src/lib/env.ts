@@ -91,6 +91,12 @@ const envObject = z.object({
   FIELD_APP_ENABLED: flag,
   // R5: the bell, the notification centre and push. Off: no entry point renders and the endpoints answer 404 (the database still records).
   NOTIFICATIONS_ENABLED: flag,
+  // Batch B module flags (CP-PROD-PLAN): off, the pages answer 404 and the entry points do not render.
+  CANCELLATIONS_ENABLED: flag,
+  DOCUMENTS_V1_ENABLED: flag,
+  DARIJA_ENABLED: flag,
+  ASSISTANT_DET_ENABLED: flag,
+  TRANSFERS_ENABLED: flag,
   ASSISTANT_ENABLED: flag,
   ASSISTANT_PROVIDER: z
     .enum(['fake', 'anthropic'], { error: 'must be "fake" or "anthropic"' })

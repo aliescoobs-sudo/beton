@@ -12,6 +12,18 @@ export {
   recordBlReturn,
 } from './service/delivery-service';
 export {
+  cancelUnproducedOrder,
+  type CancellationCase,
+  type CancellationError,
+  decideCancellation,
+  getCancellationPolicy,
+  listCancellations,
+  listRedirectCandidates,
+  openTripCase,
+  type RedirectCandidate,
+  setCancellationPolicy,
+} from './service/cancellation-service';
+export {
   attachDeliveryScan,
   openDeliveryScan,
   type OpenedScan,

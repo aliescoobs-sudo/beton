@@ -172,8 +172,8 @@ describe('stock and loads are per plant (AC-PROD-02, 03)', () => {
     const legacyOpen = Number(
       (
         await migrator.query<{ n: string }>(
-          `select coalesce(sum(qty_base), 0)::text as n from stock_movement where component_id = $1 and plant_id is null`,
-          [master.componentId],
+          `select coalesce(sum(qty_base), 0)::text as n from stock_movement where component_id = $1 and (plant_id is null or plant_id not in ($2, $3))`,
+          [master.componentId, A.id, B.id],
         )
       ).rows[0]?.n,
     );
@@ -202,12 +202,12 @@ describe('stock and loads are per plant (AC-PROD-02, 03)', () => {
     expect(await plantOf('delivery', d.id)).toBe(A.id);
     expect(await levelOf(A.id, cement)).toBe(a0 - 8 * 350_000);
     expect(await levelOf(B.id, cement)).toBe(b0);
-    // the total also holds the movements made before plants existed (no plant): total = plants + those
+    // the total also holds the movements of no plant (before plants existed) and of other plants made by other suites: total = A + B + those
     const legacy = Number(
       (
         await migrator.query<{ n: string }>(
-          `select coalesce(sum(qty_base), 0)::text as n from stock_movement where component_id = $1 and plant_id is null`,
-          [cement],
+          `select coalesce(sum(qty_base), 0)::text as n from stock_movement where component_id = $1 and (plant_id is null or plant_id not in ($2, $3))`,
+          [cement, A.id, B.id],
         )
       ).rows[0]?.n,
     );
