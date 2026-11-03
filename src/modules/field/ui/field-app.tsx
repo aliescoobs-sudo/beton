@@ -14,6 +14,7 @@ import {
   type QueueAction,
   type SyncOutcome,
 } from '../domain/index-client';
+import { dropPhoto, queuedPhotos, queuePhoto, sendPhoto, shrinkPhoto } from './photo-queue';
 
 // The phone app. One big button per step, an emergency button that is always there, large text. Every tap is queued with the
 // phone's own time and sent when there is a network; the last day read is kept for the road. No price exists in anything it gets.
@@ -40,6 +41,7 @@ interface Trip {
   steps: Record<string, string>;
   stage: keyof typeof EMERGENCY_OPTIONS;
   unloadedL: number | null;
+  blPhotos?: number;
 }
 interface Instruction {
   id: string;
@@ -94,7 +96,10 @@ export function FieldApp({ locale }: { locale: string }) {
   const [message, setMessage] = useState<string | null>(null);
   const [sheet, setSheet] = useState<{ tripId: string } | null>(null);
   const [asking, setAsking] = useState<{ tripId: string } | null>(null);
+  // Photos of signed BLs waiting on the phone (by rotation) and the last refusal told to the driver.
+  const [photosWaiting, setPhotosWaiting] = useState<Record<string, number>>({});
   const syncing = useRef(false);
+  const flushing = useRef(false);
   const queueRef = useRef<QueueAction[]>([]);
 
   const saveQueue = useCallback((q: QueueAction[]) => {
@@ -146,6 +151,39 @@ export function FieldApp({ locale }: { locale: string }) {
     }
   }, [loadDay, saveQueue]);
 
+  // Sends the waiting photos one by one. The server answers for each: stored, try again later, or refused for good.
+  const flushPhotos = useCallback(async () => {
+    if (flushing.current) return;
+    flushing.current = true;
+    try {
+      const all = await queuedPhotos().catch(() => []);
+      for (const p of all) {
+        const verdict = await sendPhoto(p);
+        if (verdict === 'retry') break;
+        await dropPhoto(p.key);
+        if (verdict === 'drop') setMessage(t('photo.refused'));
+      }
+      const rest = await queuedPhotos().catch(() => []);
+      setPhotosWaiting(
+        rest.reduce<Record<string, number>>((m, p) => ({ ...m, [p.tripId]: (m[p.tripId] ?? 0) + 1 }), {}),
+      );
+      if (all.length > rest.length) await loadDay();
+    } finally {
+      flushing.current = false;
+    }
+  }, [loadDay, t]);
+
+  async function takePhoto(trip: Trip, file: File | undefined) {
+    if (!file) return;
+    try {
+      const blob = await shrinkPhoto(file);
+      await queuePhoto({ key: newKey(), tripId: trip.id, takenAt: new Date().toISOString(), blob });
+    } catch {
+      return setMessage(t('photo.refused'));
+    }
+    await flushPhotos();
+  }
+
   useEffect(() => {
     if ('serviceWorker' in navigator)
       void navigator.serviceWorker.register('/driver-sw.js').catch(() => undefined);
@@ -153,21 +191,26 @@ export function FieldApp({ locale }: { locale: string }) {
     void Promise.resolve()
       .then(() => saveQueue(parseQueue(localStorage.getItem(QUEUE_KEY))))
       .then(() => loadDay())
-      .then(() => sync());
+      .then(() => sync())
+      .then(() => flushPhotos());
     const up = () => {
       setOnline(true);
       void sync();
+      void flushPhotos();
     };
     const down = () => setOnline(false);
     window.addEventListener('online', up);
     window.addEventListener('offline', down);
-    const timer = setInterval(() => void sync(), 20_000);
+    const timer = setInterval(() => {
+      void sync();
+      void flushPhotos();
+    }, 20_000);
     return () => {
       window.removeEventListener('online', up);
       window.removeEventListener('offline', down);
       clearInterval(timer);
     };
-  }, [loadDay, saveQueue, sync]);
+  }, [loadDay, saveQueue, sync, flushPhotos]);
 
   function push(action: QueueAction) {
     saveQueue(enqueue(queueRef.current, action));
@@ -455,6 +498,34 @@ export function FieldApp({ locale }: { locale: string }) {
                     );
                   })}
                 </ol>
+                {trip.unloadedL ? (
+                  <div className="space-y-1" data-testid={`photo-${trip.orderCode}`}>
+                    <label className="block w-full cursor-pointer rounded-2xl border-4 border-ink px-4 py-4 text-center text-2xl font-extrabold">
+                      📷 {t('photo.take')}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="sr-only"
+                        data-testid={`photo-input-${trip.orderCode}`}
+                        onChange={(e) => {
+                          void takePhoto(trip, e.target.files?.[0]);
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                    {(trip.blPhotos ?? 0) > 0 && (
+                      <p className="text-xl font-bold" data-testid={`photo-sent-${trip.orderCode}`}>
+                        ✓ {t('photo.sent', { n: trip.blPhotos ?? 0 })}
+                      </p>
+                    )}
+                    {(photosWaiting[trip.id] ?? 0) > 0 && (
+                      <p className="text-xl" data-testid={`photo-waiting-${trip.orderCode}`}>
+                        ⏳ {t('photo.waiting', { n: photosWaiting[trip.id] ?? 0 })}
+                      </p>
+                    )}
+                  </div>
+                ) : null}
                 {next === null ? (
                   <p className="text-2xl font-extrabold" data-testid={`trip-done-${trip.orderCode}`}>
                     {t('idle')}

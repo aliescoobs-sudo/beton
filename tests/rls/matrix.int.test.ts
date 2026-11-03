@@ -234,6 +234,19 @@ const FIXTURES: Record<
       ),
     visible: `select split_part(client_key, ':', 2) as owner from trip_driver_report where client_key like $1 || ':%'`,
   },
+  driver_bl_photo: {
+    // Written by driver_attach_bl_photo (the driver of the rotation); the fixture writes the row as the definer would.
+    writers: ['owner'],
+    seed: (_tx, actor) =>
+      withRlsContext(migratorPool, { userId: actor, role: 'owner', requestId: marker }, (m) =>
+        m.query(
+          `insert into driver_bl_photo (id, trip_id, driver_id, trip_date, order_code, seq, content_type, size_bytes, sha256, taken_at, client_key)
+           values (gen_random_uuid(), $1, $2, current_date, 'CMD-X', 1, 'image/jpeg', 10, repeat('a', 64), now(), $3)`,
+          [preField.trip, preField.driver, `${marker}:${actor}`],
+        ),
+      ),
+    visible: `select split_part(client_key, ':', 2) as owner from driver_bl_photo where client_key like $1 || ':%'`,
+  },
   trip_emergency: {
     writers: ['owner'],
     seed: (_tx, actor) =>

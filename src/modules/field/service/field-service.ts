@@ -30,6 +30,8 @@ export interface DriverTrip {
   steps: Record<string, string>;
   stage: EmergencyStage;
   unloadedL: number | null;
+  /** How many photos of the signed BL the office already holds for this rotation. */
+  blPhotos: number;
 }
 
 export interface DriverInstruction {
@@ -85,6 +87,11 @@ export async function getDriverDay(
       created_at: Date;
       acknowledged_at: Date | null;
     }>('select * from public.driver_instructions()');
+    const photoRows = await tx.query<{ trip_id: string; n: number }>(
+      'select trip_id, n from public.driver_bl_photo_counts($1)',
+      [date],
+    );
+    const photos = new Map(photoRows.rows.map((r) => [r.trip_id, r.n]));
     return {
       trips: trips.rows.map((r) => {
         const address = cipher.open(r.address_enc);
@@ -109,6 +116,7 @@ export async function getDriverDay(
           steps,
           stage: emergencyStage(steps),
           unloadedL: r.unloaded_l,
+          blPhotos: photos.get(r.trip_id) ?? 0,
         };
       }),
       instructions: ins.rows.map((i) => {

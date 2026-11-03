@@ -1575,6 +1575,24 @@ export const TABLE_ACCESS = {
     exception:
       'assistant A3: a draft is read and moved along by the user it was made for only (status, instant and resulting number, by a guard trigger); the parameters are sealed and never change; belgobeton_system may only re-seal them.',
   },
+  driver_bl_photo: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'none',
+      office: 'all',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'C3 (DECISIONS 155): the photo of the signed BL taken by the driver on the phone. Written only by driver_attach_bl_photo (SECURITY DEFINER, the driver of the rotation, after the unloading is reported); metadata only (type, size, SHA-256, time); the bytes are sealed in the file store. Owner roles, offices, support and the plant (a plant manager only their plant) read; no price.',
+  },
   delivery_file: {
     kind: 'rls',
     read: {

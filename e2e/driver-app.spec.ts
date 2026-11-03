@@ -9,6 +9,7 @@ import { setDriverPin } from '../src/modules/field';
 import { testEnv } from '../tests/db-env';
 import { realSessionUser } from '../tests/helpers/actors';
 import { deliveryScene, insertDelivery } from '../tests/helpers/ledger-fixtures';
+import { E2E_MD, loginAndEnrol } from './fixtures';
 
 // R4 (AC-PROD-20 to 25): the driver's phone. Sign-in by code and PIN, one big button per step, taps queued offline and sent when
 // the network returns, an emergency button with the options of the current step, never a price. Needs FIELD_APP_ENABLED (the e2e server).
@@ -164,6 +165,60 @@ test('the emergency button offers the options of the current step and alerts the
         ).rowCount,
     )
     .toBe(1);
+});
+
+// A 1x1 PNG: the phone re-draws the picture as a JPEG before sending it.
+const PNG_1X1 = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+  'base64',
+);
+
+test('after the unloading the driver can send a photo of the signed BL, and the office opens it (C3)', async ({
+  page,
+  browser,
+}) => {
+  await openAndSignIn(page);
+  await expect(page.getByTestId(`trip-${orderCode}`)).toBeVisible();
+  await expect(page.getByTestId(`photo-${orderCode}`)).toHaveCount(0); // not before the m³ unloaded
+  await page.getByTestId(`tap-${orderCode}`).click(); // unloading started
+  await expect.poll(stepsOf).toContain('unloading_started');
+  await page.getByTestId(`tap-${orderCode}`).click(); // unloading finished: asks the m³
+  await page.getByTestId('field-m3').fill('7,5');
+  await page.getByTestId('field-m3-ok').click();
+  await expect(page.getByTestId(`photo-${orderCode}`)).toBeVisible();
+  await expect
+    .poll(
+      async () =>
+        (
+          await migrator.query('select 1 from trip_driver_report where trip_id = $1 and kind = $2', [
+            tripId,
+            'unloaded',
+          ])
+        ).rowCount,
+    )
+    .toBe(1);
+  await page
+    .getByTestId(`photo-input-${orderCode}`)
+    .setInputFiles({ name: 'bl.png', mimeType: 'image/png', buffer: PNG_1X1 });
+  await expect(page.getByTestId(`photo-sent-${orderCode}`)).toBeVisible({ timeout: 60_000 });
+  const stored = await migrator.query<{ id: string; content_type: string }>(
+    'select id, content_type from driver_bl_photo where trip_id = $1',
+    [tripId],
+  );
+  expect(stored.rows).toHaveLength(1);
+  expect(stored.rows[0]?.content_type).toBe('image/jpeg');
+  // never a price on the driver's screen
+  expect((await page.getByTestId('field-day').textContent()) ?? '').not.toMatch(/MAD|DH|درهم/);
+  // the plant sees the link on the day's rotations and the file opens (checked route, audited)
+  const office = await browser.newPage();
+  await loginAndEnrol(office, 'fr', E2E_MD.driverPhotoPlant.email);
+  await office.goto(`/fr/trips?date=${today}`);
+  const link = office.getByTestId(`bl-photo-${stored.rows[0]!.id}`);
+  await expect(link).toBeVisible();
+  const res = await office.request.get(`/fr/trips/bl-photo/${stored.rows[0]!.id}`);
+  expect(res.status()).toBe(200);
+  expect(res.headers()['content-type']).toBe('image/jpeg');
+  await office.close();
 });
 
 test('a wrong code is refused with no hint, and the app answers 404 on the pages of another locale it does not know', async ({

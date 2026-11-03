@@ -1,6 +1,7 @@
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { getRequestClock } from '@/app/request-clock';
 import { getPool } from '@/lib/db/pools';
+import { listTripBlPhotos } from '@/modules/field';
 import { isRealDate } from '@/modules/ledger';
 import { listTrips } from '@/modules/operations';
 import { TripBoard } from '@/modules/operations/ui/trip-board';
@@ -24,6 +25,10 @@ export default async function TripsPage({
   const today = (await getRequestClock()).today();
   const date = query.date && isRealDate(query.date) ? query.date : today;
   const trips = await listTrips(getPool('app'), user, date);
+  // The photos of signed BLs the drivers sent for this day (a link each; the file is opened through its own checked route).
+  const photos = can(user.role, 'driver_bl_photos.read')
+    ? await listTripBlPhotos(getPool('app'), user, date)
+    : [];
   const t = await getTranslations('operations.trips');
   if (!trips.ok) return <PageHeader title={t('title')} description={t('errors.INVALID')} />;
   return (
@@ -39,6 +44,26 @@ export default async function TripsPage({
         </Button>
       </form>
       <TripBoard trips={trips.value} canTrack={can(user.role, 'trips.track')} record={recordTripStepAction} />
+      {photos.length > 0 && (
+        <section data-testid="bl-photos" className="space-y-1">
+          <h2 className="text-lg font-semibold">{t('blPhotos')}</h2>
+          <ul className="text-sm">
+            {photos.map((p) => (
+              <li key={p.id}>
+                <a
+                  href={`/${locale}/trips/bl-photo/${p.id}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline"
+                  data-testid={`bl-photo-${p.id}`}
+                >
+                  <bdi dir="ltr">{p.orderCode}</bdi> · {t('blPhotoN', { n: p.seq })}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }

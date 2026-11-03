@@ -22,6 +22,15 @@ export {
   type FieldToken,
 } from './service/session';
 export {
+  attachDriverBlPhoto,
+  BL_PHOTO_MAX_BYTES,
+  blPhotoCounts,
+  type BlPhotoError,
+  listTripBlPhotos,
+  openDriverBlPhoto,
+  type TripBlPhoto,
+} from './service/bl-photo';
+export {
   createPumpJob,
   type DriverInstruction,
   type DriverTrip,

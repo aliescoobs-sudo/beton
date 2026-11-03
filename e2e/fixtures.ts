@@ -112,6 +112,7 @@ export const E2E_MD = {
   avoirSupport: { email: 'e2e-av-support@belgobeton.test', name: 'Support Avoirs' },
   avoirOffice: { email: 'e2e-av-office@belgobeton.test', name: 'Bureau Avoirs' },
   allocOffice: { email: 'e2e-al-office@belgobeton.test', name: 'Bureau Imputations' },
+  driverPhotoPlant: { email: 'e2e-bp-plant@belgobeton.test', name: 'Centrale Photos BL' },
   queuePlant: { email: 'e2e-iq-plant@belgobeton.test', name: 'Centrale À facturer' },
   queueSupport: { email: 'e2e-iq-support@belgobeton.test', name: 'Support À facturer' },
   tripOffice: { email: 'e2e-tp-office@belgobeton.test', name: 'Bureau Rotations' },

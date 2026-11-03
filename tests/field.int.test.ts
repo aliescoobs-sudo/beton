@@ -189,6 +189,7 @@ describe('the day of a driver: own rotations, never a price (AC-PROD-20, 21)', (
       [
         'address',
         'blNo',
+        'blPhotos',
         'clientName',
         'contactName',
         'id',

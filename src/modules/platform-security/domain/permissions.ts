@@ -252,6 +252,17 @@ export const PERMISSIONS = {
     'plant',
     'plant_manager',
   ],
+  // C3: the photo of the signed BL taken by the driver on the phone. Read by the offices, the owner roles, the plant and support.
+  'driver_bl_photos.read': [
+    'owner',
+    'app_admin',
+    'office',
+    'office_sales',
+    'office_purchases',
+    'plant',
+    'plant_manager',
+    'support',
+  ],
   'delivery_files.read': [
     'owner',
     'app_admin',

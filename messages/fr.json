@@ -1699,6 +1699,8 @@
     "trips": {
       "link": "Suivi des rotations",
       "title": "Suivi des rotations",
+      "blPhotos": "Photos du BL signé (envoyées par les chauffeurs)",
+      "blPhotoN": "Photo {n}",
       "intro": "Un geste par étape : chargé, parti, arrivé sur chantier, déchargement commencé, terminé, de retour. Quantités et horaires seulement, aucun prix.",
       "date": "Jour",
       "show": "Afficher",
@@ -2514,6 +2516,12 @@
       "unloading_started": "Déchargement commencé",
       "unloading_finished": "Déchargement terminé",
       "back": "De retour à la centrale"
+    },
+    "photo": {
+      "take": "Photo du BL signé",
+      "sent": "Photo envoyée ({n})",
+      "waiting": "Photo à envoyer ({n})",
+      "refused": "Photo refusée : prévenez le bureau."
     },
     "unloadedAsk": "Combien de m³ déchargés ?",
     "confirm": "Valider",

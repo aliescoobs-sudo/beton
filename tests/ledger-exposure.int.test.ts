@@ -99,6 +99,8 @@ describe('functions the application role can execute', () => {
     'ctx.driver_id()',
     'public.create_pump_job(p_date date, p_pump uuid, p_operator uuid, p_client uuid, p_site text, p_address_enc text, p_m3 integer)',
     'public.driver_ack(p_instruction uuid)',
+    'public.driver_attach_bl_photo(p_trip uuid, p_file uuid, p_type text, p_size integer, p_sha text, p_at timestamp with time zone, p_key text)', // C3: the driver of the rotation only (checked inside)
+    'public.driver_bl_photo_counts(p_date date)', // C3: the driver's own rotations only
     'public.driver_emergency(p_trip uuid, p_option text, p_pct integer, p_note text, p_key text, p_at timestamp with time zone)',
     'public.driver_instructions()',
     'public.driver_report(p_trip uuid, p_step text, p_at timestamp with time zone, p_key text, p_volume_l integer)',
