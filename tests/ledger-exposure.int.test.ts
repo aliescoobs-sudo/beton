@@ -59,6 +59,14 @@ beforeAll(async () => {
 
 describe('functions the application role can execute', () => {
   const ALLOWED = [
+    'public.decide_document_request(p_id uuid, p_approve boolean)',
+    'public.document_requests_pending()',
+    'public.invoice_timing()',
+    'public.my_document_requests()',
+    'public.request_document(p_kind text, p_party_kind text, p_party_code text, p_doc_ref text, p_note text)',
+    'public.set_invoice_sequence(p_year integer, p_last integer)',
+    'public.set_invoice_timing(p_timing text)',
+    'public.use_document_request(p_id uuid)',
     'public.cancel_unproduced_order(p_order uuid, p_reason text, p_today date)',
     'public.cancellation_trip_stage(p_trip uuid)',
     'public.concrete_strength(p_code text)',

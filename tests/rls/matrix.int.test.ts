@@ -305,6 +305,30 @@ const FIXTURES: Record<
       ),
     visible: `select split_part(reason, ':', 2) as owner from cancellation_case where reason like $1 || ':%'`,
   },
+  document_policy: {
+    writers: ['owner'],
+    seed: (tx) => tx.query(`select public.set_invoice_timing('monthly')`),
+    visible: `select updated_by::text as owner from document_policy where updated_by is not null and $1::text is not null`,
+  },
+  document_request: {
+    // An office asks for a document of a client made by the owner in the same test.
+    writers: ['office'],
+    seed: async (tx, actor) => {
+      const code = await withRlsContext(
+        app,
+        { userId: actors.owner, role: 'owner', requestId: marker },
+        async (m) =>
+          (
+            await m.query<{ code: string }>(
+              `insert into client (id, code, name, kind) values (gen_random_uuid(), public.next_code('CLT', 3), $1, 'person') returning code`,
+              [`dr${actor.slice(0, 8)}${marker.slice(-6)}`],
+            )
+          ).rows[0]!.code,
+      );
+      return tx.query(`select public.request_document('releve', 'client', $1, null, $2)`, [code, marker]);
+    },
+    visible: `select requester::text as owner from document_request where note = $1`,
+  },
   notification: {
     // Every role sends itself a test notification; each reads only its own.
     writers: ['owner', 'partner', 'office', 'plant', 'support'],

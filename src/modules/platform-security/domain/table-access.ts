@@ -398,6 +398,40 @@ export const TABLE_ACCESS = {
     exception:
       'R6 (DECISIONS 146, REQUIREMENTS-V1 §8): one row per cancellation or incident (the seven cases), quantities, times and decisions only, no amount. A plant manager reads the cases of their own plant (policy on ctx.plant_scope()). Written only by cancel_unproduced_order, open_trip_case, decide_cancellation and driver_ack_redirect (SECURITY DEFINER).',
   },
+  document_policy: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'all',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    exception:
+      'R7 (DECISIONS 147): one row, when the final invoice is issued (at full payment, monthly recap or per delivery), chosen by the accountant, owner or app_admin. Written only by set_invoice_timing. Not money.',
+  },
+  document_request: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'none',
+      office: 'none',
+      plant: 'none',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    exception:
+      'R7 (DECISIONS 147, REQUIREMENTS-V1 §9 and §12): the gate for a number-bearing document a client or supplier asked for. No amount. Written only by request_document, decide_document_request and use_document_request (SECURITY DEFINER); a requester reads its own through my_document_requests().',
+  },
   notification: {
     kind: 'rls',
     read: {

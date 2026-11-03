@@ -29,6 +29,13 @@ const GROUPS: GroupDef[] = [
         allowed: 'documents.read',
       },
       {
+        path: '/documents/requests',
+        labelKey: 'documentRequests.link',
+        testId: 'document-requests-link',
+        allowed: (role) =>
+          can(role, 'documents.request') || can(role, 'documents.decide') || can(role, 'documents.policy'),
+      },
+      {
         path: '/disclosures',
         labelKey: 'ledger.disclosure.link',
         testId: 'disclosures-link',

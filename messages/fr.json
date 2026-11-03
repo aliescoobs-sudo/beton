@@ -2693,5 +2693,57 @@
       "MISMATCH": "Ne correspond pas à l'état réel.",
       "CONFLICT": "Déjà fait."
     }
+  },
+  "documentRequests": {
+    "link": "Demandes de documents",
+    "title": "Documents : demandes et facturation",
+    "intro": "Un document avec numéro demandé par un client ou un fournisseur part seulement après l'accord du propriétaire. Le moment de la facture définitive et la suite de la numérotation se règlent ici.",
+    "policy": "Facture définitive",
+    "timing": {
+      "label": "Émettre la facture définitive",
+      "per_delivery": "à chaque livraison",
+      "monthly": "en récapitulatif mensuel",
+      "full_payment": "au paiement complet"
+    },
+    "sequence": {
+      "year": "Année",
+      "last": "Dernier numéro de facture émis",
+      "save": "Continuer la numérotation"
+    },
+    "ask": "Demander un document",
+    "kind": {
+      "releve": "Relevé de situation",
+      "invoice_copy": "Copie de facture",
+      "quote_copy": "Copie de devis",
+      "avoir_copy": "Copie d'avoir",
+      "bl_copy": "Copie de BL",
+      "supplier_statement": "Relevé fournisseur"
+    },
+    "party": {
+      "client": "Client",
+      "supplier": "Fournisseur"
+    },
+    "partyCode": "Code client ou fournisseur",
+    "docRef": "Numéro du document",
+    "send": "Demander",
+    "release": "Libérer",
+    "pending": "À approuver",
+    "approve": "Approuver",
+    "deny": "Refuser",
+    "status": {
+      "pending": "en attente",
+      "approved": "approuvé",
+      "denied": "refusé",
+      "used": "remis"
+    },
+    "errors": {
+      "FORBIDDEN": "Non autorisé.",
+      "NOT_FOUND": "Introuvable.",
+      "INVALID": "Saisie invalide.",
+      "ALREADY_WAITING": "Déjà demandé.",
+      "NOT_AVAILABLE": "Non disponible.",
+      "STEP_UP_REQUIRED": "Confirmez avec votre code à deux facteurs.",
+      "REENROL_REQUIRED": "Réenrôlez votre authentificateur."
+    }
   }
 }

@@ -93,6 +93,23 @@ export {
   viewDisclosure,
 } from './service/disclosure-service';
 export {
+  DOCUMENT_REQUEST_KINDS,
+  type DocumentRequestError,
+  type DocumentRequestKind,
+  decideDocumentRequest,
+  getInvoiceTiming,
+  INVOICE_TIMINGS,
+  type InvoiceTiming,
+  listMyDocumentRequests,
+  listPendingDocumentRequests,
+  type MyDocumentRequest,
+  type PendingDocumentRequest,
+  requestDocument,
+  setInvoiceSequence,
+  setInvoiceTiming,
+  releaseDocumentRequest,
+} from './service/document-request-service';
+export {
   getInvoiceForPrint,
   libraryKinds,
   type LibraryEntry,

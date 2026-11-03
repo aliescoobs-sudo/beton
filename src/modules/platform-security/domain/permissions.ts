@@ -159,6 +159,12 @@ export const PERMISSIONS = {
   'notifications.read': [...ALL, 'accountant'],
   // Cancellations and incidents (R6, §8): the offices cancel, the plant reports incidents, owner and app_admin decide (the plant
   // manager only when the owner's policy allows it, checked in the database).
+  // Documents (R7, §9): the gate for number-bearing documents a client asks for, the timing of the final invoice (the accountant
+  // chooses), and the continuation of the invoice numbering.
+  'documents.request': ['office', 'office_sales', 'office_purchases', 'accountant'],
+  'documents.decide': MONEY_WRITE,
+  'documents.policy': ['owner', 'app_admin', 'accountant'],
+  'documents.sequence': MONEY_WRITE,
   'cancellations.read': ALL,
   'cancellations.open': ['owner', 'app_admin', 'partner', 'office', 'office_sales', 'plant', 'plant_manager'],
   'cancellations.decide': ['owner', 'app_admin', 'plant_manager'],

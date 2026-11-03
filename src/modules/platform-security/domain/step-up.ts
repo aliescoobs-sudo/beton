@@ -17,6 +17,7 @@ export const SENSITIVE_ACTIONS = [
   'users.manage',
   'prices.confirm',
   'disclosure.decide',
+  'documents.decide',
   'orders.release_hold',
   'credit_limit.set',
   'auth.regenerate_recovery_codes',
