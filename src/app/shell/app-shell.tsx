@@ -68,7 +68,7 @@ export function AppShell({
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="bg-ink text-white">
-        <div className="mx-auto flex w-full max-w-[1240px] items-stretch gap-2 px-4 md:gap-6 md:px-8">
+        <div className="mx-auto flex w-full max-w-[1240px] items-stretch gap-1 px-3 md:gap-4 md:px-8">
           <Link href={homeHref} className="flex items-center gap-2.5 py-3" aria-label={labels.brand}>
             <SiloMark />
             <span className="font-display text-lg font-extrabold tracking-wide">{labels.brand}</span>
@@ -106,7 +106,7 @@ export function AppShell({
               autoComplete="off"
               placeholder={labels.searchPlaceholder}
               aria-label={labels.search}
-              className="w-40 rounded border border-white/30 bg-white/10 px-2 py-1 text-sm text-white placeholder:text-white/60"
+              className="w-32 rounded border border-white/30 bg-white/10 px-2 py-1 text-sm text-white placeholder:text-white/60"
               data-testid="search-box"
             />
           </form>

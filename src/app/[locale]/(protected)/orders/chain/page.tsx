@@ -70,7 +70,7 @@ export default async function OrderChainPage({ params }: { params: Promise<{ loc
                     ) : (
                       <bdi dir="ltr">{r.code}</bdi>
                     )}
-                    {getEnv().TRANSFERS_ENABLED && (
+                    {getEnv().TRANSFERS_ENABLED && can(user.role, 'orders.read_money') && (
                       <a
                         href={`/${locale}/orders/timeline/${r.orderId}`}
                         className="ms-2 text-xs underline"
