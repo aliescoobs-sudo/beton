@@ -36,7 +36,7 @@ export async function runMigrations(migratorUrl: string): Promise<void> {
 if (import.meta.main) {
   handleHelp(import.meta.url);
   if (existsSync('.env.local')) process.loadEnvFile('.env.local');
-  const { loadEnv } = await import('../src/lib/env.ts');
-  await runMigrations(loadEnv(process.env).DATABASE_URL_MIGRATOR);
+  const { loadMaintenanceEnv } = await import('../src/lib/env.ts');
+  await runMigrations(loadMaintenanceEnv(process.env).DATABASE_URL_MIGRATOR);
   console.log('Migrations applied');
 }

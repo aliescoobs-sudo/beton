@@ -23,6 +23,8 @@ export interface ChecklistDeps {
   /** belgobeton_auth: account facts (2FA enrolment, seed accounts). */
   authPool: pg.Pool;
   clock: Clock;
+  /** See computeChecklist: the boot guard passes Infinity so a quiet month never stops a running server. */
+  restoreMaxAgeMs?: number;
 }
 
 export type Checklist = { items: ChecklistItem[]; complete: boolean };
@@ -35,6 +37,7 @@ export async function getChecklist({
   authPool,
   clock,
   runtimeEnv,
+  restoreMaxAgeMs,
 }: ChecklistDeps): Promise<Checklist> {
   const { manual, lastRestoreTestOk } = await asSystem(systemPool, async (tx) => {
     const marks = await tx.query<{
@@ -71,10 +74,12 @@ export async function getChecklist({
       seedAccounts: rows[0]!.seed,
       appHasBackupCredentials: !!(
         (runtimeEnv ?? process.env).DATABASE_URL_BACKUP ||
+        (runtimeEnv ?? process.env).DATABASE_URL_MIGRATOR ||
         (runtimeEnv ?? process.env).POSTGRES_SUPERUSER_PASSWORD
       ),
     },
     clock.now(),
+    restoreMaxAgeMs,
   );
 }
 
@@ -124,6 +129,36 @@ export async function recordRestoreTest(
       result.detail.slice(0, 500),
     ]),
   );
+}
+
+export type StartMode = 'normal' | 'first_boot';
+
+/**
+ * What the server does at start (SPEC §8, C2). REAL_DATA=true is refused until the checklist is complete, EXCEPT through the
+ * protected first start: FIRST_BOOT=true serves a restricted app (see src/proxy.ts) so that the owner can enrol, work the checklist
+ * and create accounts. That window refuses itself when it is not needed any more (checklist complete: remove the flag) or not
+ * safe any more (real business records exist), so it cannot become a standing way around the guard.
+ */
+export async function resolveStartMode(options: {
+  realData: boolean;
+  firstBoot: boolean;
+  getList: () => Promise<Checklist>;
+  countRecords: () => Promise<number>;
+}): Promise<StartMode> {
+  const { realData, firstBoot } = options;
+  if (firstBoot && !realData) throw new Error('FIRST_BOOT=true is only for REAL_DATA=true');
+  if (!firstBoot) {
+    await assertRealDataAllowed(realData, options.getList);
+    return 'normal';
+  }
+  const checklist = await options.getList();
+  if (checklist.complete)
+    throw new Error(
+      'FIRST_BOOT=true refused: the security checklist is complete, remove FIRST_BOOT and restart',
+    );
+  if ((await options.countRecords()) > 0)
+    throw new Error('FIRST_BOOT=true refused: real business records already exist');
+  return 'first_boot';
 }
 
 /** Boot guard (SPEC §8): REAL_DATA=true is refused until the checklist is complete. */

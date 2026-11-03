@@ -2,14 +2,14 @@
 //   corepack pnpm audit:verify
 import { existsSync } from 'node:fs';
 import pg from 'pg';
-import { loadEnv } from '../src/lib/env.ts';
+import { loadMaintenanceEnv } from '../src/lib/env.ts';
 import { verifyAuditChain } from '../src/modules/platform-security/service/audit-chain.ts';
 import { handleHelp } from './cli-help';
 
 handleHelp(import.meta.url);
 
 if (existsSync('.env.local')) process.loadEnvFile('.env.local');
-const client = new pg.Client({ connectionString: loadEnv(process.env).DATABASE_URL_MIGRATOR });
+const client = new pg.Client({ connectionString: loadMaintenanceEnv(process.env).DATABASE_URL_MIGRATOR });
 await client.connect();
 try {
   const verdict = await verifyAuditChain(client);

@@ -4,7 +4,7 @@
 import { existsSync } from 'node:fs';
 import { getMigrations } from 'better-auth/db/migration';
 import pg from 'pg';
-import { loadEnv } from '@/lib/env';
+import { loadMaintenanceEnv } from '@/lib/env';
 import { baseAuthOptions } from '@/modules/platform-security/auth/options';
 import { DDL_SCRATCH_DATABASE, recreateDatabase } from './db-bootstrap';
 import { handleHelp } from './cli-help';
@@ -12,7 +12,7 @@ import { handleHelp } from './cli-help';
 handleHelp(import.meta.url);
 
 if (existsSync('.env.local')) process.loadEnvFile('.env.local');
-const env = loadEnv(process.env);
+const env = loadMaintenanceEnv(process.env);
 const scratch = DDL_SCRATCH_DATABASE;
 await recreateDatabase(env, scratch);
 

@@ -3,7 +3,7 @@
 //   corepack pnpm user:reset-owner-2fa
 import { existsSync } from 'node:fs';
 import pg from 'pg';
-import { loadEnv } from '@/lib/env';
+import { loadMaintenanceEnv } from '@/lib/env';
 import { resetOwnerTwoFactor } from '@/modules/platform-security/service/break-glass';
 import { createPrompt } from './prompt';
 import { handleHelp } from './cli-help';
@@ -11,7 +11,7 @@ import { handleHelp } from './cli-help';
 handleHelp(import.meta.url);
 
 if (existsSync('.env.local')) process.loadEnvFile('.env.local');
-const env = loadEnv(process.env);
+const env = loadMaintenanceEnv(process.env);
 const prompt = createPrompt();
 const authPool = new pg.Pool({ connectionString: env.DATABASE_URL_AUTH, max: 1 });
 const systemPool = new pg.Pool({ connectionString: env.DATABASE_URL_SYSTEM, max: 1 });

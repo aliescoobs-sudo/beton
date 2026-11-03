@@ -729,6 +729,13 @@
       "when": 1793803687023,
       "tag": "0207_finance_price_status",
       "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "7",
+      "when": 1793803747023,
+      "tag": "0096_boot_probes",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import createMiddleware from 'next-intl/middleware';
 import { routing } from './i18n/routing';
+import { firstBootAllows } from './lib/first-boot';
 import { contentSecurityPolicy, newNonce, securityHeaders } from './lib/security-headers';
 
 const handleI18nRouting = createMiddleware(routing);
@@ -13,6 +14,16 @@ export default function proxy(request: NextRequest) {
   // TLS ends at the reverse proxy in deployment, so the public origin decides, not the request protocol.
   const https = (process.env.APP_BASE_URL ?? '').startsWith('https://');
   const fixed = securityHeaders({ https });
+
+  // C2: the protected first start serves only the set-up paths; the server itself refuses to start in this mode next to real records.
+  if (process.env.FIRST_BOOT === 'true' && !firstBootAllows(request.nextUrl.pathname)) {
+    const refused = new NextResponse('Service en cours de première installation.', {
+      status: 503,
+      headers: { 'cache-control': 'no-store', 'retry-after': '3600' },
+    });
+    for (const [name, value] of Object.entries(fixed)) refused.headers.set(name, value);
+    return refused;
+  }
 
   if (request.nextUrl.pathname.startsWith('/api/')) {
     const response = NextResponse.next();

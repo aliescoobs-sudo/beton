@@ -53,7 +53,6 @@ const keyring = z.string().superRefine((value, ctx) => {
 const envObject = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   DATABASE_URL_APP: postgresUrl,
-  DATABASE_URL_MIGRATOR: postgresUrl,
   DATABASE_URL_AUTH: postgresUrl,
   DATABASE_URL_SYSTEM: postgresUrl,
   AUTH_SECRET: z.string().min(32, { error: 'must be at least 32 characters' }),
@@ -81,6 +80,11 @@ const envObject = z.object({
   BACKUP_AGE_RECIPIENT: z.string().startsWith('age1', { error: 'must be an age public key (age1…)' }),
   SIMULATION_ENABLED: flag,
   REAL_DATA: flag,
+  // C2: protected first start of a real-data server. With REAL_DATA=true and an incomplete security checklist the server normally
+  // refuses to start (a loop: the checklist is completed in the app). FIRST_BOOT=true starts it in a restricted mode instead: only
+  // sign-in, enrolment, the checklist, accounts, plants and parameters are served, everything else answers 503, and it refuses to
+  // start at all once real business records exist or once the checklist is complete (remove the flag then). Never needed otherwise.
+  FIRST_BOOT: flag,
   // The AI reading of a supplier invoice photo. OFF, and refused next to real data or in production, until the CNDP has
   // authorized the transfer (DECISIONS 107); even on, only an interface exists: no provider is wired and nothing leaves the server.
   AI_EXTRACTION_ENABLED: flag,
@@ -174,6 +178,20 @@ const envSchema = envObject.superRefine((env, ctx) => {
 export type Env = z.infer<typeof envSchema>;
 
 /**
+ * Maintenance scripts only (migrate, bootstrap, audit verify, owner 2FA reset): the runtime environment above deliberately has no
+ * migrator login, so a compromised app cannot alter the schema (C2, DECISIONS open question 11). The login is read from the raw
+ * environment, like the backup URL.
+ */
+export type MaintenanceEnv = Env & { DATABASE_URL_MIGRATOR: string };
+export function loadMaintenanceEnv(source: Record<string, string | undefined>): MaintenanceEnv {
+  const env = loadEnv(source);
+  const migrator = postgresUrl.safeParse(source.DATABASE_URL_MIGRATOR);
+  if (!migrator.success)
+    throw new Error('Invalid environment configuration:\n  DATABASE_URL_MIGRATOR: missing');
+  return { ...env, DATABASE_URL_MIGRATOR: migrator.data };
+}
+
+/**
  * Backup job only (pnpm backup): the read-only BYPASSRLS role. Deliberately NOT part of the app environment
  * (DECISIONS open question 8: never in the app runtime); the security checklist checks the app does not have it.
  */
@@ -211,7 +229,6 @@ export function loadSeedUrl(source: Record<string, string | undefined>): string 
 /** Names of variables whose values must never reach logs. */
 export const SECRET_ENV_NAMES = [
   'DATABASE_URL_APP',
-  'DATABASE_URL_MIGRATOR',
   'DATABASE_URL_AUTH',
   'DATABASE_URL_SYSTEM',
   'AUTH_SECRET',

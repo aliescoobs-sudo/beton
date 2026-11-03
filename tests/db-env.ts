@@ -1,12 +1,12 @@
 import { existsSync } from 'node:fs';
 import { TEST_DATABASE } from '../scripts/db-bootstrap';
-import { loadBackupUrl, loadEnv, loadSeedUrl } from '../src/lib/env';
+import { loadBackupUrl, loadMaintenanceEnv, loadSeedUrl } from '../src/lib/env';
 
 /** Integration tests run against `belgobeton_test`, with the same roles as dev (see scripts/db-bootstrap.ts). */
 export function testEnv(database: string = TEST_DATABASE) {
   if (existsSync('.env.local')) process.loadEnvFile('.env.local');
   if (existsSync('.env.ops')) process.loadEnvFile('.env.ops');
-  const env = loadEnv(process.env);
+  const env = loadMaintenanceEnv(process.env);
   const toTestDb = (url: string) => {
     const u = new URL(url);
     u.pathname = `/${database}`;

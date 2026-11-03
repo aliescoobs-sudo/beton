@@ -289,12 +289,12 @@ One inbox with push notification. Each card shows exactly what will happen, conf
 
 ## 14. Hosting, legal, data
 
-- **VPS in a data centre in Morocco**, to keep data in Morocco. Choice criteria, in order: stability, security, cost.
+- **Hosting: Infomaniak, Switzerland** (decided 3 Nov 2026, replacing "VPS in Morocco"). Switzerland is on the CNDP list of countries with an adequate level of protection, so the data may be hosted there; the transfer is declared, not forbidden. Choice criteria, in order: stability, security, cost.
   - HTTPS, firewall, database not exposed;
   - SSH by key only;
-  - encrypted daily backups to a second location in Morocco, with restore tested;
+  - one encrypted daily backup that covers the database **and** the stored documents, pulled by an office machine in Morocco as the second location, with restore tested and the decryption keys escrowed off the server;
   - monitoring and security updates.
-- **CNDP:** the company has no file yet. Prepare the declaration (employees, clients, suppliers, drivers' data) **before** entering real personal data. Driver geolocation is *not* in V1. If wanted later, it is a separate CNDP point.
+- **CNDP:** the company has no file yet. Prepare the declaration (employees, clients, suppliers, drivers' data) **before** entering real personal data, **including the declaration of the transfer of data to Switzerland (Infomaniak) and the processing and hosting terms with the provider**. The security checklist item is *CNDP transfer declaration filed* (`cndp_transfer_declared`); the former `moroccan_hosting` item is gone. Driver geolocation is *not* in V1. If wanted later, it is a separate CNDP point.
 - **Data import:**
   - from Excel: clients, suppliers, products, price list, trucks, opening balances, cheques in transit;
   - from paper: entered by the office;

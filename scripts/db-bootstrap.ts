@@ -4,7 +4,13 @@
 import { existsSync } from 'node:fs';
 import pg from 'pg';
 import { z } from 'zod';
-import { type Env, loadBackupUrl, loadEnv, loadSeedUrl, seedRoleAllowed } from '../src/lib/env.ts';
+import {
+  type MaintenanceEnv,
+  loadBackupUrl,
+  loadMaintenanceEnv,
+  loadSeedUrl,
+  seedRoleAllowed,
+} from '../src/lib/env.ts';
 import { handleHelp } from './cli-help';
 
 export const TEST_DATABASE = 'belgobeton_test';
@@ -30,7 +36,7 @@ const ROLE_NAMES = {
   seed: 'belgobeton_seed',
 } as const;
 
-function roleUrls(env: Env, seedUrl?: string) {
+function roleUrls(env: MaintenanceEnv, seedUrl?: string) {
   return [
     { name: ROLE_NAMES.migrator, url: env.DATABASE_URL_MIGRATOR },
     { name: ROLE_NAMES.app, url: env.DATABASE_URL_APP },
@@ -42,7 +48,7 @@ function roleUrls(env: Env, seedUrl?: string) {
 }
 
 /** Superuser connection string for `database`, on the host/port of the migrator URL. */
-export function superuserUrl(env: Env, database: string): string {
+export function superuserUrl(env: MaintenanceEnv, database: string): string {
   const password = z
     .string()
     .min(16, { error: 'POSTGRES_SUPERUSER_PASSWORD must be at least 16 characters' })
@@ -69,7 +75,7 @@ async function withClient<T>(url: string, fn: (client: pg.Client) => Promise<T>)
  * only with `seedUrl` (callers pass it only in simulation, see seedRoleAllowed): without it, an existing seed role is
  * switched to NOLOGIN, so flipping a database to real data or production disables the seed's access.
  */
-export async function ensureRoles(env: Env, seedUrl?: string): Promise<void> {
+export async function ensureRoles(env: MaintenanceEnv, seedUrl?: string): Promise<void> {
   await withClient(superuserUrl(env, 'postgres'), async (client) => {
     for (const role of roleUrls(env, seedUrl)) {
       const url = new URL(role.url);
@@ -97,7 +103,7 @@ export async function ensureRoles(env: Env, seedUrl?: string): Promise<void> {
 }
 
 /** Creates `database` owned by the migrator if missing, then removes PUBLIC access. */
-export async function ensureDatabase(env: Env, database: string): Promise<void> {
+export async function ensureDatabase(env: MaintenanceEnv, database: string): Promise<void> {
   await withClient(superuserUrl(env, 'postgres'), async (client) => {
     const exists = await client.query('select 1 from pg_database where datname = $1', [database]);
     if (!exists.rowCount) {
@@ -123,7 +129,7 @@ export async function ensureDatabase(env: Env, database: string): Promise<void> 
 }
 
 /** Drops and recreates a throwaway database (test/e2e: they hold immutable audit rows). Never the dev database. */
-export async function recreateDatabase(env: Env, database: string): Promise<void> {
+export async function recreateDatabase(env: MaintenanceEnv, database: string): Promise<void> {
   if (!THROWAWAY_DATABASES.includes(database)) {
     throw new Error(
       `Refusing to recreate "${database}": only ${THROWAWAY_DATABASES.join(', ')} may be dropped`,
@@ -135,14 +141,14 @@ export async function recreateDatabase(env: Env, database: string): Promise<void
   await ensureDatabase(env, database);
 }
 
-export const recreateTestDatabase = (env: Env) => recreateDatabase(env, TEST_DATABASE);
+export const recreateTestDatabase = (env: MaintenanceEnv) => recreateDatabase(env, TEST_DATABASE);
 
 if (import.meta.main) {
   handleHelp(import.meta.url);
   if (existsSync('.env.local')) process.loadEnvFile('.env.local');
   // Ops secrets (superuser, backup role, age identity) live in .env.ops, which Next.js never loads.
   if (existsSync('.env.ops')) process.loadEnvFile('.env.ops');
-  const env = loadEnv(process.env);
+  const env = loadMaintenanceEnv(process.env);
   const databases = [new URL(env.DATABASE_URL_MIGRATOR).pathname.slice(1), TEST_DATABASE];
   // The seed role is created only in simulation (never with REAL_DATA or in production).
   await ensureRoles(env, seedRoleAllowed(process.env) ? loadSeedUrl(process.env) : undefined);

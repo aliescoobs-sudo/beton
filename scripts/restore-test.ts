@@ -4,7 +4,7 @@
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import pg from 'pg';
-import { loadEnv } from '@/lib/env';
+import { loadMaintenanceEnv } from '@/lib/env';
 import { recordRestoreTest } from '@/modules/platform-security/service/checklist';
 import { restoreCheck } from './backup-lib';
 import { superuserUrl } from './db-bootstrap';
@@ -15,7 +15,7 @@ handleHelp(import.meta.url);
 if (existsSync('.env.local')) process.loadEnvFile('.env.local');
 // Ops secrets (superuser, backup role, age identity) live in .env.ops, which Next.js never loads.
 if (existsSync('.env.ops')) process.loadEnvFile('.env.ops');
-const env = loadEnv(process.env);
+const env = loadMaintenanceEnv(process.env);
 const identityFile = process.env.BACKUP_AGE_IDENTITY_FILE;
 if (!identityFile || !existsSync(identityFile)) {
   console.error('Set BACKUP_AGE_IDENTITY_FILE to the path of the age private key (kept off the app host).');

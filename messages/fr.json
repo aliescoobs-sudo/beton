@@ -520,20 +520,21 @@
     "complete": "Liste complète : les données réelles sont autorisées.",
     "items": {
       "ci_security_tests": "Tests de sécurité CI au vert",
-      "restore_test_recent": "Test de restauration réussi depuis moins de 7 jours",
+      "restore_test_recent": "Test de restauration réussi depuis moins de 35 jours",
       "all_users_2fa": "Tous les utilisateurs actifs ont la 2FA",
       "no_seed_accounts": "Aucun compte de démonstration actif",
       "dependency_audit": "Audit des dépendances sans faille grave",
       "csp_active": "Politique de sécurité du contenu (CSP) vérifiée",
       "cndp_declaration": "Déclaration CNDP déposée (loi 09-08)",
-      "moroccan_hosting": "Hébergement au Maroc en place",
+      "cndp_transfer_declared": "Déclaration CNDP du transfert (hébergement Infomaniak, Suisse) déposée",
       "ai_zdr_contract": "Contrat IA avec rétention zéro (ZDR)",
       "rbac_second_review": "Revue des droits par une deuxième personne",
       "owner_signoff": "Signature du propriétaire",
       "backups_off_host": "Sauvegardes chiffrées copiées hors du serveur",
       "age_key_off_app_host": "Clé privée age jamais sur le serveur de l'application",
       "backup_credentials_isolated": "Identifiants du rôle de sauvegarde absents de l'application",
-      "backup_anchor_signed": "Ancre d'audit des sauvegardes signée avec une clé hors du serveur"
+      "backup_anchor_signed": "Reçu des sauvegardes signé avec une clé hors du serveur et vérifié à la restauration",
+      "field_keys_escrowed_off_host": "Clés de chiffrement des champs et des fichiers (et anciennes versions) gardées hors du serveur"
     }
   },
   "clock": {

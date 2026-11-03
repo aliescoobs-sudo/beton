@@ -27,13 +27,14 @@ describe('security checklist (T21, SPEC §8, D37)', () => {
       'dependency_audit',
       'csp_active',
       'cndp_declaration',
-      'moroccan_hosting',
+      'cndp_transfer_declared',
       'ai_zdr_contract',
       'rbac_second_review',
       'backups_off_host',
       'age_key_off_app_host',
       'backup_credentials_isolated',
       'backup_anchor_signed',
+      'field_keys_escrowed_off_host',
       'owner_signoff',
     ]);
   });
@@ -48,7 +49,13 @@ describe('security checklist (T21, SPEC §8, D37)', () => {
   it('computes the automated items', () => {
     const items = (f: Partial<ChecklistFacts>) =>
       Object.fromEntries(computeChecklist(facts(f), now).items.map((i) => [i.key, i.status]));
-    expect(items({ lastRestoreTestOk: new Date('2026-11-15T09:59:00Z') }).restore_test_recent).toBe('open'); // > 7 days
+    // Monthly restore test (runbook) with a few days of grace: 35 days, not 7 (a weekly rule would stop production after any quiet week).
+    const DAY = 86_400_000;
+    expect(items({ lastRestoreTestOk: new Date(now.getTime() - 30 * DAY) }).restore_test_recent).toBe('done');
+    expect(items({ lastRestoreTestOk: new Date(now.getTime() - 35 * DAY) }).restore_test_recent).toBe('done');
+    expect(
+      items({ lastRestoreTestOk: new Date(now.getTime() - 35 * DAY - 60_000) }).restore_test_recent,
+    ).toBe('open');
     expect(items({ lastRestoreTestOk: null }).restore_test_recent).toBe('open');
     expect(items({ usersWithout2fa: 1 }).all_users_2fa).toBe('open');
     expect(items({ seedAccounts: 2 }).no_seed_accounts).toBe('open');
