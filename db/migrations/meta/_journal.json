@@ -673,6 +673,62 @@
       "when": 1793803207023,
       "tag": "0095_plant_scope_reads",
       "breakpoints": true
+    },
+    {
+      "idx": 200,
+      "version": "7",
+      "when": 1793803267023,
+      "tag": "0200_finance_core",
+      "breakpoints": true
+    },
+    {
+      "idx": 201,
+      "version": "7",
+      "when": 1793803327023,
+      "tag": "0201_finance_sources",
+      "breakpoints": true
+    },
+    {
+      "idx": 202,
+      "version": "7",
+      "when": 1793803387023,
+      "tag": "0202_finance_cash_integrity",
+      "breakpoints": true
+    },
+    {
+      "idx": 203,
+      "version": "7",
+      "when": 1793803447023,
+      "tag": "0203_finance_fail_closed",
+      "breakpoints": true
+    },
+    {
+      "idx": 204,
+      "version": "7",
+      "when": 1793803507023,
+      "tag": "0204_finance_lease_assets",
+      "breakpoints": true
+    },
+    {
+      "idx": 205,
+      "version": "7",
+      "when": 1793803567023,
+      "tag": "0205_finance_fuel_consumption",
+      "breakpoints": true
+    },
+    {
+      "idx": 206,
+      "version": "7",
+      "when": 1793803627023,
+      "tag": "0206_finance_step_up_policy",
+      "breakpoints": true
+    },
+    {
+      "idx": 207,
+      "version": "7",
+      "when": 1793803687023,
+      "tag": "0207_finance_price_status",
+      "breakpoints": true
     }
   ]
 }

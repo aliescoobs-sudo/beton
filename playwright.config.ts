@@ -45,6 +45,7 @@ export default defineConfig({
         DARIJA_ENABLED: 'true',
         ASSISTANT_DET_ENABLED: 'true',
         TRANSFERS_ENABLED: 'true',
+        FINANCE_ENABLED: 'true',
       },
     },
     {

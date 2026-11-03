@@ -48,8 +48,15 @@ let B: Plant;
 let master: PurchaseMaster;
 let scene: Awaited<ReturnType<typeof deliveryScene>>;
 const TODAY = '2026-06-10';
-let truckNo = 100 + Math.floor(Math.random() * 300);
-const nextTruckNo = () => truckNo++;
+// A wide random start: the database is shared by the other test files and a small range collided with their truck codes (DUPLICATE).
+// Truck codes are letter + at most three digits and the database is shared by the other test files: take the first free number
+// after a random start (a fixed random range collided with their codes and failed with DUPLICATE now and then).
+let truckNo = 100 + Math.floor(Math.random() * 400);
+const takenTruckNos = new Set<number>();
+const nextTruckNo = () => {
+  while (takenTruckNos.has(truckNo)) truckNo++;
+  return truckNo++;
+};
 
 const plantOf = async (table: string, id: string) =>
   (await migrator.query<{ plant_id: string | null }>(`select plant_id from ${table} where id = $1`, [id]))
@@ -61,6 +68,8 @@ const levelOf = async (plantId: string | null, componentId: string) =>
   );
 
 beforeAll(async () => {
+  for (const r of (await migrator.query<{ code: string }>('select code from truck')).rows)
+    takenTruckNos.add(Number(r.code.slice(1)));
   for (const role of ['owner', 'partner', 'office', 'plant', 'support'] as const) {
     users[role] = await realSessionUser(env.DATABASE_URL_MIGRATOR, role);
   }

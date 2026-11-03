@@ -110,7 +110,12 @@ describe('what is in the queue (AC-INT-05)', () => {
       'totalTtcCentimes',
       'orderCode',
     ]);
-    expect(JSON.stringify(all)).not.toMatch(/78000|39000|9360|\bMAD\b/);
+    // Ids are random hex and can hold any digit run: look for amounts in everything but the uuids.
+    const withoutIds = JSON.stringify(all).replace(
+      /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g,
+      '',
+    );
+    expect(withoutIds).not.toMatch(/78000|39000|9360|\bMAD\b/);
   });
 
   it('partner and plant have no access, in the service and in the database', async () => {

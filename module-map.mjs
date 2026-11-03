@@ -1,6 +1,7 @@
 // Module dependency map — mirrors CAPABILITY-MAP.md §1 (direct dependencies only).
 // Enforced by eslint-plugin-boundaries; change the map in CAPABILITY-MAP.md first.
 export const moduleDependencies = {
+  finance: ['platform-security', 'master-data', 'ledger', 'operations', 'clock'],
   clock: [],
   'platform-security': ['clock'],
   'master-data': ['platform-security'],

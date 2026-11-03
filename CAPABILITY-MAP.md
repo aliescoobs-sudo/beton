@@ -258,3 +258,7 @@ Doc-level 🟡 items (D27–D59, R-rules) are cited inline in each module spec. 
 Inherited from DECISIONS.md: OQ1 revenue/69-21 obligations, OQ2 e-invoicing date, OQ3 plant export format, OQ4 CNDP AI transfer, OQ5 AI provider + ZDR, OQ6 real truck/zone data, OQ7 VAT, OQ8 Moroccan host (must provide a reverse proxy setting `X-Forwarded-For` for the per-IP login limit), OQ9 opening balances, OQ10 partner permissions.
 
 Resolved on 2026-10-18 (were Q1–Q4): Q1 → A9 ✅ · Q2 → A11 ✅ · Q3 → A27 ✅ · Q4 → A14 ✅.
+
+## Finance (REQUIREMENTS-V1 §10)
+
+`finance` depends directly on `platform-security`, `master-data`, `ledger`, `operations`, and `clock`. It owns schema `finance`, migrations 0200+, owner/app_admin management reports and the separate accountant export permission. It imports other modules through their public indexes only; reviewed source doors are defined by its own migrations.

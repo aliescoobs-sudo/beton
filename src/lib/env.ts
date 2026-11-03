@@ -97,6 +97,9 @@ const envObject = z.object({
   DARIJA_ENABLED: flag,
   ASSISTANT_DET_ENABLED: flag,
   TRANSFERS_ENABLED: flag,
+  // C1: finance module (Codex). Off by default; with it off its pages, exports and both endpoints answer 404 and no menu entry renders.
+  // Even when on, the database switch (finance.enabled(), owner/app_admin with a fresh TOTP) must also be on.
+  FINANCE_ENABLED: flag,
   ASSISTANT_ENABLED: flag,
   ASSISTANT_PROVIDER: z
     .enum(['fake', 'anthropic'], { error: 'must be "fake" or "anthropic"' })

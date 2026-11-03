@@ -1,6 +1,9 @@
 import type { ReactNode } from 'react';
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
+import { getPool } from '@/lib/db/pools';
+import { canFinance, financeEnabled } from '@/modules/finance';
+import { financeLabels } from '@/modules/finance/ui/labels';
 import { getEnv } from '@/lib/server-env';
 import { AssistantPanel } from '@/modules/assistant/ui/assistant-panel';
 import { currentAuthState } from '@/modules/platform-security/auth/request-state';
@@ -25,6 +28,23 @@ export default async function ProtectedLayout({
   if (state.kind === 'needs_enrolment') redirect(`/${locale}/enrol`);
   const t = await getTranslations();
   const groups = buildNav(state.user.role, locale, (key) => t(key as never));
+  if (
+    canFinance(state.user.role, 'finance.export') &&
+    getEnv().FINANCE_ENABLED &&
+    (await financeEnabled(getPool('app')))
+  ) {
+    const labels = financeLabels[locale === 'ar' ? 'ar' : 'fr'];
+    const group = groups.find((g) => g.id === 'finance');
+    const links = [
+      ...(canFinance(state.user.role, 'finance.read')
+        ? [{ href: `/${locale}/finance`, label: labels.title, testId: 'finance-link' }]
+        : []),
+      { href: `/${locale}/finance/accounting`, label: labels.export, testId: 'finance-accounting-link' },
+    ];
+    if (group) group.links.push(...links);
+    else groups.push({ id: 'finance', label: labels.title, links });
+  }
+
   return (
     <AppShell
       groups={groups}
