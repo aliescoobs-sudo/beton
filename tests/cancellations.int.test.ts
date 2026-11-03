@@ -11,6 +11,7 @@ import {
   setCancellationPolicy,
 } from '../src/modules/operations';
 import { getDriverDay, syncActions } from '../src/modules/field';
+import { createInvoice, getInvoiceQueue } from '../src/modules/ledger';
 import { fieldCipherFrom } from '../src/modules/master-data';
 import { parseKeyring } from '../src/lib/crypto/keyring';
 import { inRequest, listMyNotifications } from '../src/modules/platform-security';
@@ -469,5 +470,75 @@ describe('the redirect reaches the driver app (C3, REQUIREMENTS-V1 §7 and §8)'
     expect(after.instructions.find((i) => i.id === opened.value.id)?.acknowledgedAt).not.toBeNull();
     const seen = await listCancellations(app, u.owner!);
     expect(seen.find((c) => c.id === opened.value.id)).toMatchObject({ redirectAcknowledged: true });
+  });
+});
+
+describe('case 5 bills the m\u00b3 actually unloaded (C3, REQUIREMENTS-V1 \u00a78 and \u00a74)', () => {
+  // A rotation's load is delivered by its tracking: the driver ends the unloading (with the m\u00b3 he unloaded) after the case.
+  const unloadingEnds = (tripId: string) =>
+    asOwner((tx) =>
+      tx.query(
+        `insert into trip_event (id, trip_id, step, at, created_by) values (gen_random_uuid(), $1, 'unloading_finished', $2, $3)`,
+        [tripId, NOW.toISOString(), u.owner!.id],
+      ),
+    );
+  const noteOf = (deliveryId: string) =>
+    asOwner((tx) =>
+      tx.query<{ cancelled: boolean }>(`select cancelled from public.delivery_note($1)`, [deliveryId]),
+    );
+
+  it('the invoice line, its total and the queue use the unloaded volume; the BL keeps its number and is not annul\u00e9', async () => {
+    const o = await newOrder();
+    const { tripId, deliveryId } = await newTrip(o.id, 'unloading_started');
+    const opened = await openTripCase(app, u.owner!, { tripId, caseNo: 5, unloadedL: 5000 }, { now: NOW });
+    if (!opened.ok) throw new Error(opened.error);
+    await unloadingEnds(tripId);
+    const decided = await decideCancellation(
+      app,
+      u.owner!,
+      { caseId: opened.value.id, decision: 'loss' },
+      { now: NOW },
+    );
+    expect(decided.ok).toBe(true);
+
+    const queue = await getInvoiceQueue(app, u.office_sales!);
+    const row = queue.flatMap((c) => c.deliveries).find((d) => d.deliveryId === deliveryId);
+    expect(row?.volumeL).toBe(5000);
+
+    const made = await createInvoice(
+      app,
+      u.owner!,
+      { deliveryIds: [deliveryId], dueDate: '2026-07-15' },
+      { today: DAY },
+    );
+    if (!made.ok) throw new Error(made.error);
+    const line = await asOwner((tx) =>
+      tx.query<{ volume_l: number; line_ht_centimes: string }>(
+        `select l.volume_l, l.line_ht_centimes::text from invoice_line l join invoice i on i.id = l.invoice_id where i.number = $1`,
+        [made.value.number],
+      ),
+    );
+    expect(line.rows).toEqual([{ volume_l: 5000, line_ht_centimes: '390000' }]); // 5 m\u00b3 at 780,00
+    expect((await noteOf(deliveryId!)).rows[0]?.cancelled).toBe(false);
+  });
+
+  it('a load without a case 5 is billed in full, next to one that has it', async () => {
+    const o = await newOrder();
+    const stopped = await newTrip(o.id, 'unloading_started');
+    const opened = await openTripCase(
+      app,
+      u.owner!,
+      { tripId: stopped.tripId, caseNo: 5, unloadedL: 3000 },
+      { now: NOW },
+    );
+    expect(opened.ok).toBe(true);
+    await unloadingEnds(stopped.tripId);
+    const plain = await newTrip(o.id, 'unloading_started');
+    await unloadingEnds(plain.tripId);
+    const rows = (await getInvoiceQueue(app, u.office_sales!)).flatMap((c) => c.deliveries);
+    expect(rows.find((d) => d.deliveryId === stopped.deliveryId)?.volumeL).toBe(3000);
+    expect(rows.find((d) => d.deliveryId === plain.deliveryId)?.volumeL).toBe(8000);
+    // the office never sees an amount in the queue
+    expect(JSON.stringify(rows)).not.toMatch(/centimes|price|amount/i);
   });
 });
