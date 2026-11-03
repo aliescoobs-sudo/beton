@@ -31,6 +31,7 @@ export {
   updateSupplier,
   type SupplierError,
 } from './service/supplier-service';
+export { defaultEntryUnit, ENTRY_UNITS, parseEntryQty } from './domain/recette-units';
 export {
   BASE_UNITS,
   parseComponentInput,

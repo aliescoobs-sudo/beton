@@ -4,12 +4,14 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { formatReport, readSheet, runImport } from '../src/modules/importer';
 import {
   listClients,
+  listComponents,
   listConcreteTypes,
+  listRecetteVersions,
   listSellingPrices,
   listSuppliers,
   listTrucks,
 } from '../src/modules/master-data';
-import { getOpeningState } from '../src/modules/ledger';
+import { getOpeningState, listInstruments } from '../src/modules/ledger';
 import type { SessionUser } from '../src/modules/platform-security/auth/session-gate';
 import { testEnv } from './db-env';
 import { realSessionUser } from './helpers/actors';
@@ -250,5 +252,164 @@ describe('opening balances', () => {
         (await runImport('opening_balances', only, ctx(true, { openingDate: '2026-01-01' }))).counts.exists,
       ).toBe(1);
     }
+  });
+});
+
+describe('components (C3)', () => {
+  const rows = [
+    ['Nom', 'Nom AR', 'Unité', "Unité d'achat", 'Contenu'],
+    [`Ciment CPJ45 ${tag}`, 'إسمنت', 'g', 'Sac 50 kg', 50000],
+    [`Sable 0/4 ${tag}`, '', 'g', '', ''],
+    [`Adjuvant ${tag}`, '', 'mL', '', ''],
+  ];
+  it('creates the components and their purchase unit; a second run skips them; a wrong unit blocks the file', async () => {
+    const dry = await runImport('components', readSheet(buildXlsx(rows)), ctx(false));
+    expect(dry.counts).toMatchObject({ new: 3, error: 0 });
+    const real = await runImport('components', readSheet(buildXlsx(rows)), ctx(true));
+    expect(real.counts).toMatchObject({ created: 3, failed: 0 });
+    const made = (await listComponents(app, owner)).filter((c) => c.nameFr.endsWith(tag));
+    expect(made.map((c) => [c.nameFr.split(' ')[0], c.baseUnit]).sort()).toEqual([
+      ['Adjuvant', 'mL'],
+      ['Ciment', 'g'],
+      ['Sable', 'g'],
+    ]);
+    expect(made.find((c) => c.nameFr.startsWith('Sable'))?.nameAr).toBe(`Sable 0/4 ${tag}`); // no Arabic name: the French one
+    const units = await migrator.query(
+      `select u.label, u.factor_to_base::text from purchase_unit u join component c on c.id = u.component_id where c.name_fr = $1`,
+      [`Ciment CPJ45 ${tag}`],
+    );
+    expect(units.rows).toEqual([{ label: 'Sac 50 kg', factor_to_base: '50000' }]);
+    const again = await runImport('components', readSheet(buildXlsx(rows)), ctx(true));
+    expect(again.counts).toMatchObject({ exists: 3, created: 0 });
+    const bad = await runImport(
+      'components',
+      readSheet(buildXlsx([rows[0]!, [`Gravette ${tag}`, '', 'kg', '', '']])),
+      ctx(true),
+    );
+    expect(bad.counts).toMatchObject({ error: 1, created: 0 });
+  });
+  it('an office account cannot import', async () => {
+    await expect(
+      runImport('components', readSheet(buildXlsx([rows[0]!, [`Office ${tag}`, '', 'g', '', '']])), {
+        appPool: app,
+        actor: office,
+        apply: true,
+      }),
+    ).rejects.toThrow();
+  });
+});
+
+describe('recipes (C3)', () => {
+  const code = `R${tag}`.slice(0, 7);
+  const rows = [
+    ['Type', 'Composant', 'Quantité', 'Unité', 'À partir du'],
+    [code, `Ciment CPJ45 ${tag}`, '350', 'kg', '2026-01-01'],
+    [code, `Sable 0/4 ${tag}`, '800', 'kg', '2026-01-01'],
+    [code, `Adjuvant ${tag}`, '2,5', 'L', '2026-01-01'],
+  ];
+  it('imports the lines of one type and date as one version, converting to base units; a second run skips it', async () => {
+    await runImport(
+      'concrete_types',
+      readSheet(
+        buildXlsx([
+          ['Code', 'Libellé'],
+          [code, `Recette ${tag}`],
+        ]),
+      ),
+      ctx(true),
+    );
+    const dry = await runImport('recipes', readSheet(buildXlsx(rows)), ctx(false));
+    expect(dry.counts).toMatchObject({ new: 1, error: 0 });
+    const real = await runImport('recipes', readSheet(buildXlsx(rows)), ctx(true));
+    expect(real.counts).toMatchObject({ created: 1, failed: 0 });
+    const type = (await listConcreteTypes(app, owner)).find((t) => t.code === code)!;
+    const versions = await listRecetteVersions(app, owner, type.id);
+    expect(versions).toHaveLength(1);
+    const comps = new Map((await listComponents(app, owner)).map((c) => [c.id, c.nameFr.split(' ')[0]]));
+    expect(Object.fromEntries(versions[0]!.lines.map((l) => [comps.get(l.componentId), l.qtyPerM3]))).toEqual(
+      {
+        Ciment: 350_000, // 350 kg in grams
+        Sable: 800_000,
+        Adjuvant: 2500, // 2,5 L in the component's own unit, millilitres
+      },
+    );
+  });
+  it('refuses an unknown type or component, a date that does not follow the latest version, and a component twice', async () => {
+    const head = rows[0]!;
+    const run = (extra: (string | number)[][]) =>
+      runImport('recipes', readSheet(buildXlsx([head, ...extra])), ctx(true));
+    expect((await run([['ZZZ', `Ciment CPJ45 ${tag}`, '1', 'kg', '2026-02-01']])).counts.error).toBe(1);
+    expect((await run([[code, 'Inconnu', '1', 'kg', '2026-02-01']])).counts.error).toBe(1);
+    expect((await run([[code, `Ciment CPJ45 ${tag}`, '300', 'kg', '2025-06-01']])).counts.error).toBe(1);
+    expect(
+      (
+        await run([
+          [code, `Ciment CPJ45 ${tag}`, '300', 'kg', '2026-03-01'],
+          [code, `Ciment CPJ45 ${tag}`, '310', 'kg', '2026-03-01'],
+        ])
+      ).counts.error,
+    ).toBe(1);
+  });
+});
+
+describe('cheques in transit (C3)', () => {
+  const clientName = `Client Chèques ${tag}`;
+  const rows = (n1: string, n2: string) => [
+    ['Client', 'Type', 'Numéro', 'Banque', 'Montant', 'Date'],
+    [clientName, 'chèque', n1, 'Attijariwafa', '12 500,00', '15/10/2026'],
+    [clientName, 'LCN', n2, 'BMCE', '8000', '2026-10-20'],
+  ];
+  it('records each one as a received instrument for the right client, no allocation, and does not double on a second run', async () => {
+    await runImport(
+      'clients',
+      readSheet(
+        buildXlsx([
+          ['Nom', 'Type'],
+          [clientName, 'particulier'],
+        ]),
+      ),
+      ctx(true),
+    );
+    const n1 = `CH${tag}1`;
+    const n2 = `LC${tag}2`;
+    const dry = await runImport('cheques_in_transit', readSheet(buildXlsx(rows(n1, n2))), ctx(false));
+    expect(dry.counts).toMatchObject({ new: 2, error: 0 });
+    expect(await count('payment_instrument', `number in ('${n1}','${n2}')`)).toBe(0);
+    const real = await runImport('cheques_in_transit', readSheet(buildXlsx(rows(n1, n2))), ctx(true));
+    expect(real.counts).toMatchObject({ created: 2, failed: 0 });
+    const mine = (await listInstruments(app, owner)).filter((i) => [n1, n2].includes(i.number ?? ''));
+    expect(
+      mine.map((i) => [i.number, i.method, i.amountCentimes, i.writtenDate, i.partyName]).sort(),
+    ).toEqual([
+      [n1, 'cheque', 1_250_000, '2026-10-15', clientName],
+      [n2, 'lcn', 800_000, '2026-10-20', clientName],
+    ]);
+    expect(
+      await count(
+        'allocation',
+        `instrument_id in (select id from payment_instrument where number in ('${n1}','${n2}'))`,
+      ),
+    ).toBe(0);
+    const again = await runImport('cheques_in_transit', readSheet(buildXlsx(rows(n1, n2))), ctx(true));
+    expect(again.counts).toMatchObject({ exists: 2, created: 0 });
+  });
+  it('blocks the file on an unknown client, a wrong type, a missing number or an amount that is not money', async () => {
+    const head = rows('x', 'y')[0]!;
+    const run = (r: (string | number)[]) =>
+      runImport('cheques_in_transit', readSheet(buildXlsx([head, r])), ctx(true));
+    expect((await run(['Personne', 'chèque', `N${tag}`, 'B', '100', '2026-10-01'])).counts.error).toBe(1);
+    expect((await run([clientName, 'virement', `N${tag}`, 'B', '100', '2026-10-01'])).counts.error).toBe(1);
+    expect((await run([clientName, 'chèque', '', 'B', '100', '2026-10-01'])).counts.error).toBe(1);
+    expect((await run([clientName, 'chèque', `N${tag}`, 'B', 'cent', '2026-10-01'])).counts.error).toBe(1);
+    expect(await count('payment_instrument', `number = 'N${tag}'`)).toBe(0);
+  });
+  it('is the owner\u2019s: an office account cannot record instruments through the importer', async () => {
+    await expect(
+      runImport('cheques_in_transit', readSheet(buildXlsx(rows(`Z${tag}1`, `Z${tag}2`))), {
+        appPool: app,
+        actor: office,
+        apply: true,
+      }),
+    ).rejects.toThrow();
   });
 });

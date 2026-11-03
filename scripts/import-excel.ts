@@ -1,8 +1,9 @@
 // Imports an Excel (.xlsx) or CSV file of master data. DRY RUN by default: it validates every row, says what exists already,
 // and writes nothing. Add --apply to write; that only starts when the dry run found no error, and a re-run skips what exists.
 //   corepack pnpm import:excel <kind> <file> [--apply] [--opening-date YYYY-MM-DD]
-// kind: concrete_types | clients | suppliers | trucks | selling_prices | opening_balances
-// Import in that order (prices need the types; opening balances need the clients and suppliers). The report is printed and
+// kind: concrete_types | components | recipes | clients | suppliers | trucks | selling_prices | opening_balances | cheques_in_transit
+// Import in that order (recipes need the types and the components; prices need the types; opening balances and cheques in transit
+// need the clients and suppliers). Columns: see docs/RUNBOOK.md §4. The report is printed and
 // saved in ./.logs/. The import runs as the owner account, server-side; every row is audited like a screen entry.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import pg from 'pg';

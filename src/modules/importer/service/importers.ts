@@ -1,24 +1,40 @@
 import type pg from 'pg';
+import { realClock } from '@/modules/clock';
 import { parseCentimes } from '@/lib/money';
 import {
   createClient,
+  createComponent,
   createConcreteType,
   createListPrice,
+  createPurchaseUnit,
+  createRecetteVersion,
   createSupplier,
   createTruck,
   listClients,
+  listComponents,
   listConcreteTypes,
   listPlants,
+  listRecetteVersions,
   listSellingPrices,
   listSuppliers,
   listTrucks,
+  BASE_UNITS,
   parseCapacityM3,
   parseClientInput,
+  parseEntryQty,
+  defaultEntryUnit,
+  parseComponentInput,
   parseConcreteTypeInput,
   parseTruckInput,
   SUPPLIER_CATEGORIES,
 } from '@/modules/master-data';
-import { addPartyOpeningBalance, enterOpeningDate, getOpeningState } from '@/modules/ledger';
+import {
+  addPartyOpeningBalance,
+  enterOpeningDate,
+  getOpeningState,
+  listInstruments,
+  receiveInstrument,
+} from '@/modules/ledger';
 import type { SessionUser } from '@/modules/platform-security';
 import { type Sheet, toIsoDate, toRecords } from '../domain/sheet';
 
@@ -34,6 +50,9 @@ export const IMPORT_KINDS = [
   'trucks',
   'selling_prices',
   'opening_balances',
+  'cheques_in_transit',
+  'components',
+  'recipes',
 ] as const;
 export type ImportKind = (typeof IMPORT_KINDS)[number];
 
@@ -63,6 +82,8 @@ interface Ctx {
   appPool: pg.Pool;
   actor: SessionUser;
   openingDate?: string;
+  /** The business date the instruments are received on (default: today). */
+  today?: string;
 }
 
 const COLUMNS = {
@@ -104,6 +125,31 @@ const COLUMNS = {
     code: ['code', 'code tiers'],
     amount: ['amount', 'montant', 'solde'],
     reference: ['reference', 'référence', 'ref'],
+  },
+  // Cheques and LCN received and not yet deposited or cleared (C3). Each becomes an instrument in the state "received".
+  cheques_in_transit: {
+    client: ['client', 'code client', 'tiers', 'code'],
+    method: ['method', 'type', 'mode', 'nature'],
+    number: ['number', 'numero', 'numéro', 'n°', 'no', 'numero cheque', 'numéro chèque'],
+    bank: ['bank', 'banque'],
+    amount: ['amount', 'montant'],
+    written: ['written', 'date', 'date cheque', 'date chèque', 'date ecriture', 'date écrite', 'date lcn'],
+  },
+  // A component and, when given, the purchase unit it is bought in (e.g. "sac 50 kg" = 50000 g).
+  components: {
+    nameFr: ['name', 'nom', 'nom fr', 'name fr', 'designation', 'désignation', 'composant'],
+    nameAr: ['name ar', 'nom ar', 'arabe', 'الاسم'],
+    unit: ['unit', 'unite', 'unité', 'base unit', 'unite de base', 'unité de base'],
+    purchaseUnit: ['purchase unit', 'unite achat', 'unité achat', 'unité d achat', 'conditionnement'],
+    factor: ['factor', 'facteur', 'contenu', 'quantite par unite', 'quantité par unité'],
+  },
+  // One line of a recipe per row; rows with the same type and date are one version.
+  recipes: {
+    type: ['type', 'beton', 'béton', 'classe', 'code type'],
+    component: ['component', 'composant', 'code composant', 'matiere', 'matière'],
+    qty: ['qty', 'quantity', 'quantite', 'quantité', 'dosage', 'par m3', 'qte'],
+    unit: ['unit', 'unite', 'unité'],
+    from: ['from', 'date', 'a partir du', 'à partir du', 'effective'],
   },
 } as const satisfies Record<ImportKind, Record<string, readonly string[]>>;
 
@@ -159,6 +205,9 @@ async function plan(
     trucks: ['code', 'plate'],
     selling_prices: ['type', 'price', 'from'],
     opening_balances: ['party', 'code', 'amount'],
+    cheques_in_transit: ['client', 'method', 'number', 'amount', 'written'],
+    components: ['nameFr', 'unit'],
+    recipes: ['type', 'component', 'qty', 'from'],
   };
   const realMissing = missing.filter((m) => required[kind].includes(m));
   if (realMissing.length) return { planned: [], missing: realMissing };
@@ -339,6 +388,183 @@ async function plan(
             return r.ok ? null : fail(r);
           },
         });
+    }
+  } else if (kind === 'components') {
+    const records = rawRecords.map((r) => ({ row: r.row, values: full('components', r.values) }));
+    const existing = await listComponents(appPool, actor);
+    const names = new Set(existing.map((c) => c.nameFr.trim().toLowerCase()));
+    const seen = new Set<string>();
+    for (const { row, values: v } of records) {
+      const unit = BASE_UNITS.find((u) => u.toLowerCase() === v.unit.trim().toLowerCase());
+      const key = v.nameFr.trim().toLowerCase();
+      const factor = v.factor ? Number(v.factor.replace(/\s/g, '').replace(',', '.')) : undefined;
+      const input = { nameFr: v.nameFr, nameAr: nul(v.nameAr) ?? v.nameFr, baseUnit: unit };
+      if (!v.nameFr.trim() || !unit || !parseComponentInput(input).ok)
+        planned.push({ row, label: v.nameFr, error: `name and a base unit (${BASE_UNITS.join(', ')})` });
+      else if ((v.purchaseUnit !== '') !== (v.factor !== ''))
+        planned.push({ row, label: v.nameFr, error: 'purchase unit and its content go together' });
+      else if (v.factor && (factor === undefined || !Number.isInteger(factor) || factor < 1))
+        planned.push({
+          row,
+          label: v.nameFr,
+          error: `content of the purchase unit: a whole number of ${unit}`,
+        });
+      else if (names.has(key)) planned.push({ row, label: v.nameFr, exists: true });
+      else if (seen.has(key)) planned.push({ row, label: v.nameFr, error: 'twice in the file' });
+      else {
+        seen.add(key);
+        planned.push({
+          row,
+          label: v.nameFr,
+          apply: async () => {
+            const made = await createComponent(appPool, actor, input);
+            if (!made.ok) return fail(made);
+            if (v.purchaseUnit) {
+              const u = await createPurchaseUnit(appPool, actor, made.value.id, {
+                label: v.purchaseUnit,
+                factorToBase: factor,
+              });
+              if (!u.ok) return fail(u);
+            }
+            return null;
+          },
+        });
+      }
+    }
+  } else if (kind === 'recipes') {
+    const records = rawRecords.map((r) => ({ row: r.row, values: full('recipes', r.values) }));
+    const types = new Map((await listConcreteTypes(appPool, actor)).map((t) => [t.code, t.id]));
+    const components = await listComponents(appPool, actor);
+    const byRef = new Map<string, (typeof components)[number]>();
+    for (const c of components) {
+      byRef.set(c.code.toLowerCase(), c);
+      byRef.set(c.nameFr.trim().toLowerCase(), c);
+    }
+    // rows of one version: the same type and date
+    type Line = { row: number; componentId: string; qtyPerM3: number };
+    const groups = new Map<
+      string,
+      { row: number; type: string; typeId: string; from: string; lines: Line[]; bad: boolean }
+    >();
+    for (const { row, values: v } of records) {
+      const typeId = types.get(v.type.trim().toUpperCase());
+      const from = toIsoDate(v.from);
+      const comp = byRef.get(v.component.trim().toLowerCase());
+      const label = `${v.type} ${v.from} ${v.component}`;
+      if (!typeId) {
+        planned.push({ row, label, error: 'unknown concrete type (import the types first)' });
+        continue;
+      }
+      if (!from) {
+        planned.push({ row, label, error: 'date not understood (dd/mm/yyyy or yyyy-mm-dd)' });
+        continue;
+      }
+      if (!comp) {
+        planned.push({ row, label, error: 'unknown component (import the components first)' });
+        continue;
+      }
+      const unit = v.unit.trim() || defaultEntryUnit(comp.baseUnit);
+      const qty = parseEntryQty(v.qty, comp.baseUnit, unit);
+      if (!qty.ok) {
+        planned.push({ row, label, error: `quantity per m³ in ${unit}: ${qty.error}` });
+        continue;
+      }
+      const key = `${typeId}|${from}`;
+      const group = groups.get(key) ?? {
+        row,
+        type: v.type.trim().toUpperCase(),
+        typeId,
+        from,
+        lines: [],
+        bad: false,
+      };
+      if (group.lines.some((l) => l.componentId === comp.id)) {
+        planned.push({ row, label, error: 'the component is twice in this recipe' });
+        group.bad = true;
+      } else group.lines.push({ row, componentId: comp.id, qtyPerM3: qty.value });
+      groups.set(key, group);
+    }
+    for (const g of groups.values()) {
+      const label = `${g.type} from ${g.from} (${g.lines.length} lines)`;
+      if (g.bad) continue; // the row error above already blocks the file
+      const versions = await listRecetteVersions(appPool, actor, g.typeId);
+      if (versions.some((x) => x.effectiveFrom === g.from)) planned.push({ row: g.row, label, exists: true });
+      else if (versions.some((x) => x.effectiveFrom > g.from))
+        planned.push({
+          row: g.row,
+          label,
+          error: 'a newer version exists: the date must follow the latest one',
+        });
+      else
+        planned.push({
+          row: g.row,
+          label,
+          apply: async () => {
+            const r = await createRecetteVersion(appPool, actor, g.typeId, {
+              effectiveFrom: g.from,
+              lines: g.lines.map((l) => ({ componentId: l.componentId, qtyPerM3: l.qtyPerM3 })),
+            });
+            return r.ok ? null : fail(r);
+          },
+        });
+    }
+    planned.sort((a, b) => a.row - b.row);
+  } else if (kind === 'cheques_in_transit') {
+    const records = rawRecords.map((r) => ({ row: r.row, values: full('cheques_in_transit', r.values) }));
+    const clients = new Map<string, string>();
+    for (const c of await listClients(appPool, actor)) {
+      clients.set(c.code.toLowerCase(), c.id);
+      clients.set(c.name.trim().toLowerCase(), c.id);
+    }
+    const have = new Set(
+      (await listInstruments(appPool, actor))
+        .filter((i) => i.direction === 'in')
+        .map((i) => `${i.partyId}|${(i.number ?? '').toLowerCase()}|${(i.bank ?? '').toLowerCase()}`),
+    );
+    const seen = new Set<string>();
+    for (const { row, values: v } of records) {
+      const clientId = clients.get(v.client.trim().toLowerCase());
+      const method = ['cheque', 'chèque', 'check'].includes(v.method.trim().toLowerCase())
+        ? 'cheque'
+        : ['lcn', 'effet'].includes(v.method.trim().toLowerCase())
+          ? 'lcn'
+          : null;
+      const cents = parseCentimes(v.amount);
+      const written = toIsoDate(v.written);
+      const label = `${v.number} ${v.client}`;
+      const key = `${clientId}|${v.number.toLowerCase()}|${v.bank.toLowerCase()}`;
+      if (!clientId) planned.push({ row, label, error: 'unknown client (code or exact name)' });
+      else if (!method) planned.push({ row, label, error: 'type must be cheque or lcn' });
+      else if (!v.number.trim()) planned.push({ row, label, error: 'the cheque or LCN number is required' });
+      else if (cents === null || cents <= 0)
+        planned.push({ row, label, error: 'amount in MAD, positive, at most two decimals' });
+      else if (!written)
+        planned.push({ row, label, error: 'date not understood (dd/mm/yyyy or yyyy-mm-dd)' });
+      else if (have.has(key)) planned.push({ row, label, exists: true });
+      else if (seen.has(key)) planned.push({ row, label, error: 'twice in the file' });
+      else {
+        seen.add(key);
+        planned.push({
+          row,
+          label,
+          apply: async () => {
+            const r = await receiveInstrument(
+              appPool,
+              actor,
+              {
+                clientId,
+                method,
+                amountCentimes: cents,
+                number: v.number,
+                bank: nul(v.bank),
+                writtenDate: written,
+              },
+              { today: ctx.today ?? realClock.now().toISOString().slice(0, 10) },
+            );
+            return r.ok ? null : fail(r);
+          },
+        });
+      }
     }
   } else {
     const records = rawRecords.map((r) => ({ row: r.row, values: full('opening_balances', r.values) }));
