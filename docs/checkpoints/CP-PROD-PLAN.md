@@ -144,3 +144,9 @@ R2 follows R1 because `plant_manager` scoping needs the plant column. R3 needs R
 
 ## Not finished
 Filled in at the end of Batch A.
+
+## Finance interface follow-up (Codex, 2 Nov)
+
+Implementation and validation: [CP-FINANCE.md](CP-FINANCE.md). Finance owns schema `finance`, migrations 0200–0206 and permissions in `src/modules/finance/domain/permissions.ts`. Its source reads use reviewed, role-checked SQL doors defined by those migrations, with named fields only, because the existing public APIs do not expose consumption valuation and the accountant's restricted journals in one consistent read. Please review those doors when integrating; equivalent public ledger/operations reads may replace them without widening their field sets. No ledger, operations or master-data implementation was changed.
+
+R2 must provision app_admin/accountant and grant app_admin the ordinary `listPlants` permission. R3 must expose `sales_order.price_status='confirmed'`; until then finance excludes invoice revenue from management result and marks the report incomplete. The accountant door includes partial avoirs as well as invoice reversal documents, and exposes no treasury, balances or financing. Its provisional scope and the common module-switch helper still need the lead's integration. Resolve Drizzle journal order/timestamps with the parallel 0082–0199 migrations before any merge; the finance SQL filenames remain 0200 and above. The separate isolation commit is for this worktree, not the production host configuration.
