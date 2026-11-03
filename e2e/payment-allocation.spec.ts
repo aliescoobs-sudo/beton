@@ -7,7 +7,7 @@ import { receiveInstrument } from '../src/modules/ledger';
 import { testEnv } from '../tests/db-env';
 import { realSessionUser } from '../tests/helpers/actors';
 import { clientWithLoads, deliveryScene, orderMaster } from '../tests/helpers/ledger-fixtures';
-import { E2E_MD, goNav, loginAndEnrol, loginOwner, logout } from './fixtures';
+import { E2E_MD, goNav, loginAndEnrol, loginOwner, logout, moneySafeSuffix } from './fixtures';
 
 // integration I1.5: office enters a payment with no order named and it is spread over the client's open invoices, oldest due
 // date first; the owner directs another payment to a given invoice, with a reason (AC-INT-09, 10).
@@ -21,7 +21,7 @@ const MONEY = /MAD|DH|\d\s?\d{3},\d{2}/;
 let clientName = '';
 let invoiceA = '';
 let invoiceB = '';
-const suffix = Math.random().toString(36).slice(2, 8).toUpperCase();
+const suffix = moneySafeSuffix(6);
 
 test.beforeAll(async () => {
   const ownerId = (await migrator.query<{ id: string }>(`select id from "user" where role = 'owner'`)).rows[0]

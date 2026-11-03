@@ -4,7 +4,7 @@ import { E2E_DATABASE } from '../scripts/db-bootstrap';
 import { testEnv } from '../tests/db-env';
 import { realSessionUser } from '../tests/helpers/actors';
 import { createLoad, markDelivered } from '../src/modules/operations';
-import { E2E_MD, goNav, loginAndEnrol, loginOwner, logout } from './fixtures';
+import { E2E_MD, goNav, loginAndEnrol, loginOwner, logout, moneySafeSuffix } from './fixtures';
 
 // operations O6 + ledger L35: one action, its effect end to end. order -> load -> stock down -> invoice -> cheque -> cash,
 // and after every step the panel says what it changed. The owner sees the money facts, office sees none.
@@ -15,7 +15,7 @@ const migrator = new pg.Pool({ connectionString: env.DATABASE_URL_MIGRATOR, max:
 const app = new pg.Pool({ connectionString: env.DATABASE_URL_APP, max: 2 });
 test.afterAll(() => Promise.all([migrator.end(), app.end()]));
 
-const suffix = Math.random().toString(36).slice(2, 7).toUpperCase();
+const suffix = moneySafeSuffix(5);
 const bank = `Banque flux ${suffix}`;
 const cheque = `FLX${suffix}`;
 const mad = (text: string | null) => {

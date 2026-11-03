@@ -5,7 +5,7 @@ import { withRlsContext } from '../src/lib/db/rls-context';
 import { insertOrderWithItems, orderMaster } from '../tests/helpers/ledger-fixtures';
 import { E2E_DATABASE } from '../scripts/db-bootstrap';
 import { testEnv } from '../tests/db-env';
-import { E2E_MD, goNav, loginAndEnrol, loginOwner, logout } from './fixtures';
+import { E2E_MD, goNav, loginAndEnrol, loginOwner, logout, moneySafeSuffix } from './fixtures';
 
 // ledger L14: receive and list payments. Office enters blind (no amount echoed, no list); owner and support list them.
 test.describe.configure({ mode: 'serial' });
@@ -13,7 +13,7 @@ test.describe.configure({ mode: 'serial' });
 const migrator = new pg.Pool({ connectionString: testEnv(E2E_DATABASE).DATABASE_URL_MIGRATOR, max: 1 });
 const app = new pg.Pool({ connectionString: testEnv(E2E_DATABASE).DATABASE_URL_APP, max: 2 });
 test.afterAll(() => Promise.all([migrator.end(), app.end()]));
-const suffix = Math.random().toString(36).slice(2, 8).toUpperCase();
+const suffix = moneySafeSuffix(6);
 const chequeNo = `E2E${suffix}`;
 
 test('the owner makes sure there is a caisse', async ({ page }) => {

@@ -3,6 +3,14 @@ import { createOTP } from '@better-auth/utils/otp';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { expect, type Page } from '@playwright/test';
 
+// Random reference text that can never look like money to the specs' "no amount on this page" pattern
+// (/MAD|DH|\d\s?\d{3},\d{2}/): no D, H, M or A, so neither "DH" nor "MAD" can appear by chance. C0: a suffix such as
+// "ALDHN9RS1" once made payment-allocation.spec.ts fail in a full run although the page showed no amount.
+export function moneySafeSuffix(length = 6): string {
+  const alphabet = 'BCEFGJKLNPQRSTUVWXYZ0123456789';
+  return Array.from({ length }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join('');
+}
+
 export const E2E_PORT = 3100;
 export const E2E_BASE_URL = `http://localhost:${E2E_PORT}`;
 /** A second server on the same database with the assistant flag OFF: the entry is absent and the endpoints answer 404 (AC-ASSIST-01). */
