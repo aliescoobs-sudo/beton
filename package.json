@@ -8,18 +8,18 @@
     "node": ">=24 <25"
   },
   "scripts": {
-    "dev": "next dev -H 127.0.0.1",
+    "dev": "next dev -H 127.0.0.1 -p 3200",
     "build": "next build",
-    "start": "next start -H 127.0.0.1",
+    "start": "next start -H 127.0.0.1 -p 3200",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "ci:local": "eslint . && prettier --check . && tsc --noEmit && vitest run && node --import ./scripts/register-ts-paths.mjs scripts/audit-verify.ts && next build && playwright test",
-    "db:up": "docker compose --env-file .env.ops up -d --wait db",
-    "db:ps": "docker compose --env-file .env.ops ps",
-    "db:down": "docker compose --env-file .env.ops stop db",
+    "db:up": "docker compose -p belgobeton-finance --env-file .env.ops up -d --wait db",
+    "db:ps": "docker compose -p belgobeton-finance --env-file .env.ops ps",
+    "db:down": "docker compose -p belgobeton-finance --env-file .env.ops stop db",
     "db:bootstrap": "node --import ./scripts/register-ts-paths.mjs scripts/db-bootstrap.ts",
     "db:seed": "node --import ./scripts/register-ts-paths.mjs scripts/seed-pilot.ts",
     "db:scenario": "node --import ./scripts/register-ts-paths.mjs scripts/seed-scenario.ts",
@@ -33,7 +33,11 @@
     "crypto:rotate": "node --import ./scripts/register-ts-paths.mjs scripts/crypto-rotate.ts",
     "backup": "node --import ./scripts/register-ts-paths.mjs scripts/backup.ts",
     "backup:restore-test": "node --import ./scripts/register-ts-paths.mjs scripts/restore-test.ts",
-    "user:reset-owner-2fa": "node --import ./scripts/register-ts-paths.mjs scripts/reset-owner-2fa.ts"
+    "user:reset-owner-2fa": "node --import ./scripts/register-ts-paths.mjs scripts/reset-owner-2fa.ts",
+    "finance:integration": "node --import ./scripts/register-ts-paths.mjs scripts/finance-run.ts integration",
+    "finance:e2e": "node --import ./scripts/register-ts-paths.mjs scripts/finance-run.ts e2e",
+    "finance:build": "node --import ./scripts/register-ts-paths.mjs scripts/finance-run.ts build",
+    "finance:migrate": "node --import ./scripts/register-ts-paths.mjs scripts/finance-run.ts migrate"
   },
   "dependencies": {
     "@better-auth/utils": "0.4.2",

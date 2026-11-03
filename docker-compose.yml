@@ -1,6 +1,8 @@
 # Local development database. The superuser password lives in .env.ops (never .env.local: Next.js loads that one),
 # so every compose command needs it passed explicitly. Use the package scripts:
 #   corepack pnpm db:up | db:ps | db:down      (or: docker compose --env-file .env.ops <command>)
+name: belgobeton-finance
+
 services:
   db:
     image: postgres:17.11-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
@@ -10,9 +12,9 @@ services:
       POSTGRES_DB: postgres
       POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
     ports:
-      - '127.0.0.1:5432:5432' # loopback only, never exposed on the LAN
+      - '127.0.0.1:5542:5432' # loopback only, never exposed on the LAN
     volumes:
-      - belgobeton-pg:/var/lib/postgresql/data
+      - belgobeton-finance-pg:/var/lib/postgresql/data
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U postgres']
       interval: 2s
@@ -20,4 +22,4 @@ services:
       retries: 30
 
 volumes:
-  belgobeton-pg:
+  belgobeton-finance-pg:

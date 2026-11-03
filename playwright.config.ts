@@ -23,7 +23,7 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   timeout: 120_000,
-  globalSetup: './e2e/global-setup.ts',
+  ...(process.env.FINANCE_E2E_PREPARED === 'true' ? {} : { globalSetup: './e2e/global-setup.ts' }),
   use: { baseURL: E2E_BASE_URL, trace: 'retain-on-failure' },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: [

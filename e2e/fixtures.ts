@@ -3,10 +3,10 @@ import { createOTP } from '@better-auth/utils/otp';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { expect, type Page } from '@playwright/test';
 
-export const E2E_PORT = 3100;
+export const E2E_PORT = 3200;
 export const E2E_BASE_URL = `http://localhost:${E2E_PORT}`;
 /** A second server on the same database with the assistant flag OFF: the entry is absent and the endpoints answer 404 (AC-ASSIST-01). */
-export const E2E_OFF_PORT = 3101;
+export const E2E_OFF_PORT = 3201;
 export const E2E_OFF_URL = `http://localhost:${E2E_OFF_PORT}`;
 export const E2E_PASSWORD = 'correct-horse-battery-staple';
 export const E2E_USERS = {
