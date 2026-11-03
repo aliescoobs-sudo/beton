@@ -42,6 +42,7 @@ export function OrderForm({
   sites,
   zones,
   types,
+  plants = [],
   today,
   createAction,
   previewAction,
@@ -51,6 +52,8 @@ export function OrderForm({
   sites: { id: string; clientId: string; label: string; zoneId: string | null }[];
   zones: { id: string; name: string }[];
   types: { id: string; code: string; label: string }[];
+  /** The active plants to choose from; empty when there is only one (or the user is bound to a plant). */
+  plants?: { id: string; name: string }[];
   today: string;
   createAction: (input: unknown) => Promise<CreateOrderActionResult>;
   /** Present only for a role that may read money. */
@@ -61,6 +64,7 @@ export function OrderForm({
   const t = useTranslations('ledger.orders');
   const [search, setSearch] = useState('');
   const [clientId, setClientId] = useState(initial?.clientId ?? '');
+  const [plantId, setPlantId] = useState('');
   const [siteId, setSiteId] = useState('');
   const [zoneId, setZoneId] = useState('');
   const [typeId, setTypeId] = useState(initial?.typeId ?? types[0]?.id ?? '');
@@ -141,8 +145,10 @@ export function OrderForm({
       }
       plan = { preset, items };
     } else plan = { preset };
+    if (plants.length > 1 && !plantId) return null;
     return {
       clientId,
+      ...(plantId ? { plantId } : {}),
       siteId: siteId || null,
       zoneId: zoneId || null,
       concreteTypeId: typeId,
@@ -274,6 +280,25 @@ export function OrderForm({
             </select>
           </label>
         </div>
+        {plants.length > 1 && (
+          <label className="block">
+            <span className="field-label">{t('plant')}</span>
+            <select
+              value={plantId}
+              onChange={(e) => setPlantId(e.target.value)}
+              className={INPUT}
+              required
+              data-testid="order-plant"
+            >
+              <option value="">{t('plantChoose')}</option>
+              {plants.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="block">
           <span className="field-label">{t('type')}</span>
           <select

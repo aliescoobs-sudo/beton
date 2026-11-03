@@ -43,15 +43,19 @@ const emptyLine = (components: ComponentOption[]): Line => ({
  */
 export function PurchaseForm({
   suppliers,
+  plants = [],
   components,
   createAction,
 }: {
   suppliers: SupplierOption[];
+  /** The active plants to choose from; empty when there is only one (or the user is bound to a plant). */
+  plants?: { id: string; name: string }[];
   components: ComponentOption[];
   createAction: (input: unknown) => Promise<Result>;
 }) {
   const t = useTranslations('ledger.purchases');
   const [supplierId, setSupplierId] = useState('');
+  const [plantId, setPlantId] = useState('');
   const [lines, setLines] = useState<Line[]>([emptyLine(components)]);
   const [message, setMessage] = useState<string | null>(null);
   const [done, setDone] = useState<{ code: string; effects: Effect[] } | null>(null);
@@ -61,7 +65,7 @@ export function PurchaseForm({
     setLines(lines.map((l, i) => (i === n ? { ...l, ...patch } : l)));
 
   function build(): unknown | null {
-    if (!supplierId) return null;
+    if (!supplierId || (plants.length > 1 && !plantId)) return null;
     const out = [];
     for (const l of lines) {
       const price = parseCentimes(l.price);
@@ -83,7 +87,7 @@ export function PurchaseForm({
       }
     }
     // The order carries no invoice number and no payment plan: the payable comes from the supplier's invoice, once approved.
-    return { supplierId, lines: out };
+    return { supplierId, ...(plantId ? { plantId } : {}), lines: out };
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -153,6 +157,25 @@ export function PurchaseForm({
             ))}
           </select>
         </label>
+        {plants.length > 1 && (
+          <label className="block">
+            <span className="field-label">{t('plant')}</span>
+            <select
+              value={plantId}
+              onChange={(e) => setPlantId(e.target.value)}
+              className={INPUT}
+              required
+              data-testid="purchase-plant"
+            >
+              <option value="">{t('plantChoose')}</option>
+              {plants.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
       </div>
 
       <fieldset className="form-band space-y-3">

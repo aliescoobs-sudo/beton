@@ -16,6 +16,7 @@ import { type PlanItem, type PlanItemInput, splitPlan } from '../domain/plan';
 import { presetItems } from '../domain/plan-presets';
 import { computeTotals, type Totals } from '../domain/totals';
 import { nextDocNumber } from './doc-number';
+import { plantContext } from './plant-context';
 
 export type OrderError =
   | 'INVALID'
@@ -201,6 +202,7 @@ export async function createOrder(
   const parsed = parseOrderInput(input);
   if (!parsed.ok) return err('INVALID');
   const v = parsed.value;
+  actor = plantContext(actor, v.plantId);
 
   // A role that cannot read money (office) never sees a price: the database prices, splits and writes the order itself
   // and returns the code only (review of CP-L4). The owner goes through the preview-and-override path below.
@@ -300,6 +302,7 @@ export async function previewOrder(
   await require(appPool, actor, 'orders.write');
   const parsed = parseOrderInput(input);
   if (!parsed.ok) return err('INVALID');
+  actor = plantContext(actor, parsed.value.plantId);
   try {
     return await inRequest(appPool, actor, async (tx): Promise<Result<OrderPreview, OrderError>> => {
       const prepared = await prepareOrder(

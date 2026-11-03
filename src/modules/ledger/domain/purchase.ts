@@ -43,6 +43,8 @@ const planItem = z
 
 const purchaseSchema = z.object({
   supplierId: z.uuid(),
+  /** The plant the goods are bought for (needed when more than one plant is active; a plant manager's own plant is used). */
+  plantId: z.uuid().nullish(),
   supplierInvoiceNo: text(60).nullish(),
   supplierInvoiceDate: date.nullish(),
   /** Defaults to the supplier invoice date (else the order date) + 60 days (law 69-21). */

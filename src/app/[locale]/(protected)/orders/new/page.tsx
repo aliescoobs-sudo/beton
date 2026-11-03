@@ -7,6 +7,7 @@ import {
   listSelectableClients,
   listSelectableConcreteTypes,
   listSiteOptions,
+  listPlants,
   listZones,
 } from '@/modules/master-data';
 import { can } from '@/modules/platform-security';
@@ -26,11 +27,12 @@ export default async function NewOrderPage({
   setRequestLocale(locale);
   const user = await requirePagePermission(locale, 'orders.write');
   const pool = getPool('app');
-  const [clients, sites, zones, types, clock] = await Promise.all([
+  const [clients, sites, zones, types, plants, clock] = await Promise.all([
     listSelectableClients(pool, user),
     listSiteOptions(pool, user),
     listZones(pool, user),
     listSelectableConcreteTypes(pool, user),
+    listPlants(pool, user),
     getRequestClock(),
   ]);
   // An order made from a quote starts from it (owner and support read quotes); a person still reviews and saves.
@@ -49,6 +51,11 @@ export default async function NewOrderPage({
         sites={sites}
         zones={zones.map((z) => ({ id: z.id, name: z.name }))}
         types={types.map((c) => ({ id: c.id, code: c.code, label: c.label }))}
+        plants={
+          user.role === 'plant_manager'
+            ? []
+            : plants.filter((p) => p.status === 'active').map((p) => ({ id: p.id, name: p.name }))
+        }
         today={clock.today()}
         initial={
           quote

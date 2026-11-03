@@ -13,6 +13,7 @@ import {
   purchaseDueDate,
 } from '../domain/purchase';
 import { nextDocNumber } from './doc-number';
+import { plantContext } from './plant-context';
 import { ledgerParameter } from './order-service';
 
 export type PurchaseError =
@@ -60,6 +61,7 @@ export async function createPurchase(
   const parsed = parsePurchaseInput(input);
   if (!parsed.ok) return err('INVALID');
   const v = parsed.value;
+  actor = plantContext(actor, v.plantId);
   const due = purchaseDueDate(deps.today, v.supplierInvoiceDate, v.dueDate);
   if (!due.ok) return err(due.error);
 

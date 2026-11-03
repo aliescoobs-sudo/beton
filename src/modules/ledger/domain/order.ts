@@ -24,6 +24,8 @@ const priceOverride = z.object({
 
 const orderInputSchema = z.object({
   clientId: z.uuid(),
+  /** The plant that produces and books the order. Needed when more than one plant is active; a plant manager's own plant is used. */
+  plantId: z.uuid().nullish(),
   siteId: z.uuid().nullable().default(null),
   zoneId: z.uuid().nullable().default(null),
   concreteTypeId: z.uuid(),
