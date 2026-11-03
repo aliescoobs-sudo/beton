@@ -1,6 +1,6 @@
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { getPool } from '@/lib/db/pools';
-import { listSellingPrices, listSelectableConcreteTypes } from '@/modules/master-data';
+import { listPlants, listSellingPrices, listSelectableConcreteTypes } from '@/modules/master-data';
 import { SellingPricesManager } from '@/modules/master-data/ui/selling-prices/selling-prices-manager';
 import { can, recordMoneyView } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/next';
@@ -12,10 +12,12 @@ export default async function SellingPricesPage({ params }: { params: Promise<{ 
   const user = await requirePagePermission(locale, 'selling_prices.read');
   const pool = getPool('app');
   await recordMoneyView(pool, user, 'screen:selling-prices');
-  const [types, prices] = await Promise.all([
+  const [types, prices, plants] = await Promise.all([
     listSelectableConcreteTypes(pool, user),
     listSellingPrices(pool, user),
+    listPlants(pool, user),
   ]);
+  const activePlants = plants.filter((p) => p.status === 'active');
   const t = await getTranslations('masterData.sellingPrices');
   return (
     <div>
@@ -31,8 +33,10 @@ export default async function SellingPricesPage({ params }: { params: Promise<{ 
               id: p.id,
               priceHtPerM3Centimes: p.priceHtPerM3Centimes,
               effectiveFrom: p.effectiveFrom,
+              plantId: p.plantId,
             })),
         }))}
+        plants={activePlants.length > 1 ? activePlants.map((p) => ({ id: p.id, name: p.name })) : []}
         editable={can(user.role, 'selling_prices.write')}
       />
     </div>

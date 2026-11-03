@@ -7,6 +7,8 @@ export interface SellingPrice {
   concreteTypeId: string;
   /** null = the list price of the concrete type; otherwise a per-client override. */
   clientId: string | null;
+  /** null = the price applies to every plant; otherwise the reference price of that plant (list prices only). */
+  plantId: string | null;
   /** Centimes HT per m³. */
   priceHtPerM3Centimes: number;
   /** Business date (YYYY-MM-DD) from which this price applies. */
@@ -17,6 +19,8 @@ export interface SellingPrice {
 
 const listPriceInputSchema = z.object({
   concreteTypeId: z.uuid(),
+  /** Absent or null: every plant. */
+  plantId: z.uuid().nullish(),
   // Integer centimes: the form converts MAD with parseCentimes, never with a float.
   priceHtPerM3Centimes: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),
   effectiveFrom: dateField,
@@ -51,26 +55,34 @@ function inForce(
   concreteTypeId: string,
   clientId: string | null,
   date: string,
+  plantId: string | null = null,
 ): SellingPrice | undefined {
   let best: SellingPrice | undefined;
   for (const v of versions) {
     if (v.concreteTypeId !== concreteTypeId || v.clientId !== clientId || v.effectiveFrom > date) continue;
+    if (v.plantId !== plantId) continue;
     if (!best || v.effectiveFrom > best.effectiveFrom) best = v;
   }
   return best;
 }
 
 /**
+
  * The selling price of a concrete type for a client on a business date (SPEC-master-data §3, AC-MD-03): the client's
- * override when one is in force, else the list price. No price at all is an error, never 0.
+ * override when one is in force, else the reference price of the order's plant, else the all-plants list price. No price at all is
+ * an error, never 0. Without a plant only the all-plants price applies.
  */
 export function resolveSellingPrice(
   versions: readonly SellingPrice[],
   concreteTypeId: string,
   clientId: string | null,
   date: string,
+  plantId: string | null = null,
 ): Result<SellingPrice, 'NO_PRICE'> {
   const override = clientId ? inForce(versions, concreteTypeId, clientId, date) : undefined;
-  const found = override ?? inForce(versions, concreteTypeId, null, date);
+  const found =
+    override ??
+    (plantId ? inForce(versions, concreteTypeId, null, date, plantId) : undefined) ??
+    inForce(versions, concreteTypeId, null, date);
   return found ? ok(found) : err('NO_PRICE');
 }

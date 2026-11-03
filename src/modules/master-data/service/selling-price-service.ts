@@ -17,19 +17,21 @@ interface PriceRow {
   id: string;
   concrete_type_id: string;
   client_id: string | null;
+  plant_id: string | null;
   price_ht_per_m3_centimes: string;
   effective_from: string;
   reason: string | null;
 }
 
 // `date` is read as text so the business date is never shifted by a time zone.
-export const SELLING_PRICE_COLUMNS = `id, concrete_type_id, client_id, price_ht_per_m3_centimes::text,
+export const SELLING_PRICE_COLUMNS = `id, concrete_type_id, client_id, plant_id, price_ht_per_m3_centimes::text,
   to_char(effective_from, 'YYYY-MM-DD') as effective_from, reason`;
 
 export const toSellingPrice = (row: PriceRow): SellingPrice => ({
   id: row.id,
   concreteTypeId: row.concrete_type_id,
   clientId: row.client_id,
+  plantId: row.plant_id,
   priceHtPerM3Centimes: Number(row.price_ht_per_m3_centimes),
   effectiveFrom: row.effective_from,
   reason: row.reason,
@@ -57,7 +59,7 @@ export async function listSellingPrices(
       tx.query<PriceRow>(
         `select ${SELLING_PRICE_COLUMNS} from selling_price
           where ($1::uuid is null or concrete_type_id = $1) and ($2::uuid is null or client_id = $2)
-          order by concrete_type_id, client_id nulls first, effective_from desc`,
+          order by concrete_type_id, client_id nulls first, plant_id nulls first, effective_from desc`,
         [filter.concreteTypeId ?? null, filter.clientId ?? null],
       ),
     );
@@ -85,10 +87,24 @@ export async function createListPrice(
       ]);
       if (!type.rows[0]) return err('NOT_FOUND');
       if (type.rows[0].status !== 'active') return err('INACTIVE');
+      if (v.plantId) {
+        const plant = await tx.query<{ status: string }>(`select status from plant where id = $1`, [
+          v.plantId,
+        ]);
+        if (!plant.rows[0]) return err('NOT_FOUND');
+        if (plant.rows[0].status !== 'active') return err('INACTIVE');
+      }
       const { rows } = await tx.query<PriceRow>(
-        `insert into selling_price (id, concrete_type_id, client_id, price_ht_per_m3_centimes, effective_from, created_by)
-         values ($1, $2, null, $3, $4, $5) returning ${SELLING_PRICE_COLUMNS}`,
-        [uuidv7(realClock.now()), v.concreteTypeId, v.priceHtPerM3Centimes, v.effectiveFrom, actor.id],
+        `insert into selling_price (id, concrete_type_id, client_id, plant_id, price_ht_per_m3_centimes, effective_from, created_by)
+         values ($1, $2, null, $3, $4, $5, $6) returning ${SELLING_PRICE_COLUMNS}`,
+        [
+          uuidv7(realClock.now()),
+          v.concreteTypeId,
+          v.plantId ?? null,
+          v.priceHtPerM3Centimes,
+          v.effectiveFrom,
+          actor.id,
+        ],
       );
       return ok(toSellingPrice(rows[0] as PriceRow));
     });
@@ -151,7 +167,8 @@ export async function resolveSellingPriceFor(
   concreteTypeId: string,
   clientId: string | null,
   date: string,
+  plantId: string | null = null,
 ): Promise<Result<SellingPrice, 'NO_PRICE'>> {
   const versions = await listSellingPrices(appPool, actor, { concreteTypeId });
-  return resolveSellingPrice(versions, concreteTypeId, clientId, date);
+  return resolveSellingPrice(versions, concreteTypeId, clientId, date, plantId);
 }

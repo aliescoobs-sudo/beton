@@ -11,13 +11,22 @@ export interface SellingTypeView {
   code: string;
   label: string;
   /** List price versions, newest first. */
-  versions: { id: string; priceHtPerM3Centimes: number; effectiveFrom: string }[];
+  versions: { id: string; priceHtPerM3Centimes: number; effectiveFrom: string; plantId: string | null }[];
 }
 
 const INPUT = 'input mt-1';
 
 /** Per concrete type: the list price versions (read-only) and, for owner and partner, a "new list price" form. */
-export function SellingPricesManager({ types, editable }: { types: SellingTypeView[]; editable: boolean }) {
+export function SellingPricesManager({
+  types,
+  plants = [],
+  editable,
+}: {
+  types: SellingTypeView[];
+  /** Active plants, for a reference price per plant; empty hides the choice. */
+  plants?: { id: string; name: string }[];
+  editable: boolean;
+}) {
   const t = useTranslations('masterData.sellingPrices');
   const router = useRouter();
   const [message, setMessage] = useState<{ id: string; text: string } | null>(null);
@@ -31,6 +40,7 @@ export function SellingPricesManager({ types, editable }: { types: SellingTypeVi
       concreteTypeId: type.id,
       priceHtPerM3Centimes: price,
       effectiveFrom: String(data.get('effectiveFrom') ?? ''),
+      plantId: String(data.get('plantId') ?? '') || null,
     });
     if (result.ok) {
       setMessage({ id: type.id, text: t('saved') });
@@ -63,6 +73,11 @@ export function SellingPricesManager({ types, editable }: { types: SellingTypeVi
                 <span dir="ltr" className="num">
                   {v.effectiveFrom}
                 </span>
+                {plants.length > 0 && (
+                  <span data-testid={`sell-plant-${v.id}`}>
+                    {v.plantId ? (plants.find((p) => p.id === v.plantId)?.name ?? '—') : t('allPlants')}
+                  </span>
+                )}
                 <span dir="ltr" className="num">
                   {formatCentimes(v.priceHtPerM3Centimes)} MAD HT / m³
                 </span>
@@ -81,6 +96,24 @@ export function SellingPricesManager({ types, editable }: { types: SellingTypeVi
                   <span className="text-sm">{t('price')}</span>
                   <input name="price" required inputMode="decimal" dir="ltr" className={`${INPUT} w-32`} />
                 </label>
+                {plants.length > 0 && (
+                  <label className="block">
+                    <span className="text-sm">{t('plant')}</span>
+                    <select
+                      name="plantId"
+                      className={INPUT}
+                      defaultValue=""
+                      data-testid={`sell-plant-select-${type.code}`}
+                    >
+                      <option value="">{t('allPlants')}</option>
+                      {plants.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
                 <label className="block">
                   <span className="text-sm">{t('effectiveFrom')}</span>
                   <input name="effectiveFrom" type="date" required dir="ltr" className={INPUT} />

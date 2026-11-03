@@ -163,6 +163,7 @@ describe('functions the application role can execute', () => {
     'public.confirm_receipt_at_plant(p_purchase uuid, p_note text)',
     'public.record_receipt_lines(p_purchase uuid, p_date date, p_lines jsonb, p_confirm_excess boolean)',
     'public.reject_supplier_invoice(p_si uuid, p_reason text)',
+    'public.resolve_order_price(p_type uuid, p_client uuid, p_date date)', // C3: owner and system only (checked inside)
     'public.resolve_selling_price(p_type uuid, p_client uuid, p_date date)',
     'public.supplier_invoice_match(p_si uuid)',
   ];

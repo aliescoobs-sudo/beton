@@ -74,7 +74,14 @@ describe('reference prices (§16.1, §3)', () => {
       const { fields } = await as(role, (tx) =>
         tx.query(`select * from public.reference_prices(current_date)`),
       );
-      expect(fields.map((f) => f.name)).toEqual(['kind', 'item_code', 'item_name', 'price_centimes']);
+      expect(fields.map((f) => f.name)).toEqual([
+        'kind',
+        'item_code',
+        'item_name',
+        'price_centimes',
+        'plant_id',
+        'plant_name',
+      ]);
     },
   );
   it.each(['driver', 'pump_operator', 'accountant', 'client_portal', 'supplier_portal'] as const)(

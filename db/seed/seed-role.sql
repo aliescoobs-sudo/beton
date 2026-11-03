@@ -37,6 +37,7 @@ END $$;
 -- lifecycle guard, allocation sums, the movement written by a clearing) still run for every row.
 GRANT EXECUTE ON FUNCTION public.next_doc_number(text, integer, integer) TO belgobeton_seed;
 GRANT EXECUTE ON FUNCTION public.resolve_selling_price(uuid, uuid, date) TO belgobeton_seed;
+GRANT EXECUTE ON FUNCTION public.resolve_order_price(uuid, uuid, date) TO belgobeton_seed;
 GRANT EXECUTE ON FUNCTION public.ledger_parameter(text) TO belgobeton_seed;
 GRANT EXECUTE ON FUNCTION public.default_cash_account() TO belgobeton_seed;
 GRANT EXECUTE ON FUNCTION public.record_receipt(uuid, date) TO belgobeton_seed;

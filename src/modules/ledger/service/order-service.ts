@@ -100,7 +100,8 @@ export async function prepareOrder(
   if (type.rows[0].status !== 'active') return err('TYPE_INACTIVE');
 
   const price = await tx.query<{ id: string; price_ht_per_m3_centimes: string }>(
-    'select id, price_ht_per_m3_centimes from public.resolve_selling_price($1, $2, $3)',
+    // The price for the order's own plant (C3): the plant's reference price when it has one, else the all-plants price.
+    'select id, price_ht_per_m3_centimes from public.resolve_order_price($1, $2, $3)',
     [v.concreteTypeId, v.clientId, today],
   );
   if (!price.rows[0]) return err('NO_PRICE');

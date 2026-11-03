@@ -12,10 +12,12 @@ const price = (
   effectiveFrom: string,
   priceHtPerM3Centimes: number,
   typeId = 'B25',
+  plantId: string | null = null,
 ): SellingPrice => ({
   id,
   concreteTypeId: typeId,
   clientId,
+  plantId,
   priceHtPerM3Centimes,
   effectiveFrom,
   reason: clientId ? 'accord' : null,
@@ -99,5 +101,46 @@ describe('parseOverrideInput (AC-MD-10)', () => {
     ['a fractional price', { ...valid, priceHtPerM3Centimes: 1.5 }],
   ])('refuses %s', (_name, input) => {
     expect(parseOverrideInput(input)).toEqual({ ok: false, error: 'INVALID' });
+  });
+});
+
+describe('the reference price per plant (C3)', () => {
+  const versions = [
+    price('all', null, '2026-01-01', 90_000),
+    price('tetouan', null, '2026-02-01', 95_000, 'B25', 'P-TET'),
+    price('tetouan2', null, '2026-06-01', 97_000, 'B25', 'P-TET'),
+    price('cust', 'c1', '2026-03-01', 80_000),
+  ];
+  it('a plant price beats the all-plants price for its own plant only', () => {
+    expect(resolveSellingPrice(versions, 'B25', null, '2026-03-01', 'P-TET')).toMatchObject({
+      value: { id: 'tetouan' },
+    });
+    expect(resolveSellingPrice(versions, 'B25', null, '2026-07-01', 'P-TET')).toMatchObject({
+      value: { id: 'tetouan2' },
+    });
+    expect(resolveSellingPrice(versions, 'B25', null, '2026-07-01', 'P-CHE')).toMatchObject({
+      value: { id: 'all' },
+    });
+    expect(resolveSellingPrice(versions, 'B25', null, '2026-07-01')).toMatchObject({ value: { id: 'all' } });
+  });
+  it('before its own start a plant falls back to the all-plants price', () => {
+    expect(resolveSellingPrice(versions, 'B25', null, '2026-01-15', 'P-TET')).toMatchObject({
+      value: { id: 'all' },
+    });
+  });
+  it('a client agreement beats both', () => {
+    expect(resolveSellingPrice(versions, 'B25', 'c1', '2026-07-01', 'P-TET')).toMatchObject({
+      value: { id: 'cust' },
+    });
+  });
+  it('a plant is only accepted on a list price input', () => {
+    expect(
+      parseListPriceInput({
+        concreteTypeId: crypto.randomUUID(),
+        plantId: crypto.randomUUID(),
+        priceHtPerM3Centimes: 1,
+        effectiveFrom: '2026-06-01',
+      }).ok,
+    ).toBe(true);
   });
 });
