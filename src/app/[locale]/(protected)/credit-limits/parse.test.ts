@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { madToCentimes } from './actions';
+import { madToCentimes } from './money';
 
 describe('madToCentimes', () => {
   it('reads dirhams as integer centimes', () => {

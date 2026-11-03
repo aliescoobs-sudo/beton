@@ -17,7 +17,7 @@ Secret scan before this plan: gitleaks 8.30.1, 194 commits, **no leaks** (`.logs
 | `roles_v1` | R2 | on | idem |
 | `approvals` | R3 | on | idem |
 | `driver_pwa` | R4 | off | idem, after the driver interview of 3 Nov |
-| `notifications` | R5 | off | Batch B |
+| `notifications` | R5 | off | Batch B, done |
 | `cancellations` | R6 | off | Batch B |
 | `documents_v1` | R7 | off | Batch B |
 | `darija` | R8 | off | Batch B |
@@ -58,12 +58,16 @@ Status: `[ ]` to do, `[x]` done, `[~]` partial.
 - [x] **R9 Production readiness** (§0, §14) — done 2026-11-02, AC-PROD-27 to 33 proved by `scripts/production-config.test.ts`, `tests/import.int.test.ts`, `src/modules/importer/domain/sheet.test.ts`, the backup restore run, `docs/RUNBOOK.md` (D142). Not done: cheques-in-transit and component/recipe importers, a signed audit anchor, the host. `REAL_DATA` mode (seed and simulation refuse, banner and SPÉCIMEN removed, module flags); Excel importers (clients, suppliers, products, price list, trucks, opening balances, cheques in transit) with a dry-run report that writes nothing; production Docker (app image, database on a private network only, never published to any host port); encrypted backup with a tested restore and a nightly encrypted copy pulled to an office machine (pull-based, the app host holds no key to the copy); health checks; `docs/RUNBOOK.md`; provider-neutral.
 - [x] **A12 Full regression and report.** 2026-11-02: lint, typecheck, 3688 unit and integration tests pass; production build passes; full e2e, one worker, machine awake: **149 passed, 2 skipped (opt-in screenshots), 0 failed, 31.6 min** (`.logs/a12-e2e.log`). Build, then the full e2e once, one worker, awake machine. Update this file, commit, stop with a short report.
 
-### Batch B (after Ali confirms)
-- [ ] **R5 Notifications** (§13). In-app centre plus push (PWA); events list; content-free WhatsApp/SMS ping later.
-- [ ] **R6 Cancellations and incidents** (§8). The seven cases, redirect or loss, loss record, BL "annulé".
-- [ ] **R7 Documents** (§9). Devis, BL, relevé, facture d'acompte, définitive (timing a parameter), avoir; document request gate.
-- [ ] **R8 Darija** (§13). Arabic-script Darija messages, per-user language.
-- [ ] **R10 Deterministic assistant** (§11). Scripted intent matching on real data, figure-disclosure cards, reports, field surveys.
+### Batch B (done 2026-11-03, one commit per task, all behind their flags, default off)
+- [x] **§16.1 to §16.4** — visibility matrix, document library, scoped disclosure, assistant refuses a chosen amount (D143, D144).
+- [x] **R5 Notifications** (§13) — D145, flag `NOTIFICATIONS_ENABLED`.
+- [x] **R6 Cancellations and incidents** (§8) — D146, migration 0090, `tests/cancellations.int.test.ts`, flag `CANCELLATIONS_ENABLED`. Seven cases from the real state of the order, redirect or loss with the owner's policy on who decides, BL kept and marked "annulé". Not done: the driver app does not yet show the redirect address (door `driver_redirects` exists), billing the m³ unloaded of case 5, the plant manager's technical confirmation (§16.10).
+- [x] **R7 Documents** (§9) — D147, migration 0091, `tests/documents-v1.int.test.ts`, flag `DOCUMENTS_V1_ENABLED`. Gate for number-bearing documents a client asks for, invoice timing parameter, numbering continues from the last number. Not done: the invoice queue does not group by the timing; the last 2026 number is to be given by the owner; the gate records and releases, it cannot intercept a print.
+- [x] **R8 Darija** (§13) — D148, migration 0092, `tests/darija.int.test.ts`, flag `DARIJA_ENABLED`. Locale `ary` overlaid on Arabic, per-account language and switch. First Darija wording (driver app, notifications, cancellations) is a draft to be read by a Darija speaker.
+- [x] **R10 Deterministic assistant** (§11) — D149, migration 0093, `tests/assistant-det.int.test.ts`, flag `ASSISTANT_DET_ENABLED`. Anomaly report with fixed thresholds, field surveys. Quick-question buttons already existed.
+- [x] **§16.5 transfers, §16.8 order timeline, §16.9 day close** — D150, migration 0094, `tests/plant-flows.int.test.ts`, flag `TRANSFERS_ENABLED`. Not done: served-by-other-plant booking (§16.5 second bullet), fuel stock effect of a fuel transfer, fuel variance and cash per holder in the day close.
+- [x] **Batch A gaps closed**: plant scope on order chain, delivery note and dispatch board (migration 0095); credit-limit screen.
+- [ ] **Not started (not in this batch's list)**: §16.6 pump coordination, §16.7 receipt states, §16.10 redirect compatibility, §16.11 and §16.12 (finance, Codex).
 
 ## Acceptance criteria (AC-PROD)
 Each AC has one proving test named in the table at the end of the batch.
@@ -165,3 +169,6 @@ R2 follows R1 because `plant_manager` scoping needs the plant column. R3 needs R
 - **R9**: importers for cheques in transit, components, recipes and history are missing; the audit anchor is not signed; the host and the CNDP declaration are open.
 - Items for Ali: `docs/VISION-V3.md` was untracked in the tree and went into commit bdc408b with R1; the dev database was repaired by hand once (wrappers of migration 0082), the test databases are recreated on every run.
 
+
+## Batch B end report (2026-11-03)
+Migrations 0090 to 0095. Flags added: `CANCELLATIONS_ENABLED`, `DOCUMENTS_V1_ENABLED`, `DARIJA_ENABLED`, `ASSISTANT_DET_ENABLED`, `TRANSFERS_ENABLED` (all off by default, on in the e2e config). Still open from Batch A: plant picker on order and purchase forms, reference price per plant, other approval card kinds, BL photo, office `join`, importers for cheques in transit, components and recipes, Docker image build, hosting and CNDP. No new e2e spec was written for Batch B screens: they are proved by integration tests; a spec per screen is a next step.

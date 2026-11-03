@@ -12,14 +12,14 @@ export async function NotificationBell({ user, locale }: { user: SessionUser; lo
   return (
     <Link
       href={`/${locale}/notifications`}
-      className="relative inline-flex items-center px-2 text-paper"
+      className="relative inline-flex items-center px-1 md:px-2 text-paper"
       aria-label={t('bell', { count: n })}
       data-testid="notification-bell"
     >
       <span aria-hidden="true">🔔</span>
       {n > 0 && (
         <span
-          className="ms-1 rounded-full bg-signal px-1.5 text-xs font-semibold"
+          className="absolute -top-1 end-0 rounded-full bg-signal px-1 text-[10px] font-semibold leading-4"
           data-testid="notification-count"
         >
           {n}

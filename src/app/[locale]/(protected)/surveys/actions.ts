@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { getPool } from '@/lib/db/pools';
+import { parseQuestions } from './questions';
 import { getEnv } from '@/lib/server-env';
 import {
   answerSurvey,
@@ -14,23 +15,6 @@ import { authorize } from '@/modules/platform-security';
 import { currentAuthState } from '@/modules/platform-security/next';
 
 const deps = () => ({ getState: currentAuthState, appPool: getPool('app') });
-
-/** One question per line: `yes_no: text`, `scale: text` (1 to 5) or `text: text`; ids are q1, q2... */
-export function parseQuestions(raw: string): SurveyQuestion[] {
-  return raw
-    .split('\n')
-    .map((l) => l.trim())
-    .filter(Boolean)
-    .slice(0, 10)
-    .map((line, i) => {
-      const m = /^(yes_no|scale|text)\s*:\s*(.+)$/.exec(line);
-      return {
-        id: `q${i + 1}`,
-        kind: (m?.[1] ?? 'text') as SurveyQuestion['kind'],
-        text: (m?.[2] ?? line).slice(0, 200),
-      };
-    });
-}
 
 // @permission surveys.manage (owner, app_admin): creates a short questionnaire for one role
 export async function createSurveyAction(formData: FormData): Promise<void> {
