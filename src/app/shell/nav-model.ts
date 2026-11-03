@@ -219,6 +219,18 @@ const GROUPS: GroupDef[] = [
     id: 'production',
     items: [
       {
+        path: '/anomalies',
+        labelKey: 'anomalies.link',
+        testId: 'anomalies-link',
+        allowed: 'reports.anomalies',
+      },
+      {
+        path: '/surveys',
+        labelKey: 'surveys.link',
+        testId: 'surveys-link',
+        allowed: 'surveys.read',
+      },
+      {
         path: '/cancellations',
         labelKey: 'cancellations.link',
         testId: 'cancellations-link',

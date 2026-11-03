@@ -2746,5 +2746,38 @@
       "STEP_UP_REQUIRED": "Confirmez avec votre code à deux facteurs.",
       "REENROL_REQUIRED": "Réenrôlez votre authentificateur."
     }
+  },
+  "anomalies": {
+    "link": "Anomalies",
+    "title": "Anomalies de l'application et des opérations",
+    "intro": "Du {from} au {to} : des comptages de faits enregistrés, comparés à des seuils fixes. Aucun montant.",
+    "flagged": "à regarder",
+    "ok": "normal",
+    "kind": {
+      "job_failed": "Tâches planifiées en échec",
+      "stuck_trip": "Rotations commencées et sans nouvelle depuis 4 h",
+      "late_cancellation": "Annulations après fabrication",
+      "stock_variance": "Écarts de stock corrigés après comptage",
+      "late_confirmation": "Réceptions confirmées par la centrale, dossier non terminé depuis 2 jours",
+      "bl_not_returned": "BL signés non revenus après 3 jours"
+    }
+  },
+  "surveys": {
+    "link": "Enquêtes",
+    "title": "Enquêtes de terrain",
+    "intro": "Quelques questions à un rôle sur ce qu'il fait dans l'application. Les résultats vont au propriétaire et à l'administrateur, sans nom.",
+    "yes": "Oui",
+    "no": "Non",
+    "send": "Envoyer",
+    "create": "Nouvelle enquête",
+    "titleField": "Titre",
+    "questionsHint": "Une question par ligne : yes_no: …  ou  scale: …  (1 à 5)  ou  text: …",
+    "createButton": "Créer",
+    "close": "Clôturer",
+    "responses": "{count} réponses",
+    "status": {
+      "open": "ouverte",
+      "closed": "clôturée"
+    }
   }
 }

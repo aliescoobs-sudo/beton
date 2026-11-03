@@ -432,6 +432,40 @@ export const TABLE_ACCESS = {
     exception:
       'R7 (DECISIONS 147, REQUIREMENTS-V1 §9 and §12): the gate for a number-bearing document a client or supplier asked for. No amount. Written only by request_document, decide_document_request and use_document_request (SECURITY DEFINER); a requester reads its own through my_document_requests().',
   },
+  survey: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'none',
+      office: 'none',
+      plant: 'none',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    exception:
+      'R10 (DECISIONS 149, REQUIREMENTS-V1 §11): a short questionnaire for one role. Written only by create_survey and close_survey (owner, app_admin); a role reads the open ones addressed to it through my_surveys().',
+  },
+  survey_response: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'none',
+      office: 'none',
+      plant: 'none',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    exception:
+      'R10 (DECISIONS 149): one answer set per person and survey, written only by answer_survey (the person answers for themselves). Owner and app_admin read the counts and free texts through survey_results(), which names no respondent.',
+  },
   notification: {
     kind: 'rls',
     read: {

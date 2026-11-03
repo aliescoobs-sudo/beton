@@ -59,6 +59,13 @@ beforeAll(async () => {
 
 describe('functions the application role can execute', () => {
   const ALLOWED = [
+    'public.anomaly_report(p_from date, p_to date, p_now timestamp with time zone)',
+    'public.answer_survey(p_id uuid, p_answers jsonb)',
+    'public.close_survey(p_id uuid)',
+    'public.create_survey(p_audience text, p_title text, p_questions jsonb)',
+    'public.my_surveys()',
+    'public.survey_results(p_id uuid)',
+    'public.surveys_list()',
     'public.set_my_locale(p_locale text)',
     'public.decide_document_request(p_id uuid, p_approve boolean)',
     'public.document_requests_pending()',

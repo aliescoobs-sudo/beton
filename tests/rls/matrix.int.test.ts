@@ -329,6 +329,34 @@ const FIXTURES: Record<
     },
     visible: `select requester::text as owner from document_request where note = $1`,
   },
+  survey: {
+    writers: ['owner'],
+    seed: (tx, actor) =>
+      tx.query(
+        `select public.create_survey('driver', $1, '[{"id":"q1","text":"Question","kind":"yes_no"}]'::jsonb)`,
+        [`${marker}:${actor}`],
+      ),
+    visible: `select split_part(title, ':', 2) as owner from survey where title like $1 || ':%'`,
+  },
+  survey_response: {
+    // The owner makes a survey for the office; each office account answers it once.
+    writers: ['office'],
+    seed: async (tx) => {
+      const id = await withRlsContext(
+        app,
+        { userId: actors.owner, role: 'owner', requestId: marker },
+        async (m) =>
+          (
+            await m.query<{ id: string }>(
+              `select public.create_survey('office', $1, '[{"id":"q1","text":"Question","kind":"yes_no"}]'::jsonb) as id`,
+              [`${marker}-resp-${Math.random().toString(36).slice(2, 8)}`],
+            )
+          ).rows[0]!.id,
+      );
+      return tx.query(`select public.answer_survey($1, '{"q1": true}'::jsonb)`, [id]);
+    },
+    visible: `select r.respondent::text as owner from survey_response r join survey s on s.id = r.survey_id where s.title like $1 || '-resp-%'`,
+  },
   notification: {
     // Every role sends itself a test notification; each reads only its own.
     writers: ['owner', 'partner', 'office', 'plant', 'support'],

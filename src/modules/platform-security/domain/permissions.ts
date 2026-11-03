@@ -326,6 +326,22 @@ export const PERMISSIONS = {
   'ai.assisted_entry': OFFICE,
   // The in-app assistant (SPEC-assistant, v1.1: office included). What it can read or draft is each tool's own permission; this one is the entry.
   'assistant.use': ALL,
+  // R10 (§11): the deterministic reports and the field surveys. Owner and app_admin create and read; each role answers its own.
+  'reports.anomalies': ['owner', 'app_admin', 'support'],
+  'surveys.read': [
+    'owner',
+    'app_admin',
+    'support',
+    'office',
+    'office_sales',
+    'office_purchases',
+    'plant',
+    'plant_manager',
+    'accountant',
+  ],
+  'surveys.manage': MONEY_WRITE,
+  'surveys.results': ['owner', 'app_admin', 'support'],
+  'surveys.answer': ['office', 'office_sales', 'office_purchases', 'plant', 'plant_manager', 'accountant'],
   // Pilot operations
   'simulation.control': ['owner', 'app_admin'],
   'backups.manage': ['owner', 'app_admin'],

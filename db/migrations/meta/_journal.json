@@ -652,6 +652,13 @@
       "when": 1793803027023,
       "tag": "0092_darija",
       "breakpoints": true
+    },
+    {
+      "idx": 93,
+      "version": "7",
+      "when": 1793803087023,
+      "tag": "0093_assistant_det",
+      "breakpoints": true
     }
   ]
 }
