@@ -153,6 +153,7 @@ describe('functions the application role can execute', () => {
     'public.reference_prices(p_today date)',
     'public.invoice_print(p_invoice uuid)',
     'public.invoice_print_index()',
+    'public.applied_migrations()', // C2: a count only, for the readiness check; no row, no id
     'public.approvals_pending()',
     'public.client_balance_status(p_today date)',
     'public.confirm_order_price(p_order uuid, p_unit_price bigint)',

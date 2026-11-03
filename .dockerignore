@@ -12,3 +12,8 @@ coverage
 test-results
 playwright-report
 *.tsbuildinfo
+imports
+*.xlsx
+docs/reviews
+keys
+reports

@@ -41,7 +41,7 @@ describe('the production stack (AC-PROD-29)', () => {
   });
   it('the image runs as a non-root user with a health check and no secret baked in', () => {
     const docker = readFileSync('Dockerfile', 'utf8');
-    expect(docker).toMatch(/^USER app$/m);
+    expect(docker).toMatch(/^USER 10001:10001$/m);
     expect(docker).toMatch(/^HEALTHCHECK /m);
     expect(docker).not.toMatch(/^ENV .*(PASSWORD|SECRET|KEY)=/m);
     expect(docker).toMatch(/SIMULATION_ENABLED=false/);
@@ -49,25 +49,29 @@ describe('the production stack (AC-PROD-29)', () => {
   });
 });
 
-describe('the backup copy to the office machine (AC-PROD-31)', () => {
+describe('the backup copy to the office machine (AC-PROD-31, C2)', () => {
   const pull = readFileSync('scripts/ops/backup-pull.sh', 'utf8');
   const nightly = readFileSync('scripts/ops/backup-nightly.sh', 'utf8');
-  it('is pulled from the office machine, with its own key, and verified by checksum', () => {
+  it('is pulled from the office machine, with its own key, staged and verified before it reaches the store', () => {
     expect(pull).toMatch(/^set -euo pipefail$/m);
     expect(pull).toMatch(/rsync /);
     expect(pull).toContain('"$SERVER:$REMOTE_DIR/"');
-    expect(pull).toMatch(/sha256sum/);
     expect(pull).toMatch(/BatchMode=yes/);
+    expect(pull).toMatch(/backup-verify\.ts ingest/);
+    expect(pull).toMatch(/MAX_AGE_HOURS/);
+    expect(pull).toMatch(/alert\.sh/);
+    expect(pull).not.toMatch(/--ignore-existing/);
   });
-  it('the server script never touches the age private key nor any key to the office machine', () => {
+  it('the server scripts never touch the age private key, the signing key, nor any key to the office machine', () => {
     for (const script of [pull, nightly]) {
       expect(script).not.toMatch(/AGE-SECRET-KEY|BACKUP_AGE_IDENTITY|PRIVATE KEY/);
     }
+    expect(nightly).not.toMatch(/SIGNING_KEY_FILE/);
     expect(nightly).toMatch(/^set -euo pipefail$/m);
     expect(nightly).not.toMatch(/\bscp\b|\brsync\b|\bssh\b/);
+    expect(nightly).toMatch(/alert\.sh/);
   });
 });
-
 describe('real data mode (AC-PROD-27)', () => {
   const valid = {
     NODE_ENV: 'development',

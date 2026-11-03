@@ -1,76 +1,85 @@
 # BELGOBETON — Runbook (production)
 
-Written 2026-11-02 for the production build (REQUIREMENTS-V1 §14, CP-PROD-PLAN R9). Provider-neutral: any Linux host that runs Docker, in a Moroccan data centre. The rules of `CLAUDE.md` apply: security and privacy first; no secret in git; real personal data only after the CNDP declaration is filed.
+Written 2026-11-02, rewritten 2026-11-03 (C2) after the independent review `docs/reviews/CODEX-REVIEW-R9.md`. For the production build (REQUIREMENTS-V1 §14, CP-PROD-PLAN R9). Hosting: **Infomaniak, Switzerland** (a Linux VM that runs Docker; Switzerland is on the CNDP list of countries with adequate protection). The rules of `CLAUDE.md` apply: security and privacy first; no secret in git; real personal data only after the CNDP declarations are filed.
+
+> Every `docker compose` command below is written `./scripts/ops/dc.sh …`. The wrapper passes `-f docker-compose.prod.yml --env-file .env.ops.prod`; a bare `docker compose` in a clean shell or a cron job cannot read the compose file. Maintenance scripts run with plain node through `./scripts/ops/ops.sh <script> [args]` (no pnpm, no download, the container has no network).
 
 ## 0. Before anything
-- [ ] The **CNDP declaration** is filed (employees, clients, suppliers, drivers). No real personal data is entered before. Driver geolocation is not in V1.
+- [ ] The **CNDP declaration** is filed (employees, clients, suppliers, drivers) **including the declaration of the transfer of data to Switzerland (Infomaniak)** and the hosting and processing terms with the provider. No real personal data is entered before. Driver geolocation is not in V1.
 - [ ] The independent **security review** of Codex has run on the final `main` (portals stay off until it has).
 - [ ] The last 2026 **invoice number** is known (REQUIREMENTS-V1 §9) and the accountant has chosen the final-invoice timing.
-- [ ] The age **key pair** exists. The private key stays off the server (office machine and a sealed copy). Only the public key (`BACKUP_AGE_RECIPIENT`) goes on the server.
+- [ ] The **keys** exist and are escrowed (§2): the age key pair, the backup signing key pair, and the application keys (`FIELD_ENCRYPTION_KEYS`, `RECOVERY_CODES_KEYS`, `AUTH_SECRETS`/`AUTH_SECRET`, `LOOKUP_HMAC_KEY`) with every retired version, sealed copy off the server. **The age key alone does not open the stored documents or the encrypted fields.**
 
 ## 1. The host
-- A VPS (any provider) with Docker and Docker Compose. Firewall: allow **22 (SSH, key only), 80, 443**; deny everything else. PostgreSQL is **never** published (the compose file puts it on an internal network; a test enforces it).
-- SSH: key only (`PasswordAuthentication no`, `PermitRootLogin no`), a non-root deploy user, `unattended-upgrades` (or the distribution equivalent) for security updates, `fail2ban` optional.
-- A DNS name for `APP_DOMAIN`; the proxy (Caddy) gets the certificate by itself. Any other reverse proxy works if it appends the client address to `X-Forwarded-For` (`TRUSTED_PROXY_HOPS=1`).
-- Time: `chrony`/`systemd-timesyncd` on (audit timestamps and the second factor depend on it).
+- A VM at Infomaniak with Docker and Docker Compose, **4 GB RAM or more** to run (the image is built elsewhere, see §6). Firewall (Infomaniak security group **and** the host, IPv4 **and** IPv6): allow **22 (only from the administration addresses), 80, 443**; deny everything else. PostgreSQL is **never** published (the compose file puts it on an internal network; a test enforces it). UFW alone does not close a port that Docker publishes.
+- SSH: key only (`PasswordAuthentication no`, `KbdInteractiveAuthentication no`, `PermitRootLogin no`), a non-root deploy user, `unattended-upgrades`, `fail2ban` optional. Time: `chrony`/`systemd-timesyncd` on (audit timestamps and the second factor depend on it).
+- A DNS name for `APP_DOMAIN` (A and AAAA records to the VM) **before** the first start: Caddy asks for the certificate by itself, redirects HTTP to HTTPS and renews it. It refuses to start without `APP_DOMAIN`.
+- Directories and owners, once, as root: `sudo ./scripts/ops/init-host.sh <backup-pull-user>` (containers run as uid 10001; `backups/` is `2750` owned by 10001, group `belgobeton-backup`, so the pull account reads and never writes).
+- **Verify, do not assume:** `sudo ./scripts/ops/verify-host.sh` (reads `sshd -T`, lists what Docker publishes), then from another machine `nmap -Pn -p 22,80,443,3000,5432 <ipv4>` and `nmap -6 …`: only 22 (from your addresses), 80 and 443 may answer.
 
-## 2. Secrets (on the server only, `chmod 600`, never in git)
-`.env.prod` (the app): `DATABASE_URL_APP`, `DATABASE_URL_AUTH`, `DATABASE_URL_SYSTEM` (host `db`, internal), `AUTH_SECRET` (≥ 32 random chars), `FIELD_ENCRYPTION_KEYS`, `RECOVERY_CODES_KEYS`, `LOOKUP_HMAC_KEY`, `APP_BASE_URL=https://<APP_DOMAIN>`, `BACKUP_AGE_RECIPIENT`, `FIELD_APP_ENABLED=false` until its acceptance passes (R4). Generate keys with `openssl rand -base64 32`; see `.env.example` for the shape.
-`.env.ops.prod` (maintenance only): `POSTGRES_SUPERUSER_PASSWORD`, `DATABASE_URL_MIGRATOR`, `DATABASE_URL_BACKUP`. These two never go into the app container's environment.
+## 2. Secrets (on the server only, `chmod 600`, never in git, one file per purpose)
+- `.env.prod` (**the app**): `DATABASE_URL_APP`, `DATABASE_URL_AUTH`, `DATABASE_URL_SYSTEM` (host `db`, internal), `AUTH_SECRET` (≥ 32 random chars), `FIELD_ENCRYPTION_KEYS`, `RECOVERY_CODES_KEYS`, `LOOKUP_HMAC_KEY`, `APP_BASE_URL=https://<APP_DOMAIN>`, `BACKUP_AGE_RECIPIENT`, `FIELD_APP_ENABLED=false` until its acceptance passes. **No migrator, backup or superuser login in this file** (the security checklist checks it; the app does not even read `DATABASE_URL_MIGRATOR`).
+- `.env.ops.prod` (**maintenance and compose**): `POSTGRES_SUPERUSER_PASSWORD`, `DATABASE_URL_MIGRATOR`, `APP_DOMAIN`, `APP_IMAGE=ghcr.io/<owner>/belgobeton@sha256:<digest>`, `FIRST_BOOT` (only during §3).
+- `.env.backup.prod` (**the backup job only**): `DATABASE_URL_BACKUP`, `BACKUP_AGE_RECIPIENT`. Nothing else of the application's secrets.
+- `keys/backup-signing.pub` (public key of the office signing key; not a secret).
+- Generate keys with `openssl rand -base64 32`; see `.env.example` for the shape. **Key escrow:** write the application keys and **all their retired versions** to a sealed medium kept off the server (office safe, and a second place). Rotating keys (§8) never deletes a retired key that an existing backup needs.
+- Key pairs, on the **office machine**: `age-keygen -o ~/belgobeton-keys/age.key` (the public line goes to `BACKUP_AGE_RECIPIENT`) and `node --import ./scripts/register-ts-paths.mjs scripts/backup-verify.ts keygen ~/belgobeton-keys` (signing pair; the private key never leaves the office machine).
 
-> The image build (`next build`) needs about 4 GB of RAM. On 2026-11-02 the build on the Mac's Colima VM (default memory) was killed (exit 137): the Dockerfile itself is untested end to end. Build on the server or a CI runner with ≥ 4 GB, or raise the Colima memory, and run the install steps below as the first real test.
-
-## 3. First install
+## 3. First install (and the protected first start)
+The image is built by GitHub Actions and pulled **by digest** (§6). On the server: `docker login ghcr.io` once with a read-only token (`read:packages`) of the private registry.
 ```
 git clone <repo> /srv/belgobeton && cd /srv/belgobeton
-docker compose -f docker-compose.prod.yml --env-file .env.ops.prod up -d --wait db
-docker compose -f docker-compose.prod.yml build
-docker compose -f docker-compose.prod.yml run --rm ops corepack pnpm db:bootstrap      # roles and the database
-docker compose -f docker-compose.prod.yml run --rm ops corepack pnpm db:migrate        # structure only (no data)
-docker compose -f docker-compose.prod.yml run --rm ops corepack pnpm user:create-owner # the owner, with 2FA enrolment
-docker compose -f docker-compose.prod.yml up -d app proxy
+sudo ./scripts/ops/init-host.sh <backup-pull-user>
+# .env.ops.prod: APP_IMAGE=ghcr.io/<owner>/belgobeton@sha256:<digest>  APP_DOMAIN=…  FIRST_BOOT=true
+docker pull "$(grep ^APP_IMAGE= .env.ops.prod | cut -d= -f2-)"
+./scripts/ops/dc.sh up -d --wait db
+./scripts/ops/ops.sh db-bootstrap          # roles and the database
+./scripts/ops/ops.sh db-migrate            # structure only (no data)
+./scripts/ops/ops.sh create-owner          # the owner, with 2FA enrolment
+./scripts/ops/dc.sh up -d app proxy
 ```
-Then: sign in as the owner, enrol the second factor, create the two plants (Tétouan, Chefchaouen) under *Centrales*, the accounts under *Gérer les utilisateurs*, and work through *Liste de sécurité* (`/checklist`): with `REAL_DATA=true` the server **refuses to start** until it is complete.
-Check: `docker compose -f docker-compose.prod.yml exec app wget -qO- http://127.0.0.1:3000/api/health/ready` answers `{"status":"ready"}`.
+**Why `FIRST_BOOT=true`:** with `REAL_DATA=true` the server refuses to start until the security checklist is complete, and the checklist is completed inside the app (enrol the second factor, mark the items). `FIRST_BOOT=true` breaks that loop without weakening the protection: the server starts in a **restricted mode** that serves only sign-in, enrolment, the checklist, user accounts, plants and parameters (every other page and endpoint answers 503). It **refuses to start** (a) once any client, supplier, order, delivery, invoice or payment exists, and (b) once the checklist is complete, so it cannot stay on. Procedure: the owner signs in and enrols, creates the plants and accounts, works through *Liste de sécurité* (`/checklist`); the manual items are marked with evidence; the restore test evidence arrives through §5; when the sign-off is done **remove `FIRST_BOOT` from `.env.ops.prod` and run `./scripts/ops/dc.sh up -d app`**. Check: `./scripts/ops/dc.sh exec -T app wget -qO- http://127.0.0.1:3000/api/health/ready` answers `{"status":"ready"}` (database reachable **and** every migration of this build applied).
 
 ## 4. Loading the data (Excel)
-Files in `./imports/` (xlsx or csv). Order matters. Always a **dry run first**; read the report; fix the file; only then `--apply`.
+Files in `./imports/` (never in git, never in the image). Order matters. Always a **dry run first**; read the report; fix the file; only then `--apply`.
 ```
-docker compose -f docker-compose.prod.yml run --rm ops corepack pnpm import:excel concrete_types imports/types.xlsx
-docker compose -f docker-compose.prod.yml run --rm ops corepack pnpm import:excel concrete_types imports/types.xlsx --apply
+./scripts/ops/ops.sh import-excel concrete_types imports/types.xlsx
+./scripts/ops/ops.sh import-excel concrete_types imports/types.xlsx --apply
 ```
-Kinds, in order: `concrete_types`, `clients`, `suppliers`, `trucks`, `selling_prices`, `opening_balances` (`--opening-date YYYY-MM-DD`). Headers accepted in French or English (e.g. *Nom, Type, ICE, Téléphone, Délai de paiement*; trucks: *Code, Immatriculation, Capacité (m³), Type, Centrale*). A dry run writes nothing and lists, per line, what is new, already there, or wrong; an error anywhere blocks the whole file; a re-run skips what exists. Reports are saved in `.logs/`. **Not importable yet:** cheques in transit (entered by the office from the paper), components and recipes (set up with the plants on 3 Nov), history of previous months (later).
+Kinds, in order: `concrete_types`, `clients`, `suppliers`, `trucks`, `selling_prices`, `opening_balances` (`--opening-date YYYY-MM-DD`). Headers accepted in French or English. A dry run writes nothing and lists, per line, what is new, already there, or wrong; an error anywhere blocks the whole file; a re-run skips what exists. Reports are saved in `.logs/`.
 
 ## 5. Backups
-- **Nightly on the server** (cron `30 2 * * *`): `scripts/ops/backup-nightly.sh` — `pg_dump` as the read-only backup role, sealed with the age public key, the audit anchor beside it, last 14 kept.
-- **Nightly pull to the office machine** (cron/launchd `0 4 * * *`): `SERVER=backup@host scripts/ops/backup-pull.sh` — the office machine opens the connection with its own key (a read-only account that can read `backups/` only); the server holds no key to the office machine and no private age key. The script checks the checksum and keeps 30 sets. Check the log of that job each morning.
-- **Restore test, monthly and after every migration**, on a machine that has the private key: `BACKUP_AGE_IDENTITY_FILE=… corepack pnpm backup:restore-test <file>` — restores into a scratch database and checks the anchor, the migrations, the row counts and the whole audit chain. A backup nobody restored is not a backup. Last run on the dev database: 2026-11-02, all checks OK.
-- Sign the anchor (open question 12) with a key held off the server before go-live, or mirror the last audit hash to an independent store.
+**One backup is one set**: the database and the stored documents (BL scans, supplier invoice photos), each sealed with the age public key, and a manifest written last with their sha256, the file count and the audit anchor. A set without its manifest is incomplete and is never taken.
+- **Nightly on the server** (cron `30 2 * * *`, `MAILTO` or `scripts/ops/alert.env` set): `/srv/belgobeton/scripts/ops/backup-nightly.sh`. It runs the `backup` container (its own login, documents read-only), checks the set it just wrote, keeps the last 14 and **alerts on any failure**.
+- **Nightly pull to the office machine** (cron/launchd `0 4 * * *`): `SERVER=backup@host SIGNING_KEY_FILE=~/belgobeton-keys/backup-signing.key scripts/ops/backup-pull.sh`. The office machine opens the connection with its own key (an account in group `belgobeton-backup`: read-only). The pull is **staged and verified** before it reaches the store: complete (manifest, both archives), sizes and sha256 equal to the manifest, newest set younger than 30 h, unchanged since the office last signed it; each new set gets a **receipt signed with the office key** (the server has no such key). Any problem — stale, incomplete, damaged, rewritten, audit log shorter than before — **sends an alert and exits non-zero**. A damaged local copy is replaced from a good one.
+- **Restore test, monthly and after every migration**, on the office machine that has the keys: `BACKUP_AGE_IDENTITY_FILE=~/belgobeton-keys/age.key BACKUP_SIGNING_PUBLIC_KEY_FILE=~/belgobeton-keys/backup-signing.pub BACKUP_SIGNING_KEY_FILE=~/belgobeton-keys/backup-signing.key FIELD_ENCRYPTION_KEYS='<from the escrow>' corepack pnpm backup:restore-test`. It checks the office signature (an unsigned or re-signed-by-someone-else set fails), both archives, restores the database and the documents into scratch space, **opens every stored document with the escrowed keys**, then the migrations, row counts and the whole audit chain. A backup nobody restored is not a backup.
+- **Evidence for the checklist** (the office machine has no route to the production database): `scp` `<stamp>.restore-report.json` and `.sig` to `/srv/belgobeton/reports/` (deploy account) and run `./scripts/ops/ops.sh checklist-record-restore /app/reports/<stamp>.restore-report.json` (the signature is checked with the public key; the report must be under 36 h old). The rule is **a restore test younger than 35 days** (monthly rhythm plus grace); a quiet month never stops a running server, "never restored" does.
+- The signature protects against a set rewritten on the server **after** the office pulled it. A server already compromised **before** the pull can still hand over a consistent forged set; the audit anchor and the continuity check (the audit log may not shrink between sets) narrow that, and the first line of defence remains the host.
 
-## 6. Updating
+## 6. Updating (by digest)
+CI builds on GitHub (`.github/workflows/build-image.yml`): lint, types, unit tests, then the image for `linux/amd64`, pushed to the private registry `ghcr.io/<owner>/belgobeton`; the job summary prints the **digest**. No Docker build on the server (a 2 GB VM was killed by `next build`).
 ```
-git pull && docker compose -f docker-compose.prod.yml build
-./scripts/ops/backup-nightly.sh                                          # a fresh backup first
-docker compose -f docker-compose.prod.yml run --rm ops corepack pnpm db:migrate
-docker compose -f docker-compose.prod.yml up -d app
+git pull        # scripts and compose file only
+./scripts/ops/deploy.sh ghcr.io/<owner>/belgobeton@sha256:<digest>
 ```
-Migrations are additive (expand/contract). Rollback of the code: `git checkout <previous tag>`, rebuild, `up -d app` (the schema stays compatible: no migration drops anything). Rollback of data: restore the backup (§5) into a scratch database first, decide, then replace.
+`deploy.sh` pulls the digest, takes a fresh backup, writes `APP_IMAGE`, migrates with the new image, starts it, waits for readiness and **returns to the previous digest if it does not become ready**. Migrations are additive (expand/contract), so the previous image runs on the migrated schema. Rollback of data is a restore (§5) into a scratch database first, then a decision. Base images (Node, Caddy, Postgres) are rebuilt and redeployed on a schedule (at least monthly) so security fixes arrive: `unattended-upgrades` updates the host, not the images.
 
 ## 7. Module flags
-A module is switched on only after its acceptance tests pass **on the server**. `FIELD_APP_ENABLED` (driver and pump phone app) is an environment flag, off by default. Never on with real data: `ASSISTANT_ENABLED`, `AI_EXTRACTION_ENABLED`, `SIMULATION_ENABLED` (the server refuses to start). The client and supplier portals have no account creation and stay off until the independent review.
+A module is switched on only after its acceptance tests pass **on the server**. Environment flags (`FIELD_APP_ENABLED`, `NOTIFICATIONS_ENABLED`, `CANCELLATIONS_ENABLED`, `DOCUMENTS_V1_ENABLED`, `DARIJA_ENABLED`, `ASSISTANT_DET_ENABLED`, `TRANSFERS_ENABLED`, `FINANCE_ENABLED`) are off by default. Finance has a second switch inside the database (owner or app_admin, fresh second factor); both must be on. Never on with real data: `ASSISTANT_ENABLED`, `AI_EXTRACTION_ENABLED`, `SIMULATION_ENABLED` (the server refuses to start). The client and supplier portals have no account creation and stay off until the independent review.
 
 ## 8. Day to day
-- **Monitoring:** poll `/api/health/ready` from the server (not the proxy: it answers 404 outside) every minute from an external monitor over SSH or a cron `curl`; alert on two failures. Watch disk space of the `pgdata` and `backups` volumes, and the backup job logs.
-- **Logs:** `docker compose logs --since 1h app`. The app logs no secret, no PIN and no personal field (a test greps for it); still treat logs as sensitive.
+- **Monitoring:** an external monitor over HTTPS on the public name (the proxy answers 404 for `/api/health/*` on purpose, so use a page that needs no sign-in, e.g. the login page) **and** an internal readiness poll from the server every minute (`./scripts/ops/dc.sh exec -T app wget -qO- http://127.0.0.1:3000/api/health/ready`), alert on two failures. Watch disk space of `pgdata`, `filestore` and `backups`, memory/OOM kills (`dmesg`, `docker events`), and the backup job logs; rotate Docker logs (`max-size`/`max-file` in `/etc/docker/daemon.json`).
+- **Logs:** `./scripts/ops/dc.sh logs --since 1h app`. The app logs no secret, no PIN and no personal field (a test greps for it); still treat logs as sensitive.
 - **Drivers:** *Chauffeurs (téléphones)* — create the account, set the PIN (shown nowhere afterwards), release the phone when a driver changes it. Five wrong PINs lock the driver for 15 minutes.
-- **Accounts:** disable, never delete. The owner account cannot be disabled by the application. Lost authenticator of the owner: `corepack pnpm user:reset-owner-2fa` on the server (needs the database superuser password; alerts the owner).
-- **Key rotation:** `corepack pnpm crypto:rotate` after adding a new version to `FIELD_ENCRYPTION_KEYS` / `AUTH_SECRETS`.
+- **Accounts:** disable, never delete. The owner account cannot be disabled by the application. Lost authenticator of the owner: `./scripts/ops/ops.sh reset-owner-2fa` (needs the database superuser password; alerts the owner).
+- **Key rotation:** add the new version first in `FIELD_ENCRYPTION_KEYS` / `AUTH_SECRETS`, keep the old ones after it, restart, then `./scripts/ops/ops.sh crypto-rotate` (it re-encrypts the database columns **and every stored document**; it fails if `FILE_STORE_DIR` is wrong, prints the number of documents it found, and `--check` must report zero). **Do not delete a retired key**: every backup made before the rotation still needs it. Keep the retired versions in the escrow as long as the oldest backup you keep.
 
 ## 9. Incident
-1. **Suspected leak or intrusion:** keep the evidence (do not wipe). Disable the account concerned; revoke the sessions; rotate `AUTH_SECRET`. Run `corepack pnpm audit:verify` (chain intact?) and read the audit viewer for the period. If personal data may have left: the CNDP must be told (law 09-08) — decide with the owner the same day.
-2. **Server down:** `docker compose ps`, `logs`, disk space, `ready` endpoint. Restart `app` first; the database restarts by itself.
-3. **Database damaged:** stop `app`, restore the latest backup into a scratch database (§5), verify, then switch. The audit anchor says whether the restored history is complete.
+1. **Suspected leak or intrusion:** keep the evidence (do not wipe). Disable the account concerned; revoke the sessions; rotate `AUTH_SECRET`. Run `./scripts/ops/ops.sh audit-verify` (chain intact?) and read the audit viewer for the period. If personal data may have left: the CNDP must be told (law 09-08) — decide with the owner the same day.
+2. **Server down:** `./scripts/ops/dc.sh ps`, `logs`, disk space, the `ready` endpoint. Restart `app` first; the database restarts by itself.
+3. **Database damaged:** stop `app`, restore the latest set into a scratch database (§5), verify, then switch. The audit anchor says whether the restored history is complete; the documents come back from the same set.
 4. **A phone is lost:** release the device in *Chauffeurs (téléphones)*; the token stops working at once.
+5. **Whole server lost:** new VM (§1, §3 without `FIRST_BOOT`), restore the latest set from the office store with the escrowed keys (database **and** documents), `deploy.sh` the last good digest. Rehearse this once before go-live.
 
 ## 10. What this runbook does not do
-It does not choose the hosting provider (criteria in order: stability, security, cost; Morocco). It does not file the CNDP declaration. It does not replace the independent security review.
+It does not file the CNDP declarations. It does not replace the independent security review. It does not prove the live firewall: §1 says how to check it.

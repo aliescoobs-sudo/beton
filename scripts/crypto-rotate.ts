@@ -19,6 +19,7 @@ import {
   rotateColumn,
 } from '@/modules/platform-security/service/key-rotation';
 import { createDiskStore } from '@/lib/files/store';
+import { countStoreFiles } from './backup-lib';
 import { handleHelp } from './cli-help';
 
 handleHelp(import.meta.url);
@@ -60,6 +61,10 @@ try {
     }
   }
   // Stored documents (BL scans, supplier invoice photos) are sealed with FIELD_ENCRYPTION_KEYS too.
+  // A wrong or missing FILE_STORE_DIR used to read as "no files" and let the rotation report success without touching the documents
+  // (CODEX-REVIEW-R9 item 2): it is now an error, and the count is printed so the operator can compare it with the store.
+  const total = countStoreFiles(env.FILE_STORE_DIR);
+  console.log(`stored files found in ${env.FILE_STORE_DIR}: ${total}`);
   const store = createDiskStore(env.FILE_STORE_DIR, parseKeyring(env.FIELD_ENCRYPTION_KEYS));
   let stale = 0;
   let moved = 0;
@@ -77,4 +82,8 @@ try {
   await Promise.all(Object.values(pools).map((p) => p.end()));
 }
 if (remaining > 0) process.exitCode = 1;
-else console.log('All encrypted values are on the current keys: retired keys can be removed.');
+else
+  console.log(
+    'All live values are on the current keys. Do NOT delete the retired keys yet: every backup made before this rotation still needs them. ' +
+      'Keep them in the offline escrow for as long as the oldest backup you keep.',
+  );

@@ -1,6 +1,8 @@
-# Reverse proxy (R9). HTTPS with automatic certificates for the domain in APP_DOMAIN, security headers are set by the app itself.
+# Reverse proxy (R9, C2). HTTPS with automatic certificates for the domain in APP_DOMAIN, which docker-compose.prod.yml passes in;
+# the HTTP to HTTPS redirect and the renewal are Caddy's defaults. Security headers are set by the app itself.
 # Another reverse proxy (nginx, Traefik) works too: it must append the client address to X-Forwarded-For (TRUSTED_PROXY_HOPS=1).
-{$APP_DOMAIN:localhost} {
+# No "localhost" default on purpose: without APP_DOMAIN Caddy refuses to start instead of silently serving the wrong name.
+{$APP_DOMAIN} {
 	encode zstd gzip
 	# Never expose the maintenance surface; the monitor reads /api/health/ready from the server itself.
 	@internal path /api/health/*

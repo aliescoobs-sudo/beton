@@ -13,16 +13,19 @@ RUN pnpm build
 
 FROM node:24-alpine AS runtime
 WORKDIR /app
-# pg_dump and psql for the backup and the restore test, age to seal the backup (the private key is never on this host).
-RUN apk add --no-cache postgresql17-client age tini \
- && corepack enable \
- && addgroup -S app && adduser -S app -G app
+# pg_dump and psql for the backup and the restore test, age to seal the backup (the private key is never on this host), tar for the
+# stored documents. No corepack and no pnpm in this stage: the maintenance scripts run with plain node (scripts/ops/ops.sh), so nothing
+# tries to download a package manager inside a container that has no network (CODEX-REVIEW-R9 item 10).
+RUN apk add --no-cache postgresql17-client age tini tar \
+ && addgroup -S -g 10001 app && adduser -S -u 10001 -G app app \
+ && mkdir -p /data/file-store /app/backups && chown -R 10001:10001 /data /app/backups
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000
-COPY --from=build --chown=app:app /app /app
-USER app
+COPY --from=build --chown=10001:10001 /app /app
+USER 10001:10001
 EXPOSE 3000
 # The process listens on all interfaces inside the container; the compose file keeps it off the host network.
+# Readiness (database answers and every migration of this build is applied), not just liveness.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
-  CMD wget -qO- http://127.0.0.1:3000/api/health/live >/dev/null || exit 1
+  CMD wget -qO- http://127.0.0.1:3000/api/health/ready >/dev/null || exit 1
 ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["node", "node_modules/next/dist/bin/next", "start", "-H", "0.0.0.0", "-p", "3000"]

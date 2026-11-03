@@ -1,0 +1,74 @@
+# Builds the production image for the server (linux/amd64), pushes it to the PRIVATE GitHub Container Registry and prints the DIGEST.
+# The server deploys that digest, never a moving tag:   ./scripts/ops/deploy.sh ghcr.io/<owner>/belgobeton@sha256:<digest>
+# Nothing here holds a secret: the push uses the job's own GITHUB_TOKEN. The package must stay PRIVATE (Packages settings), and the
+# server logs in once with a read-only token (read:packages). The build needs a runner with enough memory (a standard GitHub-hosted
+# runner has 16 GB; the 2 GB local VM could not finish `next build`).
+name: Build and publish image
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: image-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    name: Lint, types and unit tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm exec vitest run --project unit
+
+  image:
+    name: Build and push (linux/amd64)
+    needs: checks
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/belgobeton" >> "$GITHUB_OUTPUT"
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          provenance: true
+          tags: |
+            ${{ steps.meta.outputs.name }}:sha-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Digest to deploy
+        run: |
+          {
+            echo "### Image published"
+            echo ""
+            echo "Deploy this exact image on the server:"
+            echo ""
+            echo '```'
+            echo "./scripts/ops/deploy.sh ${{ steps.meta.outputs.name }}@${{ steps.build.outputs.digest }}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

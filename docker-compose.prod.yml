@@ -1,8 +1,10 @@
-# BELGOBETON production stack (R9). The database is on an INTERNAL network: no host port, no route to or from the internet.
-# Only the reverse proxy publishes ports (80 and 443). Secrets come from .env.prod and .env.ops.prod on the server (never in git).
-#   docker compose -f docker-compose.prod.yml --env-file .env.ops.prod up -d --wait db
-#   docker compose -f docker-compose.prod.yml run --rm ops corepack pnpm db:bootstrap && ... db:migrate    (see docs/RUNBOOK.md)
-#   docker compose -f docker-compose.prod.yml up -d app proxy
+# BELGOBETON production stack (R9, C2). The database is on an INTERNAL network: no host port, no route to or from the internet.
+# Only the reverse proxy publishes ports (80 and 443). The image is pulled BY DIGEST from the private registry (APP_IMAGE).
+# Secrets are on the server only, chmod 600, never in git, one file per purpose:
+#   .env.prod         the app (no migrator, no backup, no superuser)
+#   .env.ops.prod     maintenance and compose interpolation: POSTGRES_SUPERUSER_PASSWORD, DATABASE_URL_MIGRATOR, APP_DOMAIN, APP_IMAGE, FIRST_BOOT
+#   .env.backup.prod  the backup job only: DATABASE_URL_BACKUP, BACKUP_AGE_RECIPIENT
+# EVERY command goes through ./scripts/ops/dc.sh, which passes --env-file .env.ops.prod (a bare `docker compose` cannot read this file).
 name: belgobeton
 
 services:
@@ -24,8 +26,7 @@ services:
     networks: [internal]
 
   app:
-    build: .
-    image: belgobeton:current
+    image: ${APP_IMAGE:?set APP_IMAGE in .env.ops.prod to ghcr.io/<owner>/belgobeton@sha256:<digest>}
     restart: unless-stopped
     env_file: .env.prod
     environment:
@@ -34,6 +35,8 @@ services:
       SIMULATION_ENABLED: 'false'
       TRUSTED_PROXY_HOPS: '1'
       FILE_STORE_DIR: /data/file-store
+      # The protected first start (RUNBOOK §3). Off everywhere else; the server refuses to start with it once it is not needed.
+      FIRST_BOOT: ${FIRST_BOOT:-false}
     volumes:
       - filestore:/data/file-store
     depends_on:
@@ -44,6 +47,9 @@ services:
   proxy:
     image: caddy:2-alpine
     restart: unless-stopped
+    environment:
+      # Without the domain Caddy would serve "localhost" and never ask for the certificate (CODEX-REVIEW-R9 item 6).
+      APP_DOMAIN: ${APP_DOMAIN:?set APP_DOMAIN in .env.ops.prod}
     ports:
       - '80:80'
       - '443:443'
@@ -53,21 +59,40 @@ services:
     depends_on: [app]
     networks: [edge]
 
-  # Maintenance container: migrations, bootstrap, backup, restore test, Excel import. Started on demand, never by `up`.
+  # Maintenance container: migrations, bootstrap, owner creation, key rotation, Excel import, restore evidence. Never started by `up`.
+  # It runs plain node (scripts/ops/ops.sh): no pnpm, no download. The migrator login lives in .env.ops.prod and nowhere else.
   ops:
-    build: .
-    image: belgobeton:current
+    image: ${APP_IMAGE:?set APP_IMAGE in .env.ops.prod}
     profiles: [ops]
     env_file: [.env.prod, .env.ops.prod]
     environment:
       NODE_ENV: production
       REAL_DATA: 'true'
       SIMULATION_ENABLED: 'false'
+      # Explicit, the same as the app: a rotation that looked in the wrong directory used to report success (review item 2).
+      FILE_STORE_DIR: /data/file-store
+      BACKUP_SIGNING_PUBLIC_KEY_FILE: /app/keys/backup-signing.pub
     volumes:
       - filestore:/data/file-store
-      - ./backups:/app/backups
+      - ./backups:/app/backups:ro
       - ./imports:/app/imports:ro
-    command: ['sh', '-c', 'echo "run a command: docker compose run --rm ops corepack pnpm <script>"']
+      - ./keys:/app/keys:ro
+      - ./reports:/app/reports:ro
+    command: ['sh', '-c', 'echo "run a command: ./scripts/ops/ops.sh <script> [args]"']
+    networks: [internal]
+
+  # Backup job: its own login and its own secret file. It sees the documents read-only and writes only the backups directory.
+  backup:
+    image: ${APP_IMAGE:?set APP_IMAGE in .env.ops.prod}
+    profiles: [ops]
+    env_file: [.env.backup.prod]
+    environment:
+      NODE_ENV: production
+      FILE_STORE_DIR: /data/file-store
+    volumes:
+      - filestore:/data/file-store:ro
+      - ./backups:/app/backups
+    command: ['sh', '-c', 'echo "run: ./scripts/ops/backup-nightly.sh"']
     networks: [internal]
 
 networks:
