@@ -21,7 +21,7 @@ Updated: 2026-11-04 (end of Batch C). No secrets in this file.
 | Hosting choice, CNDP draft | Lead | pending |
 
 ## Last handoff of each side
-- **Claude Code → lead:** Batch C end report and final e2e (153 passed, 1 fixture failure fixed and rerun green) in `docs/checkpoints/CP-PROD-PLAN.md`; not started: §16.10, day-close fuel and cash lines, office join.
+- **Claude Code → lead:** Batch C+ (recipes per plant, receipt variance, day-close fuel and cash, plant e2e; full e2e 158 passed) in `docs/checkpoints/CP-PROD-PLAN.md`; earlier: Batch C end report and final e2e (153 passed, 1 fixture failure fixed and rerun green) in `docs/checkpoints/CP-PROD-PLAN.md`; not started: §16.10, day-close fuel and cash lines, office join.
 - **Lead → Claude Code:** Batch B prompt (this batch), including REQUIREMENTS-V1 §16 from Codex's review.
 - **Codex → lead:** the §16 review, accepted 2 Nov.
 

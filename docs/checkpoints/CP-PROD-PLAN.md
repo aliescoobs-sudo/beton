@@ -191,3 +191,11 @@ Migrations 0096 to 0104 (finance 0200 to 0207 merged, journal re-based). Flag ad
 
 
 Final regression of Batch C (2026-11-04, `.logs/final-e2e.log`): lint, typecheck, unit and integration tests and production build pass; full e2e, one worker: **153 passed, 1 failed, 2 skipped, 1 did not run in 31.9 min**. The failure, `ledger-cash.spec.ts:38` (support reads the position; office has no link and no page), was fixture pollution, not a leak: `finance.spec.ts` (merged from Codex) enrolled `cashSupport`, the same user the cash spec enrols, so the second enrolment met the TOTP prompt instead of `/enrol` and stopped before any office check. The test that did not run, `ledger-cash.spec.ts:50` (Arabic layout), is in a serial file and was skipped after the failure. Fix: `finance.spec.ts` has its own user `finSupport`. Rerun of `finance.spec.ts` and `ledger-cash.spec.ts`: 7 passed (`.logs/rerun-cash.log`), including the office no-link and 404 checks. No permission or navigation change was needed; the office checks of that spec were never reached in the failed run, and pass in the rerun.
+
+## Batch C+ (2026-11-04): recipes per plant, receipt variance, day close, e2e
+Migrations 0105 to 0107. DECISIONS 160 to 162.
+- **C4.1** recipes per plant (0105): optional plant on a recette, the plant's own mix wins from its date, one database function `recette_in_force` used by the load guard and the service, plant manager reads own plant and shared mixes. Limits: projection and costing read the all-plants mix; the importer writes all-plants mixes.
+- **C4.2** variance between the plant's usable count and the office receipt (0106): insert-only row per line, parameter `receipt_variance_bp` (2 %), notification above it, shown on the receipts screen.
+- **C4.3** day close (0107): fuel variance lines (received fuel transfers with a litre gap; a tank below zero blocks) and cash per holder for owner and app_admin only, when finance is on. Cash is company-wide, not per plant. Dipstick counts still not built.
+- **C4.4** e2e `plant-screens.spec.ts` (plant picker, receipt states with variance, price per plant); day-close cash covered in `finance.spec.ts`.
+- Final regression: lint, typecheck, 4258 unit and integration tests, production build pass; full e2e, one worker, `caffeinate`: **158 passed, 2 skipped, 0 failed in 33.3 min** (`.logs/c4-final-e2e.log`).
