@@ -1,7 +1,12 @@
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { getPool } from '@/lib/db/pools';
 import { listPlants } from '@/modules/master-data';
-import { listArrivalFiles, listReceiptStates, listReceivable } from '@/modules/operations';
+import {
+  listArrivalFiles,
+  listReceiptStates,
+  listReceiptVariances,
+  listReceivable,
+} from '@/modules/operations';
 import { getRequestClock } from '@/app/request-clock';
 import { ConfirmArrivalButton } from '@/modules/operations/ui/confirm-arrival-button';
 import { formatM3 } from '@/modules/operations/ui/format';
@@ -31,6 +36,13 @@ export default async function ReceiptsPage({ params }: { params: Promise<{ local
     user,
     states.map((s) => s.confirmationId),
   );
+  const variances = await listReceiptVariances(
+    getPool('app'),
+    user,
+    states.map((s) => s.confirmationId),
+  );
+  const varianceOf = (confirmationId: string, lineId: string) =>
+    variances.find((v) => v.confirmationId === confirmationId && v.lineId === lineId);
   return (
     <div>
       <PageHeader title={t('title')} description={t('intro')} />
@@ -153,6 +165,11 @@ export default async function ReceiptsPage({ params }: { params: Promise<{ local
                     <StatusPill status="late">{t('hasRejected')}</StatusPill>
                   )}
                   {s.lines.some((l) => l.partial) && <StatusPill status="due">{t('hasPartial')}</StatusPill>}
+                  {s.lines.some((l) => varianceOf(s.confirmationId, l.lineId)?.overThreshold) && (
+                    <StatusPill status="late" data-testid={`variance-${s.purchaseCode}`}>
+                      {t('hasVariance')}
+                    </StatusPill>
+                  )}
                 </p>
                 <ul className="text-sm">
                   {s.lines
@@ -168,6 +185,22 @@ export default async function ReceiptsPage({ params }: { params: Promise<{ local
                           / {formatM3(l.orderedMilli)} {l.unitLabel}
                         </bdi>
                         {l.available && !s.documented ? ` · ${t('usableNow')}` : ''}
+                        {(() => {
+                          const v = varianceOf(s.confirmationId, l.lineId);
+                          return v && v.varianceMilli !== 0 ? (
+                            <span data-testid={`variance-line-${s.purchaseCode}`}>
+                              {' · '}
+                              <bdi dir="ltr">
+                                {t('varianceLine', {
+                                  plant: formatM3(v.plantMilli),
+                                  office: formatM3(v.officeMilli),
+                                  gap: `${v.varianceMilli > 0 ? '+' : ''}${formatM3(v.varianceMilli)}`,
+                                  percent: (v.varianceBp / 100).toFixed(2),
+                                })}
+                              </bdi>
+                            </span>
+                          ) : null;
+                        })()}
                       </li>
                     ))}
                 </ul>

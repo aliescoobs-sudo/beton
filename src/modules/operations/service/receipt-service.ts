@@ -352,6 +352,56 @@ export async function listReceiptStates(
   return [...out.values()];
 }
 
+export interface ReceiptVariance {
+  confirmationId: string;
+  lineId: string;
+  /** Thousandths of the purchase unit: usable at the plant (arrived minus refused), documented by the office, office minus plant. */
+  plantMilli: number;
+  officeMilli: number;
+  varianceMilli: number;
+  /** Size of the gap in basis points of the plant's count (1 000 000 when the plant counted nothing usable). */
+  varianceBp: number;
+  thresholdBp: number;
+  overThreshold: boolean;
+}
+
+/** The plant-count against office-receipt gaps of the confirmations given (written when the office documented). No price. */
+export async function listReceiptVariances(
+  appPool: pg.Pool,
+  actor: SessionUser,
+  confirmationIds: string[],
+): Promise<ReceiptVariance[]> {
+  await require(appPool, actor, 'receipts.read');
+  if (confirmationIds.length === 0) return [];
+  const { rows } = await inRequest(appPool, actor, (tx) =>
+    tx.query<{
+      confirmation_id: string;
+      purchase_line_id: string;
+      plant_milli: string;
+      office_milli: string;
+      variance_milli: string;
+      variance_bp: string;
+      threshold_bp: number;
+      over_threshold: boolean;
+    }>(
+      `select confirmation_id, purchase_line_id, plant_milli::text, office_milli::text, variance_milli::text,
+              variance_bp::text, threshold_bp, over_threshold
+         from receipt_variance where confirmation_id = any($1::uuid[])`,
+      [confirmationIds],
+    ),
+  );
+  return rows.map((r) => ({
+    confirmationId: r.confirmation_id,
+    lineId: r.purchase_line_id,
+    plantMilli: Number(r.plant_milli),
+    officeMilli: Number(r.office_milli),
+    varianceMilli: Number(r.variance_milli),
+    varianceBp: Number(r.variance_bp),
+    thresholdBp: r.threshold_bp,
+    overThreshold: r.over_threshold,
+  }));
+}
+
 export type ArrivalFileError = UploadError | 'NOT_FOUND' | 'ALREADY_DOCUMENTED' | 'TOO_MANY' | 'INVALID';
 
 /** The weighbridge ticket or delivery note of an arrival: checked, metadata stripped, sealed; the row first, so a refusal leaves nothing. */

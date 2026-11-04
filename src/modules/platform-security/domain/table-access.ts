@@ -218,6 +218,23 @@ export const TABLE_ACCESS = {
     exception:
       'C3 (DECISIONS 156, REQUIREMENTS-V1 §16.7): what the plant counted on a purchase line at arrival: arrived, refused, usable now (thousandths of the purchase unit). Written only by confirm_receipt_at_plant_lines (SECURITY DEFINER). Quantities only, no price. The office purchases role reads it (actor role) to document the receipt; a plant manager reads their plant.',
   },
+  receipt_variance: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'none',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    exception:
+      'C4.2 (DECISIONS 161, REQUIREMENTS-V1 §16.7): the gap between what the plant counted as usable and what the office documented, per purchase line, with the threshold in force (thousandths of the purchase unit, basis points). Written only by record_receipt_lines (SECURITY DEFINER), insert-only. Quantities only, no price. The office purchases role reads it (actor role); a plant manager reads their plant.',
+  },
   receipt_arrival_file: {
     kind: 'rls',
     read: {

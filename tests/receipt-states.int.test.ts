@@ -14,6 +14,7 @@ import {
   getStockLevels,
   listArrivalFiles,
   listReceiptStates,
+  listReceiptVariances,
   openArrivalFile,
   recordReceipt,
 } from '../src/modules/operations';
@@ -241,5 +242,94 @@ describe('receipt states (C3, §16.7)', () => {
         { store },
       ),
     ).toEqual({ ok: false, error: 'ALREADY_DOCUMENTED' });
+  });
+});
+
+describe('variance between the plant count and the office receipt (C4.2)', () => {
+  /** The plant counts `usable` (nothing refused), then the office documents `office`; returns the purchase and the variances. */
+  async function run(plantMilli: number, officeMilli: number, rejected = 0) {
+    const p = await newPurchase();
+    const c = await confirmArrivalAtPlant(app, plant, {
+      purchaseId: p.id,
+      lines: [
+        { lineId: p.line, arrivedMilli: plantMilli + rejected, rejectedMilli: rejected, available: true },
+      ],
+    });
+    if (!c.ok) throw new Error(c.error);
+    const r = await recordReceipt(
+      app,
+      owner,
+      { purchaseId: p.id, lines: [{ lineId: p.line, qtyMilli: officeMilli }] },
+      { today: TODAY },
+    );
+    if (!r.ok) throw new Error(r.error);
+    const state = await stateOf(p.code);
+    const v = await listReceiptVariances(app, buyer, [state!.confirmationId]);
+    return { p, v };
+  }
+  const alerts = async (code: string) =>
+    (
+      await migrator.query(
+        `select 1 from notification where kind = 'receipt_variance' and params->>'purchase' = $1`,
+        [code],
+      )
+    ).rowCount;
+
+  it('the same quantity is no variance and raises nothing', async () => {
+    const { p, v } = await run(10_000, 10_000);
+    expect(v).toHaveLength(1);
+    expect(v[0]).toMatchObject({
+      plantMilli: 10_000,
+      officeMilli: 10_000,
+      varianceMilli: 0,
+      varianceBp: 0,
+      overThreshold: false,
+    });
+    expect(await alerts(p.code)).toBe(0);
+  });
+
+  it('a gap within the threshold is recorded and does not alert; above it is flagged and notified', async () => {
+    const within = await run(10_000, 9_900); // 1 % under, threshold 2 %
+    expect(within.v[0]).toMatchObject({
+      varianceMilli: -100,
+      varianceBp: 100,
+      thresholdBp: 200,
+      overThreshold: false,
+    });
+    expect(await alerts(within.p.code)).toBe(0);
+    const over = await run(10_000, 9_500); // 5 % under
+    expect(over.v[0]).toMatchObject({ varianceMilli: -500, varianceBp: 500, overThreshold: true });
+    expect(await alerts(over.p.code)).toBeGreaterThan(0);
+    const more = await run(9_000, 9_300); // 3.3 % over the plant's count
+    expect(more.v[0]).toMatchObject({ varianceMilli: 300, varianceBp: 333, overThreshold: true });
+  });
+
+  it('is measured against what was usable at the plant (arrived minus refused), not against what arrived', async () => {
+    const { v } = await run(5_000, 5_000, 1_000); // 6 t arrived, 1 t refused, office documents the 5 t usable
+    expect(v[0]).toMatchObject({
+      plantMilli: 5_000,
+      officeMilli: 5_000,
+      varianceMilli: 0,
+      overThreshold: false,
+    });
+    const wrong = await run(5_000, 6_000, 1_000); // office documents the 6 t that arrived: 20 % over the usable count
+    expect(wrong.v[0]).toMatchObject({ varianceMilli: 1_000, varianceBp: 2000, overThreshold: true });
+  });
+
+  it('a variance row cannot be changed or removed, and the plant manager of another plant does not see it', async () => {
+    const { v } = await run(10_000, 9_000);
+    await expect(
+      migrator.query(`update receipt_variance set over_threshold = false where confirmation_id = $1`, [
+        v[0]!.confirmationId,
+      ]),
+    ).rejects.toThrow(/insert-only/);
+    await expect(
+      migrator.query(`delete from receipt_variance where confirmation_id = $1`, [v[0]!.confirmationId]),
+    ).rejects.toThrow(/insert-only/);
+    // roles that never read receipts (the sales office) are refused by the service
+    await expect(listReceiptVariances(app, seller, [v[0]!.confirmationId])).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
+    expect(JSON.stringify(v)).not.toMatch(/price|centimes|amount|total/i);
   });
 });

@@ -799,6 +799,13 @@
       "when": 1793804287023,
       "tag": "0105_recipe_per_plant",
       "breakpoints": true
+    },
+    {
+      "idx": 106,
+      "version": "7",
+      "when": 1793804347023,
+      "tag": "0106_receipt_variance",
+      "breakpoints": true
     }
   ]
 }

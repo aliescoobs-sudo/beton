@@ -24,6 +24,7 @@ export const NOTIFICATION_CATALOGUE = {
   redirect_proposal: { severity: 'important', link: '/cancellations' },
   loss_recorded: { severity: 'important', link: '/cancellations' },
   receipt_rejected: { severity: 'important', link: '/receipts' },
+  receipt_variance: { severity: 'important', link: '/receipts' },
   transfer: { severity: 'info', link: '/transfers' },
   day_close_blocking: { severity: 'important', link: '/day-close' },
   document_request: { severity: 'important', link: '/approvals' },

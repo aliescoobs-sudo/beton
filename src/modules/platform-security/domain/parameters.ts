@@ -104,6 +104,12 @@ export const PARAMETERS = {
     schema: z.number().int().min(5).max(180),
     description: 'One-way minutes used for an order whose site has no zone',
   }, // Production and consumption report (SPEC-operations §7.1, AC-OPS-19): a gap between the recettes and the counts above this is flagged.
+  receipt_variance_bp: {
+    default: 200,
+    schema: z.number().int().min(0).max(5000),
+    description:
+      "Gap between the plant's usable count and the quantity the office documents that raises an alert (basis points)",
+  },
   consumption_tolerance_bp: {
     default: 200,
     schema: z.number().int().min(0).max(2000),

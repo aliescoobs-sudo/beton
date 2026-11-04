@@ -99,6 +99,7 @@
       "redirect_proposal": "اقتراح تحويل كيتسنى القرار",
       "loss_recorded": "تسجّلات خسارة",
       "receipt_rejected": "جات سلعة وفيها كمية مرفوضة",
+      "receipt_variance": "فرق بين اللي عدات المحطة واللي سجّل المكتب",
       "transfer": "تحويل بين المحطتين",
       "day_close_blocking": "سدّان النهار واقف",
       "document_request": "طلب وثيقة",

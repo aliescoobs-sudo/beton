@@ -213,6 +213,41 @@ const FIXTURES: Record<
     visible: `select split_part(c.note, ':', 2) as owner from receipt_arrival_line a
                 join receipt_plant_confirmation c on c.id = a.confirmation_id where c.note like $1 || 'L:%'`,
   },
+  receipt_variance: {
+    // Only record_receipt_lines() writes it, when the office documents an arrival the plant counted (owner, partner).
+    writers: ['owner', 'partner'],
+    seed: async (tx, actor) => {
+      const pm = await purchaseMaster(app, actors.owner, `${marker}v`); // its own components: purchase_receipt's visible query reads marker's
+      const p = await newReceivablePurchase(
+        app,
+        actors.owner,
+        pm,
+        `${marker}v${actor.replace(/-/g, '').slice(-8)}`,
+      );
+      const line = (
+        await migratorPool.query<{ id: string }>(`select id from purchase_line where purchase_id = $1`, [
+          p.id,
+        ])
+      ).rows[0]!.id;
+      // The comparison exists only while a plant is active: one plant, made and archived inside this transaction.
+      const plantId = (
+        await tx.query<{ id: string }>(
+          `insert into plant (id, code, name, created_by)
+           values (gen_random_uuid(), upper(translate(substr(md5($1 || 'v' || $2::text), 1, 8), '0123456789', 'ghijklmnop')), 'rv ' || substr($1, 8, 10) || right($2::text, 6), $2::uuid) returning id`,
+          [marker, actor],
+        )
+      ).rows[0]!.id;
+      await tx.query(`select public.confirm_receipt_at_plant_lines($1, $2, $3::jsonb)`, [
+        p.id,
+        `${marker}V:${actor}`,
+        JSON.stringify([{ line, arrived: 1000, rejected: 0, available: false }]),
+      ]);
+      await tx.query(`select public.record_receipt_lines($1, current_date, null, false)`, [p.id]);
+      return archivePlants(tx, [plantId]);
+    },
+    visible: `select split_part(c.note, ':', 2) as owner from receipt_variance v
+                join receipt_plant_confirmation c on c.id = v.confirmation_id where c.note like $1 || 'V:%'`,
+  },
   receipt_arrival_file: {
     // Inserted by the plant, owner and partner on an arrival of their own, before it is documented.
     writers: ['owner', 'partner', 'plant'],

@@ -80,6 +80,8 @@ export {
   confirmArrivalAtPlant,
   listArrivalFiles,
   listReceiptStates,
+  listReceiptVariances,
+  type ReceiptVariance,
   listReceivable,
   openArrivalFile,
   type ReceiptState,
