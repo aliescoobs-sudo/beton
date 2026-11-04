@@ -1,3 +1,5 @@
+import { isTrainingEmail } from '@/lib/training';
+import { realClock } from '@/modules/clock';
 import { APIError } from 'better-auth/api';
 import type { Auth } from './create-auth';
 import type { UserRole } from './user-service';
@@ -38,7 +40,12 @@ export type AuthState =
  * The single answer to "who is this request?". A session whose user has not enrolled 2FA may only enrol
  * (SPEC §5: 2FA is mandatory). Sessions past the 12 h absolute lifetime are revoked by the auth hooks.
  */
-export async function resolveAuthState(auth: Auth, headers: Headers): Promise<AuthState> {
+export async function resolveAuthState(
+  auth: Auth,
+  headers: Headers,
+  /** T1: the training instance. Only then may a training account (reserved address) work with a password alone. */
+  opts: { trainingMode?: boolean } = {},
+): Promise<AuthState> {
   let result;
   try {
     result = await auth.api.getSession({ headers });
@@ -57,6 +64,16 @@ export async function resolveAuthState(auth: Auth, headers: Headers): Promise<Au
     twoFactorEnabled: result.user.twoFactorEnabled === true,
     reenrolRequired: result.user.reenrolRequired === true,
   };
+  const raw0 = result.session as { id: string; createdAt: Date | string };
+  if (!user.twoFactorEnabled && opts.trainingMode === true && isTrainingEmail(user.email)) {
+    // Training accounts have no authenticator: the password is the only factor, and a signed-in session counts as a fresh one so that
+    // the sensitive actions can be practised. RBAC, RLS, the audit log and money visibility apply to them exactly as to anybody.
+    return {
+      kind: 'authenticated',
+      user,
+      session: { id: raw0.id, createdAt: new Date(raw0.createdAt), twoFactorAt: realClock.now() },
+    };
+  }
   if (!user.twoFactorEnabled) return { kind: 'needs_enrolment', user };
 
   const raw = result.session as { id: string; createdAt: Date | string; twoFactorAt?: Date | string | null };
