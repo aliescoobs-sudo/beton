@@ -30,6 +30,35 @@ export const ENCRYPTED_COLUMNS = [
     keyring: 'FIELD_ENCRYPTION_KEYS',
     pool: 'system',
   },
+  {
+    table: 'supplier',
+    column: 'phone_enc',
+    idColumn: 'id',
+    keyring: 'FIELD_ENCRYPTION_KEYS',
+    pool: 'system',
+  },
+  // The phone app's addresses (R4, R6): an instruction's address, a pump job's site address, the address a redirect sends a load to.
+  {
+    table: 'trip_instruction',
+    column: 'address_enc',
+    idColumn: 'id',
+    keyring: 'FIELD_ENCRYPTION_KEYS',
+    pool: 'system',
+  },
+  {
+    table: 'pump_job',
+    column: 'address_enc',
+    idColumn: 'id',
+    keyring: 'FIELD_ENCRYPTION_KEYS',
+    pool: 'system',
+  },
+  {
+    table: 'cancellation_case',
+    column: 'redirect_address_enc',
+    idColumn: 'id',
+    keyring: 'FIELD_ENCRYPTION_KEYS',
+    pool: 'system',
+  },
   // The assistant's sealed payloads (SPEC-assistant §9): the question and the answer, the parameters of a draft.
   {
     table: 'ai_interaction',

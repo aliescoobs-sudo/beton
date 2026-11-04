@@ -827,6 +827,13 @@
       "when": 1793804527023,
       "tag": "0109_step_up_doors",
       "breakpoints": true
+    },
+    {
+      "idx": 110,
+      "version": "7",
+      "when": 1793804587023,
+      "tag": "0110_rotation_sealed_fields",
+      "breakpoints": true
     }
   ]
 }
