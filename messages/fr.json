@@ -1,4 +1,7 @@
 {
+  "training": {
+    "banner": "Version de formation — données fictives"
+  },
   "shell": {
     "title": "BELGOBETON",
     "tagline": "Pilote — données fictives uniquement",

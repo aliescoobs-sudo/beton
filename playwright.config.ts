@@ -1,7 +1,14 @@
 import { defineConfig, devices } from '@playwright/test';
 import { E2E_DATABASE } from './scripts/db-bootstrap';
 import { testEnv } from './tests/db-env';
-import { E2E_BASE_URL, E2E_OFF_PORT, E2E_OFF_URL, E2E_PORT } from './e2e/fixtures';
+import {
+  E2E_BASE_URL,
+  E2E_OFF_PORT,
+  E2E_OFF_URL,
+  E2E_PORT,
+  E2E_TRAINING_PORT,
+  E2E_TRAINING_URL,
+} from './e2e/fixtures';
 
 const env = testEnv(E2E_DATABASE);
 
@@ -54,6 +61,26 @@ export default defineConfig({
       port: E2E_OFF_PORT,
       reuseExistingServer: false,
       env: { ...serverEnv(E2E_OFF_URL), ASSISTANT_ENABLED: 'false' },
+    },
+    {
+      // The training instance (T1): TRAINING_MODE on, every module flag on except the portals.
+      command: `node node_modules/next/dist/bin/next start -H 127.0.0.1 -p ${E2E_TRAINING_PORT}`,
+      port: E2E_TRAINING_PORT,
+      reuseExistingServer: false,
+      env: {
+        ...serverEnv(E2E_TRAINING_URL),
+        TRAINING_MODE: 'true',
+        APP_ENV: 'training',
+        ASSISTANT_PROVIDER: 'fake',
+        FIELD_APP_ENABLED: 'true',
+        NOTIFICATIONS_ENABLED: 'true',
+        CANCELLATIONS_ENABLED: 'true',
+        DOCUMENTS_V1_ENABLED: 'true',
+        DARIJA_ENABLED: 'true',
+        ASSISTANT_DET_ENABLED: 'true',
+        TRANSFERS_ENABLED: 'true',
+        FINANCE_ENABLED: 'true',
+      },
     },
   ],
 });

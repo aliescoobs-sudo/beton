@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { hasLocale, NextIntlClientProvider } from 'next-intl';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { directionOf, routing } from '@/i18n/routing';
+import { TrainingBanner } from '@/modules/platform-security/ui/training-banner';
 import { FakeDataBanner } from '@/modules/platform-security/ui/fake-data-banner';
 import { ToastProvider } from '@/ui';
 import { fontClasses } from '../fonts';
@@ -32,6 +33,7 @@ export default async function LocaleLayout({
     <html lang={locale} dir={directionOf(locale)} className={fontClasses}>
       <body>
         <NextIntlClientProvider>
+          <TrainingBanner />
           <FakeDataBanner />
           <ToastProvider dismissLabel={t('dismiss')}>{children}</ToastProvider>
         </NextIntlClientProvider>

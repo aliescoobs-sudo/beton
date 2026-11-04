@@ -63,3 +63,19 @@ describe('training accounts', () => {
     expect(isTrainingEmail('x@evil.com?formation.beton.invalid')).toBe(false);
   });
 });
+
+describe('training mode refuses outside services (T1)', () => {
+  it('no external language model or invoice reading next to TRAINING_MODE', () => {
+    const base = { ...valid, TRAINING_MODE: 'true', APP_ENV: 'training' };
+    expect(() =>
+      loadEnv({
+        ...base,
+        ASSISTANT_PROVIDER: 'anthropic',
+        ANTHROPIC_API_KEY: 'k',
+        ASSISTANT_ENABLED: 'true',
+      }),
+    ).toThrow(/language model/);
+    expect(() => loadEnv({ ...base, AI_EXTRACTION_ENABLED: 'true' })).toThrow(/language model/);
+    expect(() => loadEnv({ ...base, ASSISTANT_DET_ENABLED: 'true' })).not.toThrow();
+  });
+});

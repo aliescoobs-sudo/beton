@@ -6,7 +6,8 @@ import { flushPush, vapidFromEnv } from '@/modules/platform-security';
 export function startPushLoop(): void {
   const env = getEnv();
   const vapid = vapidFromEnv(env);
-  if (!env.NOTIFICATIONS_ENABLED || !vapid) return;
+  // T1: the training instance contacts no outside service, push included (the in-app bell still works).
+  if (env.TRAINING_MODE || !env.NOTIFICATIONS_ENABLED || !vapid) return;
   const tick = () =>
     flushPush({ systemPool: getPool('system'), vapid }).catch((error: unknown) => {
       console.warn('push flush failed', error instanceof Error ? error.message : String(error));

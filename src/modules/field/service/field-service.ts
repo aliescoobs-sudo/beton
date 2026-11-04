@@ -46,8 +46,12 @@ export interface DriverInstruction {
   acknowledgedAt: string | null;
 }
 
+/** The training instance sends nothing outside (T1): no map link, whatever the address or the office typed. */
+const outboundOff = () => process.env.TRAINING_MODE === 'true';
 export const mapLink = (address: string | null): string | null =>
-  address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` : null;
+  address && !outboundOff()
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
+    : null;
 
 /** The driver's rotations of a day with their steps, the instructions of the last days. */
 export async function getDriverDay(
@@ -149,7 +153,7 @@ export async function getDriverDay(
             tripId: i.trip_id,
             kind: i.kind,
             address,
-            mapUrl: i.map_url ?? mapLink(address),
+            mapUrl: outboundOff() ? null : (i.map_url ?? mapLink(address)),
             note: i.note,
             joinTruckCode: i.join_truck_code,
             createdAt: i.created_at.toISOString(),

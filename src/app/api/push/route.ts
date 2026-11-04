@@ -11,7 +11,7 @@ async function gate(
   write: boolean,
 ): Promise<{ response: Response } | { user: SessionUser }> {
   const env = getEnv();
-  if (!env.NOTIFICATIONS_ENABLED) return { response: json(404, { error: 'NOT_FOUND' }) };
+  if (!env.NOTIFICATIONS_ENABLED || env.TRAINING_MODE) return { response: json(404, { error: 'NOT_FOUND' }) };
   if (write && request.headers.get('origin') !== new URL(env.APP_BASE_URL).origin)
     return { response: json(403, { error: 'FORBIDDEN' }) };
   const allowed = await authorize('notifications.read', {

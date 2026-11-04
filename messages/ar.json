@@ -1,4 +1,7 @@
 {
+  "training": {
+    "banner": "نسخة تدريب — معطيات وهمية"
+  },
   "shell": {
     "title": "BELGOBETON",
     "tagline": "نسخة تجريبية — بيانات وهمية فقط",

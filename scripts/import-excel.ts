@@ -34,6 +34,12 @@ if (!kind || !(IMPORT_KINDS as readonly string[]).includes(kind) || !file || !ex
 
 if (existsSync('.env.local')) process.loadEnvFile('.env.local');
 const env = loadEnv(process.env);
+if (env.TRAINING_MODE) {
+  console.error(
+    'Imports are switched off on the training instance (TRAINING_MODE=true): its data come from seed:training.',
+  );
+  process.exit(1);
+}
 const appPool = new pg.Pool({ connectionString: env.DATABASE_URL_APP, max: 2 });
 const authPool = new pg.Pool({ connectionString: env.DATABASE_URL_AUTH, max: 1 });
 try {

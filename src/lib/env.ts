@@ -186,6 +186,17 @@ const envSchema = envObject.superRefine((env, ctx) => {
       message: 'must be "false" when REAL_DATA=true (the training instance holds fictitious data only)',
     });
   }
+  if (
+    env.TRAINING_MODE &&
+    (env.ASSISTANT_PROVIDER === 'anthropic' || env.ANTHROPIC_API_KEY || env.AI_EXTRACTION_ENABLED)
+  ) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['TRAINING_MODE'],
+      message:
+        'no external language model in training mode: ASSISTANT_PROVIDER must be "fake", no ANTHROPIC_API_KEY, AI_EXTRACTION_ENABLED false',
+    });
+  }
   if (env.ASSISTANT_ENABLED && env.ASSISTANT_PROVIDER === 'anthropic' && !env.ANTHROPIC_API_KEY) {
     ctx.addIssue({
       code: 'custom',

@@ -16,6 +16,13 @@ export const E2E_BASE_URL = `http://localhost:${E2E_PORT}`;
 /** A second server on the same database with the assistant flag OFF: the entry is absent and the endpoints answer 404 (AC-ASSIST-01). */
 export const E2E_OFF_PORT = 3101;
 export const E2E_OFF_URL = `http://localhost:${E2E_OFF_PORT}`;
+export const E2E_TRAINING_PORT = 3102;
+export const E2E_TRAINING_URL = `http://localhost:${E2E_TRAINING_PORT}`;
+/** A training account (reserved address): password alone opens it, but only on the training server. */
+export const E2E_TRAINING_USER = {
+  email: 'e2e-formation@formation.beton.invalid',
+  name: 'Compte Formation E2E',
+} as const;
 export const E2E_PASSWORD = 'correct-horse-battery-staple';
 export const E2E_USERS = {
   fr: { email: 'e2e-fr@belgobeton.test', name: 'Utilisateur E2E' },

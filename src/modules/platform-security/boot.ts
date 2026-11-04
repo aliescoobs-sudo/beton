@@ -52,13 +52,11 @@ export async function assertRealDataOrExit(): Promise<void> {
 export async function assertTrainingGuardOrExit(): Promise<void> {
   try {
     const env = getEnv();
-    const { rows } = await getPool('system').query<{ seeded: boolean }>(
-      'select public.training_seeded() as seeded',
-    );
+    const databaseSeeded = await readTrainingMarker();
     const problem = trainingBootProblem({
       trainingMode: env.TRAINING_MODE,
       appEnv: env.APP_ENV,
-      databaseSeeded: rows[0]?.seeded === true,
+      databaseSeeded,
     });
     if (problem) throw new Error(problem);
     if (env.TRAINING_MODE)
@@ -66,5 +64,23 @@ export async function assertTrainingGuardOrExit(): Promise<void> {
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);
+  }
+}
+
+/**
+ * Whether the database carries the training marker. The database may still be starting (or, in the e2e run, being created): the question
+ * is retried for up to a minute; if it cannot be answered the server does not start (it never guesses "not seeded").
+ */
+async function readTrainingMarker(attempts = 60, waitMs = 1000): Promise<boolean> {
+  for (let i = 1; ; i++) {
+    try {
+      const { rows } = await getPool('system').query<{ seeded: boolean }>(
+        'select public.training_seeded() as seeded',
+      );
+      return rows[0]?.seeded === true;
+    } catch (error) {
+      if (i >= attempts) throw error;
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+    }
   }
 }
