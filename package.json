@@ -36,7 +36,9 @@
     "backup:restore-test": "node --import ./scripts/register-ts-paths.mjs scripts/restore-test.ts",
     "backup:verify": "node --import ./scripts/register-ts-paths.mjs scripts/backup-verify.ts",
     "checklist:record-restore": "node --import ./scripts/register-ts-paths.mjs scripts/checklist-record-restore.ts",
-    "user:reset-owner-2fa": "node --import ./scripts/register-ts-paths.mjs scripts/reset-owner-2fa.ts"
+    "user:reset-owner-2fa": "node --import ./scripts/register-ts-paths.mjs scripts/reset-owner-2fa.ts",
+    "seed:training": "node --import ./scripts/register-ts-paths.mjs scripts/seed-training.ts",
+    "reset:training": "node --import ./scripts/register-ts-paths.mjs scripts/reset-training.ts"
   },
   "dependencies": {
     "@better-auth/utils": "0.4.2",

@@ -6,12 +6,22 @@ export interface SeedGuardEnv {
   SIMULATION_ENABLED: boolean;
   REAL_DATA: boolean;
   NODE_ENV: string;
+  /** The training instance (T1) may seed the same fictitious data, in a production build, but never as APP_ENV=production. */
+  TRAINING_MODE?: boolean;
+  APP_ENV?: string | undefined;
 }
 
-/** AC-SIM-02: the pilot seed runs only in simulation, never on real data or in production. */
+/**
+ * AC-SIM-02: the pilot seed runs only in simulation, never on real data or in production. T1: it also runs for the training instance
+ * (TRAINING_MODE=true, not APP_ENV=production, no real data), whose build is a production build.
+ */
 export function assertSeedAllowed(env: SeedGuardEnv): void {
-  if (!env.SIMULATION_ENABLED) throw new Error('Pilot seed refused: SIMULATION_ENABLED is not "true"');
   if (env.REAL_DATA) throw new Error('Pilot seed refused: REAL_DATA is "true"');
+  if (env.TRAINING_MODE) {
+    if (env.APP_ENV === 'production') throw new Error('Pilot seed refused: APP_ENV is "production"');
+    return;
+  }
+  if (!env.SIMULATION_ENABLED) throw new Error('Pilot seed refused: SIMULATION_ENABLED is not "true"');
   if (env.NODE_ENV === 'production') throw new Error('Pilot seed refused: NODE_ENV is "production"');
 }
 

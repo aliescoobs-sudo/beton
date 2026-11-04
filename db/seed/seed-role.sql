@@ -8,6 +8,8 @@ GRANT USAGE ON SCHEMA public, ctx, audit TO belgobeton_seed;
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA ctx TO belgobeton_seed;
 GRANT EXECUTE ON FUNCTION audit.record(text, text, text, jsonb, jsonb, text) TO belgobeton_seed;
 GRANT EXECUTE ON FUNCTION public.next_code(text, integer) TO belgobeton_seed;
+-- The training seed (T1) runs the scenario with a plant active: the arrival is confirmed for the plant before the office records it.
+GRANT EXECUTE ON FUNCTION public.confirm_receipt_at_plant(uuid, text) TO belgobeton_seed;
 
 GRANT SELECT, INSERT, UPDATE ON public.code_sequence TO belgobeton_seed;
 DROP POLICY IF EXISTS seed_all ON public.code_sequence;
@@ -94,3 +96,8 @@ GRANT UPDATE (default_driver_id) ON public.truck TO belgobeton_seed;
 DROP POLICY IF EXISTS seed_update_default_driver ON public.truck;
 CREATE POLICY seed_update_default_driver ON public.truck FOR UPDATE TO belgobeton_seed
   USING (ctx.role() = 'system') WITH CHECK (ctx.role() = 'system');
+
+-- The scenario asks whether a plant is active (then a receipt needs the plant's confirmation first): read-only, as the system actor.
+GRANT SELECT ON public.plant TO belgobeton_seed;
+DROP POLICY IF EXISTS seed_read ON public.plant;
+CREATE POLICY seed_read ON public.plant FOR SELECT TO belgobeton_seed USING (ctx.role() = 'system');

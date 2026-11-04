@@ -226,6 +226,8 @@ export function loadBackupUrl(source: Record<string, string | undefined>): strin
  * in production (same rule as the seed guard and the boot guard). Read from the raw environment, like the backup URL.
  */
 export function seedRoleAllowed(source: Record<string, string | undefined>): boolean {
+  // The training instance (T1) runs a production build: its seed role is allowed by the training flag, never next to APP_ENV=production.
+  if (source.TRAINING_MODE === 'true') return source.REAL_DATA !== 'true' && source.APP_ENV !== 'production';
   return (
     source.SIMULATION_ENABLED === 'true' && source.REAL_DATA !== 'true' && source.NODE_ENV !== 'production'
   );

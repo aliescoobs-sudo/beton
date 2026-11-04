@@ -243,6 +243,7 @@ async function seedStockAndPurchases(
       if (!created.ok) throw new Error(`Scenario purchase refused (${created.error}) on ${date}`);
       purchases += 1;
       if (receive) {
+        await confirmArrivalIfPlants(tx, created.value.id);
         await tx.query('select public.record_receipt($1, $2)', [created.value.id, addDaysIso(date, 2)]);
         receipts += 1;
       }
@@ -381,6 +382,20 @@ async function seedInvoices(tx: Tx, today: string, rng: Rng): Promise<number> {
     if (!r.ok) throw new Error(`Scenario credit note refused (${r.error})`);
   }
   return made;
+}
+
+/**
+ * With a plant active a receipt needs the plant's confirmation first (D133). The pilot scenario (and the training seed, which runs it
+ * with a plant active) stands for the plant: it confirms the arrival, then the office step follows. No plant: nothing to do.
+ */
+export async function confirmArrivalIfPlants(
+  tx: { query: (sql: string, values?: unknown[]) => Promise<{ rows: unknown[] }> },
+  purchaseId: string,
+): Promise<void> {
+  await tx.query(
+    `select public.confirm_receipt_at_plant($1, null) where exists (select 1 from public.plant where status = 'active')`,
+    [purchaseId],
+  );
 }
 
 /**

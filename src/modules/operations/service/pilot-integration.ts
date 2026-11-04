@@ -12,6 +12,7 @@ import {
 import { assertSeedAllowed, type SeedGuardEnv } from '@/modules/master-data';
 import { SYSTEM_ACTOR_ID, type SessionUser } from '@/modules/platform-security';
 import { insertLoadRows, recetteInForce } from './delivery-service';
+import { confirmArrivalIfPlants } from './pilot-ops';
 
 type Tx = pg.PoolClient;
 
@@ -418,6 +419,7 @@ async function walkPurchases(tx: Tx, today: string): Promise<number> {
     await cell(tx, `select id::text as v from purchase_line where purchase_id = $1`, [created.value.id]),
   );
   // 18 of the 30 units arrive first.
+  await confirmArrivalIfPlants(tx, created.value.id);
   await must(
     tx,
     'the partial receipt',
