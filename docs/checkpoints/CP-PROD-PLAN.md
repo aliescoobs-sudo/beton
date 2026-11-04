@@ -199,3 +199,15 @@ Migrations 0105 to 0107. DECISIONS 160 to 162.
 - **C4.3** day close (0107): fuel variance lines (received fuel transfers with a litre gap; a tank below zero blocks) and cash per holder for owner and app_admin only, when finance is on. Cash is company-wide, not per plant. Dipstick counts still not built.
 - **C4.4** e2e `plant-screens.spec.ts` (plant picker, receipt states with variance, price per plant); day-close cash covered in `finance.spec.ts`.
 - Final regression: lint, typecheck, 4258 unit and integration tests, production build pass; full e2e, one worker, `caffeinate`: **158 passed, 2 skipped, 0 failed in 33.3 min** (`.logs/c4-final-e2e.log`).
+
+## Batch D (final security review, `docs/reviews/CODEX-REVIEW-FINAL.md`): paused
+Paused on 2026-11-04 by the lead for the training instance (T1). Done, one commit each: **F01** `4beaa39` (pump surface scoped to the plant, 0108), **F02** `2888cce` (driver offline data), **F03 + F12** `fce819c` (step-up for decisions and force-close, central policy, 0109), **F04** `d3c347d` (bootstrap file, keys/reports ownership), **F05** `3eff6bb` (deploy.sh root and rollback), **F06** `36e369f` (complete rotation registry, 0110).
+
+**Deferred to pre-production** (not started; each needs its own commit and a test that proves it, enforced in the database and the server actions):
+- **F07** remove the Google Maps link; show the address as text with a copy button; record the decision.
+- **F08** the client document copy must require and consume an approved request; office keeps its normal internal print.
+- **F09** accountant invoice paths without payment state or contacts.
+- **F10** the environment flag is checked on every finance endpoint, including `/api/finance-configuration`.
+- **F11** atomic PIN attempt reservation, a lock re-check before the session is issued, PIN of at least 6 digits.
+- **§16.10 note** a redirect must carry the destination site address to the driver.
+The review's verdict stands for real data until these are closed: do not launch with real data; the training instance (fictitious data only, `docs/checkpoints/CP-TRAINING.md`) is not a launch.
