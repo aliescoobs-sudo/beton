@@ -240,3 +240,131 @@ test('a wrong code is refused with no hint, and the app answers 404 on the pages
   });
   expect(sync.status()).toBe(401);
 });
+
+// F02 (final review): what the phone keeps for the road is tied to the account, limited in age, and erased on sign-out and on refusal.
+/** The service worker controls the page and has the shell, so that an offline reload really opens the app and not the browser's error page. */
+async function warmShell(page: Page) {
+  await page.evaluate(() => navigator.serviceWorker.ready.then(() => undefined));
+  await page.reload();
+  await page.getByTestId('field-code').or(page.getByTestId('field-day')).first().waitFor();
+  await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
+}
+const localState = (page: Page) =>
+  page.evaluate(async () => {
+    const dbs = (await indexedDB.databases?.()) ?? [];
+    let photos = 0;
+    if (dbs.some((d) => d.name === 'belgobeton-field')) {
+      photos = await new Promise<number>((resolve) => {
+        const req = indexedDB.open('belgobeton-field');
+        req.onsuccess = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains('photos')) return resolve(0);
+          const c = db.transaction('photos').objectStore('photos').count();
+          c.onsuccess = () => resolve(c.result);
+        };
+        req.onerror = () => resolve(-1);
+      });
+    }
+    const cached: string[] = [];
+    for (const k of await caches.keys())
+      for (const r of await (await caches.open(k)).keys()) cached.push(r.url);
+    return {
+      day: localStorage.getItem('bb_field_day'),
+      queue: localStorage.getItem('bb_field_queue'),
+      photos,
+      cached,
+    };
+  });
+
+test('the day is never put in the service worker cache and is stored with its account (F02)', async ({
+  page,
+}) => {
+  await openAndSignIn(page);
+  await expect(page.getByTestId(`trip-${orderCode}`)).toBeVisible();
+  const state = await localState(page);
+  expect(state.cached.some((u) => u.includes('/api/field/session'))).toBe(false);
+  const stored = JSON.parse(state.day!) as { userId: string; savedAt: number };
+  expect(stored.userId).toMatch(/[0-9a-f-]{36}/);
+  expect(Math.abs(Date.now() - stored.savedAt)).toBeLessThan(120_000);
+});
+
+test('signing out erases the day, the queue, the photos and the caches; offline, the phone shows the sign-in (F02)', async ({
+  page,
+  context,
+}) => {
+  await openAndSignIn(page);
+  await expect(page.getByTestId(`trip-${orderCode}`)).toBeVisible();
+  await page.getByTestId('field-signout').click();
+  await expect(page.getByTestId('field-login')).toBeVisible();
+  const state = await localState(page);
+  expect(state.day).toBeNull();
+  expect(state.queue).toBeNull();
+  expect(state.photos).toBe(0);
+  expect(state.cached.filter((u) => u.includes('/api/field/'))).toEqual([]);
+  await warmShell(page);
+  await context.setOffline(true);
+  await page.reload();
+  await expect(page.getByTestId('field-login')).toBeVisible();
+  await expect(page.getByTestId(`trip-${orderCode}`)).toHaveCount(0);
+  await expect(page.getByTestId('field-day')).toHaveCount(0);
+  await context.setOffline(false);
+});
+
+test('a day older than the offline age is not shown offline, and a refused session wipes it (F02)', async ({
+  page,
+  context,
+}) => {
+  await openAndSignIn(page);
+  await expect(page.getByTestId(`trip-${orderCode}`)).toBeVisible();
+  // twenty hours old: past the 18 hours kept for the road
+  await warmShell(page);
+  await page.evaluate(() => {
+    const v = JSON.parse(localStorage.getItem('bb_field_day')!);
+    {
+      v.savedAt = Date.now() - 20 * 3600_000;
+      localStorage.setItem('bb_field_day', JSON.stringify(v));
+    }
+  });
+  await context.setOffline(true);
+  await page.reload();
+  await expect(page.getByTestId('field-login')).toBeVisible();
+  expect((await localState(page)).day).toBeNull();
+  await context.setOffline(false);
+
+  // a session the server no longer accepts (cookie gone): the day is wiped at once, online
+  await openAndSignIn(page);
+  await expect(page.getByTestId(`trip-${orderCode}`)).toBeVisible();
+  await context.clearCookies();
+  await page.reload();
+  await expect(page.getByTestId('field-login')).toBeVisible();
+  expect((await localState(page)).day).toBeNull();
+});
+
+test('another account signing in on the phone finds nothing of the previous one (F02)', async ({ page }) => {
+  await openAndSignIn(page);
+  await expect(page.getByTestId(`trip-${orderCode}`)).toBeVisible();
+  // the phone holds a queue and a day that belong to somebody else
+  await page.evaluate(() => {
+    localStorage.setItem(
+      'bb_field_queue',
+      JSON.stringify({
+        userId: 'someone-else',
+        actions: [
+          {
+            kind: 'step',
+            key: 'foreign-tap-0001',
+            tripId: 'x',
+            step: 'arrived',
+            at: new Date().toISOString(),
+          },
+        ],
+      }),
+    );
+  });
+  await page.reload();
+  await expect(page.getByTestId('field-day')).toBeVisible();
+  await expect
+    .poll(async () => JSON.parse((await localState(page)).queue!).userId, { timeout: 15_000 })
+    .not.toBe('someone-else');
+  expect(JSON.parse((await localState(page)).queue!).actions).toEqual([]);
+});

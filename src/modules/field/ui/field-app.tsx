@@ -7,20 +7,22 @@ import {
   applyOutcomes,
   EMERGENCY_OPTIONS,
   enqueue,
+  mustWipeForAccount,
   newKey,
   nextDriverTap,
   nextPumpStep,
-  parseQueue,
+  readStoredDay,
+  readStoredQueue,
+  wrapDay,
   type QueueAction,
   type SyncOutcome,
 } from '../domain/index-client';
+import { DAY_KEY, forgetAll, forgetRead, QUEUE_KEY } from './offline-store';
 import { dropPhoto, queuedPhotos, queuePhoto, sendPhoto, shrinkPhoto } from './photo-queue';
 
 // The phone app. One big button per step, an emergency button that is always there, large text. Every tap is queued with the
 // phone's own time and sent when there is a network; the last day read is kept for the road. No price exists in anything it gets.
 
-const QUEUE_KEY = 'bb_field_queue';
-const DAY_KEY = 'bb_field_day';
 const DEVICE_KEY = 'bb_field_device';
 
 interface Trip {
@@ -65,17 +67,9 @@ interface PumpJob {
   m3Pumped: number | null;
 }
 type Day =
-  | { kind: 'driver'; date: string; trips: Trip[]; instructions: Instruction[] }
-  | { kind: 'pump_operator'; date: string; jobs: PumpJob[] };
+  | { kind: 'driver'; userId: string; date: string; trips: Trip[]; instructions: Instruction[] }
+  | { kind: 'pump_operator'; userId: string; date: string; jobs: PumpJob[] };
 
-const read = <T,>(key: string): T | null => {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : null;
-  } catch {
-    return null;
-  }
-};
 const deviceId = (): string => {
   let id = localStorage.getItem(DEVICE_KEY);
   if (!id) {
@@ -101,33 +95,63 @@ export function FieldApp({ locale }: { locale: string }) {
   const syncing = useRef(false);
   const flushing = useRef(false);
   const queueRef = useRef<QueueAction[]>([]);
+  // The account the phone's local work belongs to (F02): the taps and the photos are sent by that account only.
+  const ownerRef = useRef<string | null>(null);
 
   const saveQueue = useCallback((q: QueueAction[]) => {
     queueRef.current = q;
     setQueue(q);
-    localStorage.setItem(QUEUE_KEY, JSON.stringify(q));
+    if (ownerRef.current)
+      localStorage.setItem(QUEUE_KEY, JSON.stringify({ userId: ownerRef.current, actions: q }));
+  }, []);
+
+  // The server refused this phone's session (expired, revoked, device released): nothing that names a client stays on screen or on the
+  // phone. The work waiting to be sent stays, tied to its account, and goes out after that account signs in again.
+  const refused = useCallback(async () => {
+    await forgetRead();
+    setDay(null);
+    setSession('out');
   }, []);
 
   const loadDay = useCallback(async () => {
     try {
       const res = await fetch('/api/field/session', { cache: 'no-store' });
-      if (res.status === 401) return setSession('out');
+      if (res.status === 401) return await refused();
       if (!res.ok) throw new Error('bad');
       const data = (await res.json()) as Day;
-      localStorage.setItem(DAY_KEY, JSON.stringify(data));
+      // Another account on this phone: its day, its taps and its photos are erased before this account sees anything of them.
+      const photos = await queuedPhotos().catch(() => []);
+      const holders = [
+        readStoredDay<Day>(localStorage.getItem(DAY_KEY), Date.now())?.userId,
+        ownerRef.current,
+        ...photos.map((p) => p.userId),
+      ];
+      if (mustWipeForAccount(data.userId, holders)) {
+        await forgetAll();
+        saveQueue([]);
+        setPhotosWaiting({});
+      }
+      ownerRef.current = data.userId;
+      localStorage.setItem(DAY_KEY, JSON.stringify(wrapDay(data.userId, data, Date.now())));
+      localStorage.setItem(QUEUE_KEY, JSON.stringify({ userId: data.userId, actions: queueRef.current }));
       setDay(data);
       setSession('in');
       setOnline(true);
     } catch {
-      // No network: the last day read stays on screen.
-      const cached = read<Day>(DAY_KEY);
-      if (cached) {
-        setDay(cached);
+      // No network: the last day read stays on screen, for the account that read it and for a limited time only.
+      const kept = readStoredDay<Day>(localStorage.getItem(DAY_KEY), Date.now());
+      if (kept) {
+        ownerRef.current = kept.userId;
+        setDay(kept.day);
         setSession('in');
-      } else setSession('out');
+      } else {
+        await forgetRead();
+        setDay(null);
+        setSession('out');
+      }
       setOnline(false);
     }
-  }, []);
+  }, [refused, saveQueue]);
 
   const sync = useCallback(async () => {
     if (syncing.current || queueRef.current.length === 0) return;
@@ -138,7 +162,7 @@ export function FieldApp({ locale }: { locale: string }) {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ actions: queueRef.current }),
       });
-      if (res.status === 401) return setSession('out'); // the queue stays: it is sent after the next sign-in
+      if (res.status === 401) return await refused(); // the queue stays: it is sent after the next sign-in
       if (!res.ok) return;
       const { outcomes } = (await res.json()) as { outcomes: SyncOutcome[] };
       saveQueue(applyOutcomes(queueRef.current, outcomes));
@@ -149,21 +173,21 @@ export function FieldApp({ locale }: { locale: string }) {
     } finally {
       syncing.current = false;
     }
-  }, [loadDay, saveQueue]);
+  }, [loadDay, saveQueue, refused]);
 
   // Sends the waiting photos one by one. The server answers for each: stored, try again later, or refused for good.
   const flushPhotos = useCallback(async () => {
     if (flushing.current) return;
     flushing.current = true;
     try {
-      const all = await queuedPhotos().catch(() => []);
+      const all = (await queuedPhotos().catch(() => [])).filter((p) => p.userId === ownerRef.current);
       for (const p of all) {
         const verdict = await sendPhoto(p);
         if (verdict === 'retry') break;
         await dropPhoto(p.key);
         if (verdict === 'drop') setMessage(t('photo.refused'));
       }
-      const rest = await queuedPhotos().catch(() => []);
+      const rest = (await queuedPhotos().catch(() => [])).filter((p) => p.userId === ownerRef.current);
       setPhotosWaiting(
         rest.reduce<Record<string, number>>((m, p) => ({ ...m, [p.tripId]: (m[p.tripId] ?? 0) + 1 }), {}),
       );
@@ -177,7 +201,14 @@ export function FieldApp({ locale }: { locale: string }) {
     if (!file) return;
     try {
       const blob = await shrinkPhoto(file);
-      await queuePhoto({ key: newKey(), tripId: trip.id, takenAt: new Date().toISOString(), blob });
+      if (!ownerRef.current) throw new Error('no account');
+      await queuePhoto({
+        key: newKey(),
+        tripId: trip.id,
+        takenAt: new Date().toISOString(),
+        blob,
+        userId: ownerRef.current,
+      });
     } catch {
       return setMessage(t('photo.refused'));
     }
@@ -189,7 +220,11 @@ export function FieldApp({ locale }: { locale: string }) {
       void navigator.serviceWorker.register('/driver-sw.js').catch(() => undefined);
     // The stored queue is read after mount (localStorage does not exist on the server), then the day and the sync follow.
     void Promise.resolve()
-      .then(() => saveQueue(parseQueue(localStorage.getItem(QUEUE_KEY))))
+      .then(() => {
+        const kept = readStoredQueue<QueueAction>(localStorage.getItem(QUEUE_KEY));
+        ownerRef.current = kept?.userId ?? null;
+        saveQueue(kept?.actions ?? []);
+      })
       .then(() => loadDay())
       .then(() => sync())
       .then(() => flushPhotos());
@@ -222,7 +257,8 @@ export function FieldApp({ locale }: { locale: string }) {
     setDay((d) => {
       if (!d) return d;
       const next = update(d);
-      localStorage.setItem(DAY_KEY, JSON.stringify(next));
+      if (ownerRef.current)
+        localStorage.setItem(DAY_KEY, JSON.stringify(wrapDay(ownerRef.current, next, Date.now())));
       return next;
     });
   }
@@ -293,8 +329,17 @@ export function FieldApp({ locale }: { locale: string }) {
   }
 
   async function signOut() {
+    // What can still be sent goes first; what cannot is told to the driver, because signing out erases it with the rest.
+    await sync();
+    await flushPhotos();
+    const photos = (await queuedPhotos().catch(() => [])).filter((x) => x.userId === ownerRef.current);
+    const waiting = queueRef.current.length + photos.length;
+    if (waiting > 0 && !window.confirm(t('signOutPending', { count: waiting }))) return;
     await fetch('/api/field/logout', { method: 'POST' }).catch(() => null);
-    localStorage.removeItem(DAY_KEY);
+    await forgetAll();
+    ownerRef.current = null;
+    saveQueue([]);
+    setPhotosWaiting({});
     setDay(null);
     setSession('out');
   }

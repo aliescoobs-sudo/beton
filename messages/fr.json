@@ -2580,6 +2580,7 @@
     },
     "offline": "Hors ligne : vos actions sont gardées et seront envoyées.",
     "queued": "{count} action(s) à envoyer",
+    "signOutPending": "{count} élément(s) n'ont pas encore pu être envoyés et seront effacés de ce téléphone si vous vous déconnectez. Se déconnecter quand même ?",
     "noTrips": "Aucune livraison aujourd'hui.",
     "idle": "Au repos à la centrale.",
     "waitLoad": "En attente du chargement par la centrale.",

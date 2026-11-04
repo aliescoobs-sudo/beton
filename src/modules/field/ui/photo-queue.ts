@@ -7,6 +7,8 @@ export interface QueuedPhoto {
   tripId: string;
   takenAt: string;
   blob: Blob;
+  /** The account that took it: another account never sends it, and signing out or switching account erases it (F02). */
+  userId: string;
 }
 
 const DB = 'belgobeton-field';
@@ -32,6 +34,7 @@ async function run<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRe
 
 export const queuePhoto = (p: QueuedPhoto) => run('readwrite', (s) => s.put(p)).then(() => undefined);
 export const queuedPhotos = () => run<QueuedPhoto[]>('readonly', (s) => s.getAll());
+export const wipePhotos = () => run('readwrite', (s) => s.clear()).then(() => undefined);
 export const dropPhoto = (key: string) => run('readwrite', (s) => s.delete(key)).then(() => undefined);
 
 /** Re-draws the picture at most 1600 px wide as a JPEG: smaller to send, and the camera metadata (GPS) is not carried over. */

@@ -1,10 +1,9 @@
-// Service worker of the driver and pump phone app (R4). It keeps the app shell and the last day readable offline. It never
-// caches anything but: the driver page, the framework's own static files, and the day endpoint (network first, so a fresh
-// answer wins and the last one serves when there is no network). Taps are never cached here: the app queues them itself.
-const CACHE = 'bb-field-v1';
+// Service worker of the driver and pump phone app (R4). It keeps the app shell readable offline. It caches only the driver page and the
+// framework's own static files: NEVER the day (F02: the day names clients; the app keeps its own copy, tied to the account and limited
+// in age, and erases it on sign-out, refusal or account switch). Taps are never cached here: the app queues them itself.
+const CACHE = 'bb-field-v2';
 const SHELL = /^\/(fr|ar)\/driver\/?$/;
 const STATIC = /^\/_next\/static\//;
-const DAY = /^\/api\/field\/session$/;
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (event) => {
@@ -21,7 +20,7 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
-  const networkFirst = SHELL.test(url.pathname) || DAY.test(url.pathname);
+  const networkFirst = SHELL.test(url.pathname);
   if (!networkFirst && !STATIC.test(url.pathname)) return;
   event.respondWith(
     (async () => {
@@ -32,7 +31,7 @@ self.addEventListener('fetch', (event) => {
           if (fresh.ok) await cache.put(req, fresh.clone());
           return fresh;
         } catch {
-          const hit = await cache.match(req, { ignoreSearch: DAY.test(url.pathname) });
+          const hit = await cache.match(req, { ignoreSearch: false });
           if (hit) return hit;
           throw new Error('offline');
         }

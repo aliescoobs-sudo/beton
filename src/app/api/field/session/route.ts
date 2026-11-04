@@ -15,12 +15,14 @@ export async function GET(request: Request): Promise<Response> {
     if (user.role === 'pump_operator') {
       return fieldJson(200, {
         kind: 'pump_operator',
+        userId: user.id,
         date,
         jobs: await getPumpDay(getPool('app'), user, date, cipher),
       });
     }
     return fieldJson(200, {
       kind: 'driver',
+      userId: user.id,
       date,
       ...(await getDriverDay(getPool('app'), user, date, cipher)),
     });
