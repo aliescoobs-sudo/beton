@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
+import { StepUpDialog } from '@/modules/platform-security/ui/step-up-dialog';
 import { Button, StatusPill } from '@/ui';
 import type { CancellationCase, RedirectCandidate } from '../service/cancellation-service';
 
@@ -36,12 +37,20 @@ export function CancellationsBoard({
   const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
   const [options, setOptions] = useState<Record<string, RedirectCandidate[]>>({});
+  // A decision or a policy change needs a fresh second factor (F03): the dialog opens, then the same action runs again.
+  const [retry, setRetry] = useState<(() => Promise<void>) | null>(null);
 
-  async function send(input: Parameters<typeof decide>[0]) {
-    const r = await decide(input);
+  async function settle(run: () => Promise<Result>, again: () => Promise<void>) {
+    const r = await run();
+    if (!r.ok && r.error === 'STEP_UP_REQUIRED') return setRetry(() => again);
     setMessage(r.ok ? null : t(`errors.${r.error}` as never));
     if (r.ok) router.refresh();
   }
+  const send = (input: Parameters<typeof decide>[0]): Promise<void> =>
+    settle(
+      () => decide(input),
+      () => send(input),
+    );
 
   const open = cases.filter((c) => c.status === 'open');
   const decided = cases.filter((c) => c.status === 'decided');
@@ -59,12 +68,16 @@ export function CancellationsBoard({
           onSubmit={async (e) => {
             e.preventDefault();
             const f = new FormData(e.currentTarget);
-            const r = await setPolicy({
+            const input = {
               plantMayDecide: f.get('plantMayDecide') === 'on',
               clientCharged: f.get('clientCharged') === 'on',
-            });
-            setMessage(r.ok ? null : t(`errors.${r.error}` as never));
-            if (r.ok) router.refresh();
+            };
+            const save = (): Promise<void> =>
+              settle(
+                () => setPolicy(input),
+                () => save(),
+              );
+            await save();
           }}
         >
           <label>
@@ -154,6 +167,16 @@ export function CancellationsBoard({
           ))}
         </ul>
       </section>
+      {retry && (
+        <StepUpDialog
+          onVerified={() => {
+            const again = retry;
+            setRetry(null);
+            void again();
+          }}
+          onCancel={() => setRetry(null)}
+        />
+      )}
     </div>
   );
 }

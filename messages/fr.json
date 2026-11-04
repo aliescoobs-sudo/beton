@@ -2786,6 +2786,8 @@
       "NOT_FOUND": "Introuvable.",
       "INVALID": "Saisie invalide.",
       "MISMATCH": "Ne correspond pas à l'état réel.",
+      "REENROL_REQUIRED": "Enregistrez d'abord un nouvel authentificateur (connexion par code de secours).",
+      "STEP_UP_REQUIRED": "Un code de vérification récent est nécessaire.",
       "CONFLICT": "Déjà fait."
     }
   },
@@ -2909,6 +2911,8 @@
     "force": "Clôturer malgré tout",
     "note": "Note obligatoire",
     "close": "Clôturer",
+    "blockedTold": "Journée bloquée : le propriétaire est prévenu.",
+    "error": "Action refusée.",
     "item": {
       "unconfirmed_load": "Chargements non confirmés",
       "missing_bl": "BL signés manquants",

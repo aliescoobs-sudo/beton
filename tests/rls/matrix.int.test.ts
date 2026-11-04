@@ -450,7 +450,11 @@ const FIXTURES: Record<
   },
   cancellation_policy: {
     writers: ['owner'],
-    seed: (tx) => tx.query(`select public.set_cancellation_policy(false, false)`),
+    // a door that needs the step-up mark (D3): the fixture stands for a stepped-up request
+    seed: async (tx) => {
+      await tx.query(`select set_config('app.step_up', 'verified', true)`);
+      return tx.query(`select public.set_cancellation_policy(false, false)`);
+    },
     visible: `select updated_by::text as owner from cancellation_policy where updated_by is not null and $1::text is not null`,
   },
   cancellation_case: {

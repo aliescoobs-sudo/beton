@@ -35,8 +35,8 @@ const marker = `ps${randomUUID().replace(/-/g, '').slice(0, 10)}`;
 const cipher = fieldCipherFrom(parseKeyring(env.FIELD_ENCRYPTION_KEYS));
 const letters = (n: number) =>
   Array.from({ length: n }, () => String.fromCharCode(65 + Math.floor(Math.random() * 26))).join('');
-const DAY = '2026-06-04';
-const NOW = new Date('2026-06-04T09:00:00Z');
+const DAY = '2026-07-14';
+const NOW = new Date('2026-07-14T09:00:00Z');
 let done: () => Promise<void>;
 let owner: SessionUser, pmA: SessionUser, pmB: SessionUser;
 let plantA = '',

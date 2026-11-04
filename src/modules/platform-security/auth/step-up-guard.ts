@@ -1,3 +1,4 @@
+import { getPool } from '@/lib/db/pools';
 import { type Clock, realClock } from '@/modules/clock';
 import type { ParameterValues } from '../domain/parameters';
 import {
@@ -6,6 +7,7 @@ import {
   type SensitiveBlocker,
   STEP_UP_MAX_AGE_MS,
 } from '../domain/step-up';
+import { readParameters } from '../service/parameter-service';
 import type { AuthState, SessionUser } from './session-gate';
 
 export const STEP_UP_REQUIRED = 'STEP_UP_REQUIRED' as const;
@@ -17,7 +19,10 @@ export type StepUpResult<T> =
 export interface StepUpDeps {
   getState: () => Promise<AuthState>;
   clock?: Clock;
-  /** Current parameters (`auth.step_up_minutes`); the spec default applies without it. */
+  /**
+   * Where the policy (`auth.step_up_minutes`) is read. Callers do not need to pass it: the guard always reads the central policy from
+   * the database itself (F12), so no action can forget it. Only tests and special callers substitute their own reader.
+   */
   parameters?: () => Promise<ParameterValues>;
 }
 
@@ -29,15 +34,22 @@ export interface StepUpDeps {
 export async function withStepUp<T>(
   _action: SensitiveAction,
   fn: (user: SessionUser) => Promise<T>,
-  { getState, clock = realClock, parameters }: StepUpDeps,
+  { getState, clock = realClock, parameters = () => readParameters(getPool('auth')) }: StepUpDeps,
 ): Promise<StepUpResult<T>> {
   const state = await getState();
   if (state.kind !== 'authenticated') return { ok: false, error: 'UNAUTHENTICATED' };
+  // The central policy, always. If it cannot be read the answer is "step up", never the default of a weaker rule.
+  let maxAgeMs: number;
+  try {
+    maxAgeMs = Math.min((await parameters())['auth.step_up_minutes'] * 60_000, STEP_UP_MAX_AGE_MS);
+  } catch {
+    return { ok: false, error: 'STEP_UP_REQUIRED' };
+  }
   const blocker = sensitiveActionBlocker(
     { reenrolRequired: state.user.reenrolRequired, twoFactorAt: state.session.twoFactorAt },
     clock.now(),
-    parameters ? (await parameters())['auth.step_up_minutes'] * 60_000 : STEP_UP_MAX_AGE_MS,
+    maxAgeMs,
   );
   if (blocker) return { ok: false, error: blocker };
-  return { ok: true, value: await fn(state.user) };
+  return { ok: true, value: await fn({ ...state.user, stepUpVerified: true }) };
 }

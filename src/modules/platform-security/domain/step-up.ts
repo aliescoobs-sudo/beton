@@ -22,6 +22,10 @@ export const SENSITIVE_ACTIONS = [
   'credit_limit.set',
   'auth.regenerate_recovery_codes',
   'checklist.mark',
+  'cancellation.decide',
+  'cancellation.policy',
+  'cancellation.cancel_order',
+  'dayclose.force',
 ] as const;
 
 export type SensitiveAction = (typeof SENSITIVE_ACTIONS)[number];

@@ -29,6 +29,8 @@ const contextSchema = z.object({
   simAt: z.date().optional(),
   /** The plant of the request (R1): rows inserted without a plant take it (database trigger `plant_fill`). A context value, not a right. */
   plantId: z.uuid().optional(),
+  /** The request passed the step-up (see `SessionUser.stepUpVerified`): the sensitive database doors read it as `app.step_up`. */
+  stepUp: z.boolean().optional(),
   /** A draft of the assistant being confirmed by its human: the audit trail then says `ai_confirmed` and names the proposal. */
   aiProposalId: z.uuid().optional(),
   /** Run as usual, then roll everything back: what a draft's preview shows is what the service would do, and none of it stays. */
@@ -54,7 +56,8 @@ export async function withRlsContext<T>(
     await client.query(
       `select set_config('app.user_id', $1, true), set_config('app.role', $2, true),
               set_config('app.request_id', $3, true), set_config('app.sim_at', $4, true),
-              set_config('app.ai_proposal_id', $5, true), set_config('app.plant_id', $6, true)`,
+              set_config('app.ai_proposal_id', $5, true), set_config('app.plant_id', $6, true),
+              set_config('app.step_up', $7, true)`,
       [
         ctx.userId,
         ctx.role,
@@ -63,6 +66,7 @@ export async function withRlsContext<T>(
         ctx.simAt?.toISOString() ?? '',
         ctx.aiProposalId ?? '',
         ctx.plantId ?? '',
+        ctx.stepUp ? 'verified' : '',
       ],
     );
     // In simulated mode every transaction (including anonymous failed logins) is stamped with the simulated

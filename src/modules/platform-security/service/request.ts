@@ -34,6 +34,7 @@ export const inRequest = <T>(pool: pg.Pool, actor: SessionUser, fn: (tx: pg.Pool
       role: actor.role,
       requestId: uuidv7(realClock.now()),
       plantId: actor.plantId ?? undefined,
+      stepUp: actor.stepUpVerified === true ? true : undefined,
       aiProposalId: aiConfirmation.getStore()?.proposalId,
       rollback: dryRun.getStore() === true ? true : undefined,
     },

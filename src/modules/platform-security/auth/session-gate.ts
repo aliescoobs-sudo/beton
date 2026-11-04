@@ -14,6 +14,12 @@ export interface SessionUser {
   twoFactorEnabled: boolean;
   /** Logged in with a recovery code: must enrol a new authenticator before any sensitive action. */
   reenrolRequired: boolean;
+  /**
+   * Set only by `withStepUp`, on the copy of the user it hands to the guarded action: this request passed the step-up (a second factor no
+   * older than the policy, no re-enrolment pending). `inRequest` carries it to the database (`app.step_up`), whose sensitive doors refuse
+   * a request without it, so a service reached by any other path cannot do what only a stepped-up action may.
+   */
+  stepUpVerified?: boolean;
 }
 
 export interface SessionInfo {

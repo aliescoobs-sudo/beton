@@ -60,9 +60,10 @@ beforeAll(async () => {
   const v = await v1Actors(app, env.DATABASE_URL_MIGRATOR, marker);
   done = v.done;
   plantId = v.plantId;
-  u.owner = v.owner;
+  // These tests stand for requests that passed the step-up (the server action's guard); tests/step-up-doors proves the refusal without it.
+  u.owner = { ...v.owner, stepUpVerified: true };
   for (const r of ['app_admin', 'office_sales', 'plant_manager', 'driver', 'accountant'] as const)
-    u[r] = v.session(r);
+    u[r] = { ...v.session(r), stepUpVerified: true };
   scene = await asOwner(async () => deliveryScene(app, u.owner!.id, marker, DAY));
   master = await orderMaster(app, u.owner!.id, marker);
 });

@@ -12,7 +12,7 @@ import {
   setCancellationPolicy,
   type RedirectCandidate,
 } from '@/modules/operations';
-import { authorize, ForbiddenError } from '@/modules/platform-security';
+import { authorize, ForbiddenError, withStepUp, type SensitiveAction } from '@/modules/platform-security';
 import { currentAuthState } from '@/modules/platform-security/next';
 
 type Result = { ok: true } | { ok: false; error: string };
@@ -24,12 +24,20 @@ async function run(
     user: Parameters<typeof cancelUnproducedOrder>[1],
     now: Date,
   ) => Promise<{ ok: boolean; error?: string }>,
+  /** The sensitive action that needs a fresh second factor (F03): decisions, policy, the reversal of an unproduced order. */
+  stepUp?: SensitiveAction,
 ): Promise<Result> {
   if (!getEnv().CANCELLATIONS_ENABLED) return { ok: false, error: 'NOT_FOUND' };
   const allowed = await authorize(permission, { getState: deps.getState, appPool: deps.appPool() });
   if (!allowed.ok) return { ok: false, error: allowed.reason };
   try {
-    const r = await fn(allowed.user, (await getRequestClock()).now());
+    const now = (await getRequestClock()).now();
+    let r: { ok: boolean; error?: string };
+    if (stepUp) {
+      const guarded = await withStepUp(stepUp, (user) => fn(user, now), { getState: deps.getState });
+      if (!guarded.ok) return { ok: false, error: guarded.error };
+      r = guarded.value;
+    } else r = await fn(allowed.user, now);
     revalidatePath('/', 'layout');
     return r.ok ? { ok: true } : { ok: false, error: r.error ?? 'ERROR' };
   } catch (error) {
@@ -40,8 +48,11 @@ async function run(
 
 // @permission cancellations.open (owner, app_admin, partner, office, office_sales, plant, plant_manager): cases 1 and 2
 export async function cancelOrderCaseAction(input: { orderId: string; reason?: string }): Promise<Result> {
-  return run('cancellations.open', (user, now) =>
-    cancelUnproducedOrder(getPool('app'), user, input, { today: now.toISOString().slice(0, 10) }),
+  return run(
+    'cancellations.open',
+    (user, now) =>
+      cancelUnproducedOrder(getPool('app'), user, input, { today: now.toISOString().slice(0, 10) }),
+    'cancellation.cancel_order',
   );
 }
 
@@ -56,17 +67,25 @@ export async function openTripCaseAction(input: {
   return run('cancellations.open', (user, now) => openTripCase(getPool('app'), user, input, { now }));
 }
 
-// @permission cancellations.decide (owner, app_admin, plant_manager): redirect or loss, the plant manager only under the policy
+// @permission cancellations.decide (owner, app_admin, plant_manager) + sensitive action cancellation.decide: redirect or loss, the plant manager only under the policy
 export async function decideCaseAction(input: Parameters<typeof decideCancellation>[2]): Promise<Result> {
-  return run('cancellations.decide', (user, now) => decideCancellation(getPool('app'), user, input, { now }));
+  return run(
+    'cancellations.decide',
+    (user, now) => decideCancellation(getPool('app'), user, input, { now }),
+    'cancellation.decide',
+  );
 }
 
-// @permission cancellations.policy (owner, app_admin): who decides and whether the cancelling client is charged
+// @permission cancellations.policy (owner, app_admin) + sensitive action cancellation.policy: who decides and whether the cancelling client is charged
 export async function setPolicyAction(input: {
   plantMayDecide: boolean;
   clientCharged: boolean;
 }): Promise<Result> {
-  return run('cancellations.policy', (user) => setCancellationPolicy(getPool('app'), user, input));
+  return run(
+    'cancellations.policy',
+    (user) => setCancellationPolicy(getPool('app'), user, input),
+    'cancellation.policy',
+  );
 }
 
 // @permission cancellations.read (every company role): the orders that could take the surplus of a case

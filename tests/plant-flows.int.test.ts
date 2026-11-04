@@ -78,8 +78,10 @@ beforeAll(async () => {
   done = v.done;
   owner = v.owner;
   plant1 = v.plantId;
-  u.owner = v.owner;
-  for (const r of ['app_admin', 'office_sales', 'plant_manager', 'driver'] as const) u[r] = v.session(r);
+  // These tests stand for requests that passed the step-up (the server action's guard); tests/step-up-doors proves the refusal without it.
+  u.owner = { ...v.owner, stepUpVerified: true };
+  for (const r of ['app_admin', 'office_sales', 'plant_manager', 'driver'] as const)
+    u[r] = { ...v.session(r), stepUpVerified: true };
   // the shared scene is built while this plant is the only active one, then the second plant opens
   master = await orderMaster(app, owner.id, marker);
   scene = await asOwner(plant1, () => deliveryScene(app, owner.id, marker, DATE));

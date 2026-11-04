@@ -8,7 +8,8 @@ import { listPlants } from '@/modules/master-data';
 import { getDayCloseStatus, listDayCloses } from '@/modules/operations';
 import { can } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/next';
-import { Button, Money, PageHeader, StatusPill } from '@/ui';
+import { CloseDayForm } from '@/modules/operations/ui/close-day-form';
+import { Money, PageHeader, StatusPill } from '@/ui';
 import { closeDayAction } from './actions';
 
 /** The day close per plant: unconfirmed loads, missing BLs, stock variance. Blocking items stop the close and go to the owner (§16.9). */
@@ -66,19 +67,7 @@ export default async function DayClosePage({ params }: { params: Promise<{ local
                 </ul>
               )}
               {write && !closed && (
-                <form action={closeDayAction} className="mt-2 flex flex-wrap items-center gap-2 text-sm">
-                  <input type="hidden" name="plantId" value={p.id} />
-                  <input type="hidden" name="date" value={today} />
-                  {canForce && (
-                    <>
-                      <label>
-                        <input type="checkbox" name="force" /> {t('force')}
-                      </label>
-                      <input name="note" placeholder={t('note')} />
-                    </>
-                  )}
-                  <Button type="submit">{t('close')}</Button>
-                </form>
+                <CloseDayForm plantId={p.id} date={today} canForce={canForce} close={closeDayAction} />
               )}
             </section>
           );
