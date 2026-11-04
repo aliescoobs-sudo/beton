@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { loadEnv } from './env';
-import { isTrainingEmail, trainingBootProblem } from './training';
+import { funnelWarning, isTrainingEmail, trainingBootProblem } from './training';
 
 const valid = {
   DATABASE_URL_APP: 'postgres://app:pw@db:5432/belgobeton',
@@ -77,5 +77,17 @@ describe('training mode refuses outside services (T1)', () => {
     ).toThrow(/language model/);
     expect(() => loadEnv({ ...base, AI_EXTRACTION_ENABLED: 'true' })).toThrow(/language model/);
     expect(() => loadEnv({ ...base, ASSISTANT_DET_ENABLED: 'true' })).not.toThrow();
+  });
+});
+
+describe('the Funnel warning (T1)', () => {
+  it('warns when a Tailscale address is served without training mode, and only then', () => {
+    expect(funnelWarning({ trainingMode: false, appBaseUrl: 'https://imac.tail1234.ts.net' })).toMatch(
+      /Tailscale/,
+    );
+    expect(funnelWarning({ trainingMode: true, appBaseUrl: 'https://imac.tail1234.ts.net' })).toBeNull();
+    expect(funnelWarning({ trainingMode: false, appBaseUrl: 'https://beton.example.test' })).toBeNull();
+    expect(funnelWarning({ trainingMode: false, appBaseUrl: 'https://evil-ts.net.example.test' })).toBeNull();
+    expect(funnelWarning({ trainingMode: false, appBaseUrl: 'not a url' })).toBeNull();
   });
 });

@@ -1,0 +1,99 @@
+# BELGOBETON TRAINING instance (T1): fictitious data only, a production build. NOT a production stack. Runs on the training iMac
+# (linux/amd64 under Colima) and, unchanged, on a VPS: the only difference is who makes it public (see CP-TRAINING.md).
+#   iMac:  the app is published on 127.0.0.1:${APP_PORT:-3000} only; Tailscale Funnel carries it to the internet over HTTPS.
+#   VPS:   add the Caddy profile (./scripts/training/dc.sh --profile public up -d) with APP_DOMAIN set: Caddy takes 80 and 443 and gets the
+#          certificate; the app stays on 127.0.0.1.
+# TRAINING_MODE=true shows a banner on every page, lets the training accounts use a password alone, and switches imports and every
+# TRAINING_MODE=true shows a banner on every page, lets the training accounts use a password alone, and switches imports and every
+# outbound integration off. It is refused with APP_ENV=production, and a database seeded for training refuses to boot without the flag.
+# The database is on an INTERNAL network (no host port). Rate limiting and the login lockout stay on: the instance is reachable from the internet.
+# Two secret files on the server (chmod 600, never in git): .env.training (the app and compose) and .env.training.ops (superuser, migrator,
+# backup and seed logins, used by the maintenance container only). Every command goes through ./scripts/training/dc.sh.
+name: belgobeton-training
+
+services:
+  db:
+    image: postgres:17.11-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?set POSTGRES_SUPERUSER_PASSWORD in .env.training.ops}
+      POSTGRES_DB: postgres
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks: [internal]
+
+  app:
+    image: ${APP_IMAGE:?set APP_IMAGE in .env.training to ghcr.io/<owner>/belgobeton@sha256:<digest>}
+    restart: unless-stopped
+    env_file: .env.training
+    environment:
+      NODE_ENV: production
+      APP_ENV: training
+      TRAINING_MODE: 'true'
+      REAL_DATA: 'false'
+      SIMULATION_ENABLED: 'false'
+      # One proxy in front (Tailscale Funnel, or Caddy on a VPS) appends the client address to X-Forwarded-For.
+      TRUSTED_PROXY_HOPS: '1'
+      FILE_STORE_DIR: /data/file-store
+    # Loopback only: nothing on the local network, nothing on the internet, except through the proxy you start on purpose.
+    ports:
+      - '127.0.0.1:${APP_PORT:-3000}:3000'
+    volumes:
+      - filestore:/data/file-store
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [internal, edge]
+
+  # VPS only (profile `public`): HTTPS with an automatic certificate for APP_DOMAIN. Not started on the iMac.
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    profiles: [public]
+    environment:
+      # Empty on the iMac; Caddy refuses to start without a name rather than serving the wrong one.
+      APP_DOMAIN: ${APP_DOMAIN:-}
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on: [app]
+    networks: [edge]
+
+  # Maintenance: bootstrap of the roles, migrations, seed:training, reset:training. Never started by `up`.
+  ops:
+    image: ${APP_IMAGE:?set APP_IMAGE in .env.training}
+    profiles: [ops]
+    env_file: [.env.training, .env.training.ops]
+    environment:
+      NODE_ENV: production
+      APP_ENV: training
+      TRAINING_MODE: 'true'
+      REAL_DATA: 'false'
+      SIMULATION_ENABLED: 'false'
+      FILE_STORE_DIR: /data/file-store
+      TRAINING_ACCOUNTS_FILE: /app/out/training-accounts.local.txt
+    volumes:
+      - filestore:/data/file-store
+      - ./out:/app/out
+    command: ['sh', '-c', 'echo "run: ./scripts/training/ops.sh <script> [args]"']
+    networks: [internal]
+
+networks:
+  internal:
+    internal: true
+  edge: {}
+
+volumes:
+  pgdata: {}
+  filestore: {}
+  caddy_data: {}

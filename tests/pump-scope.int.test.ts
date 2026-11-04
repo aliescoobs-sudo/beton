@@ -70,13 +70,18 @@ beforeAll(async () => {
   const b = await createPlant(app, owner, { code: letters(6), name: `PSB ${marker}` });
   if (!b.ok) throw new Error(b.error);
   plantB = b.value.id;
-  const truckB = await createTruck(app, owner, {
-    code: `T${100 + Math.floor(Math.random() * 890)}`,
-    plate: `TB-${marker.slice(0, 8)}`,
-    plantId: plantB,
-  });
-  if (!truckB.ok) throw new Error(truckB.error);
-  sceneB = { ...sceneA, truckId: truckB.value.id };
+  // A free code among the random ones other test files also draw (the database is shared).
+  let truckBId = '';
+  for (let tries = 0; tries < 30 && !truckBId; tries++) {
+    const made = await createTruck(app, owner, {
+      code: `T${100 + Math.floor(Math.random() * 890)}`,
+      plate: `TB-${marker.slice(0, 8)}-${tries}`,
+      plantId: plantB,
+    });
+    if (made.ok) truckBId = made.value.id;
+  }
+  if (!truckBId) throw new Error('no free truck code');
+  sceneB = { ...sceneA, truckId: truckBId };
   const id = uuidv7(realClock.now());
   await migrator.query(
     `insert into "user" (id, name, email, "emailVerified", role, locale, status, "twoFactorEnabled", "provisionedAt", "plantId")

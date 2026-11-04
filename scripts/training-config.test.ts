@@ -1,0 +1,211 @@
+import { spawnSync } from 'node:child_process';
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { describe, expect, it } from 'vitest';
+import { loadEnv, loadMaintenanceEnv } from '../src/lib/env';
+
+// T1: the training stack is read as text, so that a regression of one of its rules fails here.
+const compose = readFileSync('docker-compose.training.yml', 'utf8');
+const block = (name: string): string => {
+  const start = compose.indexOf(`\n  ${name}:`);
+  expect(start, name).toBeGreaterThan(-1);
+  const rest = compose.slice(start + 1);
+  const next = rest.slice(1).search(/\n  [a-z_]+:\n|\n[a-z]+:/);
+  return next < 0 ? rest : rest.slice(0, next + 1);
+};
+const initEnv = readFileSync('scripts/training/init-env.sh', 'utf8');
+
+describe('the training stack (T1)', () => {
+  it('runs the app as a training instance on fictitious data, never as production or real data', () => {
+    const app = block('app');
+    expect(app).toMatch(/TRAINING_MODE: 'true'/);
+    expect(app).toMatch(/APP_ENV: training/);
+    expect(app).toMatch(/REAL_DATA: 'false'/);
+    expect(app).not.toMatch(/APP_ENV: production|REAL_DATA: 'true'/);
+  });
+  it('keeps the database off the host, publishes the app on the loopback only, and keeps Caddy for a VPS behind a profile', () => {
+    expect(block('db')).not.toMatch(/ports:/);
+    expect(block('db')).toMatch(/networks: \[internal\]/);
+    expect(block('app')).toMatch(/- '127\.0\.0\.1:\$\{APP_PORT:-3000\}:3000'/);
+    expect(block('app')).not.toMatch(/- '(0\.0\.0\.0:)?\d+:3000'/);
+    expect(block('proxy')).toMatch(/profiles: \[public\]/);
+    expect(block('ops')).not.toMatch(/ports:/);
+  });
+  it('is the same file for the iMac and for a VPS: no host name, no domain and no path of the iMac in it', () => {
+    expect(compose).not.toMatch(/aliobsil|\/Users\/|\.ts\.net/i);
+    expect(compose).toMatch(/APP_DOMAIN: \$\{APP_DOMAIN:-\}/);
+  });
+  it('gives the app no maintenance login: only the ops container reads the second secret file', () => {
+    expect(block('app')).toMatch(/env_file: \.env\.training\n/);
+    expect(block('ops')).toMatch(/env_file: \[\.env\.training, \.env\.training\.ops\]/);
+    expect(initEnv).toMatch(/DATABASE_URL_MIGRATOR[\s\S]*> \.env\.training\.ops/);
+    const appPart = initEnv.slice(0, initEnv.indexOf('} > .env.training\n') + 1);
+    expect(appPart).not.toMatch(/MIGRATOR|SUPERUSER|DATABASE_URL_BACKUP|DATABASE_URL_SEED/);
+  });
+  it('generates the secrets with openssl, writes them to the two files only, and never overwrites', () => {
+    expect(initEnv).toMatch(/openssl rand/);
+    expect(initEnv).toMatch(/already exists: not overwritten/);
+    expect(initEnv).toMatch(/chmod 600 \.env\.training \.env\.training\.ops/);
+  });
+  it('turns on every module flag that exists, and has no flag for the portals', () => {
+    for (const flag of [
+      'FIELD_APP_ENABLED',
+      'NOTIFICATIONS_ENABLED',
+      'CANCELLATIONS_ENABLED',
+      'DOCUMENTS_V1_ENABLED',
+      'DARIJA_ENABLED',
+      'ASSISTANT_DET_ENABLED',
+      'TRANSFERS_ENABLED',
+      'FINANCE_ENABLED',
+    ])
+      expect(initEnv).toContain(`${flag}=true`);
+    expect(initEnv).not.toMatch(/^[A-Z_]*PORTAL[A-Z_]*=/m);
+    expect(initEnv).not.toMatch(/ASSISTANT_PROVIDER=anthropic|ANTHROPIC_API_KEY=|AI_EXTRACTION_ENABLED=true/);
+  });
+  it('every flag the training env file sets is a real flag of the environment schema', () => {
+    const env = readFileSync('src/lib/env.ts', 'utf8');
+    for (const m of initEnv.matchAll(/^([A-Z_]+_ENABLED)=true$/gm))
+      expect(env, m[1]).toContain(`${m[1]}: flag`);
+  });
+});
+
+describe('init-env.sh really produces a working training environment', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'bb-trainenv-'));
+  mkdirSync(path.join(dir, 'scripts/training'), { recursive: true });
+  copyFileSync('scripts/training/init-env.sh', path.join(dir, 'scripts/training/init-env.sh'));
+  const run = () =>
+    spawnSync('bash', [path.join(dir, 'scripts/training/init-env.sh')], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        APP_BASE_URL: 'https://imac.tail1234.ts.net',
+        APP_IMAGE: `ghcr.io/o/belgobeton@sha256:${'a'.repeat(64)}`,
+      },
+    });
+  const parse = (file: string) =>
+    Object.fromEntries(
+      readFileSync(path.join(dir, file), 'utf8')
+        .split('\n')
+        .filter((l) => /^[A-Z_]+=/.test(l))
+        .map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]),
+    );
+  it('writes two files of mode 600 whose values the environment check accepts as a training instance', () => {
+    const r = run();
+    expect(r.status, r.stderr).toBe(0);
+    expect(statSync(path.join(dir, '.env.training')).mode & 0o777).toBe(0o600);
+    expect(statSync(path.join(dir, '.env.training.ops')).mode & 0o777).toBe(0o600);
+    const app = parse('.env.training');
+    const ops = parse('.env.training.ops');
+    const training = {
+      ...app,
+      TRAINING_MODE: 'true',
+      APP_ENV: 'training',
+      NODE_ENV: 'production',
+      REAL_DATA: 'false',
+    };
+    expect(loadEnv(training).TRAINING_MODE).toBe(true);
+    expect(loadEnv(training).FINANCE_ENABLED).toBe(true);
+    expect(() => loadMaintenanceEnv({ ...training, ...ops })).not.toThrow();
+    expect(app.APP_BASE_URL).toBe('https://imac.tail1234.ts.net');
+    // the app can start without any maintenance login
+    expect('DATABASE_URL_MIGRATOR' in app).toBe(false);
+    // the secrets do not appear in what the script says
+    for (const v of [app.AUTH_SECRET!, ops.POSTGRES_SUPERUSER_PASSWORD!])
+      expect(r.stdout + r.stderr).not.toContain(v);
+  });
+  it('refuses to overwrite the files it wrote', () => {
+    const r = run();
+    expect(r.status).not.toBe(0);
+    expect(existsSync(path.join(dir, '.env.training'))).toBe(true);
+  });
+});
+
+/** A throwaway copy of the scripts with a stub compose wrapper, so that the host scripts run without Docker. */
+function sandbox(dcBody: string) {
+  const root = mkdtempSync(path.join(tmpdir(), 'bb-trainsh-'));
+  mkdirSync(path.join(root, 'scripts/training'), { recursive: true });
+  for (const f of ['scripts/training-backup.sh', 'scripts/training/funnel-check.sh'])
+    copyFileSync(f, path.join(root, f));
+  writeFileSync(path.join(root, 'scripts/training/dc.sh'), `#!/usr/bin/env bash\n${dcBody}\n`);
+  for (const f of [
+    'scripts/training-backup.sh',
+    'scripts/training/funnel-check.sh',
+    'scripts/training/dc.sh',
+  ])
+    chmodSync(path.join(root, f), 0o755);
+  return root;
+}
+const withStub = (dir: string, name: string, body: string) => {
+  mkdirSync(path.join(dir, 'bin'), { recursive: true });
+  writeFileSync(path.join(dir, 'bin', name), `#!/usr/bin/env bash\n${body}\n`, { mode: 0o755 });
+  return path.join(dir, 'bin');
+};
+
+describe('scripts/training/funnel-check.sh (T1)', () => {
+  const check = (funnelOn: boolean, mode: string) => {
+    const root = sandbox(`echo ${mode}`);
+    const bin = withStub(
+      root,
+      'tailscale',
+      funnelOn ? 'echo "https://x.ts.net (Funnel on)"' : 'echo "No serve config"',
+    );
+    return spawnSync('bash', [path.join(root, 'scripts/training/funnel-check.sh')], {
+      encoding: 'utf8',
+      env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+    });
+  };
+  it('warns and fails when the Funnel is up and the app is not in training mode', () => {
+    const r = check(true, 'false');
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/Funnel is up/);
+  });
+  it('is quiet when the app is in training mode, when the Funnel is down, and when there is no Tailscale', () => {
+    expect(check(true, 'true').status).toBe(0);
+    expect(check(false, 'false').status).toBe(0);
+    const root = sandbox('echo false');
+    const r = spawnSync('bash', [path.join(root, 'scripts/training/funnel-check.sh')], {
+      encoding: 'utf8',
+      env: { PATH: '/usr/bin:/bin', NODE_ENV: 'test' },
+    });
+    expect(r.status).toBe(0);
+  });
+});
+
+describe('scripts/training-backup.sh (T1)', () => {
+  const backup = (dest: (root: string) => string, dump = 'PGDMP-fake') => {
+    const root = sandbox(`printf '%s' '${dump}'`);
+    const to = dest(root);
+    const r = spawnSync('bash', [path.join(root, 'scripts/training-backup.sh')], {
+      encoding: 'utf8',
+      env: { ...process.env, TRAINING_BACKUP_DIR: to },
+    });
+    return { r, to };
+  };
+  it('writes a private dump outside the repository and refuses a folder inside it', () => {
+    const { r, to } = backup(() => path.join(mkdtempSync(path.join(tmpdir(), 'bb-bk-')), 'dumps'));
+    expect(r.status, r.stderr).toBe(0);
+    const files = readdirSync(to).filter((f) => f.endsWith('.dump'));
+    expect(files).toHaveLength(1);
+    expect(statSync(path.join(to, files[0]!)).mode & 0o777).toBe(0o600);
+    expect(statSync(to).mode & 0o777).toBe(0o700);
+    const inside = backup((root) => path.join(root, 'backups'));
+    expect(inside.r.status).toBe(2);
+    expect(inside.r.stderr).toMatch(/outside the repository/);
+  });
+  it('refuses an empty dump and keeps no partial file', () => {
+    const { r, to } = backup(() => path.join(mkdtempSync(path.join(tmpdir(), 'bb-bk-')), 'dumps'), '');
+    expect(r.status).not.toBe(0);
+    expect(readdirSync(to)).toEqual([]);
+  });
+});

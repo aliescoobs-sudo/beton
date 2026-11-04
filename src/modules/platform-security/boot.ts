@@ -2,7 +2,7 @@ import { getPool } from '@/lib/db/pools';
 import { withRlsContext } from '@/lib/db/rls-context';
 import { uuidv7 } from '@/lib/uuidv7';
 import { getEnv } from '@/lib/server-env';
-import { trainingBootProblem } from '@/lib/training';
+import { funnelWarning, trainingBootProblem } from '@/lib/training';
 import { realClock } from '@/modules/clock';
 import { SYSTEM_ACTOR_ID } from './auth/actors';
 import { getChecklist, resolveStartMode } from './service/checklist';
@@ -59,6 +59,8 @@ export async function assertTrainingGuardOrExit(): Promise<void> {
       databaseSeeded,
     });
     if (problem) throw new Error(problem);
+    const warning = funnelWarning({ trainingMode: env.TRAINING_MODE, appBaseUrl: env.APP_BASE_URL });
+    if (warning) console.warn(warning);
     if (env.TRAINING_MODE)
       console.warn('TRAINING_MODE: fictitious data only. Imports and outbound integrations are off.');
   } catch (error) {

@@ -23,3 +23,20 @@ export function trainingBootProblem(input: {
     return 'This database holds the training seed (fictitious data and password-only accounts) but TRAINING_MODE is not "true": refusing to start. Use the training instance for it, or a clean database.';
   return null;
 }
+
+/**
+ * A warning (not a stop) at boot: the public address looks like a Tailscale Funnel / Serve name (*.ts.net) while TRAINING_MODE is off,
+ * which would be a non-training server on the internet through the training machine's tunnel. The host script funnel-check.sh asks the
+ * same question from outside the container.
+ */
+export function funnelWarning(input: { trainingMode: boolean; appBaseUrl: string }): string | null {
+  if (input.trainingMode) return null;
+  try {
+    const host = new URL(input.appBaseUrl).hostname.toLowerCase();
+    if (host === 'ts.net' || host.endsWith('.ts.net'))
+      return `APP_BASE_URL is a Tailscale address (${host}) but TRAINING_MODE is not "true": check that this server is meant to be public (tailscale funnel status), or switch the Funnel off (tailscale funnel reset).`;
+  } catch {
+    // the environment check reports a malformed address
+  }
+  return null;
+}
