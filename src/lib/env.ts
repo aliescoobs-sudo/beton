@@ -52,6 +52,8 @@ const keyring = z.string().superRefine((value, ctx) => {
 
 const envObject = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  // Which deployment this is. Unset on a developer machine. `production` is the real-data server; `training` the hands-on instance.
+  APP_ENV: z.enum(['development', 'test', 'training', 'production']).optional(),
   DATABASE_URL_APP: postgresUrl,
   DATABASE_URL_AUTH: postgresUrl,
   DATABASE_URL_SYSTEM: postgresUrl,
@@ -80,6 +82,10 @@ const envObject = z.object({
   BACKUP_AGE_RECIPIENT: z.string().startsWith('age1', { error: 'must be an age public key (age1…)' }),
   SIMULATION_ENABLED: flag,
   REAL_DATA: flag,
+  // T1: the hands-on training instance (fictitious data only, see docs/checkpoints/CP-TRAINING.md). It lets the training accounts sign in
+  // with a password alone, shows a permanent banner, and switches off imports and every outbound integration. It is refused with
+  // APP_ENV=production and with REAL_DATA=true, and a database that holds the training seed refuses to boot without it.
+  TRAINING_MODE: flag,
   // C2: protected first start of a real-data server. With REAL_DATA=true and an incomplete security checklist the server normally
   // refuses to start (a loop: the checklist is completed in the app). FIRST_BOOT=true starts it in a restricted mode instead: only
   // sign-in, enrolment, the checklist, accounts, plants and parameters are served, everything else answers 503, and it refuses to
@@ -164,6 +170,20 @@ const envSchema = envObject.superRefine((env, ctx) => {
       code: 'custom',
       path: ['ANTHROPIC_API_KEY'],
       message: 'must not be set when NODE_ENV=production or REAL_DATA=true',
+    });
+  }
+  if (env.TRAINING_MODE && env.APP_ENV === 'production') {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['TRAINING_MODE'],
+      message: 'must be "false" when APP_ENV=production (the training instance never runs as production)',
+    });
+  }
+  if (env.TRAINING_MODE && env.REAL_DATA) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['TRAINING_MODE'],
+      message: 'must be "false" when REAL_DATA=true (the training instance holds fictitious data only)',
     });
   }
   if (env.ASSISTANT_ENABLED && env.ASSISTANT_PROVIDER === 'anthropic' && !env.ANTHROPIC_API_KEY) {

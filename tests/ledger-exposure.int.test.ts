@@ -63,6 +63,7 @@ describe('functions the application role can execute', () => {
     'public.day_close_status(p_plant uuid, p_date date)',
     'public.day_closes_list(p_from date, p_to date)',
     'public.order_timeline(p_order uuid)',
+    'public.training_seeded()',
     'public.transfer_pickup(p_id uuid, p_note text)',
     'public.transfer_receive(p_id uuid, p_qty bigint, p_date date, p_note text)',
     'public.transfer_send(p_kind text, p_from uuid, p_to uuid, p_component uuid, p_qty bigint, p_date date, p_note text)',

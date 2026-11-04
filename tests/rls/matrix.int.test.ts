@@ -162,6 +162,12 @@ const FIXTURES: Record<
       ),
     visible: `select run_by::text as owner from scheduled_job_run where job_key = 'matrix-' || right($1, 12)`,
   },
+  training_marker: {
+    // Written by the maintenance login only (seed:training); no runtime role can write or read it.
+    writers: [],
+    seed: async () => undefined as never,
+    visible: `select 'x' as owner from training_marker where $1::text is not null`,
+  },
   plant: {
     // Archived on purpose: an active plant would change the plant rule for every other test sharing this database.
     writers: ['owner', 'partner'],

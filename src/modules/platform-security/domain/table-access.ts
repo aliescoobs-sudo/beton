@@ -167,6 +167,22 @@ export const TABLE_ACCESS = {
     audited: true,
     exception: 'SPEC-clock §3 idempotency ledger; written only by the system actor (job runner).',
   },
+  training_marker: {
+    kind: 'rls',
+    read: {
+      owner: 'none',
+      partner: 'none',
+      office: 'none',
+      plant: 'none',
+      system: 'none',
+      anonymous: 'none',
+      support: 'none',
+    },
+    force: true,
+    audited: false,
+    exception:
+      'T1: the marker of a database seeded with the training data. Written by seed:training through the maintenance login only; no runtime login reads the table, they ask public.training_seeded().',
+  },
   plant: {
     kind: 'rls',
     read: {

@@ -834,6 +834,13 @@
       "when": 1793804587023,
       "tag": "0110_rotation_sealed_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 111,
+      "version": "7",
+      "when": 1793804647023,
+      "tag": "0111_training_marker",
+      "breakpoints": true
     }
   ]
 }

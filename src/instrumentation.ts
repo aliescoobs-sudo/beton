@@ -3,7 +3,9 @@ export async function register() {
   if (process.env.NEXT_RUNTIME !== 'nodejs') return;
   const { assertEnvOrExit } = await import('./lib/boot-check');
   assertEnvOrExit();
-  const { assertRealDataOrExit } = await import('./modules/platform-security/boot');
+  const { assertRealDataOrExit, assertTrainingGuardOrExit } =
+    await import('./modules/platform-security/boot');
+  await assertTrainingGuardOrExit();
   await assertRealDataOrExit();
   const { startJobSchedulerOrExit, syncSimClockOrExit } = await import('./modules/clock/boot');
   await syncSimClockOrExit();
