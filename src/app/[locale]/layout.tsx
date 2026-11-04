@@ -9,6 +9,8 @@ import { fontClasses } from '../fonts';
 import '../globals.css';
 
 export const metadata = { manifest: '/app.webmanifest' };
+// Every page depends on the session and the database: none is prerendered at build time (the image build has no secrets).
+export const dynamic = 'force-dynamic';
 
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
