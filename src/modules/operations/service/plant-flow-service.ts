@@ -171,7 +171,8 @@ export async function getOrderTimeline(
 }
 
 export interface DayCloseItem {
-  kind: 'unconfirmed_load' | 'missing_bl' | 'stock_variance';
+  kind:
+    'unconfirmed_load' | 'missing_bl' | 'stock_variance' | 'fuel_transfer_variance' | 'fuel_tank_negative';
   n: number;
   refs: string[];
   blocking: boolean;

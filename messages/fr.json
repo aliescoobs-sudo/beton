@@ -2911,7 +2911,21 @@
     "item": {
       "unconfirmed_load": "Chargements non confirmés",
       "missing_bl": "BL signés manquants",
-      "stock_variance": "Écarts de stock corrigés"
+      "stock_variance": "Écarts de stock corrigés",
+      "fuel_transfer_variance": "Transferts de carburant reçus avec un écart de litres",
+      "fuel_tank_negative": "Cuve de carburant en dessous de zéro (plus servi que enregistré)"
+    },
+    "cash": {
+      "title": "Caisses par détenteur à la fin de la journée",
+      "note": "Toutes centrales ensemble : les détenteurs de caisse ne sont pas rattachés à une centrale. Visible du propriétaire et de l'administrateur seulement.",
+      "none": "Aucun compte avec un détenteur.",
+      "total": "Total",
+      "holder": {
+        "owner": "Propriétaire",
+        "office": "Bureau",
+        "company_bank": "Banque de la société",
+        "unassigned": "Non attribué"
+      }
     }
   },
   "timeline": {

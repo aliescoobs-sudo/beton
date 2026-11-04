@@ -28,6 +28,9 @@ test('owner enables finance, records a fixed expense and downloads a real Excel 
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/\.xlsx$/);
   expect(await download.failure()).toBeNull();
+  // C4.3: the day close shows the cash per holder to the owner while the module is on (money: never to the other roles).
+  await page.goto('/fr/day-close');
+  await expect(page.getByTestId('dayclose-cash')).toBeVisible();
   await page.setViewportSize({ width: 375, height: 812 });
   await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
   expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
@@ -40,6 +43,9 @@ test('support has no management page, export, navigation or write endpoint', asy
   expect((await page.goto('/fr/finance'))?.status()).toBe(404);
   expect((await page.request.get('/fr/finance/export?from=2026-01-01&to=2026-12-31')).status()).toBe(404);
   expect((await configure(page, true)).status()).toBe(404);
+  // the day close is open to support, but the cash per holder is not
+  expect((await page.goto('/fr/day-close'))?.status()).toBe(200);
+  await expect(page.getByTestId('dayclose-cash')).toHaveCount(0);
   expect(
     (
       await page.request.post('/api/finance', {
@@ -63,6 +69,8 @@ test('Arabic phone layout and module-off behavior', async ({ page }) => {
   expect((await configure(page, false)).status()).toBe(200);
   expect((await page.goto('/ar/finance'))?.status()).toBe(404);
   await expect(page.getByTestId('finance-link')).toHaveCount(0);
+  await page.goto('/ar/day-close');
+  await expect(page.getByTestId('dayclose-cash')).toHaveCount(0);
   expect(
     (
       await page.request.post('/api/finance', {

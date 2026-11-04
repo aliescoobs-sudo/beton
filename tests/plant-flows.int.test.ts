@@ -382,3 +382,66 @@ describe('the fuel tank of each plant moves with the fuel transfers (C3)', () =>
     );
   });
 });
+
+describe('the day close shows the fuel variance (C4.3)', () => {
+  const statusOf = async (plant: string, date: string) => {
+    const s = await getDayCloseStatus(app, u.owner!, { plantId: plant, date });
+    if (!s.ok) throw new Error(s.error);
+    return s.value;
+  };
+  const today = async () =>
+    (await migrator.query<{ d: string }>(`select to_char(current_date, 'YYYY-MM-DD') as d`)).rows[0]!.d;
+
+  it('a fuel transfer received with another quantity than sent shows on both plants, without blocking', async () => {
+    const day = await today();
+    const sent = await sendTransfer(app, u.owner!, {
+      kind: 'fuel',
+      fromPlant: plant1,
+      toPlant: plant2,
+      componentId: null,
+      qty: 100,
+      date: day,
+      note: null,
+    });
+    if (!sent.ok) throw new Error(sent.error);
+    await pickUpTransfer(app, u.owner!, sent.value.id);
+    const r = await receiveTransfer(app, u.owner!, { id: sent.value.id, qty: 90, date: day });
+    expect(r.ok).toBe(true);
+    for (const plant of [plant1, plant2]) {
+      const line = (await statusOf(plant, day)).find((i) => i.kind === 'fuel_transfer_variance');
+      expect(line).toMatchObject({ blocking: false });
+      expect(line!.n).toBeGreaterThanOrEqual(1);
+      expect(line!.refs).toContain(sent.value.id.slice(0, 8));
+    }
+    // not on another day, and the plant manager of the plant reads it too
+    expect((await statusOf(plant1, '2020-01-01')).find((i) => i.kind === 'fuel_transfer_variance')!.n).toBe(
+      0,
+    );
+    const pm = await getDayCloseStatus(app, u.plant_manager!, { plantId: plant1, date: day });
+    expect(pm.ok && pm.value.some((i) => i.kind === 'fuel_transfer_variance')).toBe(true);
+  });
+
+  it('a tank below zero blocks the close', async () => {
+    const day = await today();
+    const tankNow = async () => (await getFuelTankLevels(app, u.owner!)).find((t) => t.plantId === plant2)!;
+    const level = (await tankNow()).levelL;
+    const sent = await sendTransfer(app, u.owner!, {
+      kind: 'fuel',
+      fromPlant: plant2,
+      toPlant: plant1,
+      componentId: null,
+      qty: level + 500,
+      date: day,
+      note: null,
+    });
+    if (!sent.ok) throw new Error(sent.error);
+    expect((await tankNow()).levelL).toBeLessThan(0);
+    expect((await statusOf(plant2, day)).find((i) => i.kind === 'fuel_tank_negative')).toMatchObject({
+      n: 1,
+      blocking: true,
+    });
+    expect(await closeDay(app, u.pm2!, { plantId: plant2, date: day })).toMatchObject({ value: 'blocked' });
+    // the other plant is not affected by it
+    expect((await statusOf(plant1, day)).find((i) => i.kind === 'fuel_tank_negative')!.n).toBe(0);
+  });
+});
