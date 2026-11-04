@@ -172,6 +172,7 @@ describe('functions the application role can execute', () => {
     'public.schedule_pump_job(p_date date, p_pump uuid, p_operator uuid, p_order uuid, p_on_site_min integer, p_setup_min integer, p_duration_min integer, p_site text, p_address_enc text, p_m3 integer)',
     'public.reschedule_pump_job(p_job uuid, p_on_site_min integer)',
     'public.resolve_pump_conflict(p_id uuid)',
+    'public._pump_in_scope(p_plant uuid)',
     'public.pump_board(p_date date)', // C3: times and codes, no price
     'public.pump_waiting(p_date date)',
     'public.pump_conflicts(p_date date)',

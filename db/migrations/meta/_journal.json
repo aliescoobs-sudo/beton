@@ -813,6 +813,13 @@
       "when": 1793804407023,
       "tag": "0107_day_close_fuel",
       "breakpoints": true
+    },
+    {
+      "idx": 108,
+      "version": "7",
+      "when": 1793804467023,
+      "tag": "0108_pump_scope",
+      "breakpoints": true
     }
   ]
 }
