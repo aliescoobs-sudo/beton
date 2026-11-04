@@ -40,7 +40,8 @@ export async function loadStockFacts(
     );
     const recettes = await tx.query<{ type_id: string; from: string; component_id: string; qty: string }>(
       `select r.concrete_type_id as type_id, to_char(r.effective_from, 'YYYY-MM-DD') as from, l.component_id::text, l.qty_per_m3::text as qty
-         from recette r join recette_line l on l.recette_id = r.id`,
+         from recette r join recette_line l on l.recette_id = r.id
+        where r.plant_id is null`, // the projection reads the all-plants mix (a plant's own mix is not projected yet, DECISIONS 160)
     );
     const receipts = await tx.query<{
       id: string;

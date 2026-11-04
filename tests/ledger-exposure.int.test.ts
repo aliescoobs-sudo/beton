@@ -140,6 +140,7 @@ describe('functions the application role can execute', () => {
     'public.order_chain()',
     'public.ops_parameter(p_key text)',
     'public.next_doc_number(p_prefix text, p_year integer, p_width integer)',
+    'public.recette_in_force(p_type uuid, p_plant uuid, p_date date)',
     'public.record_receipt(p_purchase uuid, p_date date)',
     'public.drop_push_subscription(p_endpoint text)',
     'public.mark_notifications_read(p_ids uuid[])',

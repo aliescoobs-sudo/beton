@@ -13,12 +13,15 @@ export interface Recette {
   id: string;
   concreteTypeId: string;
   version: number;
+  /** The plant this mix is for; null is the mix of all plants (a plant's own mix wins for that plant). */
+  plantId: string | null;
   /** Business date (YYYY-MM-DD) from which this version applies. */
   effectiveFrom: string;
   lines: RecetteLine[];
 }
 
 const recetteInputSchema = z.object({
+  plantId: z.uuid().nullish(),
   effectiveFrom: dateField,
   lines: z
     .array(
@@ -56,6 +59,28 @@ export function resolveRecette<T extends { effectiveFrom: string }>(
 }
 
 /**
+ * The version in force for a plant on `date`: the plant's own latest started version if it has one, else the all-plants
+ * one (migration 0105, the same rule as the database function `recette_in_force`). With no plant, only the all-plants mix.
+ */
+export function resolveRecetteForPlant<T extends { effectiveFrom: string; plantId: string | null }>(
+  versions: readonly T[],
+  date: string,
+  plantId: string | null,
+): Result<T, 'NO_RECETTE'> {
+  const own = plantId
+    ? resolveRecette(
+        versions.filter((v) => v.plantId === plantId),
+        date,
+      )
+    : null;
+  if (own?.ok) return own;
+  return resolveRecette(
+    versions.filter((v) => v.plantId === null),
+    date,
+  );
+}
+
+/**
  * What leaves the service for a recette (SPEC-platform-security §4 layer 4, AC-MD-07/AC-SEC-05). Quantities per m³
  * are all the plant and the office ever get; the computed cost (filled in by purchase prices, T10) is money: owner and
  * support only (DECISIONS 81). The allowlist means a field added later stays hidden until someone lists it.
@@ -67,7 +92,7 @@ export interface RecetteView extends Recette {
 export const recetteVisibility = defineVisibility<RecetteView>({
   owner: 'all',
   support: 'all',
-  partner: ['id', 'concreteTypeId', 'version', 'effectiveFrom', 'lines'],
-  office: ['id', 'concreteTypeId', 'version', 'effectiveFrom', 'lines'],
-  plant: ['id', 'concreteTypeId', 'version', 'effectiveFrom', 'lines'],
+  partner: ['id', 'concreteTypeId', 'version', 'plantId', 'effectiveFrom', 'lines'],
+  office: ['id', 'concreteTypeId', 'version', 'plantId', 'effectiveFrom', 'lines'],
+  plant: ['id', 'concreteTypeId', 'version', 'plantId', 'effectiveFrom', 'lines'],
 });

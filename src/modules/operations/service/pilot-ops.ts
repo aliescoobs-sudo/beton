@@ -59,8 +59,14 @@ async function seedLoads(tx: Tx, today: string, rng: Rng): Promise<{ loads: numb
   if (trucks.length === 0)
     throw new Error('No active truck: run the master data seed first (corepack pnpm db:seed)');
   const orders = (
-    await tx.query<{ id: string; concrete_type_id: string; volume_l: number; delivery_date: string }>(
-      `select o.id, o.concrete_type_id, o.volume_l, to_char(o.delivery_date, 'YYYY-MM-DD') as delivery_date
+    await tx.query<{
+      id: string;
+      concrete_type_id: string;
+      volume_l: number;
+      delivery_date: string;
+      plant_id: string | null;
+    }>(
+      `select o.id, o.concrete_type_id, o.volume_l, o.plant_id, to_char(o.delivery_date, 'YYYY-MM-DD') as delivery_date
          from sales_order o
         where o.reverses_id is null and o.delivery_date <= $1
           and not exists (select 1 from sales_order r where r.reverses_id = o.id)
@@ -72,7 +78,7 @@ async function seedLoads(tx: Tx, today: string, rng: Rng): Promise<{ loads: numb
   let returns = 0;
   const perDay = new Map<string, number>();
   for (const o of orders) {
-    const recetteId = await recetteInForce(tx, o.concrete_type_id, o.delivery_date);
+    const recetteId = await recetteInForce(tx, o.concrete_type_id, o.delivery_date, o.plant_id);
     if (!recetteId) throw new Error(`No recette in force for ${o.delivery_date}`);
     let left = o.volume_l;
     const sizes: number[] = [];

@@ -229,6 +229,7 @@ describe('plant and office recette view (master-data T9, AC-MD-07 recette part)'
         'effectiveFrom',
         'id',
         'lines',
+        'plantId',
         'version',
       ]);
       const resolved = await resolveRecetteFor(app, users[role], type.id, '2026-02-01');

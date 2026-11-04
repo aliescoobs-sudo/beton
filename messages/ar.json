@@ -373,7 +373,9 @@
       "component": "المكوّن",
       "qtyPerM3": "الكمية لكل م³",
       "newVersionButton": "إصدار جديد",
-      "olderVersions": "الإصدارات السابقة ({count})"
+      "olderVersions": "الإصدارات السابقة ({count})",
+      "allPlants": "كل المحطات",
+      "plantScope": "المحطة المعنية (وصفة المحطة الخاصة تتقدّم على وصفة كل المحطات)"
     },
     "purchasePrices": {
       "title": "أسعار الشراء",

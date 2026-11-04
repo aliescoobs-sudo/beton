@@ -29,6 +29,7 @@ export interface RecetteTypeView {
   versions: {
     id: string;
     version: number;
+    plantId: string | null;
     effectiveFrom: string;
     lines: { componentId: string; qtyPerM3: number }[];
   }[];
@@ -43,10 +44,12 @@ const INPUT = 'input mt-1';
 export function RecettesManager({
   types,
   components,
+  plants,
   editable,
 }: {
   types: RecetteTypeView[];
   components: RecetteComponentView[];
+  plants: { id: string; name: string }[];
   editable: boolean;
 }) {
   const t = useTranslations('masterData.recettes');
@@ -59,6 +62,9 @@ export function RecettesManager({
   const [confirm, setConfirm] = useState<string | null>(null);
   const name = (c: RecetteComponentView) => (locale === 'ar' ? c.nameAr : c.nameFr);
   const byId = new Map(components.map((c) => [c.id, c]));
+  // The scope of a mix: null is all plants; a plant's own mix wins for that plant.
+  const scopeName = (plantId: string | null) =>
+    plantId === null ? t('allPlants') : (plants.find((p) => p.id === plantId)?.name ?? plantId);
 
   async function submit(type: RecetteTypeView, event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -76,7 +82,8 @@ export function RecettesManager({
         return setMessage({ id: type.id, ok: false, text: t('invalidQuantity', { name: name(c) }) });
       if (qty.value > 0) lines.push({ componentId: c.id, qtyPerM3: qty.value });
     }
-    const odd = magnitudeWarnings(lines, type.versions[0]?.lines ?? []);
+    const scope = String(data.get('plantId') ?? '') || null;
+    const odd = magnitudeWarnings(lines, type.versions.find((v) => v.plantId === scope)?.lines ?? []);
     if (odd.length > 0 && confirm !== type.id) {
       setConfirm(type.id);
       const names = odd
@@ -86,6 +93,7 @@ export function RecettesManager({
     }
     setConfirm(null);
     const result = await createRecetteVersionAction(type.id, {
+      plantId: scope,
       effectiveFrom: String(data.get('effectiveFrom') ?? ''),
       lines,
     });
@@ -139,8 +147,13 @@ export function RecettesManager({
     <div className="mt-6 space-y-6">
       {!editable && <p className="text-sm text-muted">{t('readOnly')}</p>}
       {types.map((type) => {
-        const [latest, ...older] = type.versions;
-        const quantity = new Map(latest?.lines.map((l) => [l.componentId, l.qtyPerM3]));
+        // One block per scope (all plants, then each plant with its own mix); versions arrive newest first.
+        const scopes: (string | null)[] = [];
+        for (const v of type.versions) if (!scopes.includes(v.plantId)) scopes.push(v.plantId);
+        scopes.sort((a, b) => (a === null ? -1 : b === null ? 1 : scopeName(a).localeCompare(scopeName(b))));
+        const quantity = new Map(
+          type.versions.find((v) => v.plantId === null)?.lines.map((l) => [l.componentId, l.qtyPerM3]),
+        );
         // Seeded labels repeat the code ("Béton B12" for B12): show the code only when the label lacks it.
         const title = type.label.includes(type.code) ? type.label : `${type.code} ${type.label}`;
         return (
@@ -148,36 +161,49 @@ export function RecettesManager({
             <h2 className="text-xl">
               <bdi>{title}</bdi>
             </h2>
-            {!latest && <p className="mt-2 text-sm text-muted">{t('none')}</p>}
-            {latest && (
-              <div className="mt-2 space-y-2" data-testid={`recette-${type.code}-v${latest.version}`}>
-                <p className="flex flex-wrap gap-x-4 text-sm font-medium">
-                  <span>{t('version', { version: latest.version })}</span>
-                  <span dir="ltr" className="num">
-                    {latest.effectiveFrom}
-                  </span>
-                </p>
-                {versionTable(latest.lines)}
-              </div>
-            )}
-            {older.length > 0 && (
-              <details className="mt-3 text-sm">
-                <summary>{t('olderVersions', { count: older.length })}</summary>
-                <ul className="mt-2 space-y-3">
-                  {older.map((v) => (
-                    <li key={v.id} data-testid={`recette-${type.code}-v${v.version}`}>
-                      <p className="flex flex-wrap gap-x-4 font-medium">
-                        <span>{t('version', { version: v.version })}</span>
-                        <span dir="ltr" className="num">
-                          {v.effectiveFrom}
-                        </span>
-                      </p>
-                      {versionTable(v.lines)}
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            )}
+            {scopes.length === 0 && <p className="mt-2 text-sm text-muted">{t('none')}</p>}
+            {scopes.map((scope) => {
+              const [latest, ...older] = type.versions.filter((v) => v.plantId === scope);
+              if (!latest) return null;
+              const key = scope ?? 'all';
+              return (
+                <div key={key} className="mt-3" data-testid={`recette-${type.code}-scope-${key}`}>
+                  <h3 className="text-sm font-semibold" data-testid={`recette-${type.code}-scope-name`}>
+                    <bdi>{scopeName(scope)}</bdi>
+                  </h3>
+                  <div
+                    className="mt-1 space-y-2"
+                    data-testid={`recette-${type.code}-${key}-v${latest.version}`}
+                  >
+                    <p className="flex flex-wrap gap-x-4 text-sm font-medium">
+                      <span>{t('version', { version: latest.version })}</span>
+                      <span dir="ltr" className="num">
+                        {latest.effectiveFrom}
+                      </span>
+                    </p>
+                    {versionTable(latest.lines)}
+                  </div>
+                  {older.length > 0 && (
+                    <details className="mt-3 text-sm">
+                      <summary>{t('olderVersions', { count: older.length })}</summary>
+                      <ul className="mt-2 space-y-3">
+                        {older.map((v) => (
+                          <li key={v.id} data-testid={`recette-${type.code}-${key}-v${v.version}`}>
+                            <p className="flex flex-wrap gap-x-4 font-medium">
+                              <span>{t('version', { version: v.version })}</span>
+                              <span dir="ltr" className="num">
+                                {v.effectiveFrom}
+                              </span>
+                            </p>
+                            {versionTable(v.lines)}
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
+                </div>
+              );
+            })}
             <Notice message={message?.id === type.id ? message : null} testId="recette-message" />
             {editable &&
               (open === type.id ? (
@@ -188,6 +214,19 @@ export function RecettesManager({
                   data-testid={`recette-new-${type.code}`}
                 >
                   <h3 className="text-sm font-semibold">{t('newVersion')}</h3>
+                  {plants.length > 1 && (
+                    <label className="block">
+                      <span className="text-sm">{t('plantScope')}</span>
+                      <select name="plantId" defaultValue="" className={INPUT} data-testid="recette-plant">
+                        <option value="">{t('allPlants')}</option>
+                        {plants.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
                   <label className="block">
                     <span className="text-sm">{t('effectiveFrom')}</span>
                     <input name="effectiveFrom" type="date" required dir="ltr" className={INPUT} />

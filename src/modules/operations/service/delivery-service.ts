@@ -74,16 +74,21 @@ export function withinTolerance(orderVolumeL: number, loadedL: number, tolerance
   return (loadedL - orderVolumeL) * 10_000 <= toleranceBp * orderVolumeL;
 }
 
-/** The recette in force for a type on a business date (the latest version that has started), or null. */
+/**
+ * The recette in force for a type, a plant and a business date: the plant's own latest started version, else the
+ * all-plants one (the database function `recette_in_force`, the same one the load guard uses), or null.
+ */
 export async function recetteInForce(
   tx: pg.PoolClient,
   concreteTypeId: string,
   date: string,
+  plantId: string | null = null,
 ): Promise<string | null> {
-  const { rows } = await tx.query<{ id: string }>(
-    `select id from recette where concrete_type_id = $1 and effective_from <= $2 order by effective_from desc limit 1`,
-    [concreteTypeId, date],
-  );
+  const { rows } = await tx.query<{ id: string | null }>(`select public.recette_in_force($1, $2, $3) as id`, [
+    concreteTypeId,
+    plantId,
+    date,
+  ]);
   return rows[0]?.id ?? null;
 }
 
@@ -124,8 +129,9 @@ export async function createLoadInTx(
     volume_l: number;
     zone_id: string | null;
     is_reversed: boolean;
+    plant_id: string | null;
   }>(
-    `select concrete_type_id, code, volume_l, zone_id, is_reversed from sales_order_ops where id = $1 and reverses_id is null`,
+    `select concrete_type_id, code, volume_l, zone_id, is_reversed, plant_id from sales_order_ops where id = $1 and reverses_id is null`,
     [v.orderId],
   );
   const o = order.rows[0];
@@ -149,7 +155,7 @@ export async function createLoadInTx(
   if (volumeL <= 0) return err('OVER_ORDER');
   if (volumeL > t.capacity_l) return err('OVER_CAPACITY');
   const excessL = Math.max(0, volumeL - left);
-  const recetteId = await recetteInForce(tx, o.concrete_type_id, deps.today);
+  const recetteId = await recetteInForce(tx, o.concrete_type_id, deps.today, o.plant_id);
   if (!recetteId) return err('NO_RECETTE');
 
   const warnings: CreatedLoad['warnings'] = [];

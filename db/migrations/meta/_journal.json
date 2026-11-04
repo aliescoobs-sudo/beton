@@ -792,6 +792,13 @@
       "when": 1793804227023,
       "tag": "0104_fuel_tank",
       "breakpoints": true
+    },
+    {
+      "idx": 105,
+      "version": "7",
+      "when": 1793804287023,
+      "tag": "0105_recipe_per_plant",
+      "breakpoints": true
     }
   ]
 }

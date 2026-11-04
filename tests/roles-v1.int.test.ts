@@ -4,7 +4,14 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { withRlsContext } from '../src/lib/db/rls-context';
 import { uuidv7 } from '../src/lib/uuidv7';
 import { realClock } from '../src/modules/clock';
-import { createPlant, updatePlant, type Plant } from '../src/modules/master-data';
+import {
+  createConcreteType,
+  createPlant,
+  createRecetteVersion,
+  listRecetteVersions,
+  updatePlant,
+  type Plant,
+} from '../src/modules/master-data';
 import { getStockLevels, setOpeningStock } from '../src/modules/operations';
 import type { SessionUser } from '../src/modules/platform-security/auth/session-gate';
 import type { Role } from '../src/modules/platform-security/domain/permissions';
@@ -287,5 +294,34 @@ describe('the other V1 roles are real accounts', () => {
   it('a test account of every V1 role was created', async () => {
     expect(Object.keys(actors).sort()).toEqual([...V1].sort());
     expect((await realActor(env.DATABASE_URL_MIGRATOR, 'office')).id).toBeTruthy();
+  });
+});
+
+describe('recipes per plant are read inside the plant scope (C4.1)', () => {
+  it('a plant manager reads the all-plants mix and its own plant, not the other plant mix', async () => {
+    const t = await createConcreteType(app, owner, {
+      code: `Q${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
+      label: 'Béton portée',
+    });
+    if (!t.ok) throw new Error(t.error);
+    const line = [{ componentId: master.componentId, qtyPerM3: 300_000 }];
+    for (const plantId of [null, A.id, B.id]) {
+      const r = await createRecetteVersion(app, owner, t.value.id, {
+        plantId,
+        effectiveFrom: '2026-01-01',
+        lines: line,
+      });
+      if (!r.ok) throw new Error(r.error);
+    }
+    const seen = await listRecetteVersions(app, managerA, t.value.id);
+    expect(seen.map((v) => v.plantId).sort()).toEqual([A.id, null].sort());
+    expect((await listRecetteVersions(app, owner, t.value.id)).length).toBe(3);
+    // the lines of the other plant's mix are hidden too
+    const lines = await as('plant_manager', (tx) =>
+      tx.query(`select 1 from recette_line l join recette r on r.id = l.recette_id where r.plant_id = $1`, [
+        B.id,
+      ]),
+    );
+    expect(lines.rowCount).toBe(0);
   });
 });

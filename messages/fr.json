@@ -373,7 +373,9 @@
       "component": "Composant",
       "qtyPerM3": "Quantité par m³",
       "newVersionButton": "Nouvelle version",
-      "olderVersions": "Versions précédentes ({count})"
+      "olderVersions": "Versions précédentes ({count})",
+      "allPlants": "Toutes les centrales",
+      "plantScope": "Centrale concernée (la recette propre d'une centrale prime sur celle de toutes)"
     },
     "purchasePrices": {
       "title": "Prix d'achat",

@@ -1,7 +1,7 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { project } from '@/modules/platform-security';
-import { parseRecetteInput, recetteVisibility, resolveRecette } from './recette';
+import { parseRecetteInput, recetteVisibility, resolveRecette, resolveRecetteForPlant } from './recette';
 
 const v = (effectiveFrom: string, id = effectiveFrom) => ({ id, effectiveFrom });
 
@@ -68,6 +68,7 @@ describe('recetteVisibility (AC-MD-07)', () => {
     id: 'r1',
     concreteTypeId: 't1',
     version: 1,
+    plantId: null,
     effectiveFrom: '2026-01-01',
     lines: [{ componentId: 'c1', qtyPerM3: 1 }],
     componentCostPerM3Centimes: 362_500,
@@ -79,5 +80,31 @@ describe('recetteVisibility (AC-MD-07)', () => {
   });
   it.each(['owner', 'support'] as const)('%s sees the component cost', (role) => {
     expect(project(recetteVisibility, role, row).componentCostPerM3Centimes).toBe(362_500);
+  });
+});
+
+describe('resolveRecetteForPlant (C4.1)', () => {
+  const v = (plantId: string | null, effectiveFrom: string) => ({ plantId, effectiveFrom });
+  const all = [v(null, '2026-01-01'), v('A', '2026-03-01'), v('B', '2026-02-01')];
+  it('the plant own mix wins from its date, the all-plants mix before it and for the others', () => {
+    expect(resolveRecetteForPlant(all, '2026-04-01', 'A')).toEqual({ ok: true, value: v('A', '2026-03-01') });
+    expect(resolveRecetteForPlant(all, '2026-02-01', 'A')).toEqual({
+      ok: true,
+      value: v(null, '2026-01-01'),
+    });
+    expect(resolveRecetteForPlant(all, '2026-04-01', 'C')).toEqual({
+      ok: true,
+      value: v(null, '2026-01-01'),
+    });
+    expect(resolveRecetteForPlant(all, '2026-04-01', null)).toEqual({
+      ok: true,
+      value: v(null, '2026-01-01'),
+    });
+  });
+  it('is an error, never a guess, when nothing applies', () => {
+    expect(resolveRecetteForPlant([v('A', '2026-03-01')], '2026-04-01', 'B')).toEqual({
+      ok: false,
+      error: 'NO_RECETTE',
+    });
   });
 });
