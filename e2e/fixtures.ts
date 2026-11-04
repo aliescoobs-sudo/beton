@@ -74,6 +74,8 @@ export const E2E_MD = {
   acctSupport: { email: 'e2e-ac-support@belgobeton.test', name: 'Support Comptes' },
   acctOffice: { email: 'e2e-ac-office@belgobeton.test', name: 'Bureau Comptes' },
   cashSupport: { email: 'e2e-ca-support@belgobeton.test', name: 'Support Trésorerie' },
+  psOffice: { email: 'e2e-ps-office@belgobeton.test', name: 'Bureau Écrans Centrales' },
+  psPlant: { email: 'e2e-ps-plant@belgobeton.test', name: 'Centrale Écrans' },
   finSupport: { email: 'e2e-fi-support@belgobeton.test', name: 'Support Finance' },
   cashOffice: { email: 'e2e-ca-office@belgobeton.test', name: 'Bureau Trésorerie' },
   payOffice: { email: 'e2e-py-office@belgobeton.test', name: 'Bureau Paiements' },

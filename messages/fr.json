@@ -1654,7 +1654,7 @@
       "hasRejected": "Quantité refusée",
       "hasPartial": "Livraison partielle",
       "hasVariance": "Écart au-dessus du seuil",
-      "varianceLine": "Centrale {plant} · bureau {office} · écart {gap} ({percent} %)",
+      "varianceLine": "Comptage centrale {plant} · réception bureau {office} · écart {gap} ({percent} %)",
       "arrivedShort": "arrivé",
       "rejectedShort": "refusé",
       "usableNow": "utilisable pour la production",

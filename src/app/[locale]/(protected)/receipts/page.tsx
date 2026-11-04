@@ -195,7 +195,13 @@ export default async function ReceiptsPage({ params }: { params: Promise<{ local
                                   plant: formatM3(v.plantMilli),
                                   office: formatM3(v.officeMilli),
                                   gap: `${v.varianceMilli > 0 ? '+' : ''}${formatM3(v.varianceMilli)}`,
-                                  percent: (v.varianceBp / 100).toFixed(2),
+                                  percent: (v.varianceBp / 100).toLocaleString(
+                                    locale === 'ar' ? 'ar-MA-u-nu-latn' : 'fr-FR',
+                                    {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                    },
+                                  ),
                                 })}
                               </bdi>
                             </span>

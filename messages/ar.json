@@ -1654,7 +1654,7 @@
       "hasRejected": "كمية مرفوضة",
       "hasPartial": "توريد جزئي",
       "hasVariance": "فرق فوق الحد",
-      "varianceLine": "المحطة {plant} · المكتب {office} · الفرق {gap} ({percent} %)",
+      "varianceLine": "عدّ المحطة {plant} · استلام المكتب {office} · الفرق {gap} ({percent} %)",
       "arrivedShort": "وصل",
       "rejectedShort": "مرفوض",
       "usableNow": "صالح للإنتاج",
