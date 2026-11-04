@@ -149,7 +149,9 @@ if (import.meta.main) {
   // Ops secrets (superuser, backup role, age identity) live in .env.ops, which Next.js never loads.
   if (existsSync('.env.ops')) process.loadEnvFile('.env.ops');
   const env = loadMaintenanceEnv(process.env);
-  const databases = [new URL(env.DATABASE_URL_MIGRATOR).pathname.slice(1), TEST_DATABASE];
+  // The scratch test database is for development machines only: a production server gets its own database and nothing else.
+  const databases = [new URL(env.DATABASE_URL_MIGRATOR).pathname.slice(1)];
+  if (process.env.NODE_ENV !== 'production') databases.push(TEST_DATABASE);
   // The seed role is created only in simulation (never with REAL_DATA or in production).
   await ensureRoles(env, seedRoleAllowed(process.env) ? loadSeedUrl(process.env) : undefined);
   for (const database of databases) await ensureDatabase(env, database);

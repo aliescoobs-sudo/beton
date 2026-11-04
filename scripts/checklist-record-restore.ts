@@ -19,8 +19,21 @@ if (!file || !publicKeyFile) {
   console.error('Usage: checklist-record-restore.ts <report.json> (with BACKUP_SIGNING_PUBLIC_KEY_FILE set)');
   process.exit(2);
 }
-const body = readFileSync(file, 'utf8');
-const signature = readFileSync(file.replace(/\.json$/, '.sig'), 'utf8');
+function readOrExplain(path: string): string {
+  try {
+    return readFileSync(path, 'utf8');
+  } catch (error) {
+    const code = (error as { code?: string }).code;
+    console.error(
+      code === 'EACCES'
+        ? `${path} cannot be read by the container: on the host run  chmod 640 reports/*  (group 10001 reads, see the runbook).`
+        : `${path} cannot be read (${code ?? 'error'}): upload the report and its .sig to reports/ first.`,
+    );
+    process.exit(1);
+  }
+}
+const body = readOrExplain(file);
+const signature = readOrExplain(file.replace(/\.json$/, '.sig'));
 if (!verifyText(body, signature, publicKeyFile)) {
   console.error('The report signature is invalid: nothing recorded.');
   process.exit(1);

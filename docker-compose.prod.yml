@@ -81,6 +81,20 @@ services:
     command: ['sh', '-c', 'echo "run a command: ./scripts/ops/ops.sh <script> [args]"']
     networks: [internal]
 
+  # One-off bootstrap of the database roles (F04): it must set the password of every role, the backup login included, and that login
+  # belongs in no file the app or the maintenance container reads. Its extra secret is a TEMPORARY file, `.env.bootstrap.prod`, that
+  # `scripts/ops/bootstrap.sh` checks (nothing but DATABASE_URL_BACKUP) and deletes after a successful run. Never started by `up`.
+  bootstrap:
+    image: ${APP_IMAGE:?set APP_IMAGE in .env.ops.prod}
+    profiles: [bootstrap]
+    env_file: [.env.prod, .env.ops.prod, .env.bootstrap.prod]
+    environment:
+      NODE_ENV: production
+      REAL_DATA: 'true'
+      SIMULATION_ENABLED: 'false'
+    command: ['sh', '-c', 'echo "run: ./scripts/ops/bootstrap.sh"']
+    networks: [internal]
+
   # Backup job: its own login and its own secret file. It sees the documents read-only and writes only the backups directory.
   backup:
     image: ${APP_IMAGE:?set APP_IMAGE in .env.ops.prod}

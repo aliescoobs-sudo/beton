@@ -1,4 +1,15 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { loadEnv, loadMaintenanceEnv } from '../src/lib/env';
 import { CHECKLIST } from '../src/modules/platform-security/domain/checklist';
@@ -141,5 +152,78 @@ describe('deploy by digest from the private registry (GitHub Actions)', () => {
     expect(d).toMatch(/@sha256:/);
     expect(d).toMatch(/rolled back/);
     expect(d).toMatch(/backup-nightly\.sh/);
+  });
+});
+
+describe('bootstrap and host ownership (F04 of the final review)', () => {
+  it('the bootstrap service is the only one that reads the temporary bootstrap file, and it is not in the default profile', () => {
+    expect(block('bootstrap')).toMatch(/env_file: \[\.env\.prod, \.env\.ops\.prod, \.env\.bootstrap\.prod\]/);
+    expect(block('bootstrap')).toMatch(/profiles: \[bootstrap\]/);
+    for (const name of ['app', 'ops', 'backup'])
+      expect(block(name).match(/env_file:.*$/m)?.[0] ?? '', name).not.toMatch(/bootstrap/);
+  });
+  it('the documented first install uses the bootstrap wrapper and never gives the backup login to the app or ops files', () => {
+    expect(runbook).toMatch(/\.\/scripts\/ops\/bootstrap\.sh/);
+    expect(runbook).not.toMatch(/ops\.sh db-bootstrap/);
+    expect(runbook).toMatch(/`\.env\.bootstrap\.prod`[^\n]*temporary/i);
+  });
+  it('init-host gives keys/ and reports/ to the deploy account and group 10001, and verify-host checks it', () => {
+    const init = readFileSync('scripts/ops/init-host.sh', 'utf8');
+    expect(init).toMatch(/install -d -o "\$deployer" -g 10001 -m 2750 "\$root\/keys" "\$root\/reports"/);
+    expect(init).not.toMatch(/install -d -m 0750 "\$root\/reports"/);
+    const verify = readFileSync('scripts/ops/verify-host.sh', 'utf8');
+    expect(verify).toMatch(/10001 2750/);
+    expect(verify).toMatch(/permitrootlogin no'/);
+  });
+  it('production bootstrap creates its own database only, not the scratch test database', () => {
+    const script = readFileSync('scripts/db-bootstrap.ts', 'utf8');
+    expect(script).toMatch(/if \(process\.env\.NODE_ENV !== 'production'\) databases\.push\(TEST_DATABASE\)/);
+  });
+});
+
+describe('scripts/ops/bootstrap.sh (F04)', () => {
+  const run = (content: string | null, dcExit: number) => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'bb-boot-'));
+    mkdirSync(path.join(dir, 'scripts/ops'), { recursive: true });
+    copyFileSync('scripts/ops/bootstrap.sh', path.join(dir, 'scripts/ops/bootstrap.sh'));
+    writeFileSync(
+      path.join(dir, 'dc-stub.sh'),
+      `#!/usr/bin/env bash\necho "$@" >> "${dir}/dc.log"\nexit ${dcExit}\n`,
+      { mode: 0o755 },
+    );
+    if (content !== null) writeFileSync(path.join(dir, '.env.bootstrap.prod'), content);
+    const r = spawnSync('bash', [path.join(dir, 'scripts/ops/bootstrap.sh')], {
+      env: { ...process.env, DC: path.join(dir, 'dc-stub.sh') },
+      encoding: 'utf8',
+    });
+    return {
+      dir,
+      status: r.status,
+      err: r.stderr,
+      left: existsSync(path.join(dir, '.env.bootstrap.prod')),
+      called: existsSync(path.join(dir, 'dc.log')),
+    };
+  };
+  it('runs the bootstrap service once and deletes the file when it succeeds', () => {
+    const r = run('DATABASE_URL_BACKUP=postgres://b:pw@db:5432/x\n', 0);
+    expect(r.status).toBe(0);
+    expect(r.called).toBe(true);
+    expect(r.left).toBe(false);
+  });
+  it('keeps the file when the run fails (so it can be retried) and says so by its exit code', () => {
+    const r = run('DATABASE_URL_BACKUP=postgres://b:pw@db:5432/x\n', 3);
+    expect(r.status).not.toBe(0);
+    expect(r.left).toBe(true);
+  });
+  it('refuses a file with any other variable, an empty file and a missing file, and runs nothing', () => {
+    for (const content of [
+      'DATABASE_URL_BACKUP=postgres://b@db/x\nAUTH_SECRET=oops\n',
+      '# nothing\n',
+      null,
+    ]) {
+      const r = run(content, 0);
+      expect(r.status, String(content)).not.toBe(0);
+      expect(r.called, String(content)).toBe(false);
+    }
   });
 });
