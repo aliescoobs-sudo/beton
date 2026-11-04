@@ -227,3 +227,89 @@ describe('scripts/ops/bootstrap.sh (F04)', () => {
     }
   });
 });
+
+describe('scripts/ops/deploy.sh (F05 of the final review)', () => {
+  const OLD = `ghcr.io/o/belgobeton@sha256:${'a'.repeat(64)}`;
+  const NEW = `ghcr.io/o/belgobeton@sha256:${'b'.repeat(64)}`;
+  /** Runs deploy.sh from a directory that is NOT the repository root, against stubs; `fail` names the step that fails. */
+  const deploy = (
+    fail: 'none' | 'pull' | 'backup' | 'migrate' | 'up' | 'ready',
+    previous: string | null = OLD,
+  ) => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'bb-deploy-'));
+    mkdirSync(path.join(dir, 'scripts/ops'), { recursive: true });
+    copyFileSync('scripts/ops/deploy.sh', path.join(dir, 'scripts/ops/deploy.sh'));
+    writeFileSync(
+      path.join(dir, '.env.ops.prod'),
+      `APP_DOMAIN=x.test\n${previous ? `APP_IMAGE=${previous}\n` : ''}FIRST_BOOT=\n`,
+    );
+    const log = path.join(dir, 'calls.log');
+    const stub = (name: string, body: string) =>
+      writeFileSync(path.join(dir, name), `#!/usr/bin/env bash\n${body}\n`, { mode: 0o755 });
+    stub('docker', `echo "docker $*" >> "${log}"; [ "${fail}" = pull ] && exit 5; exit 0`);
+    stub('backup', `echo "backup" >> "${log}"; [ "${fail}" = backup ] && exit 6; exit 0`);
+    stub('ops', `echo "ops $*" >> "${log}"; [ "${fail}" = migrate ] && exit 7; exit 0`);
+    stub(
+      'dc',
+      `echo "dc $*" >> "${log}"
+case "$1" in
+  up) if [ "${fail}" = up ] && [ ! -f "${dir}/rolled" ] && grep -q "${'b'.repeat(64)}" "${dir}/.env.ops.prod"; then exit 8; fi;;
+  exec) if [ "${fail}" = ready ]; then exit 1; fi; echo '{"status":"ready"}';;
+esac
+exit 0`,
+    );
+    const r = spawnSync('bash', [path.join(dir, 'scripts/ops/deploy.sh'), NEW], {
+      cwd: tmpdir(), // not the repository: the script must find its own root
+      env: {
+        ...process.env,
+        DOCKER: path.join(dir, 'docker'),
+        DC: path.join(dir, 'dc'),
+        OPS: path.join(dir, 'ops'),
+        BACKUP: path.join(dir, 'backup'),
+        READY_TRIES: '2',
+        READY_SLEEP: '0',
+      },
+      encoding: 'utf8',
+    });
+    const env = readFileSync(path.join(dir, '.env.ops.prod'), 'utf8');
+    return {
+      status: r.status,
+      err: r.stderr,
+      image: /^APP_IMAGE=(.*)$/m.exec(env)?.[1] ?? null,
+      calls: existsSync(log) ? readFileSync(log, 'utf8').split('\n').filter(Boolean) : [],
+    };
+  };
+
+  it('works from any directory and ends on the new digest after a clean run', () => {
+    const r = deploy('none');
+    expect(r.status, r.err).toBe(0);
+    expect(r.image).toBe(NEW);
+    expect(r.calls).toEqual(expect.arrayContaining(['backup', expect.stringContaining('db-migrate')]));
+  });
+  it('a failure before the switch changes nothing and rolls nothing back (pull, backup)', () => {
+    for (const fail of ['pull', 'backup'] as const) {
+      const r = deploy(fail);
+      expect(r.status, fail).not.toBe(0);
+      expect(r.image, fail).toBe(OLD);
+      expect(
+        r.calls.filter((c) => c.startsWith('dc up')),
+        fail,
+      ).toEqual([]);
+    }
+  });
+  it('every failure after the switch puts the previous image back and starts it: migration, start, readiness', () => {
+    for (const fail of ['migrate', 'up', 'ready'] as const) {
+      const r = deploy(fail);
+      expect(r.status, fail).not.toBe(0);
+      expect(r.image, fail).toBe(OLD);
+      expect(r.err, fail).toMatch(/rolled back to/);
+      // the last thing run is the start of the previous image
+      expect(r.calls[r.calls.length - 1], fail).toBe('dc up -d app');
+    }
+  });
+  it('with no previous image it fails loudly and does not invent one', () => {
+    const r = deploy('migrate', null);
+    expect(r.status).not.toBe(0);
+    expect(r.err).toMatch(/no previous image/);
+  });
+});
