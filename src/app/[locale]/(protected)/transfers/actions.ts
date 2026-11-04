@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { getRequestClock } from '@/app/request-clock';
 import { getPool } from '@/lib/db/pools';
 import { getEnv } from '@/lib/server-env';
-import { pickUpTransfer, receiveTransfer, sendTransfer } from '@/modules/operations';
+import { pickUpTransfer, receiveTransfer, sendTransfer, setFuelTankOpening } from '@/modules/operations';
 import { authorize } from '@/modules/platform-security';
 import { currentAuthState } from '@/modules/platform-security/next';
 
@@ -46,6 +46,19 @@ export async function receiveTransferAction(formData: FormData): Promise<void> {
     id: String(formData.get('id')),
     qty: Number(formData.get('qty')),
     date: (await getRequestClock()).today(),
+  });
+  revalidatePath('/', 'layout');
+}
+
+// @permission transfers.write (owner, app_admin, plant_manager): the opening level of a plant fuel tank, once per plant
+export async function fuelTankOpeningAction(formData: FormData): Promise<void> {
+  if (!getEnv().TRANSFERS_ENABLED) return;
+  const allowed = await authorize('transfers.write', deps());
+  if (!allowed.ok) return;
+  await setFuelTankOpening(getPool('app'), allowed.user, {
+    plantId: String(formData.get('plantId')),
+    litres: Number(formData.get('litres')),
+    asOf: (await getRequestClock()).today(),
   });
   revalidatePath('/', 'layout');
 }

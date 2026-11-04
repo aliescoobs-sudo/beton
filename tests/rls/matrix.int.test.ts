@@ -361,6 +361,21 @@ const FIXTURES: Record<
       return `select updated_by::text as owner from order_pump where order_id = '${pumpedOrder}' and $1::text is not null`;
     },
   },
+  fuel_tank_opening: {
+    // Written by set_fuel_tank_opening; the fixture writes the row as the definer would, on a plant that has no opening yet.
+    writers: ['owner'],
+    seed: (_tx, actor) =>
+      withRlsContext(migratorPool, { userId: actor, role: 'owner', requestId: marker }, async (m) => {
+        const p = await m.query<{ id: string }>(
+          `select id from plant p where not exists (select 1 from fuel_tank_opening o where o.plant_id = p.id) limit 1`,
+        );
+        return m.query(
+          `insert into fuel_tank_opening (plant_id, level_ml, as_of, set_by) values ($1, 1234, current_date, $2)`,
+          [p.rows[0]!.id, actor],
+        );
+      }),
+    visible: `select set_by::text as owner from fuel_tank_opening where level_ml = 1234 and $1::text is not null`,
+  },
   pump_conflict: {
     // Written by the pump doors and triggers; the fixture writes a double-booking row on a pump job of its own.
     writers: ['owner'],

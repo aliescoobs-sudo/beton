@@ -175,6 +175,8 @@ describe('functions the application role can execute', () => {
     'public.pump_waiting(p_date date)',
     'public.pump_conflicts(p_date date)',
     'public.pump_options()',
+    'public.set_fuel_tank_opening(p_plant uuid, p_litres bigint, p_as_of date)',
+    'public.fuel_tank_levels()', // C3: litres per plant, no price
     'public.record_receipt_lines(p_purchase uuid, p_date date, p_lines jsonb, p_confirm_excess boolean)',
     'public.reject_supplier_invoice(p_si uuid, p_reason text)',
     'public.resolve_order_price(p_type uuid, p_client uuid, p_date date)', // C3: owner and system only (checked inside)

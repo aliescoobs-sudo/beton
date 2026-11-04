@@ -2870,6 +2870,10 @@
   "transfers": {
     "link": "Transferts entre centrales",
     "title": "Transferts entre centrales",
+    "tanksTitle": "Cuves de carburant",
+    "inTransit": "en route",
+    "openingL": "Niveau initial (L)",
+    "setOpening": "Enregistrer",
     "intro": "Matériaux et carburant entre Tétouan et Chefchaouen : envoyé, en transit, reçu, avec l'écart et qui a fait chaque étape. Quantités seulement.",
     "kind": {
       "material": "Matériau",

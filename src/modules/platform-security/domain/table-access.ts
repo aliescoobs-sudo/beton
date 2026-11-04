@@ -535,6 +535,24 @@ export const TABLE_ACCESS = {
     exception:
       'R10 (DECISIONS 149): one answer set per person and survey, written only by answer_survey (the person answers for themselves). Owner and app_admin read the counts and free texts through survey_results(), which names no respondent.',
   },
+  fuel_tank_opening: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'none',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'C3 (DECISIONS 159): the opening level of a plant fuel tank, once per plant. Written only by set_fuel_tank_opening (SECURITY DEFINER). Litres only, no price; a plant manager reads their plant.',
+  },
   plant_transfer: {
     kind: 'rls',
     read: {

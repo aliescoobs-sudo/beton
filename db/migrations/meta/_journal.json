@@ -785,6 +785,13 @@
       "when": 1793804167023,
       "tag": "0103_pump_by_code",
       "breakpoints": true
+    },
+    {
+      "idx": 104,
+      "version": "7",
+      "when": 1793804227023,
+      "tag": "0104_fuel_tank",
+      "breakpoints": true
     }
   ]
 }

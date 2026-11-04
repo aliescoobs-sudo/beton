@@ -8,6 +8,8 @@ import { createPlant, updatePlant } from '../src/modules/master-data';
 import {
   closeDay,
   getDayCloseStatus,
+  getFuelTankLevels,
+  setFuelTankOpening,
   getOrderTimeline,
   listDayCloses,
   listTransfers,
@@ -325,5 +327,58 @@ describe('three older reads are scoped to the plant of a plant manager (Batch A 
     expect(await seen(u.pm2!)).toEqual({ chain: 0, note: 0, board: 0 });
     // the owner's chain is capped at 300 recent orders, so only the other two reads are compared
     expect(await seen(u.owner!)).toMatchObject({ note: 1, board: 1 });
+  });
+});
+
+describe('the fuel tank of each plant moves with the fuel transfers (C3)', () => {
+  const tank = async (plant: string) =>
+    (await getFuelTankLevels(app, u.owner!)).find((t) => t.plantId === plant)!;
+  it('sending takes the litres out of the sender, receiving adds what arrived; the difference stays the variance', async () => {
+    const a0 = await tank(plant1);
+    const b0 = await tank(plant2);
+    const set = await setFuelTankOpening(app, u.owner!, {
+      plantId: plant1,
+      litres: 5000,
+      asOf: '2000-01-01',
+    }).catch(() => null);
+    const a1 = set?.ok ? await tank(plant1) : a0;
+    const sent = await sendTransfer(app, u.owner!, {
+      kind: 'fuel',
+      fromPlant: plant1,
+      toPlant: plant2,
+      componentId: null,
+      qty: 1000,
+      date: DATE,
+      note: null,
+    });
+    if (!sent.ok) throw new Error(sent.error);
+    const a2 = await tank(plant1);
+    expect(a2.levelL).toBe(a1.levelL - 1000);
+    expect((await tank(plant2)).inTransitL).toBe(b0.inTransitL + 1000);
+    expect((await tank(plant2)).levelL).toBe(b0.levelL);
+    await pickUpTransfer(app, u.owner!, sent.value.id);
+    const r = await receiveTransfer(app, u.owner!, { id: sent.value.id, qty: 980, date: DATE });
+    expect(r.ok).toBe(true);
+    const b1 = await tank(plant2);
+    expect(b1.levelL).toBe(b0.levelL + 980);
+    expect(b1.inTransitL).toBe(b0.inTransitL);
+  });
+  it('the opening is set once; other roles cannot set it; no price is returned', async () => {
+    expect(
+      await setFuelTankOpening(app, u.owner!, { plantId: plant2, litres: 100, asOf: '2000-01-01' }).catch(
+        () => null,
+      ),
+    ).not.toBeNull();
+    expect(
+      await refused(setFuelTankOpening(app, u.owner!, { plantId: plant2, litres: 200, asOf: '2000-01-01' })),
+    ).toBe(true);
+    expect(
+      await refused(
+        setFuelTankOpening(app, u.office_sales!, { plantId: plant1, litres: 1, asOf: '2000-01-01' }),
+      ),
+    ).toBe(true);
+    expect(JSON.stringify(await getFuelTankLevels(app, u.owner!))).not.toMatch(
+      /price|centimes|total|amount/i,
+    );
   });
 });

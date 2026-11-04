@@ -251,3 +251,64 @@ export async function listDayCloses(
     closedAt: new Date(r.closed_at).toISOString(),
   }));
 }
+
+export interface FuelTankLevel {
+  plantId: string;
+  plantName: string;
+  /** Litres: the opening level, the fuel bought for the plant, received from the other plant, dispensed from the tank, sent. */
+  openingL: number;
+  asOf: string | null;
+  purchasedL: number;
+  receivedL: number;
+  filledL: number;
+  sentL: number;
+  /** Fuel on its way to this plant (sent, not received yet): not in the level. */
+  inTransitL: number;
+  levelL: number;
+}
+
+/** The fuel tank of every plant the caller may see, computed from its movements (never stored). Litres only, no price. */
+export async function getFuelTankLevels(appPool: pg.Pool, actor: SessionUser): Promise<FuelTankLevel[]> {
+  await require(appPool, actor, 'transfers.read');
+  const { rows } = await inRequest(appPool, actor, (tx) =>
+    tx.query('select * from public.fuel_tank_levels()'),
+  );
+  const litres = (ml: string | number) => Number(ml) / 1000;
+  return rows.map((r) => ({
+    plantId: r.plant_id,
+    plantName: r.plant_name,
+    openingL: litres(r.opening_ml),
+    asOf: r.as_of ? new Date(r.as_of).toISOString().slice(0, 10) : null,
+    purchasedL: litres(r.purchased_ml),
+    receivedL: litres(r.received_ml),
+    filledL: litres(r.filled_ml),
+    sentL: litres(r.sent_ml),
+    inTransitL: litres(r.in_transit_ml),
+    levelL: litres(r.level_ml),
+  }));
+}
+
+/** The level of a plant's fuel tank on the day it starts counting (once per plant). The sending plant manager, owner or app_admin. */
+export async function setFuelTankOpening(
+  appPool: pg.Pool,
+  actor: SessionUser,
+  input: { plantId: string; litres: number; asOf: string },
+): Promise<Result<true, PlantFlowError>> {
+  await require(appPool, actor, 'transfers.write');
+  const p = z
+    .object({ plantId: z.uuid(), litres: z.number().int().min(0).max(1_000_000), asOf: day })
+    .safeParse(input);
+  if (!p.success) return err('INVALID');
+  try {
+    await inRequest(appPool, actor, (tx) =>
+      tx.query('select public.set_fuel_tank_opening($1, $2, $3)', [
+        p.data.plantId,
+        p.data.litres,
+        p.data.asOf,
+      ]),
+    );
+    return ok(true);
+  } catch (error) {
+    return err(failure(error));
+  }
+}
