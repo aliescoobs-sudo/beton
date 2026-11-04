@@ -122,6 +122,7 @@ export default async function globalSetup() {
       [E2E_MD.quoteOffice, 'office', 'fr'],
       [E2E_MD.purPlant, 'plant', 'fr'],
       [E2E_MD.cashSupport, 'support', 'fr'],
+      [E2E_MD.finSupport, 'support', 'fr'],
       [E2E_MD.cashOffice, 'office', 'fr'],
       [E2E_MD.acctOffice, 'office', 'fr'],
       [E2E_MD.acctPartner, 'partner', 'fr'],

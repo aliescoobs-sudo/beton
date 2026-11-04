@@ -35,7 +35,7 @@ test('owner enables finance, records a fixed expense and downloads a real Excel 
   await logout(page);
 });
 test('support has no management page, export, navigation or write endpoint', async ({ page }) => {
-  await loginAndEnrol(page, 'fr', E2E_MD.cashSupport.email);
+  await loginAndEnrol(page, 'fr', E2E_MD.finSupport.email);
   await expect(page.getByTestId('finance-link')).toHaveCount(0);
   expect((await page.goto('/fr/finance'))?.status()).toBe(404);
   expect((await page.request.get('/fr/finance/export?from=2026-01-01&to=2026-12-31')).status()).toBe(404);

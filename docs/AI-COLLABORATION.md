@@ -21,9 +21,9 @@ Updated: 2026-11-04 (end of Batch C). No secrets in this file.
 | Hosting choice, CNDP draft | Lead | pending |
 
 ## Last handoff of each side
-- **Claude Code → lead:** Batch C end report in `docs/checkpoints/CP-PROD-PLAN.md`; not started: §16.10, day-close fuel and cash lines, office join.
+- **Claude Code → lead:** Batch C end report and final e2e (153 passed, 1 fixture failure fixed and rerun green) in `docs/checkpoints/CP-PROD-PLAN.md`; not started: §16.10, day-close fuel and cash lines, office join.
 - **Lead → Claude Code:** Batch B prompt (this batch), including REQUIREMENTS-V1 §16 from Codex's review.
 - **Codex → lead:** the §16 review, accepted 2 Nov.
 
 ## Next step
-Lead reviews Batch B; decide on §16.6, §16.7, §16.10 and the open Batch A gaps; Darija wording to be read by a Darija speaker; then Codex reviews main.
+Lead reviews Batch C; decide on §16.6, §16.7, §16.10 and the open Batch A gaps; Darija wording to be read by a Darija speaker; then Codex reviews main.
