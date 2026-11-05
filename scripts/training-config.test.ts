@@ -48,6 +48,10 @@ describe('the training stack (T1)', () => {
     expect(up).not.toMatch(/1777|chmod [0-7]*7 out/);
     expect(up).toMatch(/chown 10001:10001 \/app\/out && chmod 700 \/app\/out/);
   });
+  it('R11-07: generates no push keys', () => {
+    expect(initEnv).not.toMatch(/VAPID/);
+    expect(compose).not.toMatch(/VAPID/);
+  });
   it('keeps the database off the host, publishes the app on the loopback only, and keeps Caddy for a VPS behind a profile', () => {
     expect(block('db')).not.toMatch(/ports:/);
     expect(block('db')).toMatch(/networks: \[internal\]/);

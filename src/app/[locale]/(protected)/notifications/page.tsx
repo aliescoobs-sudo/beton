@@ -32,20 +32,22 @@ export default async function NotificationsPage({ params }: { params: Promise<{ 
           </button>
         </form>
       </div>
-      <div className="mt-4">
-        <PushSetup
-          publicKey={getEnv().VAPID_PUBLIC_KEY ?? null}
-          workerUrl="/sw.js"
-          subscribeUrl="/api/push"
-          labels={{
-            enable: t('push.enable'),
-            enabled: t('push.enabled'),
-            unsupported: t('push.unsupported'),
-            denied: t('push.denied'),
-            unavailable: t('push.unavailable'),
-          }}
-        />
-      </div>
+      {!getEnv().TRAINING_MODE && (
+        <div className="mt-4">
+          <PushSetup
+            publicKey={getEnv().VAPID_PUBLIC_KEY ?? null}
+            workerUrl="/sw.js"
+            subscribeUrl="/api/push"
+            labels={{
+              enable: t('push.enable'),
+              enabled: t('push.enabled'),
+              unsupported: t('push.unsupported'),
+              denied: t('push.denied'),
+              unavailable: t('push.unavailable'),
+            }}
+          />
+        </div>
+      )}
       {items.length === 0 ? (
         <p className="mt-6 text-sm text-muted" data-testid="notifications-empty">
           {t('empty')}

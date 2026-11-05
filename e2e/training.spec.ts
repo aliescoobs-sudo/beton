@@ -33,6 +33,26 @@ test('a training account signs in with its password alone and the banner stays o
   expect((await page.request.get(`${E2E_TRAINING_URL}/api/push`)).status()).toBe(404);
 });
 
+test('R11-07: the phone push endpoints answer 404 in training, session or not, and the phone shows no push action', async ({
+  request,
+}) => {
+  const origin = { origin: E2E_TRAINING_URL };
+  expect((await request.get(`${E2E_TRAINING_URL}/api/field/push`)).status()).toBe(404);
+  expect(
+    (
+      await request.post(`${E2E_TRAINING_URL}/api/field/push`, { headers: origin, data: { endpoint: 'x' } })
+    ).status(),
+  ).toBe(404);
+  // on the normal server the same door exists: it asks for a phone session
+  expect((await request.get(`${E2E_BASE_URL}/api/field/push`)).status()).toBe(401);
+});
+
+test('R11-07: the phone page of the training instance has no push subscription button', async ({ page }) => {
+  await page.goto(`${E2E_TRAINING_URL}/ar/driver`);
+  await expect(page.getByTestId('field-login')).toBeVisible();
+  await expect(page.getByTestId('push-enable')).toHaveCount(0);
+});
+
 test('the same account has to enrol on a normal server', async ({ page }) => {
   await page.goto(`${E2E_BASE_URL}/fr/login`);
   await page.fill('input[name=email]', E2E_TRAINING_USER.email);

@@ -130,7 +130,7 @@ const deviceId = (): string => {
 const hhmm = (iso: string) =>
   new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
-export function FieldApp({ locale }: { locale: string }) {
+export function FieldApp({ locale, pushAvailable = false }: { locale: string; pushAvailable?: boolean }) {
   const t = useTranslations('field');
   const [session, setSession] = useState<'unknown' | 'out' | 'in'>('unknown');
   const [day, setDay] = useState<Day | null>(null);
@@ -486,19 +486,21 @@ export function FieldApp({ locale }: { locale: string }) {
           {t('signOut')}
         </button>
       </header>
-      <PushSetup
-        publicKey={null}
-        keyUrl="/api/field/push"
-        workerUrl="/driver-sw.js"
-        subscribeUrl="/api/field/push"
-        labels={{
-          enable: t('push.enable'),
-          enabled: t('push.enabled'),
-          unsupported: t('push.unsupported'),
-          denied: t('push.denied'),
-          unavailable: t('push.unavailable'),
-        }}
-      />
+      {pushAvailable && (
+        <PushSetup
+          publicKey={null}
+          keyUrl="/api/field/push"
+          workerUrl="/driver-sw.js"
+          subscribeUrl="/api/field/push"
+          labels={{
+            enable: t('push.enable'),
+            enabled: t('push.enabled'),
+            unsupported: t('push.unsupported'),
+            denied: t('push.denied'),
+            unavailable: t('push.unavailable'),
+          }}
+        />
+      )}
       {!online && (
         <p
           role="status"

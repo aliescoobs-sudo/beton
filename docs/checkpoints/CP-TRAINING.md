@@ -21,7 +21,7 @@ the final review (`docs/reviews/CODEX-REVIEW-FINAL.md`) still stands for real da
   lockout stay on** (the instance is on the internet). Drivers and the pump operator sign in on the phone with their code and PIN (five wrong PINs lock them 15 minutes, attempts are serialised per driver, and the sign-in endpoint has a per-IP limit).
 - **Banner.** A red banner on every page, in the user's language: « Version de formation — données fictives » / « نسخة تدريب — معطيات وهمية ».
 - **Nothing goes out, nothing comes in.** Imports are refused entirely (`import:excel` stops; a fictitious database is only ever filled by the seed), map links are
-  not built, web push is off, and a language model (`ASSISTANT_PROVIDER=anthropic`, a key, invoice reading) is refused at startup. (There is no WhatsApp/SMS in the code.)
+  not built, web push is off (the phone push endpoints answer 404, no subscription button is shown, and VAPID keys are refused at startup), and a language model (`ASSISTANT_PROVIDER=anthropic`, a key, invoice reading) is refused at startup. (There is no WhatsApp/SMS in the code.)
 - **Modules.** Every module flag that exists is on: field app, notifications, cancellations, documents V1, Darija, deterministic assistant, transfers, finance.
   The client and supplier portals have no flag and stay off. The external assistant stays off (it is refused in a production build).
 

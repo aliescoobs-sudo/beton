@@ -27,6 +27,16 @@ describe('TRAINING_MODE in the environment (T1)', () => {
     );
     expect(() => loadEnv({ ...valid, TRAINING_MODE: 'true', REAL_DATA: 'true' })).toThrow(/TRAINING_MODE/);
   });
+  it('R11-07: no web push keys in training mode (nothing goes out to a push provider)', () => {
+    const t = { ...valid, TRAINING_MODE: 'true', APP_ENV: 'training', NODE_ENV: 'production' };
+    const pub = 'B'.repeat(87);
+    const priv = 'C'.repeat(43);
+    expect(() => loadEnv({ ...t, VAPID_PUBLIC_KEY: pub, VAPID_PRIVATE_KEY: priv })).toThrow(/web push/);
+    expect(() => loadEnv({ ...t, VAPID_PRIVATE_KEY: priv })).toThrow(/web push/);
+    expect(loadEnv({ ...t }).TRAINING_MODE).toBe(true);
+    // outside training the keys are accepted as before
+    expect(() => loadEnv({ ...valid, VAPID_PUBLIC_KEY: pub, VAPID_PRIVATE_KEY: priv })).not.toThrow();
+  });
   it('R11-02: TRAINING_ALLOW_UNMARKED exists for the e2e server only: needs training mode, never production or real data', () => {
     const t = { ...valid, TRAINING_MODE: 'true', APP_ENV: 'training', NODE_ENV: 'production' };
     expect(loadEnv(t).TRAINING_ALLOW_UNMARKED).toBe(false);

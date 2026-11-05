@@ -182,6 +182,14 @@ const envSchema = envObject.superRefine((env, ctx) => {
       message: 'must be "false" when APP_ENV=production (the training instance never runs as production)',
     });
   }
+  if (env.TRAINING_MODE && (env.VAPID_PUBLIC_KEY || env.VAPID_PRIVATE_KEY)) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['VAPID_PUBLIC_KEY'],
+      message:
+        'no web push in training mode: VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY must be absent (nothing goes out to a push provider)',
+    });
+  }
   if (env.TRAINING_ALLOW_UNMARKED && (env.APP_ENV === 'production' || env.REAL_DATA || !env.TRAINING_MODE)) {
     ctx.addIssue({
       code: 'custom',
