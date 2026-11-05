@@ -206,7 +206,7 @@ Paused on 2026-11-04 by the lead for the training instance (T1). Done, one commi
 **Deferred to pre-production** (not started; each needs its own commit and a test that proves it, enforced in the database and the server actions):
 - ~~**F07**~~ **done** (D7 / decision 169): `MAP_LINKS_ENABLED` off by default; address as text with a copy button.
 - ~~**F08**~~ **done** (decision 170, migration 0112): a client copy needs an approved request consumed by the download (own, exact document and client, 24 h, once); the internal print is unchanged.
-- **F09** accountant invoice paths without payment state or contacts.
+- ~~**F09**~~ **done** (decision 171): no payment-state call for a role without balances; export for the accountant is the sales journal (purchases journal only through finance when it is on).
 - **F10** the environment flag is checked on every finance endpoint, including `/api/finance-configuration`.
 - **F11** atomic PIN attempt reservation, a lock re-check before the session is issued, PIN of at least 6 digits.
 - **§16.10 note** a redirect must carry the destination site address to the driver.

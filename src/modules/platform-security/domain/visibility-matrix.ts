@@ -140,3 +140,9 @@ export function matrixMarkdown(rows: readonly VisibilityRow[] = VISIBILITY_MATRI
     ),
   ].join('\n');
 }
+
+/** F09: does this role see balances and aggregates over this item (§16.1)? Services use it to avoid calling a balance door a role is refused. */
+export function seesBalances(role: Role, item: string): boolean {
+  return VISIBILITY_MATRIX.find((r) => r.item === item)?.balances.includes(role) ?? false;
+}
+export const INVOICE_ITEM = 'Sales invoices and avoirs';

@@ -127,6 +127,7 @@ export { getCompanyProfile, listCompanyProfiles, saveCompanyProfile } from './se
 export {
   type AccountingExport,
   buildAccountingExport,
+  exportFilesFor,
   EXPORT_FILES,
   type ExportError,
   type ExportFile,

@@ -2,7 +2,15 @@ import { randomUUID } from 'node:crypto';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { withRlsContext } from '../src/lib/db/rls-context';
-import { buildAccountingExport, cancelInvoice, createInvoice, createPurchase } from '../src/modules/ledger';
+import {
+  buildAccountingExport,
+  cancelInvoice,
+  createInvoice,
+  createPurchase,
+  exportFilesFor,
+  getInvoiceDocument,
+  listInvoices,
+} from '../src/modules/ledger';
 import { createLoad, markDelivered } from '../src/modules/operations';
 import type { SessionUser } from '../src/modules/platform-security/auth/session-gate';
 import { testEnv } from './db-env';
@@ -16,7 +24,7 @@ const app = new pg.Pool({ connectionString: env.DATABASE_URL_APP, max: 4 });
 const migrator = new pg.Pool({ connectionString: env.DATABASE_URL_MIGRATOR, max: 1 });
 afterAll(() => Promise.all([app.end(), migrator.end()]));
 
-const users = {} as Record<'owner' | 'partner' | 'office' | 'plant' | 'support', SessionUser>;
+const users = {} as Record<'owner' | 'partner' | 'office' | 'plant' | 'support' | 'accountant', SessionUser>;
 const inCtx = <T>(user: SessionUser, fn: (tx: pg.PoolClient) => Promise<T>) =>
   withRlsContext(app, { userId: user.id, role: user.role, requestId: 'test' }, fn);
 const marker = `ae${randomUUID().replace(/-/g, '').slice(0, 10)}`;
@@ -25,7 +33,7 @@ const DAY = '2088-03-10';
 let scene: DeliveryScene;
 
 beforeAll(async () => {
-  for (const role of ['owner', 'partner', 'office', 'plant', 'support'] as const) {
+  for (const role of ['owner', 'partner', 'office', 'plant', 'support', 'accountant'] as const) {
     users[role] = await realSessionUser(env.DATABASE_URL_MIGRATOR, role);
   }
   scene = await deliveryScene(app, users.owner.id, marker);
@@ -119,5 +127,42 @@ describe('the accountant export (AC-LED-24)', () => {
     if (!out.ok) throw new Error(out.error);
     expect(out.value.summary).toMatchObject({ invoices: 0, purchases: 0 });
     expect(out.value.files.sales).toContain('Total;;;;0,00;0,00;0,00;');
+  });
+});
+
+// F09: the accountant's invoice and export paths never call the payment-state door (which refuses the role) and carry no balance.
+describe('the accountant paths (F09)', () => {
+  const period = { from: '2088-03-01', to: '2088-03-31' };
+  it('reads the invoices with their amounts and no payment standing', async () => {
+    const list = await listInvoices(app, users.accountant);
+    const mine = list.filter((i) => i.invoiceDate >= period.from && i.invoiceDate <= period.to);
+    expect(mine.length).toBeGreaterThan(0);
+    for (const i of mine) {
+      expect(i.paymentState).toBeNull();
+      expect(i.paidCentimes).toBe(0);
+    }
+    const doc = await getInvoiceDocument(app, users.accountant, mine[0]!.id);
+    expect(doc?.invoice.number).toBe(mine[0]!.number);
+    expect(doc?.invoice.paymentState).toBeNull();
+    // the owner still gets the standing from the same list
+    const ownerView = (await listInvoices(app, users.owner)).find((i) => i.id === mine[0]!.id);
+    expect(ownerView).toBeDefined();
+  });
+  it('exports the sales journal and nothing that is a balance, a treasury figure or a table the role cannot read', async () => {
+    const out = await buildAccountingExport(app, users.accountant, period);
+    if (!out.ok) throw new Error(out.error);
+    expect(out.value.summary).toMatchObject({ invoices: 2, purchases: 0, payments: 0, movements: 0 });
+    expect(out.value.files.sales).toContain('FA-');
+    expect(out.value.files.purchases).toBe('');
+    expect(out.value.files.payments).toBe('');
+    expect(out.value.files.ageing).toBe('');
+    expect(exportFilesFor('accountant')).toEqual(['sales']);
+    expect(exportFilesFor('owner')).toEqual(['sales', 'purchases', 'payments', 'ageing']);
+    expect(exportFilesFor('support')).toHaveLength(4);
+  });
+  it('the database still refuses the accountant the payment-state door (the fix widens nothing)', async () => {
+    await expect(
+      inCtx(users.accountant, (tx) => tx.query('select * from public.invoice_payment_state()')),
+    ).rejects.toThrow(/may not read payment states/);
   });
 });

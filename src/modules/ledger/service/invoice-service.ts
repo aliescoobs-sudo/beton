@@ -1,7 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import type pg from 'pg';
 import { err, ok, type Result } from '@/lib/result';
-import { can, inRequest, isMalformedId, require, type SessionUser } from '@/modules/platform-security';
+import {
+  can,
+  inRequest,
+  INVOICE_ITEM,
+  isMalformedId,
+  require,
+  seesBalances,
+  type SessionUser,
+} from '@/modules/platform-security';
 import { type Effect, visibleEffects } from '../domain/effects';
 import { invoiceDueDate, type InvoiceInput, parseInvoiceInput } from '../domain/invoice';
 import { groupInvoiceLines, type InvoiceGroup, netToPay } from '../domain/invoice-groups';
@@ -237,7 +245,10 @@ export async function loadInvoicePayments(tx: pg.PoolClient): Promise<Map<string
 export async function listInvoices(appPool: pg.Pool, actor: SessionUser): Promise<InvoiceView[]> {
   await require(appPool, actor, 'invoices.read');
   const { rows, payments } = await inRequest(appPool, actor, async (tx) => {
-    const payments = await loadInvoicePayments(tx);
+    // F09: payment state is a balance; a role that does not see balances (the accountant) never asks the door that refuses it.
+    const payments = seesBalances(actor.role, INVOICE_ITEM)
+      ? await loadInvoicePayments(tx)
+      : new Map<string, InvoicePayment>();
     const result = await tx.query<{
       id: string;
       number: string;

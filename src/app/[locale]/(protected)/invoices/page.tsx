@@ -3,7 +3,7 @@ import { getRequestClock } from '@/app/request-clock';
 import { getPool } from '@/lib/db/pools';
 import { listInvoices } from '@/modules/ledger';
 import { CancelInvoice } from '@/modules/ledger/ui/invoices/cancel-invoice';
-import { can, recordMoneyView } from '@/modules/platform-security';
+import { can, INVOICE_ITEM, recordMoneyView, seesBalances } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/next';
 import { EmptyState, Money, PageHeader, StatusPill, Table, Td, Th } from '@/ui';
 import { cancelInvoiceAction } from './actions';
@@ -19,6 +19,8 @@ export default async function InvoicesPage({ params }: { params: Promise<{ local
   const today = clock.today();
   const t = await getTranslations('ledger.invoices');
   const canCancel = can(user.role, 'ledger.reverse');
+  // F09: "overdue" is a balance statement; a role that does not see balances (the accountant) gets the invoice, not its payment standing.
+  const showStanding = seesBalances(user.role, INVOICE_ITEM);
   return (
     <div>
       <PageHeader title={t('title')} description={t('intro')} />
@@ -77,7 +79,7 @@ export default async function InvoicesPage({ params }: { params: Promise<{ local
                 </Td>
                 <Td>
                   <bdi dir="ltr">{i.dueDate}</bdi>
-                  {!i.creditNoteOf && !i.cancelled && i.dueDate < today && (
+                  {showStanding && !i.creditNoteOf && !i.cancelled && i.dueDate < today && (
                     <StatusPill status="late">{t('overdue')}</StatusPill>
                   )}
                 </Td>

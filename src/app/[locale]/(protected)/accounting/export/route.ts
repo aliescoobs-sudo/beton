@@ -1,5 +1,5 @@
 import { getPool } from '@/lib/db/pools';
-import { buildAccountingExport, EXPORT_FILES, type ExportFile } from '@/modules/ledger';
+import { buildAccountingExport, exportFilesFor, type ExportFile } from '@/modules/ledger';
 import { authorize, recordMoneyExport } from '@/modules/platform-security';
 import { currentAuthState } from '@/modules/platform-security/next';
 
@@ -10,14 +10,14 @@ const NAMES: Record<ExportFile, string> = {
   ageing: 'balance-agee',
 };
 
-// @permission accounting.export (owner, support): one CSV of the accountant's files; every download is audited
+// @permission accounting.export (owner, app_admin, support: four files; accountant: the two journals): one CSV of the accountant's files; every download is audited
 export async function GET(request: Request): Promise<Response> {
   const notFound = () => new Response('Not found', { status: 404 });
   const pool = getPool('app');
   const allowed = await authorize('accounting.export', { getState: currentAuthState, appPool: pool });
   if (!allowed.ok) return notFound();
   const q = new URL(request.url).searchParams;
-  const file = EXPORT_FILES.find((f) => f === q.get('file'));
+  const file = exportFilesFor(allowed.user.role).find((f) => f === q.get('file'));
   if (!file) return notFound();
   const from = q.get('from') ?? '';
   const to = q.get('to') ?? '';

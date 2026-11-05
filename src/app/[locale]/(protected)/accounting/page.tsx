@@ -1,7 +1,7 @@
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { getRequestClock } from '@/app/request-clock';
 import { getPool } from '@/lib/db/pools';
-import { buildAccountingExport, EXPORT_FILES } from '@/modules/ledger';
+import { buildAccountingExport, exportFilesFor } from '@/modules/ledger';
 import { recordMoneyView } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/next';
 import { Card, Money, PageHeader } from '@/ui';
@@ -74,16 +74,18 @@ export default async function AccountingPage({
                   <Money centimes={result.value.summary.salesTtcCentimes} />
                 </dd>
               </div>
-              <div>
-                <dt className="field-label">{t('purchases', { n: result.value.summary.purchases })}</dt>
-                <dd>
-                  <Money centimes={result.value.summary.purchasesTtcCentimes} />
-                </dd>
-              </div>
+              {exportFilesFor(user.role).includes('purchases') && (
+                <div>
+                  <dt className="field-label">{t('purchases', { n: result.value.summary.purchases })}</dt>
+                  <dd>
+                    <Money centimes={result.value.summary.purchasesTtcCentimes} />
+                  </dd>
+                </div>
+              )}
             </dl>
           </Card>
           <ul className="grid gap-3 sm:grid-cols-2" data-testid="accounting-files">
-            {EXPORT_FILES.map((f) => (
+            {exportFilesFor(user.role).map((f) => (
               <li key={f}>
                 <a
                   href={`/${locale}/accounting/export?file=${f}&from=${from}&to=${to}`}

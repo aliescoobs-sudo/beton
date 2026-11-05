@@ -1,6 +1,12 @@
 import type pg from 'pg';
 import { err, ok, type Result } from '@/lib/result';
-import { inRequest, require, type SessionUser } from '@/modules/platform-security';
+import {
+  INVOICE_ITEM,
+  inRequest,
+  require,
+  seesBalances,
+  type SessionUser,
+} from '@/modules/platform-security';
 import { isRealDate } from '../domain/dates';
 import {
   type AgeingItem,
@@ -18,6 +24,15 @@ import {
 
 export const EXPORT_FILES = ['sales', 'purchases', 'payments', 'ageing'] as const;
 export type ExportFile = (typeof EXPORT_FILES)[number];
+
+/**
+ * F09: the accountant gets the sales journal (invoices and credit notes with their amounts, which the role reads) and nothing
+ * that is a balance or a treasury figure: no payments, no cash or bank movements, no ageing. The role has no read of the purchase
+ * tables, so this legacy export holds no purchases journal for it; its purchases journal is the restricted one of the finance
+ * module (`finance.accounting_journal`, when the module is on). The other roles of `accounting.export` get the four files.
+ */
+export const exportFilesFor = (role: SessionUser['role']): readonly ExportFile[] =>
+  seesBalances(role, INVOICE_ITEM) ? EXPORT_FILES : EXPORT_FILES.filter((f) => f === 'sales');
 
 export interface AccountingExport {
   from: string;
@@ -82,20 +97,24 @@ export async function buildAccountingExport(
         where i.invoice_date between $1 and $2`,
       [from, to],
     );
+    // The accountant reads no purchase table: nothing is asked of them (an empty journal would pass for a complete one).
+    const readsPurchases = seesBalances(actor.role, INVOICE_ITEM);
     const purchases = (
-      await tx.query<{
-        code: string;
-        date: string;
-        supplier: string;
-        inv: string | null;
-        due: string;
-        ht: string;
-        vat: string;
-        ttc: string;
-      }>(
-        // The purchases journal is what was bought on the supplier's paper: orders that carry their own payable, and the supplier
-        // invoices approved for payment (the order of an invoice-based payable is a commitment, not an entry).
-        `select code, date, supplier, inv, due, ht, vat, ttc from (
+      !readsPurchases
+        ? { rows: [] }
+        : await tx.query<{
+            code: string;
+            date: string;
+            supplier: string;
+            inv: string | null;
+            due: string;
+            ht: string;
+            vat: string;
+            ttc: string;
+          }>(
+            // The purchases journal is what was bought on the supplier's paper: orders that carry their own payable, and the supplier
+            // invoices approved for payment (the order of an invoice-based payable is a commitment, not an entry).
+            `select code, date, supplier, inv, due, ht, vat, ttc from (
            select p.code, to_char(p.order_date, 'YYYY-MM-DD') as date, s.name as supplier, p.supplier_invoice_no as inv,
                   to_char(p.due_date, 'YYYY-MM-DD') as due, p.total_ht_centimes::text as ht, p.total_vat_centimes::text as vat,
                   p.total_ttc_centimes::text as ttc
@@ -108,8 +127,8 @@ export async function buildAccountingExport(
             where si.invoice_date between $1 and $2
               and (select e.event from supplier_invoice_event e where e.supplier_invoice_id = si.id order by e.seq desc limit 1) = 'approved'
          ) j order by date, code`,
-        [from, to],
-      )
+            [from, to],
+          )
     ).rows.map((r): PurchaseRow => ({
       code: r.code,
       date: r.date,
@@ -122,6 +141,28 @@ export async function buildAccountingExport(
     }));
     const recon = reconcile({ sales, purchases, invoiceLinesHtCentimes: Number(lines.rows[0]?.s ?? 0) });
     if (!recon.ok) return err(recon.error);
+
+    // F09: no balance, no treasury for a role that does not see them; the files are empty and nothing asks the refused doors.
+    if (!seesBalances(actor.role, INVOICE_ITEM)) {
+      return ok({
+        from,
+        to,
+        files: {
+          sales: salesJournalCsv(sales),
+          purchases: '',
+          payments: '',
+          ageing: '',
+        },
+        summary: {
+          invoices: sales.length,
+          purchases: purchases.length,
+          payments: 0,
+          movements: 0,
+          salesTtcCentimes: sales.reduce((s, r) => s + r.ttcCentimes, 0),
+          purchasesTtcCentimes: 0,
+        },
+      });
+    }
 
     const payments = (
       await tx.query<{
