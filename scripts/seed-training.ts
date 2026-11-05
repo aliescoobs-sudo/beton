@@ -4,7 +4,7 @@
 // database is a training database. Credentials are generated once and written to `training-accounts.local.txt` (ignored by git);
 // they are never printed.
 //   corepack pnpm seed:training         (an already seeded database is left alone: use `reset:training`)
-import { chmodSync, existsSync, writeFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import pg from 'pg';
 import { realClock } from '../src/modules/clock/index.ts';
 import { inRequest } from '../src/modules/platform-security/index.ts';
@@ -48,7 +48,12 @@ import {
   emailOf,
   generatePassword,
   generatePin,
+  commitCredentialsFile,
+  discardCredentialsFile,
   renderCredentialsFile,
+  stageCredentialsFile,
+  type StagedCredentials,
+  validateCredentialsPath,
 } from './training-lib.ts';
 
 export interface SeedTrainingOptions {
@@ -134,6 +139,8 @@ export async function seedTraining(opts: SeedTrainingOptions): Promise<SeedTrain
     if ((await migrator.query('select 1 from public.training_marker')).rowCount)
       return { applied: false, accounts: 0, credentialsFile: null };
     await assertSeedTargetEmpty(migrator);
+    // R11-04: a destination that cannot be trusted is found before the first write, not after the database is full.
+    validateCredentialsPath(opts.credentialsFile);
 
     const issued: IssuedCredential[] = [];
     const cipher = fieldCipherFrom(parseKeyring(env.FIELD_ENCRYPTION_KEYS));
@@ -493,12 +500,28 @@ export async function seedTraining(opts: SeedTrainingOptions): Promise<SeedTrain
       }),
     );
 
-    // 9. The marker, last: the database now refuses to boot without TRAINING_MODE.
-    await migrator.query('insert into public.training_marker default values');
-    writeFileSync(opts.credentialsFile, renderCredentialsFile(env.APP_BASE_URL, issued, realClock.now()), {
-      mode: 0o600,
-    });
-    chmodSync(opts.credentialsFile, 0o600);
+    // 9. Credentials first, marker last (R11-04, R11-02). The file is staged privately and exclusively; if it cannot be written the seed
+    //    stops here, with no marker, saying so. Only then is it put in place, and only then is the database marked: the marker means
+    //    "completed seed, credentials in the hands of the operator". If the marker cannot be written the file is taken away again.
+    let staged: StagedCredentials;
+    try {
+      staged = stageCredentialsFile(
+        opts.credentialsFile,
+        renderCredentialsFile(env.APP_BASE_URL, issued, realClock.now()),
+      );
+    } catch (error) {
+      throw new SeedError(
+        `training seed NOT completed: the credentials file could not be written (${error instanceof Error ? error.message : String(error)}). ` +
+          'The accounts exist but nobody knows their passwords and the database is not marked: remove the training volume and start again.',
+      );
+    }
+    commitCredentialsFile(staged);
+    try {
+      await migrator.query('insert into public.training_marker default values');
+    } catch (error) {
+      discardCredentialsFile(staged.final);
+      throw error;
+    }
     return { applied: true, accounts: issued.length, credentialsFile: opts.credentialsFile };
   } finally {
     await Promise.all([app.end(), authPool.end(), system.end(), seed.end(), migrator.end()]);

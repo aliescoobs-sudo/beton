@@ -1,6 +1,17 @@
 // The pure parts of the training seed (T1): the account plan, the random credentials and the file they are written to once.
 // A leaf with no database access, so it is unit-tested without one.
-import { randomInt } from 'node:crypto';
+import { randomBytes, randomInt } from 'node:crypto';
+import {
+  closeSync,
+  constants,
+  fsyncSync,
+  lstatSync,
+  openSync,
+  renameSync,
+  unlinkSync,
+  writeSync,
+} from 'node:fs';
+import path from 'node:path';
 import { TRAINING_EMAIL_DOMAIN } from '../src/lib/training.ts';
 import { parsePin } from '../src/modules/field/domain/pin.ts';
 
@@ -106,4 +117,80 @@ export function renderCredentialsFile(
       '',
     );
   return lines.join('\n');
+}
+
+// R11-04: the credentials file holds every training password and PIN. It is created privately and exclusively, then renamed into place;
+// its folder must be ours and closed to writers; its name must be one the ignore rules cover.
+
+/** The names `.gitignore` and `.dockerignore` cover (training-accounts*.local.txt): a custom path must still match. */
+export const CREDENTIALS_NAME = /^training-accounts[A-Za-z0-9._-]*\.local\.txt$/;
+
+/** Checks a destination for the credentials file and returns its absolute path; throws with the reason otherwise. */
+export function validateCredentialsPath(file: string): string {
+  const abs = path.resolve(file);
+  if (!CREDENTIALS_NAME.test(path.basename(abs)))
+    throw new Error(
+      `credentials file refused: "${path.basename(abs)}" is not a name the ignore rules cover (training-accounts*.local.txt)`,
+    );
+  const dir = lstatSync(path.dirname(abs), { throwIfNoEntry: false });
+  if (!dir || dir.isSymbolicLink() || !dir.isDirectory())
+    throw new Error('credentials file refused: its folder does not exist or is a link');
+  const me = process.getuid?.();
+  if (me !== undefined && dir.uid !== me)
+    throw new Error('credentials file refused: its folder is not owned by the user running the seed');
+  if ((dir.mode & 0o022) !== 0)
+    throw new Error(
+      'credentials file refused: its folder is writable by group or others (use a folder with mode 0700)',
+    );
+  const target = lstatSync(abs, { throwIfNoEntry: false });
+  if (target && (target.isSymbolicLink() || !target.isFile()))
+    throw new Error('credentials file refused: the destination exists and is not a regular file');
+  if (target && me !== undefined && target.uid !== me)
+    throw new Error('credentials file refused: the destination exists and belongs to somebody else');
+  return abs;
+}
+
+export interface StagedCredentials {
+  tmp: string;
+  final: string;
+}
+
+/** Writes the content to a new file made exclusively (O_EXCL, no symlink following) with mode 0600, flushed to disk. Not yet in place. */
+export function stageCredentialsFile(file: string, content: string): StagedCredentials {
+  const final = validateCredentialsPath(file);
+  const tmp = path.join(path.dirname(final), `.${path.basename(final)}.${randomBytes(6).toString('hex')}`);
+  const fd = openSync(
+    tmp,
+    constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
+    0o600,
+  );
+  try {
+    writeSync(fd, content);
+    fsyncSync(fd);
+  } catch (error) {
+    closeSync(fd);
+    unlinkSync(tmp);
+    throw error;
+  }
+  closeSync(fd);
+  const made = lstatSync(tmp);
+  if (!made.isFile() || (made.mode & 0o077) !== 0) {
+    unlinkSync(tmp);
+    throw new Error('credentials file refused: the staged file is not private');
+  }
+  return { tmp, final };
+}
+
+/** Puts the staged file in place (atomic rename). */
+export function commitCredentialsFile(staged: StagedCredentials): void {
+  renameSync(staged.tmp, staged.final);
+}
+
+/** Removes a staged or committed file, ignoring one that is not there. */
+export function discardCredentialsFile(file: string): void {
+  try {
+    unlinkSync(file);
+  } catch {
+    // already gone
+  }
 }

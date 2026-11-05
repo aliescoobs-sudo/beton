@@ -18,5 +18,5 @@ docs/reviews
 keys
 reports
 
-training-accounts.local.txt
+training-accounts*.local.txt
 out/

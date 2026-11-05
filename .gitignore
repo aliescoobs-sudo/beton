@@ -20,5 +20,5 @@ keys/
 reports/
 
 # Training instance credentials (T1): written once by seed:training, never committed
-training-accounts.local.txt
+training-accounts*.local.txt
 out/

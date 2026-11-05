@@ -84,7 +84,7 @@ services:
       TRAINING_ACCOUNTS_FILE: /app/out/training-accounts.local.txt
     volumes:
       - filestore:/data/file-store
-      - ./out:/app/out
+      - accounts:/app/out
     command: ['sh', '-c', 'echo "run: ./scripts/training/ops.sh <script> [args]"']
     networks: [internal]
 
@@ -96,4 +96,6 @@ networks:
 volumes:
   pgdata: {}
   filestore: {}
+  # The one-time credentials file of the seed (mode 0700 folder, owned by the container user): no host folder, no host user can reach it.
+  accounts: {}
   caddy_data: {}

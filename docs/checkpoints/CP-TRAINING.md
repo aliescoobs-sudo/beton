@@ -14,7 +14,7 @@ the final review (`docs/reviews/CODEX-REVIEW-FINAL.md`) still stands for real da
   reference prices per plant; fictitious clients and suppliers with fake ICE (`000000000000…`) and fake phones (`06000000xx`), a cement supplier "Ciment Démo";
   orders in every state, cheques and payments, invoices, rotations, receipts, transfers (the pilot scenario dated from today, plus data for both plants).
 - **Accounts.** One per role (owner, app_admin, office_sales, office_purchases, two plant managers, accountant, three drivers, one pump operator). Random
-  passwords and 6-digit PINs are written **once** to `out/training-accounts.local.txt` (mode 0600, ignored by git and by the image) and never printed or logged.
+  passwords and 6-digit PINs are written **once** to `/app/out/training-accounts.local.txt` inside a Docker volume (`accounts`, folder mode 0700 owned by the container user, no folder of the checkout; file mode 0600, created exclusively then renamed, name covered by the ignore rules of git and of the image; the seed stops without marking the database if it cannot be written) and never printed or logged.
   Read them with `./scripts/training/show-accounts.sh`.
 - **Sign-in.** The accounts on the reserved address `…@formation.beton.invalid` work with their **password alone** (no authenticator), only while training
   mode is on. Everything else is unchanged: roles and permissions, row-level security, the audit log, money visibility, the **rate limiting and the login

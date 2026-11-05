@@ -10,9 +10,10 @@ for f in .env.training .env.training.ops; do
   [ -r "$f" ] || { echo "training-up.sh: $f is missing. First run:  APP_IMAGE=ghcr.io/<owner>/belgobeton@sha256:<digest> ./scripts/training/init-env.sh" >&2; exit 1; }
 done
 docker info >/dev/null 2>&1 || { echo "training-up.sh: Docker does not answer. On the iMac start it first:  colima start --arch x86_64 --cpu 2 --memory 4 --disk 40" >&2; exit 1; }
-# The container (uid 10001) writes the credentials file here with mode 0600; the sticky bit keeps others from removing it.
-mkdir -p out && chmod 1777 out
 $dc pull
+# R11-04: the credentials file lives in a Docker volume ("accounts"), not in a folder of this checkout that other users of the machine could
+# reach: the folder is made owned by the container user (10001) and closed to everybody else (0700) before the seed writes into it.
+$dc run --rm -T --user root ops sh -c 'mkdir -p /app/out && chown 10001:10001 /app/out && chmod 700 /app/out'
 $dc up -d --wait db
 $ops db-bootstrap
 $ops db-migrate
