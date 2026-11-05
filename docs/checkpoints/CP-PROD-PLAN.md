@@ -208,7 +208,7 @@ Paused on 2026-11-04 by the lead for the training instance (T1). Done, one commi
 - ~~**F08**~~ **done** (decision 170, migration 0112): a client copy needs an approved request consumed by the download (own, exact document and client, 24 h, once); the internal print is unchanged.
 - ~~**F09**~~ **done** (decision 171): no payment-state call for a role without balances; export for the accountant is the sales journal (purchases journal only through finance when it is on).
 - ~~**F10**~~ **done** (decision 172): the environment flag is checked first on both finance endpoints.
-- **F11** atomic PIN attempt reservation, a lock re-check before the session is issued, PIN of at least 6 digits.
+- ~~**F11**~~ **done** (decision 173, migration 0113): attempts serialised per driver by a row lock, lock re-checked by the database before a session, new PINs 6 to 8 digits. Open: an IP-level throttle.
 - **§16.10 note** a redirect must carry the destination site address to the driver.
 The review's verdict stands for real data until these are closed: do not launch with real data; the training instance (fictitious data only, `docs/checkpoints/CP-TRAINING.md`) is not a launch.
 

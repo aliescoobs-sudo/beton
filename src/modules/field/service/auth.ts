@@ -12,7 +12,7 @@ import {
   type SessionUser,
 } from '@/modules/platform-security';
 import { auditAuthEvent } from '@/modules/platform-security/auth/audit';
-import { parsePin, PIN_LOCK_MINUTES, PIN_MAX_FAILED } from '../domain/pin';
+import { parseLoginPin, parsePin, PIN_LOCK_MINUTES, PIN_MAX_FAILED } from '../domain/pin';
 import { FIELD_SESSION_DAYS, hashDeviceId, signFieldToken } from './session';
 
 export interface FieldAuthDeps {
@@ -150,9 +150,22 @@ export type LoginError = 'INVALID' | 'WRONG' | 'LOCKED' | 'OTHER_DEVICE';
 const DUMMY_HASH =
   '$argon2id$v=19$m=19456,t=2,p=1$c29tZXNhbHRzb21lc2FsdA$0MBXbUjDqkJRK3yrWNHkCxY4SnLJ4/4cgEwIyxVNhqs';
 
+type Outcome =
+  | { kind: 'unknown' }
+  | { kind: 'locked'; driverId: string }
+  | { kind: 'wrong'; driverId: string; locksNow: boolean }
+  | { kind: 'other_device'; driverId: string }
+  | { kind: 'in'; driverId: string; userId: string; role: 'driver' | 'pump_operator'; bound: boolean };
+
 /**
  * The phone's sign-in: the driver code, the PIN, and the phone's own id. Five wrong PINs lock the driver for fifteen minutes;
  * a phone other than the bound one is refused until the owner or app_admin releases the first. Every outcome is audited.
+ *
+ * F11: the lock check, the PIN check, the failure count and the issue of the session are ONE serialised step per driver. The
+ * transaction takes the driver's PIN row `FOR UPDATE` and keeps it until commit, so parallel attempts queue behind each other and
+ * each one sees the count the previous one left (no parallel bypass of the five), and a correct PIN that arrives after the lock
+ * cannot clear it. The database re-checks the lock when it issues the success (`field_login_ok`). An attempt that cannot get the
+ * row within three seconds is told "locked" rather than left waiting.
  */
 export async function loginDriver(
   deps: FieldAuthDeps,
@@ -164,20 +177,12 @@ export async function loginDriver(
     typeof input.deviceId === 'string' && input.deviceId.length >= 16 && input.deviceId.length <= 100
       ? input.deviceId
       : null;
-  const pin = parsePin(input.pin);
+  const pin = parseLoginPin(input.pin);
   if (!/^CH-\d{2,4}$/.test(code) || !device || !pin.ok) {
     // Same time as a real attempt, same answer as a wrong PIN: nothing tells a bad shape from a bad PIN.
     await verify(DUMMY_HASH, 'x').catch(() => false);
     return err('INVALID');
   }
-  const found = await deps.authPool.query<{
-    driver_id: string;
-    user_id: string;
-    kind: 'driver' | 'pump_operator';
-    pin_hash: string;
-    locked_until: Date | null;
-  }>('select driver_id, user_id, kind, pin_hash, locked_until from public.field_login_lookup($1)', [code]);
-  const row = found.rows[0];
   const fail = async (reason: string, driverId?: string) =>
     auditAuthEvent(
       deps.authPool,
@@ -189,66 +194,115 @@ export async function loginDriver(
         reason,
       },
     );
-  if (!row) {
-    await verify(DUMMY_HASH, 'x').catch(() => false);
-    await fail('unknown_driver');
-    return err('WRONG');
-  }
-  if (row.locked_until && row.locked_until > now) {
-    await fail('locked', row.driver_id);
-    return err('LOCKED');
-  }
-  const good = await verify(row.pin_hash, pepper(deps.secret, row.driver_id, pin.value)).catch(() => false);
-  if (!good) {
-    const failed = await deps.authPool.query<{ n: number }>(
-      'select public.field_login_failed($1, $2, $3) as n',
-      [row.driver_id, PIN_MAX_FAILED, PIN_LOCK_MINUTES],
-    );
-    await fail('wrong_pin', row.driver_id);
-    if ((failed.rows[0]?.n ?? 0) >= PIN_MAX_FAILED) {
-      await auditAuthEvent(
-        deps.authPool,
-        { userId: ANONYMOUS_ACTOR_ID, role: 'anonymous' },
-        {
-          action: 'account_locked',
-          table: 'driver',
-          rowId: row.driver_id,
-        },
-      );
-      return err('LOCKED');
-    }
-    return err('WRONG');
-  }
   const deviceHash = hashDeviceId(deps.secret, device);
   const label = typeof input.deviceLabel === 'string' ? input.deviceLabel : '';
-  const bound = await deps.authPool.query<{ r: 'bound' | 'known' | 'other_device' }>(
-    'select public.field_login_ok($1, $2, $3) as r',
-    [row.driver_id, deviceHash, label],
-  );
-  if (bound.rows[0]?.r === 'other_device') {
-    await fail('other_device', row.driver_id);
-    return err('OTHER_DEVICE');
+
+  let outcome: Outcome;
+  const client = await deps.authPool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query("SET LOCAL lock_timeout = '3s'");
+    const found = await client.query<{
+      driver_id: string;
+      user_id: string;
+      kind: 'driver' | 'pump_operator';
+      pin_hash: string;
+      locked_until: Date | null;
+    }>('select driver_id, user_id, kind, pin_hash, locked_until from public.field_login_lock($1)', [code]);
+    const row = found.rows[0];
+    if (!row) {
+      await verify(DUMMY_HASH, 'x').catch(() => false);
+      outcome = { kind: 'unknown' };
+    } else if (row.locked_until && row.locked_until > now) {
+      outcome = { kind: 'locked', driverId: row.driver_id };
+    } else {
+      const good = await verify(row.pin_hash, pepper(deps.secret, row.driver_id, pin.value)).catch(
+        () => false,
+      );
+      if (!good) {
+        const failed = await client.query<{ n: number }>(
+          'select public.field_login_failed($1, $2, $3) as n',
+          [row.driver_id, PIN_MAX_FAILED, PIN_LOCK_MINUTES],
+        );
+        outcome = {
+          kind: 'wrong',
+          driverId: row.driver_id,
+          locksNow: (failed.rows[0]?.n ?? 0) >= PIN_MAX_FAILED,
+        };
+      } else {
+        const bound = await client.query<{ r: 'bound' | 'known' | 'other_device' | 'locked' }>(
+          'select public.field_login_ok($1, $2, $3) as r',
+          [row.driver_id, deviceHash, label],
+        );
+        const r = bound.rows[0]?.r;
+        outcome =
+          r === 'other_device'
+            ? { kind: 'other_device', driverId: row.driver_id }
+            : r === 'bound' || r === 'known'
+              ? {
+                  kind: 'in',
+                  driverId: row.driver_id,
+                  userId: row.user_id,
+                  role: row.kind,
+                  bound: r === 'bound',
+                }
+              : { kind: 'locked', driverId: row.driver_id };
+      }
+    }
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    // Could not take the driver's row in time: another attempt is running. Nothing was counted; the answer is "locked".
+    if ((error as { code?: string }).code === '55P03') return err('LOCKED');
+    throw error;
+  } finally {
+    client.release();
   }
-  await auditAuthEvent(
-    deps.authPool,
-    { userId: row.user_id, role: row.kind },
-    {
-      action: 'login',
-      table: 'driver',
-      rowId: row.driver_id,
-      reason: bound.rows[0]?.r === 'bound' ? 'device_bound' : 'known_device',
-    },
-  );
-  const maxAgeSeconds = FIELD_SESSION_DAYS * 86_400;
-  return ok({
-    kind: row.kind,
-    maxAgeSeconds,
-    token: signFieldToken(deps.secret, {
-      driverId: row.driver_id,
-      deviceHash,
-      exp: Math.floor(now.getTime() / 1000) + maxAgeSeconds,
-    }),
-  });
+
+  switch (outcome.kind) {
+    case 'unknown':
+      await fail('unknown_driver');
+      return err('WRONG');
+    case 'locked':
+      await fail('locked', outcome.driverId);
+      return err('LOCKED');
+    case 'wrong':
+      await fail('wrong_pin', outcome.driverId);
+      if (outcome.locksNow) {
+        await auditAuthEvent(
+          deps.authPool,
+          { userId: ANONYMOUS_ACTOR_ID, role: 'anonymous' },
+          { action: 'account_locked', table: 'driver', rowId: outcome.driverId },
+        );
+        return err('LOCKED');
+      }
+      return err('WRONG');
+    case 'other_device':
+      await fail('other_device', outcome.driverId);
+      return err('OTHER_DEVICE');
+    case 'in': {
+      await auditAuthEvent(
+        deps.authPool,
+        { userId: outcome.userId, role: outcome.role },
+        {
+          action: 'login',
+          table: 'driver',
+          rowId: outcome.driverId,
+          reason: outcome.bound ? 'device_bound' : 'known_device',
+        },
+      );
+      const maxAgeSeconds = FIELD_SESSION_DAYS * 86_400;
+      return ok({
+        kind: outcome.role,
+        maxAgeSeconds,
+        token: signFieldToken(deps.secret, {
+          driverId: outcome.driverId,
+          deviceHash,
+          exp: Math.floor(now.getTime() / 1000) + maxAgeSeconds,
+        }),
+      });
+    }
+  }
 }
 
 /** Every request of the phone: the token is valid, and the database still knows this driver and this phone. */

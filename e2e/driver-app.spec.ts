@@ -24,7 +24,7 @@ test.afterAll(() => Promise.all([migrator.end(), app.end(), auth.end()]));
 const marker = `e2edr${randomUUID().replace(/-/g, '').slice(0, 8)}`;
 const today = new Date().toISOString().slice(0, 10);
 const code = `CH-${3000 + Math.floor(Math.random() * 900)}`;
-const PIN = '4829';
+const PIN = '482913';
 let tripId = '';
 let orderCode = '';
 
@@ -105,7 +105,7 @@ test('a driver signs in with code and PIN, taps the steps, and never sees a pric
   await page.goto('/ar/driver');
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
   await page.getByTestId('field-code').fill(code);
-  await page.getByTestId('field-pin').fill('9182');
+  await page.getByTestId('field-pin').fill('918204');
   await page.getByTestId('field-signin').click();
   await expect(page.getByTestId('field-error')).toBeVisible();
   await page.getByTestId('field-pin').fill(PIN);
@@ -226,7 +226,7 @@ test('a wrong code is refused with no hint, and the app answers 404 on the pages
 }) => {
   const res = await request.post('/api/field/login', {
     headers: { origin: 'http://localhost:3100', 'content-type': 'application/json' },
-    data: { code: 'CH-9999', pin: '4829', deviceId: 'x'.repeat(32) },
+    data: { code: 'CH-9999', pin: '482913', deviceId: 'x'.repeat(32) },
   });
   expect(res.status()).toBe(401);
   const other = await request.post('/api/field/login', {

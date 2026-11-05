@@ -421,7 +421,7 @@ export function FieldApp({ locale }: { locale: string }) {
               type="password"
               inputMode="numeric"
               pattern="[0-9]*"
-              maxLength={6}
+              maxLength={8}
               required
               dir="ltr"
               className="input mt-2 w-full text-3xl"

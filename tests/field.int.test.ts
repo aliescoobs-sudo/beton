@@ -64,7 +64,7 @@ async function newDriver(kind: 'driver' | 'pump_operator' = 'driver') {
 const device = () => `phone-${randomUUID()}`;
 const signIn = async (d: { code: string }, pin: string, deviceId: string) =>
   loginDriver(deps(), { code: d.code, pin, deviceId }, new Date());
-async function sessionFor(d: { id: string; code: string }, pin = '4829') {
+async function sessionFor(d: { id: string; code: string }, pin = '482913') {
   const dev = device();
   expect((await setDriverPin(deps(), owner, { driverId: d.id, pin })).ok).toBe(true);
   const r = await signIn(d, pin, dev);
@@ -117,18 +117,18 @@ beforeAll(async () => {
 describe('sign-in: a PIN and one bound phone (AC-PROD-25)', () => {
   it('binds the first phone, knows it again, refuses another, and the owner can release it', async () => {
     const d = await newDriver();
-    await setDriverPin(deps(), owner, { driverId: d.id, pin: '4829' });
+    await setDriverPin(deps(), owner, { driverId: d.id, pin: '482913' });
     const a = device();
-    expect((await signIn(d, '4829', a)).ok).toBe(true);
-    expect((await signIn(d, '4829', a)).ok).toBe(true);
-    expect(await signIn(d, '4829', device())).toEqual({ ok: false, error: 'OTHER_DEVICE' });
+    expect((await signIn(d, '482913', a)).ok).toBe(true);
+    expect((await signIn(d, '482913', a)).ok).toBe(true);
+    expect(await signIn(d, '482913', device())).toEqual({ ok: false, error: 'OTHER_DEVICE' });
     const accounts = await listFieldAccounts(deps(), owner);
     expect(accounts.find((x) => x.driverId === d.id)).toMatchObject({ hasAccount: true, hasPin: true });
     expect(await revokeDriverDevice(deps(), owner, d.id)).toBe(true);
     const b = device();
-    expect((await signIn(d, '4829', b)).ok).toBe(true);
+    expect((await signIn(d, '482913', b)).ok).toBe(true);
     // the first phone's token stops working at once
-    const old = await loginDriver(deps(), { code: d.code, pin: '4829', deviceId: a }, new Date());
+    const old = await loginDriver(deps(), { code: d.code, pin: '482913', deviceId: a }, new Date());
     expect(old).toEqual({ ok: false, error: 'OTHER_DEVICE' });
   });
 
@@ -143,29 +143,65 @@ describe('sign-in: a PIN and one bound phone (AC-PROD-25)', () => {
 
   it('five wrong PINs lock the driver; the right PIN is then refused until the lock ends or the PIN is reset', async () => {
     const d = await newDriver();
-    await setDriverPin(deps(), owner, { driverId: d.id, pin: '4829' });
+    await setDriverPin(deps(), owner, { driverId: d.id, pin: '482913' });
     const dev = device();
-    for (let i = 0; i < 4; i++) expect(await signIn(d, '9182', dev)).toEqual({ ok: false, error: 'WRONG' });
-    expect(await signIn(d, '9182', dev)).toEqual({ ok: false, error: 'LOCKED' });
-    expect(await signIn(d, '4829', dev)).toEqual({ ok: false, error: 'LOCKED' });
-    await setDriverPin(deps(), owner, { driverId: d.id, pin: '7351' });
-    expect((await signIn(d, '7351', dev)).ok).toBe(true);
+    for (let i = 0; i < 4; i++) expect(await signIn(d, '918204', dev)).toEqual({ ok: false, error: 'WRONG' });
+    expect(await signIn(d, '918204', dev)).toEqual({ ok: false, error: 'LOCKED' });
+    expect(await signIn(d, '482913', dev)).toEqual({ ok: false, error: 'LOCKED' });
+    await setDriverPin(deps(), owner, { driverId: d.id, pin: '735109' });
+    expect((await signIn(d, '735109', dev)).ok).toBe(true);
+  });
+
+  it('F11: parallel wrong PINs cannot get past the limit of five, and a correct PIN after the lock cannot clear it', async () => {
+    const d = await newDriver();
+    await setDriverPin(deps(), owner, { driverId: d.id, pin: '482913' });
+    const dev = device();
+    const storm = await Promise.all(Array.from({ length: 24 }, () => signIn(d, '918204', dev)));
+    const verdicts = storm.map((r) => (r.ok ? 'ok' : r.error));
+    // exactly four attempts were checked and found wrong; the fifth locks; every other one is refused unchecked
+    expect(verdicts.filter((v) => v === 'WRONG')).toHaveLength(4);
+    expect(verdicts.filter((v) => v === 'LOCKED')).toHaveLength(20);
+    const acct = (await listFieldAccounts(deps(), owner)).find((a) => a.driverId === d.id);
+    expect(acct?.lockedUntil).not.toBeNull();
+    // the correct PIN arrives late, in parallel with more wrong ones: nobody gets in, the lock stays
+    const late = await Promise.all([
+      signIn(d, '482913', dev),
+      signIn(d, '918204', dev),
+      signIn(d, '482913', dev),
+    ]);
+    expect(late.every((r) => !r.ok && r.error === 'LOCKED')).toBe(true);
+    // and the database itself refuses to issue a session on a locked driver, whatever the caller checked
+    const direct = await kit.authPool.query<{ r: string }>('select public.field_login_ok($1, $2, $3) as r', [
+      d.id,
+      hashDeviceId(secret, dev),
+      '',
+    ]);
+    expect(direct.rows[0]?.r).toBe('locked');
   });
 
   it('an unknown code, a malformed PIN and a trivial PIN are refused alike; only the owner roles manage accounts', async () => {
     expect(
-      await loginDriver(deps(), { code: 'CH-9999', pin: '4829', deviceId: device() }, new Date()),
+      await loginDriver(deps(), { code: 'CH-9999', pin: '482913', deviceId: device() }, new Date()),
     ).toEqual({ ok: false, error: 'WRONG' });
     expect(await loginDriver(deps(), { code: 'nope', pin: 'abc', deviceId: device() }, new Date())).toEqual({
       ok: false,
       error: 'INVALID',
     });
     const d = await newDriver();
-    expect(await setDriverPin(deps(), owner, { driverId: d.id, pin: '1234' })).toEqual({
+    expect(await setDriverPin(deps(), owner, { driverId: d.id, pin: '123456' })).toEqual({
       ok: false,
       error: 'TOO_EASY',
     });
-    await expect(setDriverPin(deps(), office, { driverId: d.id, pin: '4829' })).rejects.toThrow();
+    // F11: the shortest PIN that can be set is six digits
+    for (const short of ['1234', '48291'])
+      expect(await setDriverPin(deps(), owner, { driverId: d.id, pin: short })).toEqual({
+        ok: false,
+        error: 'INVALID',
+      });
+    expect((await setDriverPin(deps(), owner, { driverId: d.id, pin: '48291357' })).ok).toBe(true);
+    // an older, shorter PIN is still recognised at sign-in (it is wrong here, not malformed)
+    expect(await signIn(d, '4829', device())).toEqual({ ok: false, error: 'WRONG' });
+    await expect(setDriverPin(deps(), office, { driverId: d.id, pin: '482913' })).rejects.toThrow();
     await expect(createFieldAccount(deps(), office, d.id)).rejects.toThrow();
   });
 });

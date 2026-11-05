@@ -67,10 +67,10 @@ async function driverSession() {
   const d = row.rows[0]!;
   const acct = await createFieldAccount(deps(), owner, d.id);
   if (!acct.ok) throw new Error(acct.error);
-  await setDriverPin(deps(), owner, { driverId: d.id, pin: '4829' });
+  await setDriverPin(deps(), owner, { driverId: d.id, pin: '482913' });
   const r = await loginDriver(
     deps(),
-    { code: d.code, pin: '4829', deviceId: `phone-${randomUUID()}` },
+    { code: d.code, pin: '482913', deviceId: `phone-${randomUUID()}` },
     new Date(),
   );
   if (!r.ok) throw new Error(r.error);
