@@ -29,6 +29,7 @@ export const SERVICE_AUDIT_ACTIONS = [
   'telegram_link',
   'clock_advance',
   'view',
+  'password_reset',
 ] as const;
 
 const eventSchema = z.object({

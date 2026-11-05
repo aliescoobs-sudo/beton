@@ -37,6 +37,7 @@
     "backup:verify": "node --import ./scripts/register-ts-paths.mjs scripts/backup-verify.ts",
     "checklist:record-restore": "node --import ./scripts/register-ts-paths.mjs scripts/checklist-record-restore.ts",
     "user:reset-owner-2fa": "node --import ./scripts/register-ts-paths.mjs scripts/reset-owner-2fa.ts",
+    "user:reset-owner-password": "node --import ./scripts/register-ts-paths.mjs scripts/reset-owner-password.ts",
     "seed:training": "node --import ./scripts/register-ts-paths.mjs scripts/seed-training.ts",
     "reset:training": "node --import ./scripts/register-ts-paths.mjs scripts/reset-training.ts"
   },

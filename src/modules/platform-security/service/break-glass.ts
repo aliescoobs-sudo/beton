@@ -1,9 +1,11 @@
+import { hash as argon2Hash } from '@node-rs/argon2';
 import pg from 'pg';
 import { withRlsContext } from '@/lib/db/rls-context';
 import { uuidv7 } from '@/lib/uuidv7';
 import { realClock } from '@/modules/clock';
 import { SYSTEM_ACTOR_ID } from '../auth/actors';
 import { auditAuthEvent } from '../auth/audit';
+import { checkPassword } from '../auth/password-policy';
 import type { SessionUser } from '../auth/session-gate';
 import { can } from '../domain/permissions';
 import { clearTwoFactor } from './user-admin';
@@ -56,6 +58,37 @@ export async function resetOwnerTwoFactor(deps: BreakGlassDeps): Promise<{ owner
       OWNER_2FA_RESET_DETAIL,
     ]),
   );
+  return { ownerId };
+}
+
+/**
+ * Owner break-glass: sets a new password for the owner (forgotten password, with the authenticator still in hand) and ends the
+ * owner's sessions. Server-only, needs the superuser password, never logs or returns the password, audited as `password_reset`
+ * (its own action, not `session_revoked`). The 2FA is not touched: the owner still needs the authenticator to sign in.
+ */
+export async function resetOwnerPassword(
+  deps: BreakGlassDeps,
+  newPassword: string,
+): Promise<{ ownerId: string }> {
+  await assertSuperuser(deps.adminUrl);
+  const check = checkPassword(newPassword);
+  if (!check.ok) throw new Error(`The password is refused (${check.reason})`);
+  const { rows } = await deps.authPool.query<{ id: string }>(`select id from "user" where role = 'owner'`);
+  const ownerId = rows[0]?.id;
+  if (!ownerId) throw new Error('There is no owner account');
+  const hashed = await argon2Hash(newPassword, { algorithm: 2 /* Argon2id, as the sign-in verifies */ });
+  const updated = await deps.authPool.query(
+    `update account set password = $2, "updatedAt" = $3 where "userId" = $1 and "providerId" = 'credential'`,
+    [ownerId, hashed, realClock.now()],
+  );
+  if (updated.rowCount !== 1) throw new Error('The owner has no password account');
+  await deps.authPool.query('delete from session where "userId" = $1', [ownerId]);
+  await auditAuthEvent(deps.authPool, system, {
+    action: 'password_reset',
+    table: 'user',
+    rowId: ownerId,
+    reason: 'break_glass_cli',
+  });
   return { ownerId };
 }
 

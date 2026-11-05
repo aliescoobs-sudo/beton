@@ -6,6 +6,7 @@ import { resolveAuthState, type SessionUser } from '../src/modules/platform-secu
 import {
   acknowledgeSecurityAlert,
   pendingSecurityAlerts,
+  resetOwnerPassword,
   resetOwnerTwoFactor,
 } from '../src/modules/platform-security/service/break-glass';
 import { authTestKit } from './auth-helpers';
@@ -77,6 +78,38 @@ describe('user:reset-owner-2fa (break glass)', () => {
       [owner.id],
     );
     expect(event).toMatchObject({ actor_user_id: SYSTEM_ACTOR_ID, actor_kind: 'system' });
+  });
+
+  it('resets the owner password: its own audit action, old sessions and old password gone, never recorded as session_revoked', async () => {
+    const strong = 'violet-lantern-orchard-9047';
+    await expect(resetOwnerPassword(deps(kit.env.DATABASE_URL_MIGRATOR), strong)).rejects.toThrow(
+      /superuser/i,
+    );
+    await expect(resetOwnerPassword(deps(admin()), 'short')).rejects.toThrow(/refused/);
+    await expect(resetOwnerPassword(deps(admin()), 'unbelievable')).rejects.toThrow(/refused/);
+    const before = kit.cookieOf(
+      await kit.call('/sign-in/email', { email: owner.email, password: kit.password }),
+    );
+    expect((await resolveAuthState(kit.auth, new Headers({ cookie: before }))).kind).not.toBe('anonymous');
+
+    await resetOwnerPassword(deps(admin()), strong);
+
+    expect((await resolveAuthState(kit.auth, new Headers({ cookie: before }))).kind).toBe('anonymous');
+    const oldPw = await kit.call('/sign-in/email', { email: owner.email, password: kit.password });
+    expect(oldPw.status).toBeGreaterThanOrEqual(400);
+    const fresh = kit.cookieOf(await kit.call('/sign-in/email', { email: owner.email, password: strong }));
+    expect((await resolveAuthState(kit.auth, new Headers({ cookie: fresh }))).kind).not.toBe('anonymous');
+    const [event] = await kit.auditEvents(`action = 'password_reset' and row_id = $1`, [owner.id]);
+    expect(event).toMatchObject({
+      actor_user_id: SYSTEM_ACTOR_ID,
+      actor_kind: 'system',
+      reason: 'break_glass_cli',
+    });
+    // the password itself is nowhere in the audit trail
+    const all = await kit.auditEvents(`action = 'password_reset'`, []);
+    expect(JSON.stringify(all)).not.toContain(strong);
+    // restore the shared test password for the suites that follow
+    await resetOwnerPassword(deps(admin()), kit.password);
   });
 
   it('alerts the owner and the partner until each acknowledges; others never see it', async () => {
