@@ -328,6 +328,30 @@ describe('the iMac guides protect the host credentials (R11-10)', () => {
   });
 });
 
+describe('the guides open the Funnel last (R11)', () => {
+  const en = readFileSync('docs/checkpoints/CP-TRAINING.md', 'utf8');
+  const fr = readFileSync('docs/checkpoints/CP-TRAINING-IMAC-FR.md', 'utf8');
+  it('set the public address before the Funnel, and use the gate, not a bare funnel command', () => {
+    for (const doc of [en, fr]) {
+      expect(doc.indexOf('set-url.sh https://')).toBeGreaterThan(-1);
+      expect(doc.indexOf('set-url.sh https://')).toBeLessThan(doc.indexOf('go-public.sh https://'));
+      expect(doc).not.toMatch(/^\s*[a-d]\.\s+`tailscale funnel --bg 3000`/m);
+    }
+  });
+  it('tie the image to the exact commit, never "the latest green run"', () => {
+    for (const doc of [en, fr]) {
+      expect(doc).toMatch(/pick-image\.sh/);
+      expect(doc).not.toMatch(/latest green (run|passage)|dernier passage vert/i);
+    }
+    expect(en).toMatch(/exact commit/);
+    expect(fr).toMatch(/commit exact/);
+  });
+  it('test the whole path over the real HTTPS address, and the closing of the Funnel', () => {
+    expect(en).toMatch(/whole\*\* path/);
+    expect(fr).toMatch(/tout le parcours/);
+  });
+});
+
 describe('the training guides do not promise what was not rehearsed (R11-09, R11-10)', () => {
   const guide = readFileSync('docs/checkpoints/CP-TRAINING.md', 'utf8');
   it('R11-09: a move to a VPS starts with a fresh seed; a dump alone is not a transfer', () => {
@@ -394,5 +418,118 @@ describe('scripts/training/show-accounts.sh (R11-10)', () => {
     const all = run('--all');
     expect(all.stdout).toMatch(/PWD-OWNER-AAAA[\s\S]*111222[\s\S]*333444/);
     expect(all.stderr).toMatch(/WARNING/);
+  });
+});
+
+describe('the Funnel is opened last, to the real port, and only for the exact image (R11, tail of the review)', () => {
+  const sbx = (files: string[], dcBody: string, env = '') => {
+    const root = mkdtempSync(path.join(tmpdir(), 'bb-gopub-'));
+    mkdirSync(path.join(root, 'scripts/training'), { recursive: true });
+    for (const f of files) {
+      copyFileSync(`scripts/training/${f}`, path.join(root, 'scripts/training', f));
+      chmodSync(path.join(root, 'scripts/training', f), 0o755);
+    }
+    writeFileSync(path.join(root, 'scripts/training/dc.sh'), `#!/usr/bin/env bash\n${dcBody}\n`, {
+      mode: 0o755,
+    });
+    if (env) writeFileSync(path.join(root, '.env.training'), env, { mode: 0o600 });
+    return root;
+  };
+  const dcOk = `case "$*" in *printenv*) echo true;; *ready*) echo '{"status":"ready"}';; esac`;
+  const tail = (root: string, status: string, calls = 'calls.log') =>
+    withStub(
+      root,
+      'tailscale',
+      `if [ "$1 $2" = "funnel status" ]; then echo '${status}'; else echo "$*" >> "${root}/${calls}"; fi`,
+    );
+  const goPublic = (root: string, bin: string, url: string) =>
+    spawnSync('bash', [path.join(root, 'scripts/training/go-public.sh'), url], {
+      encoding: 'utf8',
+      env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, READY_TRIES: '1', READY_SLEEP: '0' },
+    });
+  const URL = 'https://imac.tail1.ts.net';
+
+  it('go-public.sh refuses when the app was told another address, and opens nothing', () => {
+    const root = sbx(['go-public.sh'], dcOk, 'APP_BASE_URL=http://127.0.0.1:3000\n');
+    const r = goPublic(root, tail(root, 'No serve config'), URL);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/set-url\.sh/);
+    expect(existsSync(path.join(root, 'calls.log'))).toBe(false);
+  });
+  it('go-public.sh refuses when the app is not in training mode or not ready, and opens nothing', () => {
+    const notTraining = sbx(['go-public.sh'], 'echo false', `APP_BASE_URL=${URL}\n`);
+    expect(goPublic(notTraining, tail(notTraining, 'x'), URL).status).toBe(1);
+    expect(existsSync(path.join(notTraining, 'calls.log'))).toBe(false);
+    const notReady = sbx(
+      ['go-public.sh'],
+      `case "$*" in *printenv*) echo true;; *) exit 1;; esac`,
+      `APP_BASE_URL=${URL}\n`,
+    );
+    const r = goPublic(notReady, tail(notReady, 'x'), URL);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/not ready/);
+    expect(existsSync(path.join(notReady, 'calls.log'))).toBe(false);
+  });
+  it("go-public.sh opens the Funnel on the app's real port once address, mode and readiness agree", () => {
+    const root = sbx(['go-public.sh'], dcOk, `APP_BASE_URL=${URL}\nAPP_PORT=3300\n`);
+    const r = goPublic(root, tail(root, 'x'), URL);
+    expect(r.status, r.stderr).toBe(0);
+    expect(readFileSync(path.join(root, 'calls.log'), 'utf8').trim()).toBe('funnel --bg 3300');
+    expect(goPublic(root, tail(root, 'x'), 'http://insecure.example').status).toBe(2);
+  });
+
+  const check = (status: string, appPort?: string) => {
+    const root = sbx(['funnel-check.sh'], `echo true`, appPort ? `APP_PORT=${appPort}\n` : '');
+    return spawnSync('bash', [path.join(root, 'scripts/training/funnel-check.sh')], {
+      encoding: 'utf8',
+      env: { ...process.env, PATH: `${tail(root, status)}:${process.env.PATH}` },
+    });
+  };
+  it('funnel-check.sh warns when the Funnel points at another port or another machine, and is quiet for the real port', () => {
+    const up = (target: string) => `https://x.ts.net (Funnel on)\n|-- / proxy ${target}`;
+    expect(check(up('http://127.0.0.1:3000')).status).toBe(0);
+    const wrong = check(up('http://127.0.0.1:8080'));
+    expect(wrong.status).toBe(1);
+    expect(wrong.stderr).toMatch(/port 3000/);
+    expect(check(up('http://127.0.0.1:3300'), '3300').status).toBe(0);
+    expect(check(up('http://127.0.0.1:3000'), '3300').status).toBe(1);
+    expect(check(up('http://192.168.1.20:3000')).stderr).toMatch(/not this machine/);
+    expect(check('No serve config').status).toBe(0);
+  });
+
+  describe('pick-image.sh', () => {
+    const SHA_LINE = (sha: string) => `IMAGE_REF=ghcr.io/o/belgobeton@sha256:${'c'.repeat(64)} COMMIT=${sha}`;
+    const pick = (runList: string, log: (sha: string) => string) => {
+      const root = sbx(['pick-image.sh'], '');
+      const git = (...a: string[]) => spawnSync('git', a, { cwd: root, encoding: 'utf8' });
+      git('init', '-q');
+      git('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'x');
+      const sha = git('rev-parse', 'HEAD').stdout.trim();
+      const bin = withStub(
+        root,
+        'gh',
+        `if [ "$1 $2" = "run list" ]; then echo '${runList}'; else printf '%s\\n' "${log(sha)}"; fi`,
+      );
+      const r = spawnSync('bash', [path.join(root, 'scripts/training/pick-image.sh')], {
+        encoding: 'utf8',
+        env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+      });
+      return { r, sha };
+    };
+    it('prints the digest of the green run of this very commit', () => {
+      const { r, sha } = pick('777', SHA_LINE);
+      expect(r.status, r.stderr).toBe(0);
+      expect(r.stdout.trim()).toBe(`ghcr.io/o/belgobeton@sha256:${'c'.repeat(64)}`);
+      expect(r.stderr).toContain(sha);
+    });
+    it('refuses when no green run exists for the commit, when the run built another commit, and when the log has no reference', () => {
+      expect(pick('', SHA_LINE).r.status).toBe(1);
+      const other = pick('777', () => SHA_LINE('f'.repeat(40)));
+      expect(other.r.status).toBe(1);
+      expect(other.r.stderr).toMatch(/built commit/);
+      const none = pick('777', () => 'nothing here');
+      expect(none.r.status).toBe(1);
+      expect(none.r.stderr).toMatch(/IMAGE_REF/);
+    });
   });
 });

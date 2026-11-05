@@ -39,10 +39,12 @@ Quand il écrit **Password:**, colle le jeton (rien ne s'affiche) et Entrée.
 ✅ Tu vois `Login Succeeded`. Vérifie que le jeton n'a pas été écrit dans un fichier : `grep -c '"auth"' ~/.docker/config.json` doit afficher `0`.
 Si ce n'est pas 0 : `docker logout ghcr.io`, supprime le jeton sur github.com et corrige le réglage avant de continuer. Si le jeton apparaît ailleurs que dans ce prompt, supprime-le sur github.com et refais-en un.
 
-**6. Choisir la version à lancer**
-Sur github.com → le dépôt → onglet **Actions** → le dernier passage vert de **Build and publish image** → dans le résumé, copie la ligne **Digest to deploy** (`sha256:…`). Puis :
-`APP_IMAGE=ghcr.io/aliescoobs-sudo/belgobeton@sha256:COLLE_ICI_LE_DIGEST ./scripts/training/init-env.sh`
-✅ Il écrit « wrote .env.training and .env.training.ops » et n'affiche aucun secret. (Il refuse d'écraser des fichiers existants : c'est voulu.)
+**6. Choisir la version à lancer (celle de TON code, pas « la dernière »)**
+L'image et le code doivent être le **même commit**. Tape :
+`APP_IMAGE=$(./scripts/training/pick-image.sh) ./scripts/training/init-env.sh`
+Le script prend le commit de ton dossier (`git rev-parse HEAD`), cherche sur GitHub le passage **vert** de « Build and publish image » **pour ce commit exact**, lit le digest
+qu'il a publié avec son commit, et **refuse** s'il n'y en a pas ou si le commit ne correspond pas. Il écrit « wrote .env.training and .env.training.ops » et n'affiche aucun secret.
+(Il refuse d'écraser des fichiers existants : c'est voulu.)
 
 **7. Démarrer**
 `./scripts/training-up.sh`
@@ -58,14 +60,18 @@ Pour un stagiaire : `./scripts/training/show-accounts.sh chauffeur` (ou le nom o
 de code d'authentification : le mot de passe suffit (seulement dans cette version). **Exception : la finance.** Le propriétaire, l'administrateur et le comptable qui veulent essayer la finance
 activent une vraie application d'authentification (lien dans la bannière rouge) : la finance n'accepte jamais le mot de passe seul.
 
-**9. Rendre l'iMac joignable depuis Internet (Tailscale Funnel)**
+**9. Rendre l'iMac joignable depuis Internet (Tailscale Funnel) : en dernier, et dans cet ordre**
 a. `sudo brew services start tailscale` puis `sudo tailscale up` : il affiche un lien, ouvre-le, crée/ouvre ton compte Tailscale gratuit et valide la machine.
 ✅ `tailscale status` liste l'iMac.
-b. Sur https://login.tailscale.com/admin → **DNS** : active **MagicDNS** et **HTTPS Certificates**.
-c. `tailscale funnel --bg 3000` : s'il dit que Funnel n'est pas autorisé, il affiche un lien ; ouvre-le, accepte, relance la commande.
-✅ Il affiche l'adresse publique `https://…ts.net`. Note-la.
-d. Donne cette adresse à l'application : `./scripts/training/set-url.sh https://TON-ADRESSE.ts.net`
-✅ Il écrit « the app now accepts requests from https://… ». Teste depuis un **téléphone en 4G** (pas le Wi-Fi de la maison) : la page de connexion s'ouvre avec la bannière rouge.
+b. Sur https://login.tailscale.com/admin → **DNS** : active **MagicDNS** et **HTTPS Certificates**. La console montre le nom de la machine : l'adresse sera `https://NOM.TON-RESEAU.ts.net`
+(**rien n'est public encore**).
+c. Donne d'abord cette adresse à l'application : `./scripts/training/set-url.sh https://TON-ADRESSE.ts.net`
+✅ Il écrit « the app now accepts requests from https://… ».
+d. Ouvre l'accès : `./scripts/training/go-public.sh https://TON-ADRESSE.ts.net`
+✅ Il **refuse** si l'adresse n'est pas celle donnée à l'application, si l'application n'est pas en mode formation ou pas prête ; sinon il lance `tailscale funnel` sur le bon port.
+S'il dit que Funnel n'est pas autorisé, il affiche un lien ; ouvre-le, accepte, relance `go-public.sh`.
+e. Teste depuis un **téléphone en 4G** (pas le Wi-Fi de la maison) **tout le parcours** : la page de connexion avec la bannière rouge, connexion avec un compte de formation, une modification, déconnexion.
+Puis `tailscale funnel reset` : l'adresse ne doit plus répondre. Rouvre avec `go-public.sh` quand la formation commence.
 
 **10. Sauvegarde de nuit** (dans un dossier hors du projet)
 `crontab -e` puis ajoute la ligne : `30 2 * * * cd $HOME/belgobeton && ./scripts/training-backup.sh >> $HOME/belgobeton-training-backup.log 2>&1`
@@ -75,5 +81,5 @@ d. Donne cette adresse à l'application : `./scripts/training/set-url.sh https:/
 - Fermer l'accès public quand personne ne s'entraîne : `tailscale funnel reset` ✅ l'adresse ne répond plus.
 - Arrêter : `./scripts/training-down.sh` (les données restent). Redémarrer : `./scripts/training-up.sh`.
 - **Remettre à zéro** (efface tout, nouveaux mots de passe) : `./scripts/training-reset.sh`, tape `RESET`, puis `./scripts/training/show-accounts.sh <nom>` pour chaque stagiaire.
-- Nouvelle version : prends le nouveau digest (étape 6), remplace la ligne `APP_IMAGE=` dans `.env.training`, relance `./scripts/training-up.sh`.
+- Nouvelle version : `git pull`, puis `./scripts/training/pick-image.sh` (le digest du build vert de CE commit), remplace la ligne `APP_IMAGE=` dans `.env.training`, relance `./scripts/training-up.sh`.
 - Ne jamais saisir de vraies données (vrai client, vrai téléphone, vrai chèque).

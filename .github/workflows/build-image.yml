@@ -66,9 +66,13 @@ jobs:
           {
             echo "### Image published"
             echo ""
+            echo "Commit: \`${{ github.sha }}\`"
+            echo ""
             echo "Deploy this exact image on the server:"
             echo ""
             echo '```'
             echo "./scripts/ops/deploy.sh ${{ steps.meta.outputs.name }}@${{ steps.build.outputs.digest }}"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          # Read by scripts/training/pick-image.sh: ties the digest to the exact commit it was built from.
+          echo "IMAGE_REF=${{ steps.meta.outputs.name }}@${{ steps.build.outputs.digest }} COMMIT=${{ github.sha }}"

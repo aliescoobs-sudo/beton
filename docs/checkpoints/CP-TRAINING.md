@@ -58,22 +58,26 @@ Nothing here is done for you, and no token or password is ever pasted anywhere b
    Terminal: `docker login ghcr.io -u aliescoobs-sudo` — when it asks **Password:** paste the token there (nothing shows as you paste) and press Return.
    Check that the token did not land in a file: `grep -c '"auth"' ~/.docker/config.json` must print `0`. If it prints more, run `docker logout ghcr.io`, delete the
    token on github.com and fix the helper before going on. Do not put the token anywhere else; if it is ever shown in a chat or a file, delete it on github.com.
-6. **Pick the image.** github.com → the repository → Actions → the latest green run of **Build and publish image** → its summary shows the **Digest to deploy**
-   (`sha256:…`). Then create the two secret files (random secrets, mode 600, not printed):
-   `APP_IMAGE=ghcr.io/aliescoobs-sudo/belgobeton@sha256:<the digest> ./scripts/training/init-env.sh`
+6. **Pick the image, tied to your commit.** The code you run and the image must be the same commit: `APP_IMAGE=$(./scripts/training/pick-image.sh) ./scripts/training/init-env.sh`.
+   `pick-image.sh` takes `git rev-parse HEAD`, finds the **green** run of **Build and publish image** for that exact commit (GitHub CLI), reads the digest that run
+   printed with its commit, refuses if there is none or if it names another commit (never simply the newest green build: it can be another commit), and prints
+   `ghcr.io/…/belgobeton@sha256:…` on stdout and the commit on stderr. `init-env.sh` then writes the two secret files (random secrets, mode 600, not printed).
 7. **Start it:** `./scripts/training-up.sh` (the first run takes a few minutes: image, database, roles, structure, training data). Open
    <http://127.0.0.1:3000/fr/login> on the iMac itself: the red training banner must show. Give each trainee only their own line:
    `./scripts/training/show-accounts.sh` lists the account names (no secret), `./scripts/training/show-accounts.sh <name or login>` shows one block. Hand it over in
    person, then clear the screen and its history (Command-K). Never circulate the whole list: no screenshot, no message, no `script` or other terminal recording,
    no redirection of the output to a file (`--all` exists for the rare case you need everything, and says so).
-8. **Make it public with Tailscale Funnel.**
+8. **Make it public with Tailscale Funnel: last, and in this order.**
    a. `sudo brew services start tailscale` then `sudo tailscale up` — it prints a link: open it, sign in (create the free Tailscale account), approve the machine.
    b. In the Tailscale admin console (<https://login.tailscale.com/admin>): **DNS** → turn on **MagicDNS** and **HTTPS Certificates**. The console shows the
-      machine name: the address will be `https://<machine>.<your-tailnet>.ts.net`.
-   c. `tailscale funnel --bg 3000` — if it says Funnel is not allowed it prints a link to enable it for this machine: open it, accept, run the command again.
-      It prints the public `https://….ts.net` address.
-   d. Tell the app its public address (it only accepts writes coming from it): `./scripts/training/set-url.sh https://<machine>.<tailnet>.ts.net`
-   e. Test from a phone on mobile data (not the home Wi-Fi): the login page opens with the red banner.
+      machine name: the address will be `https://<machine>.<your-tailnet>.ts.net` (nothing is public yet).
+   c. Tell the app its public address **first** (it only accepts writes coming from it): `./scripts/training/set-url.sh https://<machine>.<tailnet>.ts.net`.
+   d. `./scripts/training/go-public.sh https://<machine>.<tailnet>.ts.net` — the only step that opens the Funnel. It refuses unless the app was told this very address,
+      runs in training mode and answers its readiness check (database and migrations), then runs `tailscale funnel --bg <the app's real port>`. If Tailscale says Funnel is
+      not allowed it prints a link to enable it for this machine: open it, accept, run `go-public.sh` again. (`funnel-check.sh`, run by `training-up.sh`, only warns if a
+      Funnel points at another port or machine; it never authorises anything.)
+   e. Test from a phone on mobile data (not the home Wi-Fi) the **whole** path over the real HTTPS address: the login page with the red banner, sign in with a training
+      account, make one change, sign out. Then `tailscale funnel reset` and check that the address no longer answers. Open it again with `go-public.sh` when the training starts.
 9. **Nightly dump** (outside the repository, 14 kept): `crontab -e` and add
    `30 2 * * * cd $HOME/belgobeton && ./scripts/training-backup.sh >> $HOME/belgobeton-training-backup.log 2>&1`
    The dump is the **database only** (no attachments, no keys): it brings back the database on THIS host, with the same `.env.training` files and the same
@@ -85,7 +89,7 @@ Nothing here is done for you, and no token or password is ever pasted anywhere b
 - **Stop the Funnel** (the public address closes at once): `tailscale funnel reset`. Do this whenever nobody is training.
 - **Reset to the clean seed** (erases everything entered, new passwords): `./scripts/training-reset.sh` (asks you to type RESET), then `./scripts/training/show-accounts.sh <name>` for each trainee.
   It only ever wipes a database that carries the training marker.
-- **New version:** take the new digest from the latest green Actions run, replace the `APP_IMAGE=` line in `.env.training`, run `./scripts/training-up.sh` (it migrates).
+- **New version:** `git pull`, then `./scripts/training/pick-image.sh` (the digest of the green build of exactly that commit), replace the `APP_IMAGE=` line in `.env.training` with it, run `./scripts/training-up.sh` (it migrates and waits for readiness).
 - Never enter a real client, a real phone number or a real cheque. The instance has no CNDP declaration and no hardening review behind it.
 
 ## What was checked, what was not
