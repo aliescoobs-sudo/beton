@@ -37,6 +37,8 @@ the final review (`docs/reviews/CODEX-REVIEW-FINAL.md`) still stands for real da
 | Sign-in at boot | Turn off FileVault, or turn on automatic login, otherwise nothing starts after a power cut until someone types the password. |
 | Updates | Disable automatic restart for macOS updates (`sudo softwareupdate --schedule off`); restart it yourself on a quiet evening. |
 
+A short version in French for a non-expert, with what to see at each step, is in `CP-TRAINING-IMAC-FR.md`.
+
 ## Step by step, on the iMac (what Ali does himself)
 Nothing here is done for you, and no token or password is ever pasted anywhere but into the Terminal prompt that asks for it.
 

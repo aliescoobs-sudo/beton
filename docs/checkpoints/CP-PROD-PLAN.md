@@ -211,3 +211,10 @@ Paused on 2026-11-04 by the lead for the training instance (T1). Done, one commi
 - **F11** atomic PIN attempt reservation, a lock re-check before the session is issued, PIN of at least 6 digits.
 - **§16.10 note** a redirect must carry the destination site address to the driver.
 The review's verdict stands for real data until these are closed: do not launch with real data; the training instance (fictitious data only, `docs/checkpoints/CP-TRAINING.md`) is not a launch.
+
+## Status for the lead (2026-11-05)
+- **T1 training instance: done** (commits T1.1 to T1.6, `docs/checkpoints/CP-TRAINING.md` and the French iMac guide `CP-TRAINING-IMAC-FR.md`). Guard, seed and reset, one account per role, password-only sign-in on the reserved address, banner, imports/maps/push/LLM off, compose bound to 127.0.0.1 with Caddy behind a profile for the VPS, up/down/reset/backup/set-url/funnel-check scripts. The CI image build is green on the last push. Not proved here: a start on a real Docker host, Colima, Tailscale Funnel and the nightly job on the iMac (the guide says to rehearse them once). A local training instance runs on Ali's Mac (separate database `belgobeton_training`, port 3300, `training-accounts.local.txt` at the repo root, ignored by git).
+- **Batch D, deferred to pre-production:** F07 (no external map link), F08 (document copy needs an approved request), F09 (accountant invoice paths), F10 (environment flag on every finance endpoint), F11 (atomic PIN attempts, 6-digit minimum), the §16.10 note (redirect carries the destination address), and **a "password reset" audit action**: the audit log has no action for it (a reset of the owner's password on the dev database was recorded as `session_revoked`); add one with its test.
+- **Full e2e:** not rerun since Batch D and the training work (the Mac was on battery). The last full run, 158 passed, predates them; the training spec and the driver, finance and approvals specs were run on their own and pass. Run it once on power before real data.
+- The review's verdict stands for real data: do not launch with real data until Batch D is closed and the pre-production steps of the runbook are rehearsed.
+
