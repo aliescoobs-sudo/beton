@@ -63,6 +63,21 @@ export async function checkLogin(
   return 'allowed';
 }
 
+/**
+ * R11-01: the per-IP limit alone, for the phone sign-in (its account limit is the driver's own atomic lock). True when this
+ * IP already has `auth.lockout_ip_failures` failures inside the window. Skipped (false) when the IP is unknown.
+ */
+export async function ipIsLocked(deps: LoginGuardDeps, ip: string | null): Promise<boolean> {
+  if (ip === null) return false;
+  const p = await deps.parameters();
+  const since = new Date(deps.clock.now().getTime() - p['auth.lockout_window_minutes'] * 60_000);
+  const { rows } = await deps.pool.query<{ n: number }>(
+    `select count(*)::int as n from login_attempt where ip_hmac = $1 and not success and at > $2`,
+    [keyedHash(deps.hmacKey, `ip:${ip}`), since],
+  );
+  return (rows[0]?.n ?? 0) >= p['auth.lockout_ip_failures'];
+}
+
 export async function recordLogin(
   deps: LoginGuardDeps,
   identifier: string,

@@ -46,6 +46,7 @@ export { flushPush, vapidFromEnv, vapidJwt, type VapidKeys } from './service/web
 export { DOCUMENT_KINDS, type DocumentKind, isDocumentKind } from './domain/document-kinds';
 export { INVOICE_ITEM, seesBalances } from './domain/visibility-matrix';
 export { recordMoneyExport, recordMoneyView } from './service/money-view';
+export { clientIp, ipIsLocked, recordLogin, type LoginGuardDeps } from './auth/login-guard';
 export { auditDenied, authorize, type Authorization } from './auth/guards';
 // Building blocks for other modules' services. Pages and actions also need ./next (Next.js-only, not loadable by CLIs).
 export type { SessionUser } from './auth/session-gate';

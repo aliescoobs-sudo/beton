@@ -18,7 +18,7 @@ the final review (`docs/reviews/CODEX-REVIEW-FINAL.md`) still stands for real da
   Read them with `./scripts/training/show-accounts.sh`.
 - **Sign-in.** The accounts on the reserved address `…@formation.beton.invalid` work with their **password alone** (no authenticator), only while training
   mode is on. Everything else is unchanged: roles and permissions, row-level security, the audit log, money visibility, the **rate limiting and the login
-  lockout stay on** (the instance is on the internet). Drivers and the pump operator sign in on the phone with their code and PIN (five wrong PINs lock them 15 minutes).
+  lockout stay on** (the instance is on the internet). Drivers and the pump operator sign in on the phone with their code and PIN (five wrong PINs lock them 15 minutes, attempts are serialised per driver, and the sign-in endpoint has a per-IP limit).
 - **Banner.** A red banner on every page, in the user's language: « Version de formation — données fictives » / « نسخة تدريب — معطيات وهمية ».
 - **Nothing goes out, nothing comes in.** Imports are refused entirely (`import:excel` stops; a fictitious database is only ever filled by the seed), map links are
   not built, web push is off, and a language model (`ASSISTANT_PROVIDER=anthropic`, a key, invoice reading) is refused at startup. (There is no WhatsApp/SMS in the code.)

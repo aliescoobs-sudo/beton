@@ -221,3 +221,6 @@ F07 to F11, the §16.10 destination address and the `password_reset` audit actio
 - **Full e2e:** not rerun since Batch D and the training work (the Mac was on battery). The last full run, 158 passed, predates them; the training spec and the driver, finance and approvals specs were run on their own and pass. Run it once on power before real data.
 - The review's verdict stands for real data: do not launch with real data until Batch D is closed and the pre-production steps of the runbook are rehearsed.
 
+
+## T3: fixes of the R11 review (`docs/reviews/CODEX-REVIEW-R11.md`), started 2026-11-05
+- [x] **R11-01** PIN sign-in. The review was written on `52c2858`, before Batch D. Already closed by F11 (`cade9d1`, migration 0113): atomic serialised attempts per driver (row lock), the database re-checks the lock before issuing a session, new PINs 6 to 8 digits, concurrency test (24 parallel wrong PINs). **Remained and done here:** the per-IP limit on `/api/field/login` (same parameters as the office sign-in, `ipIsLocked`, 429; the IP is the entry the trusted proxy appended). Test `tests/field-ip-throttle.int.test.ts`. The forged `X-Forwarded-For` behaviour through the real Funnel is still to be verified on the iMac.
