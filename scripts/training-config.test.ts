@@ -297,3 +297,13 @@ describe('scripts/training/set-url.sh (R11-03)', () => {
     expect(text).not.toMatch(/> \.env\.training\.new/);
   });
 });
+
+describe('the training guides do not promise what was not rehearsed (R11-09, R11-10)', () => {
+  const guide = readFileSync('docs/checkpoints/CP-TRAINING.md', 'utf8');
+  it('R11-09: a move to a VPS starts with a fresh seed; a dump alone is not a transfer', () => {
+    expect(guide).toMatch(/starts with a fresh training seed/);
+    expect(guide).toMatch(/discarded/);
+    expect(guide).not.toMatch(/Copy the data over/);
+    expect(guide).toMatch(/database only/);
+  });
+});
