@@ -16,6 +16,7 @@ import {
   setOrderPumped,
 } from '../src/modules/operations';
 import type { SessionUser } from '../src/modules/platform-security/auth/session-gate';
+import { superuserUrl, TEST_DATABASE } from '../scripts/db-bootstrap';
 import { testEnv } from './db-env';
 import {
   deliveryScene,
@@ -272,5 +273,96 @@ describe('the emergency instruction and the redirect candidates follow the same 
       );
     await expect(call(pmA)).rejects.toThrow(/another plant/);
     await expect(call(pmB)).resolves.toBeTruthy();
+  });
+});
+
+// R11-05: the scope check fails closed for NULL plants, and the redirect candidates are filtered row by row.
+describe('NULL plant rows are denied to a plant manager, in the mutation doors and in the candidates (R11-05)', () => {
+  /** The fixtures cannot be made through the doors (they refuse a plant-less row), so the plant is removed afterwards, triggers off. */
+  const unassign = async (table: 'sales_order' | 'trip_plan', id: string) => {
+    const c = new pg.Client({ connectionString: superuserUrl(env, TEST_DATABASE) });
+    await c.connect();
+    try {
+      await c.query('set session_replication_role = replica');
+      await c.query(`update ${table} set plant_id = null where id = $1`, [id]);
+    } finally {
+      await c.end();
+    }
+  };
+  const tripOf = (orderId: string) =>
+    asOwner(plantA, async (tx) => {
+      const t = await tx.query<{ id: string }>(
+        `insert into trip_plan (id, batch_id, trip_date, order_id, seq, truck_id, driver_id, volume_l, load_min, depart_min, arrive_min,
+                                unload_end_min, back_min, created_by, plant_id)
+         values (gen_random_uuid(), gen_random_uuid(), $4, $1, 1, $2, null, 8000, 420, 430, 455, 485, 520, $3, $5) returning id`,
+        [orderId, sceneA.truckId, owner.id, DAY, plantA],
+      );
+      const delivery = await insertDelivery(
+        tx,
+        owner.id,
+        { orderId, truckId: sceneA.truckId, recetteId: sceneA.recetteId },
+        8000,
+      );
+      await tx.query(
+        `insert into trip_event (id, trip_id, step, at, delivery_id, created_by) values (gen_random_uuid(), $1, 'loaded', $2, $3, $4)`,
+        [t.rows[0]!.id, new Date(NOW.getTime() - 20 * 60_000).toISOString(), delivery.id, owner.id],
+      );
+      return t.rows[0]!.id;
+    });
+  const scopeOf = (who: SessionUser, plant: string | null) =>
+    withRlsContext(
+      app,
+      { userId: who.id, role: who.role as never, requestId: marker },
+      async (tx) =>
+        (await tx.query<{ r: boolean | null }>('select public._pump_in_scope($1::uuid) as r', [plant]))
+          .rows[0]!.r,
+    );
+
+  it('_pump_in_scope answers a definite boolean: false for a manager on NULL or another plant, true for the owner', async () => {
+    expect(await scopeOf(pmA, plantA)).toBe(true);
+    expect(await scopeOf(pmA, plantB)).toBe(false);
+    expect(await scopeOf(pmA, null)).toBe(false); // was NULL: "IF NOT NULL" never raised
+    expect(await scopeOf(owner, null)).toBe(true);
+    expect(await scopeOf(owner, plantB)).toBe(true);
+  });
+
+  it('a manager cannot schedule, nor mark pumped, an order that has no plant; the owner can', async () => {
+    const orphan = await newOrder(plantA, sceneA);
+    await unassign('sales_order', orphan.id);
+    expect(await refused(schedule(pmA, orphan.id, 1000))).toBe(true);
+    expect(await refused(setOrderPumped(app, pmA, { orderId: orphan.id, pumped: true }))).toBe(true);
+    expect(await refused(setOrderPumped(app, pmA, { orderCode: orphan.code, pumped: true }))).toBe(true);
+    expect((await setOrderPumped(app, owner, { orderId: orphan.id, pumped: true })).ok).toBe(true);
+    expect((await schedule(owner, orphan.id, 1010)).ok).toBe(true);
+  });
+
+  it('redirect candidates: a manager of the case plant never gets an unassigned order; the owner still does', async () => {
+    const order = await newOrder(plantA, sceneA);
+    const own = await newOrder(plantA, sceneA);
+    const orphan = await newOrder(plantA, sceneA);
+    await unassign('sales_order', orphan.id);
+    const tripId = await tripOf(order.id);
+    const opened = await openTripCase(app, owner, { tripId, caseNo: 3 }, { now: NOW });
+    if (!opened.ok) throw new Error(opened.error);
+    const codes = async (who: SessionUser) =>
+      (await listRedirectCandidates(app, who, opened.value.id, { now: NOW })).map((c) => c.orderCode);
+    const mine = await codes(pmA);
+    expect(mine).toContain(own.code);
+    expect(mine).not.toContain(orphan.code);
+    const all = await codes(owner);
+    expect(all).toEqual(expect.arrayContaining([own.code, orphan.code]));
+  });
+
+  it("a case with no plant is not the manager's: its candidates are refused", async () => {
+    const order = await newOrder(plantA, sceneA);
+    await newOrder(plantA, sceneA);
+    const tripId = await tripOf(order.id);
+    await unassign('trip_plan', tripId);
+    const opened = await openTripCase(app, owner, { tripId, caseNo: 3 }, { now: NOW });
+    if (!opened.ok) throw new Error(opened.error);
+    expect(await refused(listRedirectCandidates(app, pmA, opened.value.id, { now: NOW }))).toBe(true);
+    expect((await listRedirectCandidates(app, owner, opened.value.id, { now: NOW })).length).toBeGreaterThan(
+      0,
+    );
   });
 });

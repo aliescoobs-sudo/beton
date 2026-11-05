@@ -869,6 +869,13 @@
       "when": 1793804887023,
       "tag": "0115_audit_password_reset",
       "breakpoints": true
+    },
+    {
+      "idx": 116,
+      "version": "7",
+      "when": 1793804947023,
+      "tag": "0116_pump_scope_null_safe",
+      "breakpoints": true
     }
   ]
 }
