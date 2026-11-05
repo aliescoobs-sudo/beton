@@ -32,7 +32,9 @@ export async function handleFinancePost(
     !canFinance(state.user.role, 'finance.write')
   )
     return financeNotFound();
-  if (!deps.configuration && !(await deps.enabled())) return financeNotFound();
+  // F10: the environment flag (FINANCE_ENABLED) is checked on every finance endpoint, the configuration one included. Only the
+  // database switch may be bypassed by `configure` (it is how the module is first switched on), never the environment flag.
+  if (!(await deps.enabled())) return financeNotFound();
   try {
     const text = await request.text();
     if (new TextEncoder().encode(text).length > 131072) return new Response('Too large', { status: 413 });

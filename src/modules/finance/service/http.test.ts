@@ -70,9 +70,23 @@ describe('finance HTTP authorization and flag', () => {
     const d = deps('app_admin');
     expect((await handleFinancePost(request({ action: 'entry' }), d)).status).toBe(200);
     expect((await handleFinancePost(request({ action: 'configure' }), d)).status).toBe(404);
-    const c = { ...deps('owner', false), configuration: true };
+    const c = { ...deps('owner', true), configuration: true };
     expect((await handleFinancePost(request({ action: 'configure' }), c)).status).toBe(200);
     expect((await handleFinancePost(request({ action: 'entry' }), c)).status).toBe(404);
+  });
+  it('F10: with the environment flag off the configuration endpoint is hidden too and executes nothing', async () => {
+    for (const role of ['owner', 'app_admin']) {
+      const c = { ...deps(role, false), configuration: true };
+      const res = await handleFinancePost(request({ action: 'configure', enabled: true }), c);
+      expect(res.status).toBe(404);
+      expect(c.enabled).toHaveBeenCalled();
+      expect(c.execute).not.toHaveBeenCalled();
+    }
+  });
+  it('F10: the configuration endpoint still needs the role, the origin and a signed-in session', async () => {
+    const wrongRole = { ...deps('office_sales', true), configuration: true };
+    expect((await handleFinancePost(request({ action: 'configure' }), wrongRole)).status).toBe(404);
+    expect(wrongRole.execute).not.toHaveBeenCalled();
   });
   it('sanitizes database errors, enforces a bounded body and signals fresh TOTP', async () => {
     const d = deps();
