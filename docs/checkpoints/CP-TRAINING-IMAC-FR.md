@@ -9,8 +9,14 @@ Ne copie jamais un mot de passe ou un jeton dans un message, un mail ou un fichi
 Le Terminal demande ton mot de passe Mac (rien ne s'affiche quand tu tapes : c'est normal). Ensuite : `pmset -g | grep -E "sleep|autorestart"`.
 ✅ Tu dois voir `sleep 0` et `autorestart 1`. Branche l'iMac en **Ethernet** si tu peux.
 
+**1 bis. Garder le disque chiffré (FileVault) et ne PAS activer la connexion automatique**
+L'iMac contiendra des secrets (comptes de formation, jeton GitHub, accès Tailscale) : il faut le protéger comme un ordinateur qui garde des mots de passe.
+Réglages Système → Confidentialité et sécurité → **FileVault : activé** ; Utilisateurs et groupes → **Connexion automatique : désactivée** ; un mot de passe sur ta session et un verrouillage d'écran.
+⚠️ Conséquence : après une coupure de courant, l'iMac redémarre mais **rien ne repart tant que tu n'as pas tapé le mot de passe** à l'écran FileVault. Préviens les
+stagiaires que la formation peut être indisponible jusqu'à ce que tu déverrouilles l'iMac.
+
 **2. Installer les outils** (si `brew` n'existe pas, installe d'abord Homebrew depuis https://brew.sh en suivant leur commande)
-`brew install colima docker docker-compose git gh tailscale`
+`brew install colima docker docker-compose docker-credential-helper git gh tailscale`
 ✅ À la fin, `colima version` et `docker --version` affichent un numéro de version.
 
 **3. Démarrer le moteur Docker (Colima)** : 4 Go de mémoire, 20 Go de disque minimum libres
@@ -25,10 +31,13 @@ Puis `gh repo clone aliescoobs-sudo/beton ~/belgobeton && cd ~/belgobeton`
 
 **5. Autoriser l'iMac à télécharger l'image privée (GHCR) avec TON jeton en lecture seule**
 Sur github.com : ta photo → Settings → Developer settings → Personal access tokens → **Tokens (classic)** → Generate new token (classic) → nom « iMac formation »,
-durée 90 jours, coche **seulement `read:packages`** → Generate. Copie le jeton (tu ne le revois plus). Puis dans le Terminal :
-`docker login ghcr.io -u aliescoobs-sudo`
+durée 90 jours, coche **seulement `read:packages`** (lecture seule) → Generate. Copie le jeton (tu ne le revois plus).
+**Avant de l'utiliser**, fais garder les identifiants Docker dans le **Trousseau macOS** et pas dans un fichier : ouvre `~/.docker/config.json` (`open -e ~/.docker/config.json`)
+et vérifie qu'il contient la ligne `"credsStore": "osxkeychain"` (ajoute-la si elle manque, entre les accolades). Test : `docker-credential-osxkeychain version` répond.
+Puis dans le Terminal : `docker login ghcr.io -u aliescoobs-sudo`
 Quand il écrit **Password:**, colle le jeton (rien ne s'affiche) et Entrée.
-✅ Tu vois `Login Succeeded`. Si le jeton apparaît ailleurs que dans ce prompt, supprime-le sur github.com et refais-en un.
+✅ Tu vois `Login Succeeded`. Vérifie que le jeton n'a pas été écrit dans un fichier : `grep -c '"auth"' ~/.docker/config.json` doit afficher `0`.
+Si ce n'est pas 0 : `docker logout ghcr.io`, supprime le jeton sur github.com et corrige le réglage avant de continuer. Si le jeton apparaît ailleurs que dans ce prompt, supprime-le sur github.com et refais-en un.
 
 **6. Choisir la version à lancer**
 Sur github.com → le dépôt → onglet **Actions** → le dernier passage vert de **Build and publish image** → dans le résumé, copie la ligne **Digest to deploy** (`sha256:…`). Puis :
@@ -41,10 +50,13 @@ La première fois, compte quelques minutes (image, base, données de formation).
 ✅ À la fin : « The training instance is running on this machine only: http://127.0.0.1:3000 ». Ouvre **http://localhost:3000/fr/login** dans Safari sur l'iMac :
 tu vois la bannière rouge « Version de formation — données fictives ».
 
-**8. Lire les comptes (une seule fois)**
-`./scripts/training/show-accounts.sh`
-✅ Une liste : propriétaire, administrateur, bureau ventes/achats, deux chefs de centrale, comptable, trois chauffeurs et un pompiste, chacun avec son mot de passe ou son PIN.
-Donne à chacun sa ligne **en main propre**, puis efface l'écran (`clear`). Les comptes e-mail n'ont **pas** de code d'authentification : le mot de passe suffit (seulement dans cette version).
+**8. Donner à chacun SON compte (jamais la liste entière)**
+`./scripts/training/show-accounts.sh` affiche seulement les **noms** des comptes, sans secret.
+✅ Une liste : propriétaire, administrateur, bureau ventes/achats, deux chefs de centrale, comptable, trois chauffeurs et un pompiste.
+Pour un stagiaire : `./scripts/training/show-accounts.sh chauffeur` (ou le nom ou le code de la personne) affiche **son bloc seulement**. Donne-le **en main propre**, puis efface l'écran
+**et son historique** (touches ⌘K). Pas de capture d'écran, pas de message, pas d'enregistrement du Terminal (`script`), pas de redirection vers un fichier. Les comptes e-mail n'ont **pas**
+de code d'authentification : le mot de passe suffit (seulement dans cette version). **Exception : la finance.** Le propriétaire, l'administrateur et le comptable qui veulent essayer la finance
+activent une vraie application d'authentification (lien dans la bannière rouge) : la finance n'accepte jamais le mot de passe seul.
 
 **9. Rendre l'iMac joignable depuis Internet (Tailscale Funnel)**
 a. `sudo brew services start tailscale` puis `sudo tailscale up` : il affiche un lien, ouvre-le, crée/ouvre ton compte Tailscale gratuit et valide la machine.
@@ -62,6 +74,6 @@ d. Donne cette adresse à l'application : `./scripts/training/set-url.sh https:/
 **Au quotidien**
 - Fermer l'accès public quand personne ne s'entraîne : `tailscale funnel reset` ✅ l'adresse ne répond plus.
 - Arrêter : `./scripts/training-down.sh` (les données restent). Redémarrer : `./scripts/training-up.sh`.
-- **Remettre à zéro** (efface tout, nouveaux mots de passe) : `./scripts/training-reset.sh`, tape `RESET`, puis `./scripts/training/show-accounts.sh`.
+- **Remettre à zéro** (efface tout, nouveaux mots de passe) : `./scripts/training-reset.sh`, tape `RESET`, puis `./scripts/training/show-accounts.sh <nom>` pour chaque stagiaire.
 - Nouvelle version : prends le nouveau digest (étape 6), remplace la ligne `APP_IMAGE=` dans `.env.training`, relance `./scripts/training-up.sh`.
 - Ne jamais saisir de vraies données (vrai client, vrai téléphone, vrai chèque).

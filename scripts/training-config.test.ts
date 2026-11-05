@@ -298,6 +298,36 @@ describe('scripts/training/set-url.sh (R11-03)', () => {
   });
 });
 
+describe('the iMac guides protect the host credentials (R11-10)', () => {
+  const en = readFileSync('docs/checkpoints/CP-TRAINING.md', 'utf8');
+  const fr = readFileSync('docs/checkpoints/CP-TRAINING-IMAC-FR.md', 'utf8');
+  it('keep FileVault on and never suggest automatic login', () => {
+    expect(en).toMatch(/Keep FileVault ON and automatic login OFF/);
+    expect(en).not.toMatch(/Turn off FileVault|turn on automatic login/i);
+    expect(fr).toMatch(/FileVault : activé/);
+    expect(fr).toMatch(/Connexion automatique : désactivée/);
+    expect(fr).not.toMatch(/désactive(r)? FileVault|(?<!PAS )activer la connexion automatique/i);
+  });
+  it('require the macOS Keychain as Docker credential helper, checked before and after the login, with a read-only token', () => {
+    for (const doc of [en, fr]) {
+      expect(doc).toMatch(/osxkeychain/);
+      expect(doc).toMatch(/docker-credential-helper/);
+      expect(doc).toMatch(/grep -c '"auth"'/);
+      expect(doc).toMatch(/read:packages/);
+    }
+    expect(en.indexOf('osxkeychain')).toBeLessThan(en.indexOf('docker login ghcr.io'));
+    expect(fr.indexOf('osxkeychain')).toBeLessThan(fr.indexOf('docker login ghcr.io'));
+  });
+  it('hand out one trainee line at a time and keep no transcript', () => {
+    for (const doc of [en, fr]) {
+      expect(doc).toMatch(/show-accounts\.sh <?[a-zé ]+/i);
+      expect(doc).toMatch(/script/);
+    }
+    expect(en).toMatch(/Never circulate the whole list/);
+    expect(fr).toMatch(/jamais la liste entière/);
+  });
+});
+
 describe('the training guides do not promise what was not rehearsed (R11-09, R11-10)', () => {
   const guide = readFileSync('docs/checkpoints/CP-TRAINING.md', 'utf8');
   it('R11-09: a move to a VPS starts with a fresh seed; a dump alone is not a transfer', () => {
@@ -305,5 +335,64 @@ describe('the training guides do not promise what was not rehearsed (R11-09, R11
     expect(guide).toMatch(/discarded/);
     expect(guide).not.toMatch(/Copy the data over/);
     expect(guide).toMatch(/database only/);
+  });
+});
+
+describe('scripts/training/show-accounts.sh (R11-10)', () => {
+  const FILE = [
+    'BELGOBETON — comptes de formation',
+    'Adresse : http://127.0.0.1:3000',
+    '',
+    'Ce fichier est lu une seule fois.',
+    '',
+    'Propriétaire (owner)',
+    '  e-mail : proprietaire@formation.beton.invalid',
+    '  mot de passe : PWD-OWNER-AAAA',
+    '',
+    'Chauffeur 1 (driver)',
+    '  code   : CH-01',
+    '  PIN : 111222',
+    '',
+    'Chauffeur 2 (driver)',
+    '  code   : CH-02',
+    '  PIN : 333444',
+    '',
+  ].join('\n');
+  const run = (...args: string[]) => {
+    const root = mkdtempSync(path.join(tmpdir(), 'bb-show-'));
+    mkdirSync(path.join(root, 'scripts/training'), { recursive: true });
+    copyFileSync('scripts/training/show-accounts.sh', path.join(root, 'scripts/training/show-accounts.sh'));
+    writeFileSync(path.join(root, 'file.txt'), FILE);
+    // the stub stands for `dc.sh run --rm -T ops cat <file>`: it prints the sample
+    writeFileSync(
+      path.join(root, 'scripts/training/dc.sh'),
+      `#!/usr/bin/env bash\ncat "${root}/file.txt"\n`,
+      { mode: 0o755 },
+    );
+    return spawnSync('bash', [path.join(root, 'scripts/training/show-accounts.sh'), ...args], {
+      encoding: 'utf8',
+    });
+  };
+  it('with no argument lists the accounts and prints no secret', () => {
+    const r = run();
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('Propriétaire (owner)');
+    expect(r.stdout).toContain('Chauffeur 2 (driver)');
+    expect(r.stdout + r.stderr).not.toMatch(/PWD-OWNER|111222|333444/);
+  });
+  it('shows only the block asked for', () => {
+    const r = run('ch-02');
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('333444');
+    expect(r.stdout).not.toMatch(/111222|PWD-OWNER/);
+    expect(run('proprietaire').stdout).toContain('PWD-OWNER-AAAA');
+    expect(run('proprietaire').stdout).not.toContain('333444');
+  });
+  it('refuses an unknown name and an unknown option; everything needs --all and says so', () => {
+    expect(run('nobody').status).toBe(1);
+    expect(run('--nope').status).toBe(2);
+    const all = run('--all');
+    expect(all.stdout).toMatch(/PWD-OWNER-AAAA[\s\S]*111222[\s\S]*333444/);
+    expect(all.stderr).toMatch(/WARNING/);
   });
 });

@@ -15,7 +15,7 @@ the final review (`docs/reviews/CODEX-REVIEW-FINAL.md`) still stands for real da
   orders in every state, cheques and payments, invoices, rotations, receipts, transfers (the pilot scenario dated from today, plus data for both plants).
 - **Accounts.** One per role (owner, app_admin, office_sales, office_purchases, two plant managers, accountant, three drivers, one pump operator). Random
   passwords and 6-digit PINs are written **once** to `/app/out/training-accounts.local.txt` inside a Docker volume (`accounts`, folder mode 0700 owned by the container user, no folder of the checkout; file mode 0600, created exclusively then renamed, name covered by the ignore rules of git and of the image; the seed stops without marking the database if it cannot be written) and never printed or logged.
-  Read them with `./scripts/training/show-accounts.sh`.
+  Read them one trainee at a time with `./scripts/training/show-accounts.sh <name>` (no argument lists the names only).
 - **Sign-in.** The accounts on the reserved address `…@formation.beton.invalid` work with their **password alone** (no authenticator), only while training
   mode is on. Everything else is unchanged: roles and permissions, row-level security, the audit log, money visibility, the **rate limiting and the login
   lockout stay on** (the instance is on the internet). Drivers and the pump operator sign in on the phone with their code and PIN (five wrong PINs lock them 15 minutes, attempts are serialised per driver, and the sign-in endpoint has a per-IP limit).
@@ -35,7 +35,7 @@ the final review (`docs/reviews/CODEX-REVIEW-FINAL.md`) still stands for real da
 | Never sleeps | `sudo pmset -a sleep 0 disksleep 0 displaysleep 15` (the screen may sleep; the machine may not). |
 | Starts after a power cut | `sudo pmset -a autorestart 1` and System Settings → Energy → "Start up automatically after a power failure". |
 | Network | **Ethernet** if possible (Wi-Fi works but drops more). Give the iMac a fixed address in the router if you can. |
-| Sign-in at boot | Turn off FileVault, or turn on automatic login, otherwise nothing starts after a power cut until someone types the password. |
+| Disk encryption | **Keep FileVault ON and automatic login OFF.** The iMac holds the app secrets, the training owner's credentials, a registry token and the Tailscale identity: treat it as a credential-bearing host, with a password on the operator account and a screen lock. The price is that after a power cut nothing starts until somebody types the password at the FileVault screen: plan for it (tell the trainees the instance may be down until you unlock the iMac). Do not trade this for convenience. |
 | Updates | Disable automatic restart for macOS updates (`sudo softwareupdate --schedule off`); restart it yourself on a quiet evening. |
 
 A short version in French for a non-expert, with what to see at each step, is in `CP-TRAINING-IMAC-FR.md`.
@@ -52,15 +52,20 @@ Nothing here is done for you, and no token or password is ever pasted anywhere b
 4. **Get the code.** `gh auth login` (choose GitHub.com, HTTPS, "Login with a web browser"; the browser does the work, you paste nothing), then
    `gh repo clone aliescoobs-sudo/beton ~/belgobeton && cd ~/belgobeton`.
 5. **Let the iMac pull the private image** (GHCR). On github.com: your picture → Settings → Developer settings → Personal access tokens → **Tokens (classic)**
-   → Generate new token (classic) → note "training iMac", expiry 90 days, tick **only `read:packages`** → Generate. Copy it (you see it once). In the Terminal:
-   `docker login ghcr.io -u aliescoobs-sudo` — when it asks **Password:** paste the token there (nothing shows as you paste) and press Return. Do not put it
-   anywhere else. If the token is ever shown in a chat or a file, delete it on github.com and make another.
+   → Generate new token (classic) → note "training iMac", expiry 90 days, tick **only `read:packages`** (read-only: never write or delete) → Generate. Copy it
+   (you see it once). **First make Docker keep registry credentials in the macOS Keychain, not in a file:** `brew install docker-credential-helper`, then check
+   that `~/.docker/config.json` says `"credsStore": "osxkeychain"` (add it if it is missing; `docker-credential-osxkeychain version` must answer). Only then, in the
+   Terminal: `docker login ghcr.io -u aliescoobs-sudo` — when it asks **Password:** paste the token there (nothing shows as you paste) and press Return.
+   Check that the token did not land in a file: `grep -c '"auth"' ~/.docker/config.json` must print `0`. If it prints more, run `docker logout ghcr.io`, delete the
+   token on github.com and fix the helper before going on. Do not put the token anywhere else; if it is ever shown in a chat or a file, delete it on github.com.
 6. **Pick the image.** github.com → the repository → Actions → the latest green run of **Build and publish image** → its summary shows the **Digest to deploy**
    (`sha256:…`). Then create the two secret files (random secrets, mode 600, not printed):
    `APP_IMAGE=ghcr.io/aliescoobs-sudo/belgobeton@sha256:<the digest> ./scripts/training/init-env.sh`
 7. **Start it:** `./scripts/training-up.sh` (the first run takes a few minutes: image, database, roles, structure, training data). Open
-   <http://127.0.0.1:3000/fr/login> on the iMac itself: the red training banner must show. Read the accounts once: `./scripts/training/show-accounts.sh`
-   and hand each person their line in person.
+   <http://127.0.0.1:3000/fr/login> on the iMac itself: the red training banner must show. Give each trainee only their own line:
+   `./scripts/training/show-accounts.sh` lists the account names (no secret), `./scripts/training/show-accounts.sh <name or login>` shows one block. Hand it over in
+   person, then clear the screen and its history (Command-K). Never circulate the whole list: no screenshot, no message, no `script` or other terminal recording,
+   no redirection of the output to a file (`--all` exists for the rare case you need everything, and says so).
 8. **Make it public with Tailscale Funnel.**
    a. `sudo brew services start tailscale` then `sudo tailscale up` — it prints a link: open it, sign in (create the free Tailscale account), approve the machine.
    b. In the Tailscale admin console (<https://login.tailscale.com/admin>): **DNS** → turn on **MagicDNS** and **HTTPS Certificates**. The console shows the
@@ -78,7 +83,7 @@ Nothing here is done for you, and no token or password is ever pasted anywhere b
 ## Day to day
 - Stop: `./scripts/training-down.sh` (data kept). Start: `./scripts/training-up.sh`.
 - **Stop the Funnel** (the public address closes at once): `tailscale funnel reset`. Do this whenever nobody is training.
-- **Reset to the clean seed** (erases everything entered, new passwords): `./scripts/training-reset.sh` (asks you to type RESET), then `./scripts/training/show-accounts.sh`.
+- **Reset to the clean seed** (erases everything entered, new passwords): `./scripts/training-reset.sh` (asks you to type RESET), then `./scripts/training/show-accounts.sh <name>` for each trainee.
   It only ever wipes a database that carries the training marker.
 - **New version:** take the new digest from the latest green Actions run, replace the `APP_IMAGE=` line in `.env.training`, run `./scripts/training-up.sh` (it migrates).
 - Never enter a real client, a real phone number or a real cheque. The instance has no CNDP declaration and no hardening review behind it.
