@@ -57,6 +57,7 @@ export async function assertTrainingGuardOrExit(): Promise<void> {
       trainingMode: env.TRAINING_MODE,
       appEnv: env.APP_ENV,
       databaseSeeded,
+      allowUnmarked: env.TRAINING_ALLOW_UNMARKED,
     });
     if (problem) throw new Error(problem);
     const warning = funnelWarning({ trainingMode: env.TRAINING_MODE, appBaseUrl: env.APP_BASE_URL });

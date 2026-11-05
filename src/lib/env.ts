@@ -110,6 +110,9 @@ const envObject = z.object({
   // C1: finance module (Codex). Off by default; with it off its pages, exports and both endpoints answer 404 and no menu entry renders.
   // Even when on, the database switch (finance.enabled(), owner/app_admin with a fresh TOTP) must also be on.
   FINANCE_ENABLED: flag,
+  // R11-02: lets a TRAINING_MODE server run on a database without the training marker. For the e2e training server ONLY (it shares the
+  // e2e database); refused with APP_ENV=production, REAL_DATA=true, and by the training compose file's own test.
+  TRAINING_ALLOW_UNMARKED: flag,
   ASSISTANT_ENABLED: flag,
   ASSISTANT_PROVIDER: z
     .enum(['fake', 'anthropic'], { error: 'must be "fake" or "anthropic"' })
@@ -177,6 +180,13 @@ const envSchema = envObject.superRefine((env, ctx) => {
       code: 'custom',
       path: ['TRAINING_MODE'],
       message: 'must be "false" when APP_ENV=production (the training instance never runs as production)',
+    });
+  }
+  if (env.TRAINING_ALLOW_UNMARKED && (env.APP_ENV === 'production' || env.REAL_DATA || !env.TRAINING_MODE)) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['TRAINING_ALLOW_UNMARKED'],
+      message: 'only with TRAINING_MODE=true, and never with APP_ENV=production or REAL_DATA=true',
     });
   }
   if (env.TRAINING_MODE && env.REAL_DATA) {

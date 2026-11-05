@@ -16,11 +16,18 @@ export function trainingBootProblem(input: {
   trainingMode: boolean;
   appEnv: string | undefined;
   databaseSeeded: boolean;
+  /** TRAINING_ALLOW_UNMARKED: the e2e training server only. Refused by the environment schema outside tests of this kind. */
+  allowUnmarked?: boolean;
 }): string | null {
   if (input.trainingMode && input.appEnv === 'production')
     return 'TRAINING_MODE=true is refused when APP_ENV=production: the training instance never runs as production.';
   if (input.databaseSeeded && !input.trainingMode)
     return 'This database holds the training seed (fictitious data and password-only accounts) but TRAINING_MODE is not "true": refusing to start. Use the training instance for it, or a clean database.';
+  // R11-02: the rule runs both ways. Training traffic is served only from a database a COMPLETED training seed has marked; the
+  // flags and the banner never establish that the data are fictitious. An unmarked database (empty, half-seeded, or somebody's
+  // real records) is refused: initialise a fresh one with seed:training.
+  if (input.trainingMode && !input.databaseSeeded && !input.allowUnmarked)
+    return 'TRAINING_MODE is "true" but this database carries no training marker (no completed training seed): refusing to serve it. Initialise a fresh database with the training seed (scripts/training-up.sh); never point training at an existing database.';
   return null;
 }
 

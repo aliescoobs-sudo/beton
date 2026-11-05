@@ -6,7 +6,7 @@ It runs on a dedicated Intel 2019 iMac (not the development MacBook, not a VPS),
 the final review (`docs/reviews/CODEX-REVIEW-FINAL.md`) still stands for real data (Batch D, paused: see CP-PROD-PLAN.md).
 
 ## What "training mode" is (`TRAINING_MODE=true`)
-- **Guard.** The server refuses to start with `TRAINING_MODE=true` next to `APP_ENV=production` or `REAL_DATA=true`; and a database that holds the training
+- **Guard.** The server refuses to start without a completed training seed on its database (the marker) when `TRAINING_MODE=true`, and the seed only fills an empty, unmarked database (a failed seed leaves one that is refused: remove the volume with `./scripts/training/dc.sh down -v` and start again). The server refuses to start with `TRAINING_MODE=true` next to `APP_ENV=production` or `REAL_DATA=true`; and a database that holds the training
   seed (a marker row, migration 0111) refuses to start without `TRAINING_MODE=true`. A boot warning is logged if the public address looks like a Tailscale
   address while training mode is off; `scripts/training/funnel-check.sh` (run by `training-up.sh`) warns, from outside the container, if the Funnel is up
   while the app is not in training mode.

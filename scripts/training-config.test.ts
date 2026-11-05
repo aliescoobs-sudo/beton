@@ -34,6 +34,10 @@ describe('the training stack (T1)', () => {
     expect(app).toMatch(/REAL_DATA: 'false'/);
     expect(app).not.toMatch(/APP_ENV: production|REAL_DATA: 'true'/);
   });
+  it('R11-02: nothing in the training stack can switch off the marker requirement', () => {
+    expect(compose).not.toMatch(/TRAINING_ALLOW_UNMARKED/);
+    expect(initEnv).not.toMatch(/TRAINING_ALLOW_UNMARKED/);
+  });
   it('keeps the database off the host, publishes the app on the loopback only, and keeps Caddy for a VPS behind a profile', () => {
     expect(block('db')).not.toMatch(/ports:/);
     expect(block('db')).toMatch(/networks: \[internal\]/);

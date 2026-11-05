@@ -27,6 +27,15 @@ describe('TRAINING_MODE in the environment (T1)', () => {
     );
     expect(() => loadEnv({ ...valid, TRAINING_MODE: 'true', REAL_DATA: 'true' })).toThrow(/TRAINING_MODE/);
   });
+  it('R11-02: TRAINING_ALLOW_UNMARKED exists for the e2e server only: needs training mode, never production or real data', () => {
+    const t = { ...valid, TRAINING_MODE: 'true', APP_ENV: 'training', NODE_ENV: 'production' };
+    expect(loadEnv(t).TRAINING_ALLOW_UNMARKED).toBe(false);
+    expect(loadEnv({ ...t, TRAINING_ALLOW_UNMARKED: 'true' }).TRAINING_ALLOW_UNMARKED).toBe(true);
+    expect(() => loadEnv({ ...valid, TRAINING_ALLOW_UNMARKED: 'true' })).toThrow(/TRAINING_ALLOW_UNMARKED/);
+    expect(() =>
+      loadEnv({ ...valid, TRAINING_MODE: 'true', TRAINING_ALLOW_UNMARKED: 'true', REAL_DATA: 'true' }),
+    ).toThrow();
+  });
   it('the production environment is untouched by the training variables being absent', () => {
     expect(() =>
       loadEnv({ ...valid, APP_ENV: 'production', NODE_ENV: 'production', REAL_DATA: 'true' }),
@@ -46,9 +55,33 @@ describe('the boot rule (T1)', () => {
       /TRAINING_MODE is not "true"/,
     );
   });
-  it('lets through the training server on its database, and any server on a clean database', () => {
+  it('R11-02: training mode is served only from a database a completed seed has marked', () => {
+    expect(trainingBootProblem({ trainingMode: true, appEnv: 'training', databaseSeeded: false })).toMatch(
+      /no training marker/,
+    );
+    expect(trainingBootProblem({ trainingMode: true, appEnv: undefined, databaseSeeded: false })).toMatch(
+      /no training marker/,
+    );
+    // the e2e training server shares the e2e database and says so explicitly
+    expect(
+      trainingBootProblem({
+        trainingMode: true,
+        appEnv: 'training',
+        databaseSeeded: false,
+        allowUnmarked: true,
+      }),
+    ).toBeNull();
+    expect(
+      trainingBootProblem({
+        trainingMode: true,
+        appEnv: 'production',
+        databaseSeeded: false,
+        allowUnmarked: true,
+      }),
+    ).toMatch(/APP_ENV=production/);
+  });
+  it('lets through the training server on its marked database, and any server on a clean database', () => {
     expect(trainingBootProblem({ trainingMode: true, appEnv: 'training', databaseSeeded: true })).toBeNull();
-    expect(trainingBootProblem({ trainingMode: true, appEnv: 'training', databaseSeeded: false })).toBeNull();
     expect(
       trainingBootProblem({ trainingMode: false, appEnv: 'production', databaseSeeded: false }),
     ).toBeNull();

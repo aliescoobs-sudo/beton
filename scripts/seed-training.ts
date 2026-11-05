@@ -90,6 +90,35 @@ const session = (u: {
     ...(u.plantId ? { plantId: u.plantId } : {}),
   }) as unknown as SessionUser;
 
+/**
+ * R11-02: the seed writes only into a database that is EMPTY of business records and unmarked. A database that already holds
+ * accounts, parties, orders, trucks or invoices is somebody's data (or a half-finished seed): refused before the first write, with
+ * the way out (a fresh database). The marker is written last, only once everything else, the credentials file included, is done.
+ */
+const NOT_EMPTY_TABLES = [
+  '"user"',
+  'client',
+  'supplier',
+  'sales_order',
+  'purchase',
+  'truck',
+  'driver',
+  'invoice',
+  'payment_instrument',
+] as const;
+export async function assertSeedTargetEmpty(migrator: pg.Pool): Promise<void> {
+  const holding: string[] = [];
+  for (const t of NOT_EMPTY_TABLES)
+    if ((await migrator.query(`select 1 from public.${t} limit 1`)).rowCount)
+      holding.push(t.replaceAll('"', ''));
+  if (holding.length)
+    throw new SeedError(
+      `training seed refused: this database is not empty (${holding.join(', ')} hold rows) and carries no training marker. ` +
+        'The training seed only fills a fresh database: remove the training database volume and start again (docker compose down -v), ' +
+        'never point training at an existing database.',
+    );
+}
+
 export async function seedTraining(opts: SeedTrainingOptions): Promise<SeedTrainingResult> {
   const { env, today } = opts;
   if (!env.TRAINING_MODE) throw new SeedError('training seed refused: TRAINING_MODE is not "true"');
@@ -104,6 +133,7 @@ export async function seedTraining(opts: SeedTrainingOptions): Promise<SeedTrain
   try {
     if ((await migrator.query('select 1 from public.training_marker')).rowCount)
       return { applied: false, accounts: 0, credentialsFile: null };
+    await assertSeedTargetEmpty(migrator);
 
     const issued: IssuedCredential[] = [];
     const cipher = fieldCipherFrom(parseKeyring(env.FIELD_ENCRYPTION_KEYS));
