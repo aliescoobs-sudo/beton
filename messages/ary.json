@@ -63,6 +63,8 @@
     },
     "acknowledge": "فهمت",
     "openMap": "حل الخريطة",
+    "copyAddress": "نسخ العنوان",
+    "addressCopied": "تنسخ العنوان",
     "plannedM3": "المبرمج: {m3} م³",
     "pumpedAsk": "م³ اللي تضخّو",
     "pump": {

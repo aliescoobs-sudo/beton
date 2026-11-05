@@ -48,8 +48,14 @@ export interface DriverInstruction {
 
 /** The training instance sends nothing outside (T1): no map link, whatever the address or the office typed. */
 const outboundOff = () => process.env.TRAINING_MODE === 'true';
+/**
+ * F07: a map link hands the site address to a third party (Google) when it is tapped, so it is OFF by default.
+ * The driver sees the address as text with a copy button; an operator who has accepted that transfer (and recorded it
+ * in the CNDP file) turns it on with MAP_LINKS_ENABLED=true. Training mode keeps it off whatever the flag says.
+ */
+export const mapLinksOn = () => process.env.MAP_LINKS_ENABLED === 'true' && !outboundOff();
 export const mapLink = (address: string | null): string | null =>
-  address && !outboundOff()
+  address && mapLinksOn()
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
     : null;
 
@@ -153,7 +159,7 @@ export async function getDriverDay(
             tripId: i.trip_id,
             kind: i.kind,
             address,
-            mapUrl: outboundOff() ? null : (i.map_url ?? mapLink(address)),
+            mapUrl: mapLinksOn() ? (i.map_url ?? mapLink(address)) : null,
             note: i.note,
             joinTruckCode: i.join_truck_code,
             createdAt: i.created_at.toISOString(),

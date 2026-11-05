@@ -377,7 +377,8 @@ describe('emergency and the office instructions (AC-PROD-22, 23)', () => {
     const day = await getDriverDay(app, s.user, today, cipher);
     const ins = day.instructions.find((i) => i.id === made.value.id);
     expect(ins).toMatchObject({ kind: 'redirect', address: '12 rue Exemple, Martil', acknowledgedAt: null });
-    expect(ins?.mapUrl).toMatch(/^https:\/\/www\.google\.com\/maps\/search/);
+    // F07: the address is text for the driver; no external map link unless the operator switched it on
+    expect(ins?.mapUrl).toBeNull();
     // R5: the instruction reaches that driver's own notifications, and nobody else's
     expect(
       (await listMyNotifications(app, s.user, 20)).some(

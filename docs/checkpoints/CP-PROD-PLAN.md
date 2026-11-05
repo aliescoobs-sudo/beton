@@ -204,7 +204,7 @@ Migrations 0105 to 0107. DECISIONS 160 to 162.
 Paused on 2026-11-04 by the lead for the training instance (T1). Done, one commit each: **F01** `4beaa39` (pump surface scoped to the plant, 0108), **F02** `2888cce` (driver offline data), **F03 + F12** `fce819c` (step-up for decisions and force-close, central policy, 0109), **F04** `d3c347d` (bootstrap file, keys/reports ownership), **F05** `3eff6bb` (deploy.sh root and rollback), **F06** `36e369f` (complete rotation registry, 0110).
 
 **Deferred to pre-production** (not started; each needs its own commit and a test that proves it, enforced in the database and the server actions):
-- **F07** remove the Google Maps link; show the address as text with a copy button; record the decision.
+- ~~**F07**~~ **done** (D7 / decision 169): `MAP_LINKS_ENABLED` off by default; address as text with a copy button.
 - **F08** the client document copy must require and consume an approved request; office keeps its normal internal print.
 - **F09** accountant invoice paths without payment state or contacts.
 - **F10** the environment flag is checked on every finance endpoint, including `/api/finance-configuration`.

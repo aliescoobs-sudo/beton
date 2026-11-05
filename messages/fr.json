@@ -2629,6 +2629,8 @@
     },
     "acknowledge": "J'ai bien compris",
     "openMap": "Ouvrir la carte",
+    "copyAddress": "Copier l’adresse",
+    "addressCopied": "Adresse copiée",
     "plannedM3": "Prévu : {m3} m³",
     "pumpedAsk": "m³ pompés",
     "pump": {

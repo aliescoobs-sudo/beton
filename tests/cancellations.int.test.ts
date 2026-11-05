@@ -452,8 +452,8 @@ describe('the redirect reaches the driver app (C3, REQUIREMENTS-V1 §7 and §8)'
       address: 'Rue des Orangers 12, Tétouan',
       acknowledgedAt: null,
     });
-    expect(redirect?.mapUrl).toContain('google.com/maps');
-    expect(redirect?.mapUrl).toContain(encodeURIComponent('Rue des Orangers 12, Tétouan'));
+    // F07: no external map link by default; the address itself is what the driver gets
+    expect(redirect?.mapUrl).toBeNull();
     expect(JSON.stringify(before)).not.toMatch(/price|centimes|amount/i);
 
     // acknowledged through the phone's sync, as the queue sends it (a replay changes nothing)

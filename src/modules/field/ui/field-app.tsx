@@ -25,6 +25,53 @@ import { dropPhoto, queuedPhotos, queuePhoto, sendPhoto, shrinkPhoto } from './p
 
 const DEVICE_KEY = 'bb_field_device';
 
+/**
+ * F07: the site address is shown as text with a copy button; nothing is sent to a third party. The external map link only
+ * exists when the operator switched MAP_LINKS_ENABLED on (the server then sends mapUrl), and it is never on in training.
+ */
+function AddressBlock({
+  address,
+  mapUrl,
+  t,
+}: {
+  address: string | null;
+  mapUrl: string | null;
+  t: (key: string) => string;
+}) {
+  const [copied, setCopied] = useState(false);
+  if (!address && !mapUrl) return null;
+  const copy = () => {
+    if (!address) return;
+    void navigator.clipboard?.writeText(address).then(
+      () => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      },
+      () => undefined,
+    );
+  };
+  return (
+    <div className="space-y-2">
+      {address && <p className="text-2xl">{address}</p>}
+      {address && (
+        <button
+          type="button"
+          onClick={copy}
+          className="rounded-xl border-2 border-rule px-4 py-3 text-xl font-bold"
+          data-testid="copy-address"
+        >
+          {copied ? t('addressCopied') : t('copyAddress')}
+        </button>
+      )}
+      {mapUrl && (
+        <a href={mapUrl} target="_blank" rel="noreferrer" className="block text-2xl underline">
+          {t('openMap')}
+        </a>
+      )}
+    </div>
+  );
+}
+
 interface Trip {
   id: string;
   seq: number;
@@ -451,19 +498,9 @@ export function FieldApp({ locale }: { locale: string }) {
               >
                 <h2 className="text-3xl font-extrabold">{t(`instruction.${i.kind}`)}</h2>
                 {i.note && <p className="text-2xl">{i.note}</p>}
-                {i.address && <p className="text-2xl">{i.address}</p>}
+                <AddressBlock address={i.address} mapUrl={i.mapUrl} t={t} />
                 {i.joinTruckCode && (
                   <p className="text-2xl">{t('instruction.joinTruck', { code: i.joinTruckCode })}</p>
-                )}
-                {i.mapUrl && (
-                  <a
-                    href={i.mapUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className={`${big} block bg-white text-center text-black underline`}
-                  >
-                    {t('openMap')}
-                  </a>
                 )}
                 <button
                   type="button"
@@ -497,12 +534,7 @@ export function FieldApp({ locale }: { locale: string }) {
                   {trip.clientName} · <bdi dir="ltr">{(trip.volumeL / 1000).toLocaleString('fr-FR')} m³</bdi>
                 </p>
                 {trip.siteLabel && <p className="text-2xl">{trip.siteLabel}</p>}
-                {trip.address && <p className="text-2xl">{trip.address}</p>}
-                {trip.mapUrl && (
-                  <a href={trip.mapUrl} target="_blank" rel="noreferrer" className="block text-2xl underline">
-                    {t('openMap')}
-                  </a>
-                )}
+                <AddressBlock address={trip.address} mapUrl={trip.mapUrl} t={t} />
                 {trip.phone && (
                   <a href={`tel:${trip.phone}`} className="block text-2xl underline">
                     {trip.contactName ? `${trip.contactName} · ` : ''}
@@ -632,12 +664,7 @@ export function FieldApp({ locale }: { locale: string }) {
               >
                 <h2 className="text-3xl font-extrabold">{job.siteLabel}</h2>
                 {job.clientName && <p className="text-2xl">{job.clientName}</p>}
-                {job.address && <p className="text-2xl">{job.address}</p>}
-                {job.mapUrl && (
-                  <a href={job.mapUrl} target="_blank" rel="noreferrer" className="block text-2xl underline">
-                    {t('openMap')}
-                  </a>
-                )}
+                <AddressBlock address={job.address} mapUrl={job.mapUrl} t={t} />
                 {job.plannedM3 && <p className="text-xl">{t('plannedM3', { m3: job.plannedM3 })}</p>}
                 <ol className="space-y-1 text-xl">
                   {(['arrived', 'set_up', 'pumping_started', 'pumping_ended', 'left'] as const).map((s) => (
