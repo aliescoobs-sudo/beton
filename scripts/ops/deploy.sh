@@ -8,11 +8,14 @@
 # image is not a rollback of the data (restore, runbook section 5).
 # Environment overrides exist for the tests only: DOCKER, DC, OPS, BACKUP, READY_TRIES, READY_SLEEP.
 set -euo pipefail
+# R11-03: the env file holds the database and encryption secrets: everything created here is private from its first byte.
+umask 077
 cd "$(dirname "$0")/../.."
 image="${1:?usage: deploy.sh ghcr.io/<owner>/belgobeton@sha256:<digest>}"
 case "$image" in *@sha256:????????????????????????????????????????????????????????????????) ;; *) echo "deploy.sh: give an image reference with @sha256:<64 hex>" >&2; exit 2;; esac
 env_file=.env.ops.prod
 [ -r "$env_file" ] || { echo "deploy.sh: $env_file not found in $(pwd)" >&2; exit 1; }
+[ ! -L "$env_file" ] || { echo "deploy.sh: $env_file is a symbolic link: refusing" >&2; exit 1; }
 docker_bin="${DOCKER:-docker}"
 dc="${DC:-./scripts/ops/dc.sh}"
 ops="${OPS:-./scripts/ops/ops.sh}"
@@ -20,7 +23,14 @@ backup="${BACKUP:-./scripts/ops/backup-nightly.sh}"
 tries="${READY_TRIES:-30}"
 nap="${READY_SLEEP:-5}"
 previous=$(grep -E '^APP_IMAGE=' "$env_file" | tail -n1 | cut -d= -f2- || true)
-set_image() { grep -v '^APP_IMAGE=' "$env_file" > "$env_file.new" || true; echo "APP_IMAGE=$1" >> "$env_file.new"; chmod 600 "$env_file.new"; mv "$env_file.new" "$env_file"; }
+# mktemp creates its file exclusively with mode 0600 (a pre-existing or symlinked name is never reused); the rename is atomic.
+set_image() {
+  local tmp
+  tmp=$(mktemp "$env_file.XXXXXX") || return 1
+  if { grep -v '^APP_IMAGE=' "$env_file" || true; echo "APP_IMAGE=$1"; } > "$tmp" && chmod 600 "$tmp" && mv -f "$tmp" "$env_file"; then return 0; fi
+  rm -f "$tmp"
+  return 1
+}
 
 # Nothing has changed yet: a failure here leaves the running image alone.
 "$docker_bin" pull "$image"

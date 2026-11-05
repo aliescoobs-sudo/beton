@@ -6,6 +6,9 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  renameSync,
+  statSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -235,6 +238,7 @@ describe('scripts/ops/deploy.sh (F05 of the final review)', () => {
   const deploy = (
     fail: 'none' | 'pull' | 'backup' | 'migrate' | 'up' | 'ready',
     previous: string | null = OLD,
+    hostile: 'none' | 'stale-temp' | 'symlink' = 'none',
   ) => {
     const dir = mkdtempSync(path.join(tmpdir(), 'bb-deploy-'));
     mkdirSync(path.join(dir, 'scripts/ops'), { recursive: true });
@@ -243,6 +247,12 @@ describe('scripts/ops/deploy.sh (F05 of the final review)', () => {
       path.join(dir, '.env.ops.prod'),
       `APP_DOMAIN=x.test\n${previous ? `APP_IMAGE=${previous}\n` : ''}FIRST_BOOT=\n`,
     );
+    if (hostile === 'stale-temp')
+      writeFileSync(path.join(dir, '.env.ops.prod.new'), 'planted\n', { mode: 0o666 });
+    if (hostile === 'symlink') {
+      renameSync(path.join(dir, '.env.ops.prod'), path.join(dir, 'real.env'));
+      symlinkSync('real.env', path.join(dir, '.env.ops.prod'));
+    }
     const log = path.join(dir, 'calls.log');
     const stub = (name: string, body: string) =>
       writeFileSync(path.join(dir, name), `#!/usr/bin/env bash\n${body}\n`, { mode: 0o755 });
@@ -258,21 +268,29 @@ case "$1" in
 esac
 exit 0`,
     );
-    const r = spawnSync('bash', [path.join(dir, 'scripts/ops/deploy.sh'), NEW], {
-      cwd: tmpdir(), // not the repository: the script must find its own root
-      env: {
-        ...process.env,
-        DOCKER: path.join(dir, 'docker'),
-        DC: path.join(dir, 'dc'),
-        OPS: path.join(dir, 'ops'),
-        BACKUP: path.join(dir, 'backup'),
-        READY_TRIES: '2',
-        READY_SLEEP: '0',
+    // umask 022 on purpose: the script must make its own files private, whatever the caller's umask
+    const r = spawnSync(
+      'bash',
+      ['-c', 'umask 022; exec bash "$0" "$@"', path.join(dir, 'scripts/ops/deploy.sh'), NEW],
+      {
+        cwd: tmpdir(), // not the repository: the script must find its own root
+        env: {
+          ...process.env,
+          DOCKER: path.join(dir, 'docker'),
+          DC: path.join(dir, 'dc'),
+          OPS: path.join(dir, 'ops'),
+          BACKUP: path.join(dir, 'backup'),
+          READY_TRIES: '2',
+          READY_SLEEP: '0',
+        },
+        encoding: 'utf8',
       },
-      encoding: 'utf8',
-    });
+    );
     const env = readFileSync(path.join(dir, '.env.ops.prod'), 'utf8');
     return {
+      dir,
+      mode: statSync(path.join(dir, hostile === 'symlink' ? 'real.env' : '.env.ops.prod')).mode & 0o777,
+      leftovers: readdirSync(dir).filter((f) => f.startsWith('.env.ops.prod.')),
       status: r.status,
       err: r.stderr,
       image: /^APP_IMAGE=(.*)$/m.exec(env)?.[1] ?? null,
@@ -285,6 +303,22 @@ exit 0`,
     expect(r.status, r.err).toBe(0);
     expect(r.image).toBe(NEW);
     expect(r.calls).toEqual(expect.arrayContaining(['backup', expect.stringContaining('db-migrate')]));
+  });
+  it('R11-03: the env file is rewritten privately, whatever the umask; a planted temp name is never reused; a symlink is refused', () => {
+    const clean = deploy('none');
+    expect(clean.status, clean.err).toBe(0);
+    expect(clean.mode.toString(8)).toBe('600');
+    expect(clean.leftovers).toEqual([]);
+    const planted = deploy('none', OLD, 'stale-temp');
+    expect(planted.status, planted.err).toBe(0);
+    expect(planted.mode.toString(8)).toBe('600');
+    // the planted world-writable file was not the one written: it still says what the attacker put there
+    expect(readFileSync(path.join(planted.dir, '.env.ops.prod.new'), 'utf8')).toBe('planted\n');
+    expect(planted.image).toBe(NEW);
+    const linked = deploy('none', OLD, 'symlink');
+    expect(linked.status).not.toBe(0);
+    expect(linked.err).toMatch(/symbolic link/);
+    expect(linked.calls).toEqual([]);
   });
   it('a failure before the switch changes nothing and rolls nothing back (pull, backup)', () => {
     for (const fail of ['pull', 'backup'] as const) {

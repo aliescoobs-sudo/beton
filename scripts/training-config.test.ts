@@ -7,7 +7,9 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  renameSync,
   statSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -211,5 +213,75 @@ describe('scripts/training-backup.sh (T1)', () => {
     const { r, to } = backup(() => path.join(mkdtempSync(path.join(tmpdir(), 'bb-bk-')), 'dumps'), '');
     expect(r.status).not.toBe(0);
     expect(readdirSync(to)).toEqual([]);
+  });
+});
+
+describe('scripts/training/set-url.sh (R11-03)', () => {
+  const run = (hostile: 'none' | 'stale-temp' | 'symlink', url = 'https://imac.tail1.ts.net') => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'bb-seturl-'));
+    mkdirSync(path.join(dir, 'scripts/training'), { recursive: true });
+    copyFileSync('scripts/training/set-url.sh', path.join(dir, 'scripts/training/set-url.sh'));
+    writeFileSync(
+      path.join(dir, 'scripts/training/dc.sh'),
+      '#!/usr/bin/env bash\necho "dc $*" >> "$(dirname "$0")/../../calls.log"\n',
+      {
+        mode: 0o755,
+      },
+    );
+    writeFileSync(
+      path.join(dir, '.env.training'),
+      'AUTH_SECRET=s3cret\nAPP_BASE_URL=http://127.0.0.1:3000\n',
+      {
+        mode: 0o600,
+      },
+    );
+    if (hostile === 'stale-temp')
+      writeFileSync(path.join(dir, '.env.training.new'), 'planted\n', { mode: 0o666 });
+    if (hostile === 'symlink') {
+      renameSync(path.join(dir, '.env.training'), path.join(dir, 'real.env'));
+      symlinkSync('real.env', path.join(dir, '.env.training'));
+    }
+    // umask 022 on purpose: the script must not depend on the caller's umask
+    const r = spawnSync(
+      'bash',
+      ['-c', 'umask 022; exec bash "$0" "$@"', path.join(dir, 'scripts/training/set-url.sh'), url],
+      {
+        encoding: 'utf8',
+      },
+    );
+    const real = path.join(dir, hostile === 'symlink' ? 'real.env' : '.env.training');
+    return {
+      dir,
+      status: r.status,
+      err: r.stderr,
+      text: readFileSync(real, 'utf8'),
+      mode: statSync(real).mode & 0o777,
+      leftovers: readdirSync(dir).filter((f) => f.startsWith('.env.training.')),
+    };
+  };
+  it('replaces the address and keeps the file private, with no temporary file left', () => {
+    const r = run('none');
+    expect(r.status, r.err).toBe(0);
+    expect(r.text).toContain('AUTH_SECRET=s3cret');
+    expect(r.text).toContain('APP_BASE_URL=https://imac.tail1.ts.net');
+    expect(r.text.match(/APP_BASE_URL=/g)).toHaveLength(1);
+    expect(r.mode.toString(8)).toBe('600');
+    expect(r.leftovers).toEqual([]);
+  });
+  it('never reuses a planted temporary name, and refuses a symbolic link', () => {
+    const planted = run('stale-temp');
+    expect(planted.status, planted.err).toBe(0);
+    expect(planted.mode.toString(8)).toBe('600');
+    expect(readFileSync(path.join(planted.dir, '.env.training.new'), 'utf8')).toBe('planted\n');
+    const linked = run('symlink');
+    expect(linked.status).not.toBe(0);
+    expect(linked.err).toMatch(/symbolic link/);
+    expect(linked.text).not.toContain('ts.net');
+  });
+  it('the script creates nothing with a shell redirection before it is private', () => {
+    const text = readFileSync('scripts/training/set-url.sh', 'utf8');
+    expect(text).toMatch(/^umask 077$/m);
+    expect(text).toMatch(/mktemp/);
+    expect(text).not.toMatch(/> \.env\.training\.new/);
   });
 });
