@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { loadEnv } from './env';
-import { funnelWarning, isTrainingEmail, trainingBootProblem } from './training';
+import { funnelWarning, isTrainingEmail, offersFinanceEnrolment, trainingBootProblem } from './training';
 
 const valid = {
   DATABASE_URL_APP: 'postgres://app:pw@db:5432/belgobeton',
@@ -132,5 +132,18 @@ describe('the Funnel warning (T1)', () => {
     expect(funnelWarning({ trainingMode: false, appBaseUrl: 'https://beton.example.test' })).toBeNull();
     expect(funnelWarning({ trainingMode: false, appBaseUrl: 'https://evil-ts.net.example.test' })).toBeNull();
     expect(funnelWarning({ trainingMode: false, appBaseUrl: 'not a url' })).toBeNull();
+  });
+});
+
+describe('the optional authenticator for finance (R11-08)', () => {
+  const u = (email: string, role: string, twoFactorEnabled = false) => ({ email, role, twoFactorEnabled });
+  it('is offered to a training account of a finance role that has none, and to nobody else', () => {
+    const t = 'x@formation.beton.invalid';
+    for (const role of ['owner', 'app_admin', 'accountant'])
+      expect(offersFinanceEnrolment(u(t, role))).toBe(true);
+    for (const role of ['office_sales', 'office_purchases', 'plant_manager', 'driver', 'support'])
+      expect(offersFinanceEnrolment(u(t, role))).toBe(false);
+    expect(offersFinanceEnrolment(u(t, 'owner', true))).toBe(false);
+    expect(offersFinanceEnrolment(u('boss@belgobeton.test', 'owner'))).toBe(false);
   });
 });

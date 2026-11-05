@@ -1,6 +1,7 @@
 {
   "training": {
-    "banner": "Version de formation — données fictives"
+    "banner": "Version de formation — données fictives",
+    "enrolForFinance": "Activer l’authentification à deux facteurs (nécessaire pour la finance)"
   },
   "shell": {
     "title": "BELGOBETON",

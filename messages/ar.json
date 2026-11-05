@@ -1,6 +1,7 @@
 {
   "training": {
-    "banner": "نسخة تدريب — معطيات وهمية"
+    "banner": "نسخة تدريب — معطيات وهمية",
+    "enrolForFinance": "تفعيل المصادقة الثنائية (ضرورية للمالية)"
   },
   "shell": {
     "title": "BELGOBETON",

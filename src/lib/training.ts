@@ -47,3 +47,14 @@ export function funnelWarning(input: { trainingMode: boolean; appBaseUrl: string
   }
   return null;
 }
+
+/** R11-08: the roles that can use the finance module. Finance asks for a REAL authenticator, which a training account may enrol if it wants. */
+export const FINANCE_TRAINING_ROLES: readonly string[] = ['owner', 'app_admin', 'accountant'];
+
+/** Whether a signed-in account is shown the optional authenticator enrolment (training accounts of a finance role without one). */
+export const offersFinanceEnrolment = (user: {
+  email: string;
+  role: string;
+  twoFactorEnabled: boolean;
+}): boolean =>
+  !user.twoFactorEnabled && isTrainingEmail(user.email) && FINANCE_TRAINING_ROLES.includes(user.role);

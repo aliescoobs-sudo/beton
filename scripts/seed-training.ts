@@ -25,6 +25,7 @@ import {
   seedPilotMasterData,
   updateTruck,
 } from '../src/modules/master-data/index.ts';
+import { executeFinance } from '../src/modules/finance/index.ts';
 import { createFieldAccount, setDriverPin } from '../src/modules/field/index.ts';
 import {
   confirmArrivalAtPlant,
@@ -498,6 +499,15 @@ export async function seedTraining(opts: SeedTrainingOptions): Promise<SeedTrain
         qty: 500,
         date: today,
       }),
+    );
+
+    // 8b. R11-08: the finance module's database switch is turned on for the training instance (it defaults to off). This is provisioning by
+    //     the seed, like the step-up flag of its other doors, not a runtime path: the application still asks every finance request for the
+    //     user's REAL authenticator (a password-only training sign-in is refused by finance), which a training account may enrol on its own.
+    await executeFinance(
+      app,
+      { user: { ...owner, twoFactorEnabled: true } as never, twoFactorAt: realClock.now() },
+      { action: 'configure', enabled: true, leasingTreatment: 'expense' },
     );
 
     // 9. Credentials first, marker last (R11-04, R11-02). The file is staged privately and exclusively; if it cannot be written the seed
