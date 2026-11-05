@@ -7,12 +7,14 @@ import {
   applyOutcomes,
   EMERGENCY_OPTIONS,
   enqueue,
+  judgeDay,
   mustWipeForAccount,
   newKey,
   nextDriverTap,
   nextPumpStep,
   readStoredDay,
   readStoredQueue,
+  rewrapDay,
   wrapDay,
   type QueueAction,
   type SyncOutcome,
@@ -200,6 +202,16 @@ export function FieldApp({ locale }: { locale: string }) {
     }
   }, [refused, saveQueue]);
 
+  // R11-06: the limit is enforced while the page is open and when it comes back, and revocation is looked for whether or not there is
+  // queued work: a day that is stale is read from the server again (a refusal erases it); a day that is no longer valid and cannot be
+  // renewed is erased and the sign-in is shown.
+  const shown = useRef(false);
+  const recheck = useCallback(async () => {
+    if (!shown.current) return;
+    if (judgeDay(localStorage.getItem(DAY_KEY), Date.now()) === 'fresh') return;
+    await loadDay();
+  }, [loadDay]);
+
   const sync = useCallback(async () => {
     if (syncing.current || queueRef.current.length === 0) return;
     syncing.current = true;
@@ -279,20 +291,35 @@ export function FieldApp({ locale }: { locale: string }) {
       setOnline(true);
       void sync();
       void flushPhotos();
+      void recheck();
     };
     const down = () => setOnline(false);
+    const resume = () => {
+      if (document.visibilityState === 'visible') void recheck();
+    };
     window.addEventListener('online', up);
     window.addEventListener('offline', down);
+    document.addEventListener('visibilitychange', resume);
+    window.addEventListener('pageshow', resume);
+    window.addEventListener('focus', resume);
     const timer = setInterval(() => {
       void sync();
       void flushPhotos();
+      void recheck();
     }, 20_000);
     return () => {
       window.removeEventListener('online', up);
       window.removeEventListener('offline', down);
+      document.removeEventListener('visibilitychange', resume);
+      window.removeEventListener('pageshow', resume);
+      window.removeEventListener('focus', resume);
       clearInterval(timer);
     };
-  }, [loadDay, saveQueue, sync, flushPhotos]);
+  }, [loadDay, saveQueue, sync, flushPhotos, recheck]);
+
+  useEffect(() => {
+    shown.current = day !== null && session === 'in';
+  }, [day, session]);
 
   function push(action: QueueAction) {
     saveQueue(enqueue(queueRef.current, action));
@@ -304,8 +331,11 @@ export function FieldApp({ locale }: { locale: string }) {
     setDay((d) => {
       if (!d) return d;
       const next = update(d);
-      if (ownerRef.current)
-        localStorage.setItem(DAY_KEY, JSON.stringify(wrapDay(ownerRef.current, next, Date.now())));
+      // R11-06: a local tap changes the day, never the time the server last vouched for it.
+      const kept = ownerRef.current
+        ? rewrapDay(localStorage.getItem(DAY_KEY), ownerRef.current, next, Date.now())
+        : null;
+      if (kept) localStorage.setItem(DAY_KEY, kept);
       return next;
     });
   }

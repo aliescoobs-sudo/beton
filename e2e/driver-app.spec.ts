@@ -340,6 +340,45 @@ test('a day older than the offline age is not shown offline, and a refused sessi
   expect((await localState(page)).day).toBeNull();
 });
 
+test('R11-06: a local tap does not extend the 18 hours, and a page left open crosses the limit by itself', async ({
+  page,
+  context,
+}) => {
+  await openAndSignIn(page);
+  await expect(page.getByTestId(`trip-${orderCode}`)).toBeVisible();
+  await warmShell(page);
+  // the server last answered 17 h 59 min 40 s ago
+  const readAt = await page.evaluate(() => {
+    const v = JSON.parse(localStorage.getItem('bb_field_day')!);
+    v.savedAt = Date.now() - (18 * 3600_000 - 40_000);
+    localStorage.setItem('bb_field_day', JSON.stringify(v));
+    return v.savedAt as number;
+  });
+  await context.setOffline(true);
+  // a tap on the phone changes the day shown, not the time the server vouched for it
+  await page.getByTestId(`tap-${orderCode}`).click();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('bb_field_day')!).savedAt)).toBe(readAt);
+  // no reload, no tap: the page crosses 18 hours on its own and shows the sign-in, with nothing of the client left
+  await expect(page.getByTestId('field-login')).toBeVisible({ timeout: 90_000 });
+  expect((await localState(page)).day).toBeNull();
+  await context.setOffline(false);
+});
+
+test('R11-06: a revoked session is found without any queued work', async ({ page, context }) => {
+  await openAndSignIn(page);
+  await expect(page.getByTestId(`trip-${orderCode}`)).toBeVisible();
+  // the day was read six minutes ago, nothing is waiting to be sent, and the server no longer accepts this phone
+  await page.evaluate(() => {
+    const v = JSON.parse(localStorage.getItem('bb_field_day')!);
+    v.savedAt = Date.now() - 6 * 60_000;
+    localStorage.setItem('bb_field_day', JSON.stringify(v));
+    localStorage.setItem('bb_field_queue', JSON.stringify({ userId: v.userId, actions: [] }));
+  });
+  await context.clearCookies();
+  await expect(page.getByTestId('field-login')).toBeVisible({ timeout: 60_000 });
+  expect((await localState(page)).day).toBeNull();
+});
+
 test('another account signing in on the phone finds nothing of the previous one (F02)', async ({ page }) => {
   await openAndSignIn(page);
   await expect(page.getByTestId(`trip-${orderCode}`)).toBeVisible();

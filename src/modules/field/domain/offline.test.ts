@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { mustWipeForAccount, OFFLINE_MAX_AGE_MS, readStoredDay, readStoredQueue, wrapDay } from './offline';
+import {
+  judgeDay,
+  mustWipeForAccount,
+  OFFLINE_MAX_AGE_MS,
+  readStoredDay,
+  readStoredQueue,
+  REVALIDATE_MS,
+  rewrapDay,
+  wrapDay,
+} from './offline';
 
 const NOW = Date.parse('2026-06-02T09:00:00Z');
 
@@ -39,5 +48,42 @@ describe('account switch (F02)', () => {
     expect(mustWipeForAccount('u2', [null, undefined, 'u2'])).toBe(false);
     expect(mustWipeForAccount('u2', [])).toBe(false);
     expect(mustWipeForAccount('u2', ['u2', 'u1'])).toBe(true);
+  });
+});
+
+describe('the 18 hours are a hard limit (R11-06)', () => {
+  const HOUR = 3_600_000;
+  it('a local tap keeps the time the server last vouched for the day; it never extends it', () => {
+    const read = NOW - 17 * HOUR;
+    const raw = JSON.stringify(wrapDay('u1', { n: 1 }, read));
+    // a tap one hour before the limit, then another right after the limit
+    const afterTap = rewrapDay(raw, 'u1', { n: 2 }, NOW);
+    expect(afterTap).not.toBeNull();
+    expect(JSON.parse(afterTap!)).toMatchObject({ userId: 'u1', savedAt: read, day: { n: 2 } });
+    const later = NOW + 2 * HOUR; // 19 hours after the server read
+    expect(readStoredDay(afterTap, later)).toBeNull();
+    expect(rewrapDay(afterTap, 'u1', { n: 3 }, later)).toBeNull();
+  });
+  it('a tap on an expired, foreign or damaged day writes nothing', () => {
+    const old = JSON.stringify(wrapDay('u1', {}, NOW - OFFLINE_MAX_AGE_MS - 1));
+    expect(rewrapDay(old, 'u1', {}, NOW)).toBeNull();
+    expect(rewrapDay(JSON.stringify(wrapDay('u1', {}, NOW)), 'u2', {}, NOW)).toBeNull();
+    expect(rewrapDay('{', 'u1', {}, NOW)).toBeNull();
+    expect(rewrapDay(null, 'u1', {}, NOW)).toBeNull();
+  });
+  it('judges the day at any moment: fresh, stale (ask the server, revocation is looked for), none (erase or sign in)', () => {
+    const at = (age: number) => JSON.stringify(wrapDay('u1', {}, NOW - age));
+    expect(judgeDay(at(60_000), NOW)).toBe('fresh');
+    expect(judgeDay(at(REVALIDATE_MS + 1), NOW)).toBe('stale');
+    expect(judgeDay(at(OFFLINE_MAX_AGE_MS - 1), NOW)).toBe('stale');
+    expect(judgeDay(at(OFFLINE_MAX_AGE_MS + 1), NOW)).toBe('none');
+    expect(judgeDay(null, NOW)).toBe('none');
+    expect(judgeDay('{', NOW)).toBe('none');
+  });
+  it('a page left open crosses the limit: the same stored day is stale, then none, as the clock moves', () => {
+    const raw = JSON.stringify(wrapDay('u1', {}, NOW));
+    expect(judgeDay(raw, NOW + HOUR)).toBe('stale');
+    expect(judgeDay(raw, NOW + 17 * HOUR)).toBe('stale');
+    expect(judgeDay(raw, NOW + 19 * HOUR)).toBe('none');
   });
 });
