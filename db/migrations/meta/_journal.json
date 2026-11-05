@@ -841,6 +841,13 @@
       "when": 1793804647023,
       "tag": "0111_training_marker",
       "breakpoints": true
+    },
+    {
+      "idx": 112,
+      "version": "7",
+      "when": 1793804707023,
+      "tag": "0112_document_copy_gate",
+      "breakpoints": true
     }
   ]
 }

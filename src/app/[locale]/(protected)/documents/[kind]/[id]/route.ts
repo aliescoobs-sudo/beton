@@ -3,6 +3,8 @@ import { getPool } from '@/lib/db/pools';
 import { defaultFileStore } from '@/lib/files/server-store';
 import {
   avoirPdf,
+  COPY_REQUEST_KIND,
+  consumeDocumentCopy,
   getInvoiceDocument,
   getInvoiceForPrint,
   getQuote,
@@ -20,7 +22,7 @@ import { currentAuthState } from '@/modules/platform-security/next';
 
 // @permission documents.read (every signed-in role), then the permission of the document type (§16.2): the type is checked again here, the read goes through the caller's own row-level security (or the invoice print door), and every open is audited
 export async function GET(
-  _request: Request,
+  request: Request,
   ctx: { params: Promise<{ kind: string; id: string }> },
 ): Promise<Response> {
   const notFound = () => new Response('Not found', { status: 404 });
@@ -30,6 +32,16 @@ export async function GET(
   const { kind, id } = await ctx.params;
   if (!isDocumentKind(kind) || !mayOpen(allowed.user.role, kind)) return notFound();
   const user = allowed.user;
+  // F08: `?copy=<request id>` is the delivery of a client copy. It needs an approved request of the caller for this very document,
+  // consumed here (single use, 24 hours). Without it, this is the internal view/print, which is unchanged. A client copy of a
+  // document type that has no request kind (a supplier file) does not exist.
+  const copyId = new URL(request.url).searchParams.get('copy');
+  const gate = async (docKind: keyof typeof COPY_REQUEST_KIND, number: string): Promise<boolean> =>
+    copyId === null ||
+    (await consumeDocumentCopy(pool, user, { requestId: copyId, kind: docKind, docRef: number }).catch(
+      () => false,
+    ));
+  if (copyId !== null && !(kind in COPY_REQUEST_KIND)) return notFound();
   switch (kind) {
     case 'invoice': {
       const printed = ['office_sales', 'office'].includes(user.role);
@@ -37,27 +49,31 @@ export async function GET(
         ? await getInvoiceForPrint(pool, user, id)
         : await getInvoiceDocument(pool, user, id);
       if (!doc) return notFound();
-      await recordLibraryOpen(pool, user, `invoice:${doc.invoice.number}`);
+      if (!(await gate('invoice', doc.invoice.number))) return notFound();
+      await recordLibraryOpen(pool, user, `${copyId ? 'copy:' : ''}invoice:${doc.invoice.number}`);
       return pdfResponse(invoicePdf(doc, await pdfContext(user)), doc.invoice.number);
     }
     case 'avoir': {
       const avoir = (await listAvoirs(pool, user)).find((a) => a.id === id);
       if (!avoir) return notFound();
-      await recordLibraryOpen(pool, user, `avoir:${avoir.number}`);
+      if (!(await gate('avoir', avoir.number))) return notFound();
+      await recordLibraryOpen(pool, user, `${copyId ? 'copy:' : ''}avoir:${avoir.number}`);
       return pdfResponse(avoirPdf(avoir, await pdfContext(user)), avoir.number);
     }
     case 'quote': {
       const quote = await getQuote(pool, user, id);
       if (!quote) return notFound();
-      await recordLibraryOpen(pool, user, `quote:${quote.code}`);
+      if (!(await gate('quote', quote.code))) return notFound();
+      await recordLibraryOpen(pool, user, `${copyId ? 'copy:' : ''}quote:${quote.code}`);
       return pdfResponse(quotePdf(quote, await pdfContext(user)), quote.code);
     }
     case 'bl': {
       const note = await getDeliveryNote(pool, user, id);
       if (!note) return notFound();
+      if (!(await gate('bl', note.blNo))) return notFound();
       const { company, specimen } = await pdfContext(user);
       const mentions = company ? legalMentions({ ...company, rib: null }) : [];
-      await recordLibraryOpen(pool, user, `bl:${note.blNo}`);
+      await recordLibraryOpen(pool, user, `${copyId ? 'copy:' : ''}bl:${note.blNo}`);
       return pdfResponse(deliveryNotePdf(note, { specimen, company: mentions }), `BL-${note.blNo}`);
     }
     case 'supplier_invoice_file': {

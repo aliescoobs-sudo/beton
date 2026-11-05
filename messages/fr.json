@@ -2829,6 +2829,7 @@
     "docRef": "Numéro du document",
     "send": "Demander",
     "release": "Libérer",
+    "download": "Télécharger la copie",
     "pending": "À approuver",
     "approve": "Approuver",
     "deny": "Refuser",
@@ -2836,7 +2837,8 @@
       "pending": "en attente",
       "approved": "approuvé",
       "denied": "refusé",
-      "used": "remis"
+      "used": "remis",
+      "expired": "expiré"
     },
     "errors": {
       "FORBIDDEN": "Non autorisé.",

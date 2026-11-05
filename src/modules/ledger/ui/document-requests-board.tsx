@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { Button } from '@/ui';
 import type { MyDocumentRequest, PendingDocumentRequest } from '../service/document-request-service';
@@ -35,6 +35,7 @@ export function DocumentRequestsBoard({
   };
 }) {
   const t = useTranslations('documentRequests');
+  const locale = useLocale();
   const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
   const finish = (r: Result) => {
@@ -139,15 +140,25 @@ export function DocumentRequestsBoard({
               <li key={r.id} data-testid={`mine-${r.id}`}>
                 {t(`kind.${r.kind}` as never)} · {r.partyCode} {r.docRef ?? ''} ·{' '}
                 {t(`status.${r.status}` as never)}
-                {r.status === 'approved' && (
-                  <button
-                    type="button"
-                    className="ml-2 underline"
-                    onClick={async () => finish(await actions.use(r.id))}
-                  >
-                    {t('release')}
-                  </button>
-                )}
+                {r.status === 'approved' &&
+                  (r.kind === 'releve' || r.kind === 'supplier_statement' ? (
+                    <button
+                      type="button"
+                      className="ml-2 underline"
+                      onClick={async () => finish(await actions.use(r.id))}
+                    >
+                      {t('release')}
+                    </button>
+                  ) : (
+                    // F08: a document copy goes out by its download, which consumes the approval (once, 24 hours).
+                    <a
+                      className="ml-2 underline"
+                      href={`/${locale}/documents/copy/${r.id}`}
+                      data-testid={`download-${r.id}`}
+                    >
+                      {t('download')}
+                    </a>
+                  ))}
               </li>
             ))}
           </ul>

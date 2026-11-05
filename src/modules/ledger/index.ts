@@ -110,6 +110,8 @@ export {
   setInvoiceSequence,
   setInvoiceTiming,
   releaseDocumentRequest,
+  consumeDocumentCopy,
+  COPY_REQUEST_KIND,
 } from './service/document-request-service';
 export {
   getInvoiceForPrint,

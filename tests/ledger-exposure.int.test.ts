@@ -84,6 +84,7 @@ describe('functions the application role can execute', () => {
     'public.set_invoice_sequence(p_year integer, p_last integer)',
     'public.set_invoice_timing(p_timing text)',
     'public.use_document_request(p_id uuid)',
+    'public.consume_document_copy(p_id uuid, p_kind text, p_doc_ref text)',
     'public.cancel_unproduced_order(p_order uuid, p_reason text, p_today date)',
     'public.cancellation_trip_stage(p_trip uuid)',
     'public.concrete_strength(p_code text)',

@@ -11,7 +11,10 @@ import {
   setInvoiceSequence,
   setInvoiceTiming,
   releaseDocumentRequest,
+  consumeDocumentCopy,
+  createQuote,
 } from '../src/modules/ledger';
+import { createConcreteType, createListPrice } from '../src/modules/master-data';
 import { listMyNotifications } from '../src/modules/platform-security';
 import type { SessionUser } from '../src/modules/platform-security/auth/session-gate';
 import { testEnv } from './db-env';
@@ -105,7 +108,7 @@ describe('the gate for documents a client asks for', () => {
     expect(await refused(ask('accountant', { docRef: 'FA-2026-99999' }))).toBe(true);
   });
   it('only the owner and app_admin decide; approval releases once, to the requester only', async () => {
-    const r = await ask('office_sales');
+    const r = await ask('office_sales', { kind: 'releve', docRef: null });
     if (!r.ok) throw new Error(r.error);
     expect(
       await refused(decideDocumentRequest(app, u.office_sales!, { id: r.value.id, approve: true })),
@@ -121,8 +124,16 @@ describe('the gate for documents a client asks for', () => {
     // not the requester: nothing
     expect(await refused(releaseDocumentRequest(app, u.accountant!, r.value.id))).toBe(true);
     const used = await releaseDocumentRequest(app, u.office_sales!, r.value.id);
-    expect(used).toMatchObject({ ok: true, value: { kind: 'invoice_copy', partyCode: clientCode } });
+    expect(used).toMatchObject({ ok: true, value: { kind: 'releve', partyCode: clientCode } });
     expect(await refused(releaseDocumentRequest(app, u.office_sales!, r.value.id))).toBe(true);
+  });
+  it('a document copy cannot be released by marking it used: only its download consumes the approval (F08)', async () => {
+    const r = await ask('office_sales');
+    if (!r.ok) throw new Error(r.error);
+    expect((await decideDocumentRequest(app, u.owner!, { id: r.value.id, approve: true })).ok).toBe(true);
+    expect(await refused(releaseDocumentRequest(app, u.office_sales!, r.value.id))).toBe(true);
+    const mine = await listMyDocumentRequests(app, u.office_sales!);
+    expect(mine.find((m) => m.id === r.value.id)?.status).toBe('approved');
   });
   it('a denied request releases nothing', async () => {
     const r = await ask('office_sales');
@@ -149,5 +160,107 @@ describe('invoice timing and numbering', () => {
     expect(next.rows[0]?.n).toBe(`FA-${year}-01205`);
     expect(await refused(setInvoiceSequence(app, u.owner!, { year, last: 1100 }))).toBe(true);
     expect(await refused(setInvoiceSequence(app, u.accountant!, { year, last: 5000 }))).toBe(true);
+  });
+});
+
+describe('the client copy is tied to its download (F08)', () => {
+  const owner = () => ({ userId: u.owner!.id, role: 'owner' as const, requestId: marker });
+  let quoteCode = '';
+  let otherClientCode = '';
+  beforeAll(async () => {
+    const type = await createConcreteType(app, u.owner!, {
+      code: `D${marker.slice(2, 8)}`,
+      label: 'Béton copie',
+    });
+    if (!type.ok) throw new Error(type.error);
+    const list = await createListPrice(app, u.owner!, {
+      concreteTypeId: type.value.id,
+      priceHtPerM3Centimes: 70_000,
+      effectiveFrom: '2026-01-01',
+    });
+    if (!list.ok) throw new Error(list.error);
+    const clientId = (
+      await withRlsContext(app, owner(), (tx) =>
+        tx.query<{ id: string }>('select id from client where code = $1', [clientCode]),
+      )
+    ).rows[0]!.id;
+    const q = await createQuote(
+      app,
+      u.owner!,
+      { clientId, concreteTypeId: type.value.id, volumeL: 5_000 },
+      { today: '2026-06-01' },
+    );
+    if (!q.ok) throw new Error(q.error);
+    quoteCode = q.value.code;
+    otherClientCode = (
+      await withRlsContext(app, owner(), (tx) =>
+        tx.query<{ code: string }>(
+          `insert into client (id, code, name, kind) values (gen_random_uuid(), public.next_code('CLT', 3), $1, 'person') returning code`,
+          [`dvo${marker}`],
+        ),
+      )
+    ).rows[0]!.code;
+  });
+  const approved = async (extra: Record<string, unknown> = {}) => {
+    const r = await ask('office_sales', { kind: 'quote_copy', docRef: quoteCode, ...extra });
+    if (!r.ok) throw new Error(r.error);
+    const d = await decideDocumentRequest(app, u.owner!, { id: r.value.id, approve: true });
+    if (!d.ok) throw new Error(d.error);
+    return r.value.id;
+  };
+  const take = (who: string, id: string, kind = 'quote' as const, docRef = quoteCode) =>
+    consumeDocumentCopy(app, u[who]!, { requestId: id, kind, docRef });
+
+  it('an approved request releases its own document once, then never again', async () => {
+    const id = await approved();
+    expect(await take('office_sales', id)).toBe(true);
+    expect(await take('office_sales', id)).toBe(false);
+    expect((await listMyDocumentRequests(app, u.office_sales!)).find((m) => m.id === id)?.status).toBe(
+      'used',
+    );
+  });
+  it('two downloads at the same moment release it once', async () => {
+    const id = await approved();
+    const results = await Promise.all([
+      take('office_sales', id),
+      take('office_sales', id),
+      take('office_sales', id),
+    ]);
+    expect(results.filter(Boolean)).toHaveLength(1);
+  });
+  it('a pending or denied request releases nothing', async () => {
+    const r = await ask('accountant', { kind: 'quote_copy', docRef: quoteCode });
+    if (!r.ok) throw new Error(r.error);
+    expect(await take('accountant', r.value.id)).toBe(false); // still pending
+    expect((await decideDocumentRequest(app, u.owner!, { id: r.value.id, approve: false })).ok).toBe(true);
+    expect(await take('accountant', r.value.id)).toBe(false); // denied
+  });
+  it('only the requester, only for the approved document, kind and client', async () => {
+    const id = await approved();
+    expect(await take('accountant', id)).toBe(false); // not the requester
+    expect(await take('office_sales', id, 'quote', 'DV-2026-99999')).toBe(false); // another document
+    expect(await take('office_sales', id, 'avoir' as never)).toBe(false); // another kind
+    expect(await take('office_sales', id)).toBe(true); // still intact after the refusals
+    const wrongClient = await approved({ partyCode: otherClientCode });
+    expect(await take('office_sales', wrongClient)).toBe(false); // the quote is not that client's
+  });
+  it('an approval expires after 24 hours', async () => {
+    const id = await approved();
+    const c = new pg.Client({ connectionString: env.DATABASE_URL_MIGRATOR });
+    await c.connect();
+    try {
+      await c.query(`select set_config('app.user_id', $1, false), set_config('app.role', 'owner', false)`, [
+        u.owner!.id,
+      ]);
+      await c.query(`update document_request set decided_at = now() - interval '25 hours' where id = $1`, [
+        id,
+      ]);
+    } finally {
+      await c.end();
+    }
+    expect(await take('office_sales', id)).toBe(false);
+    expect((await listMyDocumentRequests(app, u.office_sales!)).find((m) => m.id === id)?.status).toBe(
+      'expired',
+    );
   });
 });

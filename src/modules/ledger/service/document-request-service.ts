@@ -26,7 +26,7 @@ export interface MyDocumentRequest {
   partyKind: 'client' | 'supplier';
   partyCode: string;
   docRef: string | null;
-  status: 'pending' | 'approved' | 'denied' | 'used';
+  status: 'pending' | 'approved' | 'denied' | 'used' | 'expired';
   createdAt: string;
 }
 export interface PendingDocumentRequest {
@@ -140,7 +140,41 @@ export async function decideDocumentRequest(
   }
 }
 
-/** The release of an approved document to the requester, once. */
+/** The kind of request that lets a client copy of each document type go out (F08). */
+export const COPY_REQUEST_KIND = {
+  invoice: 'invoice_copy',
+  avoir: 'avoir_copy',
+  quote: 'quote_copy',
+  bl: 'bl_copy',
+} as const;
+
+/**
+ * F08: the download of a client copy. Checks and consumes, in one statement under a row lock, an approved request that is the
+ * caller's own, for this kind and this document number, for a document of the requested client, at most 24 hours old, once.
+ */
+export async function consumeDocumentCopy(
+  appPool: pg.Pool,
+  actor: SessionUser,
+  input: { requestId: string; kind: keyof typeof COPY_REQUEST_KIND; docRef: string },
+): Promise<boolean> {
+  await require(appPool, actor, 'documents.request');
+  if (!z.uuid().safeParse(input.requestId).success) return false;
+  try {
+    await inRequest(appPool, actor, (tx) =>
+      tx.query('select public.consume_document_copy($1, $2, $3)', [
+        input.requestId,
+        COPY_REQUEST_KIND[input.kind],
+        input.docRef,
+      ]),
+    );
+    return true;
+  } catch (error) {
+    if ((error as { code?: string }).code === '42501') return false;
+    throw error;
+  }
+}
+
+/** The release of an approved statement (relevé) to the requester, once. A document copy goes out by its download only. */
 export async function releaseDocumentRequest(
   appPool: pg.Pool,
   actor: SessionUser,
