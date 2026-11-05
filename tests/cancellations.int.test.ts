@@ -71,6 +71,22 @@ beforeAll(async () => {
 const newOrder = () =>
   asOwner((tx) => insertOrder(tx, u.owner!.id, { ...master, clientId: scene.clientId }, DAY));
 
+/** An order of the client whose delivery site has a sealed address (§16.10: the redirect carries it to the driver). */
+async function newOrderAtSite(address: string | null) {
+  const cipher = fieldCipherFrom(parseKeyring(env.FIELD_ENCRYPTION_KEYS));
+  return asOwner(async (tx) => {
+    const site = await tx.query<{ id: string }>(
+      `insert into client_site (id, client_id, label, address_enc) values (gen_random_uuid(), $1, $2, $3) returning id`,
+      [
+        scene.clientId,
+        `Chantier ${marker} ${Math.random().toString(36).slice(2, 8)}`,
+        address ? cipher.seal(address) : null,
+      ],
+    );
+    return insertOrder(tx, u.owner!.id, { ...master, clientId: scene.clientId }, DAY, site.rows[0]!.id);
+  });
+}
+
 /** A rotation of an order, taken as far as `upTo` ('planned' none, 'loaded', 'departed', 'unloading_started'). */
 async function newTrip(
   orderId: string,
@@ -198,7 +214,7 @@ describe('cases 3 to 5: concrete is made, redirect or loss', () => {
   });
   it('case 3: a same-day order of the same type is proposed; redirect is decided by the owner, the BL is marked annulé and kept', async () => {
     const o = await newOrder();
-    const target = await newOrder();
+    const target = await newOrderAtSite('Site cible, Tétouan');
     const { tripId, deliveryId } = await newTrip(o.id, 'loaded');
     const opened = await openTripCase(app, u.office_sales!, { tripId, caseNo: 3 }, { now: NOW });
     if (!opened.ok) throw new Error(opened.error);
@@ -541,5 +557,91 @@ describe('case 5 bills the m\u00b3 actually unloaded (C3, REQUIREMENTS-V1 \u00a7
     expect(rows.find((d) => d.deliveryId === plain.deliveryId)?.volumeL).toBe(8000);
     // the office never sees an amount in the queue
     expect(JSON.stringify(rows)).not.toMatch(/centimes|price|amount/i);
+  });
+});
+
+describe('a redirect carries the destination address to the driver (§16.10)', () => {
+  const driverOf = async () => {
+    const drvUser = await realSessionUser(env.DATABASE_URL_MIGRATOR, 'driver');
+    const driverId = await asOwner(async (tx) => {
+      const d = await tx.query<{ id: string }>(
+        `insert into driver (id, code, name, created_by, user_id) values (gen_random_uuid(), $1, $2, $3, $4) returning id`,
+        [`CH-${5000 + Math.floor(Math.random() * 4000)}`, `ra${marker}`, u.owner!.id, drvUser.id],
+      );
+      return d.rows[0]!.id;
+    });
+    return { drvUser, driverId };
+  };
+  const today = new Date().toISOString().slice(0, 10);
+
+  it("with no typed address, the destination order's own site address is what the driver gets", async () => {
+    const cipher = fieldCipherFrom(parseKeyring(env.FIELD_ENCRYPTION_KEYS));
+    const { drvUser, driverId } = await driverOf();
+    const o = await newOrder();
+    const target = await newOrderAtSite('Chantier Destination 7, Martil');
+    const { tripId } = await newTrip(o.id, 'departed', driverId, scene.truckId, today);
+    const opened = await openTripCase(app, u.owner!, { tripId, caseNo: 4 }, { now: NOW });
+    if (!opened.ok) throw new Error(opened.error);
+    const decided = await decideCancellation(
+      app,
+      u.owner!,
+      { caseId: opened.value.id, decision: 'redirect', redirectOrderId: target.id },
+      { now: NOW },
+    );
+    if (!decided.ok) throw new Error(decided.error);
+    const day = await getDriverDay(app, drvUser, today, cipher);
+    expect(day.instructions.find((i) => i.id === opened.value.id)).toMatchObject({
+      kind: 'redirect',
+      address: 'Chantier Destination 7, Martil',
+      acknowledgedAt: null,
+    });
+  });
+
+  it("an address typed by the deciding person wins over the site's", async () => {
+    const cipher = fieldCipherFrom(parseKeyring(env.FIELD_ENCRYPTION_KEYS));
+    const { drvUser, driverId } = await driverOf();
+    const o = await newOrder();
+    const target = await newOrderAtSite('Adresse du site, Tétouan');
+    const { tripId } = await newTrip(o.id, 'departed', driverId, scene.truckId, today);
+    const opened = await openTripCase(app, u.owner!, { tripId, caseNo: 4 }, { now: NOW });
+    if (!opened.ok) throw new Error(opened.error);
+    const decided = await decideCancellation(
+      app,
+      u.owner!,
+      {
+        caseId: opened.value.id,
+        decision: 'redirect',
+        redirectOrderId: target.id,
+        addressEnc: cipher.seal('Entrée côté route, Tétouan') ?? undefined,
+      },
+      { now: NOW },
+    );
+    if (!decided.ok) throw new Error(decided.error);
+    const day = await getDriverDay(app, drvUser, today, cipher);
+    expect(day.instructions.find((i) => i.id === opened.value.id)?.address).toBe(
+      'Entrée côté route, Tétouan',
+    );
+  });
+
+  it('a redirect that would reach the driver with no address at all is refused, and the case stays open', async () => {
+    const o = await newOrder();
+    const bare = await newOrderAtSite(null);
+    const { tripId } = await newTrip(o.id, 'departed', null, scene.truckId, today);
+    const opened = await openTripCase(app, u.owner!, { tripId, caseNo: 4 }, { now: NOW });
+    if (!opened.ok) throw new Error(opened.error);
+    expect(
+      await refused(
+        decideCancellation(
+          app,
+          u.owner!,
+          { caseId: opened.value.id, decision: 'redirect', redirectOrderId: bare.id },
+          { now: NOW },
+        ),
+      ),
+    ).toBe(true);
+    const row = await asOwner((tx) =>
+      tx.query<{ status: string }>('select status from cancellation_case where id = $1', [opened.value.id]),
+    );
+    expect(row.rows[0]?.status).toBe('open');
   });
 });

@@ -53,14 +53,16 @@ export async function insertOrder(
   master: OrderMaster,
   /** The delivery date (default 2026-06-02); the order date stays 2026-06-01. */
   deliveryDate = '2026-06-02',
+  /** The delivery site of the order, when the test needs one. */
+  siteId: string | null = null,
 ): Promise<{ id: string; code: string }> {
   const id = randomUUID();
   const code = (await tx.query<{ n: string }>(`select public.next_doc_number('CMD', 2026, 5) as n`)).rows[0]
     ?.n as string;
   await tx.query(
     `insert into sales_order (id, code, client_id, concrete_type_id, volume_l, order_date, delivery_date, selling_price_id,
-                              unit_price_ht_centimes, vat_rate_bp, total_ht_centimes, total_vat_centimes, total_ttc_centimes, created_by)
-     values ($1, $2, $3, $4, 10000, '2026-06-01', $8, $5, $6, 2000, 780000, 156000, 936000, $7)`,
+                              unit_price_ht_centimes, vat_rate_bp, total_ht_centimes, total_vat_centimes, total_ttc_centimes, created_by, site_id)
+     values ($1, $2, $3, $4, 10000, '2026-06-01', $8, $5, $6, 2000, 780000, 156000, 936000, $7, $9)`,
     [
       id,
       code,
@@ -70,6 +72,7 @@ export async function insertOrder(
       master.unitPriceCentimes,
       actorId,
       deliveryDate,
+      siteId,
     ],
   );
   await tx.query(
