@@ -99,6 +99,12 @@ CREATE POLICY trip_dispatch_change_read ON public.trip_dispatch_change FOR SELEC
   ctx.actor_role() IN ('owner', 'app_admin') OR (ctx.actor_role() = 'plant_manager' AND plant_id IS NOT NULL AND plant_id = ctx.plant_scope()));
 --> statement-breakpoint
 
+-- The audit trail must not be a side door to the same data: the audit rows of the delays and of the changes made because of them (they name
+-- drivers) are read by the owner and app_admin only, whatever the other audit policies allow (partner, office, plant managers, support).
+CREATE POLICY audit_event_trip_performance ON public.audit_event AS RESTRICTIVE FOR SELECT TO belgobeton_app
+  USING (table_name NOT IN ('trip_delay', 'trip_dispatch_change') OR ctx.actor_role() IN ('owner', 'app_admin'));
+--> statement-breakpoint
+
 -- The planned instant of a plan minute: the trip's day at midnight Casablanca plus the minutes (they may pass 1440).
 CREATE FUNCTION public._plan_time(p_date date, p_min integer) RETURNS timestamptz LANGUAGE sql IMMUTABLE SET search_path = '' AS $$
   SELECT (p_date::timestamp + make_interval(mins => p_min)) AT TIME ZONE 'Africa/Casablanca'

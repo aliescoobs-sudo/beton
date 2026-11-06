@@ -322,6 +322,22 @@ describe('who can read the delays (enforced by row-level security)', () => {
     for (const u of [accountant, sales, purchases, partner, support])
       expect(await countAs(u), u.role).toBe(0);
   });
+  it('the audit trail is no side door: its rows about the delays are read by the owner and app_admin only', async () => {
+    const n = async (u: SessionUser) =>
+      Number(
+        (
+          await asRole(u, (tx) =>
+            tx.query<{ n: string }>(
+              `select count(*)::text as n from audit_event where table_name in ('trip_delay', 'trip_dispatch_change')`,
+            ),
+          )
+        ).rows[0]!.n,
+      );
+    expect(await n(owner)).toBeGreaterThan(0);
+    expect(await n(appAdmin)).toBeGreaterThan(0);
+    for (const u of [partner, support, accountant, sales, purchases, pmA, pmB, driver1])
+      expect(await n(u), u.role).toBe(0);
+  });
   it('the timing door refuses those roles outright', async () => {
     for (const u of [accountant, sales, purchases, partner, support])
       await expect(getTimingBoard(app, u, DAY, NOW_MS), u.role).rejects.toThrow(/may not read the timing/);

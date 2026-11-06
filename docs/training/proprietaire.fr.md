@@ -5,6 +5,7 @@ Données **fictives**. Compte à utiliser : « Propriétaire » (proprietaire@fo
 ## À essayer
 1. **Tableau de bord** : l'accueil montre l'activité du jour (commandes, rotations, alertes de stock, encaissements).
 2. **Décisions** : *Approbations* et *Annulations* : traite les demandes en attente (une confirmation d'authentification fraîche peut être demandée dans la version réelle).
-3. **Les deux centrales** : tu vois Tétouan et Chefchaouen ; compare leurs commandes du jour.
+3. **Retards** : *Répartition* montre pour les deux centrales le suivi des rotations (statut, retour recalculé, rotation suivante touchée) et les statistiques de retard par étape, route, chauffeur et jour. Ce sont des données de performance sur des personnes : lis-les comme une information, pas comme une note.
+4. **Les deux centrales** : tu vois Tétouan et Chefchaouen ; compare leurs commandes du jour.
 
 Captures : `docs/training/screens/proprietaire-*.png` (jeu de données fictif).

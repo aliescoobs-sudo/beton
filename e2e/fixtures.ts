@@ -37,6 +37,8 @@ export const E2E_OWNER = { email: 'e2e-owner@belgobeton.test', name: 'Propriéta
 export const E2E_PLANT = { email: 'e2e-plant@belgobeton.test', name: 'Centrale E2E' } as const;
 /** master-data specs: a partner per locale (edit) and an office user (read-only), each enrolled once by its spec. */
 export const E2E_MD = {
+  // T5 trip-timing spec: a plant manager (bound to a plant by the spec), enrolled once
+  timingManager: { email: 'e2e-timing-manager@belgobeton.test', name: 'Chef de centrale Timing' },
   partnerFr: { email: 'e2e-md-partner-fr@belgobeton.test', name: 'Associé MD' },
   partnerAr: { email: 'e2e-md-partner-ar@belgobeton.test', name: 'شريك البيانات' },
   office: { email: 'e2e-md-office@belgobeton.test', name: 'Bureau MD' },

@@ -175,6 +175,8 @@ async function main() {
           await page.goto(`${BASE}${url}`);
           await page.waitForLoadState('networkidle').catch(() => undefined);
           await page.screenshot({ path: `${OUT}/${shot.key}-${name}.png` });
+          if (name === 'dispatch' && (await page.getByTestId('timing-board').count()))
+            await page.getByTestId('timing-board').screenshot({ path: `${OUT}/${shot.key}-timing.png` });
         }
         await ctx.close();
       }
@@ -183,7 +185,8 @@ async function main() {
         ['chauffeur', (c: Cred) => /^Chauffeur/.test(c.label)],
         ['pompiste', (c: Cred) => /^Pompiste/.test(c.label)],
       ] as const) {
-        const cred = creds.find(test);
+        // the last driver is the one whose rotation is already on the road, so the late banner is on his screen
+        const cred = creds.filter(test).at(-1);
         if (!cred) throw new Error(`no account for ${key}`);
         const ctx = await browser.newContext(phone);
         const page = await ctx.newPage();

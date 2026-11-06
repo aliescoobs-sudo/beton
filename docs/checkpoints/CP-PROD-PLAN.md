@@ -269,3 +269,15 @@ Spec: the review. One commit per finding, on top of the T2 commits. Decision 177
 - [x] **T5.3** push button absent in training (already so in code; pinned by e2e).
 Not done in phase 1: a credit-limit client for office_sales, owner decision items beyond what the pilot data already holds; cards not walked through by a person.
 
+### T5 phase 2: dispatch and timing (decision 179)
+- [x] **a** stages: the existing six (+ the driver's `loading_started`); none added.
+- [x] **b** estimates per plant + zone + stage (median of the last 10 completed, at least 5; else audited override; else plan defaults); override by plant manager (own plant), owner, app_admin.
+- [x] **c** schedule/projection/slip: `src/modules/operations/domain/trip-timing.ts` (pure), 21 unit tests: skipped stage, offline tap, midnight crossing, negative delay, DST-safe midnight.
+- [x] **d** recording: `trip_delay` (planned, phone time, server time, stage and cumulative delay, reason), append-only, audited.
+- [x] **e** alerts none / watch / critical (in-app only), driver banner, board, reassign and postpone with reason (audited); no client message, no automatic assignment.
+- [x] **f** views: driver list with planned times and own status and no prices; plant board by truck; owner and app_admin both plants plus statistics by stage, route, driver, day.
+- [x] **g** privacy in RLS, doors and the audit trail (integration test: eight roles).
+- [x] **h** seed: late rotation, history delays for 49 completed rotations, override.
+- [x] **i** tests: unit (21), integration `tests/trip-timing.int.test.ts` (17), seed tests (3 added), e2e `e2e/trip-timing.spec.ts` (late tap -> critical on the plant board -> reassign -> driver's list changes).
+Not done: live refresh of the board (reload to refresh); the reason can only be chosen before the tap; no alert history screen; Chefchaouen has no driver accounts.
+

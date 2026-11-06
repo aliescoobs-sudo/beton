@@ -1,4 +1,18 @@
-import { minuteOfDay } from './trip-times';
+// Imported from the clock's own leaf file, not its index: this file is also used by client components, which must not pull the server.
+import { BUSINESS_TIME_ZONE } from '@/modules/clock/domain/business-date';
+
+const PARTS = new Intl.DateTimeFormat('en-GB', {
+  timeZone: BUSINESS_TIME_ZONE,
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+});
+/** Minutes from midnight (Casablanca) of an instant. */
+function minuteOfDay(iso: string): number {
+  const parts = PARTS.formatToParts(new Date(iso));
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+  return get('hour') * 60 + get('minute');
+}
 
 // Stage timing of the rotations (T5 phase 2). Pure and deterministic: no clock, no database, no model. A rotation has a planned timeline
 // (the plan's minutes from midnight Casablanca); every driver tap is compared with it; the rest of the rotation is PROJECTED from the last
