@@ -55,7 +55,7 @@ tu vois la bannière rouge « Version de formation — données fictives ».
 **8. Donner à chacun SON compte (jamais la liste entière)**
 `./scripts/training/show-accounts.sh` affiche seulement les **noms** des comptes, sans secret.
 ✅ Une liste : propriétaire, administrateur, bureau ventes/achats, deux chefs de centrale, comptable, trois chauffeurs et un pompiste.
-Pour un stagiaire : `./scripts/training/show-accounts.sh chauffeur` (ou le nom ou le code de la personne) affiche **son bloc seulement**. Donne-le **en main propre**, puis efface l'écran
+Pour un stagiaire : `./scripts/training/show-accounts.sh CH-02` (le **code exact** du chauffeur ; pour un compte e-mail, son **identifiant exact**, par exemple `comptable`) affiche **son bloc seulement**. Un mot générique (`chauffeur`, le domaine `formation.beton.invalid`) est **refusé sans rien afficher** : il désignerait plusieurs personnes. Vérifie qu'un seul bloc s'affiche. Donne-le **en main propre**, puis efface l'écran
 **et son historique** (touches ⌘K). Pas de capture d'écran, pas de message, pas d'enregistrement du Terminal (`script`), pas de redirection vers un fichier. Les comptes e-mail n'ont **pas**
 de code d'authentification : le mot de passe suffit (seulement dans cette version). **Exception : la finance.** Le propriétaire, l'administrateur et le comptable qui veulent essayer la finance
 activent une vraie application d'authentification (lien dans la bannière rouge) : la finance n'accepte jamais le mot de passe seul.

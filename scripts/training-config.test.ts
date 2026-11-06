@@ -379,9 +379,38 @@ describe('scripts/training/show-accounts.sh (R11-10)', () => {
     expect(r.stdout).not.toMatch(/111222|PWD-OWNER/);
     expect(run('proprietaire').stdout).toContain('PWD-OWNER-AAAA');
     expect(run('proprietaire').stdout).not.toContain('333444');
+    expect(run('Chauffeur 2').stdout).toContain('333444'); // the whole name is exact too
+    expect(run('proprietaire@formation.beton.invalid').stdout).toContain('PWD-OWNER-AAAA');
+  });
+  it('R12-06: a generic word, the shared domain or a part of a code prints NO secret and says why', () => {
+    for (const generic of [
+      'chauffeur',
+      'formation.beton.invalid',
+      'beton',
+      'driver',
+      'ch',
+      'CH-0',
+      'e-mail',
+      'code',
+    ]) {
+      const r = run(generic);
+      expect(r.status, generic).not.toBe(0);
+      expect(r.stdout, generic).toBe('');
+      expect(r.stdout + r.stderr, generic).not.toMatch(/PWD-OWNER|111222|333444/);
+    }
+    const ambiguous = run('chauffeur');
+    expect(ambiguous.stderr).toMatch(/part of 2 of them/);
+    expect(ambiguous.stderr).toContain('Chauffeur 1 (driver)'); // names only, to help choose
+  });
+  it('R12-06: the secret text is never matched', () => {
+    expect(run('111222').status).toBe(1);
+    expect(run('PWD-OWNER-AAAA').status).toBe(1);
+    expect(run('pin').status).toBe(1);
+    expect(run('mot de passe').status).toBe(1);
   });
   it('refuses an unknown name and an unknown option; everything needs --all and says so', () => {
     expect(run('nobody').status).toBe(1);
+    expect(run('nobody').stderr).toMatch(/no account/);
     expect(run('--nope').status).toBe(2);
     const all = run('--all');
     expect(all.stdout).toMatch(/PWD-OWNER-AAAA[\s\S]*111222[\s\S]*333444/);

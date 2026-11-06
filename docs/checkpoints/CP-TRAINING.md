@@ -15,7 +15,7 @@ the final review (`docs/reviews/CODEX-REVIEW-FINAL.md`) still stands for real da
   orders in every state, cheques and payments, invoices, rotations, receipts, transfers (the pilot scenario dated from today, plus data for both plants).
 - **Accounts.** One per role (owner, app_admin, office_sales, office_purchases, two plant managers, accountant, three drivers, one pump operator). Random
   passwords and 6-digit PINs are written **once** to `/app/out/training-accounts.local.txt` inside a Docker volume (`accounts`, folder mode 0700 owned by the container user, no folder of the checkout; file mode 0600, created exclusively then renamed, name covered by the ignore rules of git and of the image; the seed stops without marking the database if it cannot be written) and never printed or logged.
-  Read them one trainee at a time with `./scripts/training/show-accounts.sh <name>` (no argument lists the names only).
+  Read them one trainee at a time with `./scripts/training/show-accounts.sh <exact login or code>` (no argument lists the names only; zero or several matches are refused).
 - **Sign-in.** The accounts on the reserved address `…@formation.beton.invalid` work with their **password alone** (no authenticator), only while training
   mode is on. Everything else is unchanged: roles and permissions, row-level security, the audit log, money visibility, the **rate limiting and the login
   lockout stay on** (the instance is on the internet). Drivers and the pump operator sign in on the phone with their code and PIN (five wrong PINs lock them 15 minutes, attempts are serialised per driver, and the sign-in endpoint has a per-IP limit).
@@ -64,7 +64,7 @@ Nothing here is done for you, and no token or password is ever pasted anywhere b
    `ghcr.io/…/belgobeton@sha256:…` on stdout and the commit on stderr. `init-env.sh` then writes the two secret files (random secrets, mode 600, not printed).
 7. **Start it:** `./scripts/training-up.sh` (the first run takes a few minutes: image, database, roles, structure, training data). Open
    <http://127.0.0.1:3000/fr/login> on the iMac itself: the red training banner must show. Give each trainee only their own line:
-   `./scripts/training/show-accounts.sh` lists the account names (no secret), `./scripts/training/show-accounts.sh <name or login>` shows one block. Hand it over in
+   `./scripts/training/show-accounts.sh` lists the account names (no secret), `./scripts/training/show-accounts.sh <exact login or code>` (e.g. `CH-02`, `comptable`) shows one block; a generic word or the shared domain matches several accounts and is refused before anything secret is printed. Hand it over in
    person, then clear the screen and its history (Command-K). Never circulate the whole list: no screenshot, no message, no `script` or other terminal recording,
    no redirection of the output to a file (`--all` exists for the rare case you need everything, and says so).
 8. **Make it public with Tailscale Funnel: last, and in this order.**
