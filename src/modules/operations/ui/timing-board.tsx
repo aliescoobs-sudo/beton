@@ -334,6 +334,7 @@ function Estimates(props: TimingBoardProps) {
         </Select>
         <Input
           type="number"
+          dir="ltr"
           min={0}
           max={720}
           value={minutes}
