@@ -715,7 +715,7 @@ esac`,
     expect(calls(ctx)[0]).toBe('funnel reset');
   });
   it('R13-04: a reset that "succeeds" but leaves the Funnel on, or a status that cannot be read, is also unconfirmed', () => {
-    for (const env of [
+    for (const env of <Record<string, string>[]>[
       { STUB_RESET_NOOP: '1', STUB_INITIAL: UP('http://127.0.0.1:9999') },
       { STUB_STATUS_FAIL: '1' },
       { STUB_RESET_NOOP: '1', STUB_INITIAL: 'something I do not recognise' },
