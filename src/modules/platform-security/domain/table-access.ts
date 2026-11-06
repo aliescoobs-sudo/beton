@@ -322,6 +322,57 @@ export const TABLE_ACCESS = {
     exception:
       'R3 (DECISIONS 131): an order held for the credit limit or an overdue instalment. No amount. Written only by create_order and release_order_hold; the offices learn that an order waits through order_approval_state(), never from this table.',
   },
+  trip_delay: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'none',
+      office: 'none',
+      plant: 'none',
+      system: 'none',
+      anonymous: 'none',
+      support: 'none',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    exception:
+      'T5 (DECISIONS 179): the delay of each driver tap, performance data about a named driver. Written only by driver_report. Read by that driver, his plant manager (own plant), the owner and app_admin; partner, office, accountant, purchases and support read nothing. Append-only (trigger). No price.',
+  },
+  trip_estimate_override: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'none',
+      office: 'none',
+      plant: 'none',
+      system: 'none',
+      anonymous: 'none',
+      support: 'none',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    exception:
+      'T5 (DECISIONS 179): an override of the estimated duration of a stage for a plant and a zone, with its reason. Written only by set_trip_estimate (owner, app_admin, plant manager of the plant). Insert-only. No price.',
+  },
+  trip_dispatch_change: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'none',
+      office: 'none',
+      plant: 'none',
+      system: 'none',
+      anonymous: 'none',
+      support: 'none',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    exception:
+      'T5 (DECISIONS 179): a reassignment or a postponement of a rotation with its reason (it names drivers). Written only by log_dispatch_change. Read by the owner, app_admin and the plant manager of the plant. Append-only. No price.',
+  },
   trip_driver_report: {
     kind: 'rls',
     read: {

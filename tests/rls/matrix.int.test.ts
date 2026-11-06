@@ -311,6 +311,44 @@ const FIXTURES: Record<
       ),
     visible: `select created_by::text as owner from order_hold where note = $1`,
   },
+  trip_delay: {
+    // Written by driver_report (the driver of the rotation); the fixture writes the row as the definer would. The row is marked by its planned instant.
+    writers: ['owner'],
+    seed: (_tx, actor) =>
+      withRlsContext(migratorPool, { userId: actor, role: 'owner', requestId: marker }, (m) =>
+        m.query(
+          `insert into trip_delay (id, trip_id, driver_id, trip_date, step, planned_at, tapped_at, cumulative_delay_min, created_by)
+           values (gen_random_uuid(), $1, $2, current_date, 'back', $3, now(), 5, $4)`,
+          [preField.trip, preField.driver, markedAt(marker), actor],
+        ),
+      ),
+    visible: `select created_by::text as owner from trip_delay where planned_at = ${MARKED_SQL}`,
+  },
+  trip_estimate_override: {
+    // Written by set_trip_estimate; the fixture writes the row as the definer would, for any plant.
+    writers: ['owner'],
+    seed: (_tx, actor) =>
+      withRlsContext(migratorPool, { userId: actor, role: 'owner', requestId: marker }, (m) =>
+        m.query(
+          `insert into trip_estimate_override (id, plant_id, stage, minutes, reason, created_by)
+           values (gen_random_uuid(), (select id from plant order by created_at limit 1), 'to_site', 40, $1, $2)`,
+          [`${marker}:${actor}`, actor],
+        ),
+      ),
+    visible: `select split_part(reason, ':', 2) as owner from trip_estimate_override where reason like $1 || ':%'`,
+  },
+  trip_dispatch_change: {
+    // Written by log_dispatch_change; the fixture writes the row as the definer would, on a rotation of its own.
+    writers: ['owner'],
+    seed: (_tx, actor) =>
+      withRlsContext(migratorPool, { userId: actor, role: 'owner', requestId: marker }, (m) =>
+        m.query(
+          `insert into trip_dispatch_change (id, kind, old_trip_id, reason, created_by) values (gen_random_uuid(), 'postpone', $1, $2, $3)`,
+          [preField.trip, `${marker}:${actor}`, actor],
+        ),
+      ),
+    visible: `select split_part(reason, ':', 2) as owner from trip_dispatch_change where reason like $1 || ':%'`,
+  },
   trip_driver_report: {
     // Written by driver_report (the driver of the rotation); the fixture writes the row as the definer would, on a rotation of its own.
     writers: ['owner'],

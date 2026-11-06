@@ -105,7 +105,12 @@ describe('functions the application role can execute', () => {
     'public.driver_bl_photo_counts(p_date date)', // C3: the driver's own rotations only
     'public.driver_emergency(p_trip uuid, p_option text, p_pct integer, p_note text, p_key text, p_at timestamp with time zone)',
     'public.driver_instructions()',
-    'public.driver_report(p_trip uuid, p_step text, p_at timestamp with time zone, p_key text, p_volume_l integer)',
+    'public.driver_report(p_trip uuid, p_step text, p_at timestamp with time zone, p_key text, p_volume_l integer, p_reason text)', // T5: also records the delay of the tap (own rotation only, checked inside)
+    'public.log_dispatch_change(p_kind text, p_old uuid, p_new uuid, p_from_truck uuid, p_to_truck uuid, p_from_driver uuid, p_to_driver uuid, p_reason text)', // T5: owner, app_admin, plant manager of the plant (checked inside)
+    'public.set_trip_estimate(p_plant uuid, p_zone uuid, p_stage text, p_minutes integer, p_reason text)', // T5: owner, app_admin, plant manager of the plant (checked inside)
+    'public.timing_parameter(p_key text)', // T5: four plan parameters, for the driver, plant manager, owner and app_admin (checked inside)
+    'public.trip_stage_estimate(p_plant uuid, p_zone uuid, p_stage text)', // T5: the estimate of a stage, same roles (checked inside)
+    'public.trip_timing(p_date date)', // T5: the timing inputs of the rotations the caller may see (checked inside, scoped)
     'public.driver_trips(p_date date)',
     'public.emergencies_open()',
     'public.emergency_instruct(p_emergency uuid, p_kind text, p_address_enc text, p_map_url text, p_note text, p_join_trip uuid)',
