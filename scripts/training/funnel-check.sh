@@ -26,4 +26,9 @@ if [ "$(printf '%s\n' "$targets" | grep -c .)" != 1 ]; then
 elif [ -n "$port" ] && [ "$targets" != "http://127.0.0.1:$port" ]; then
   fail "the Funnel proxies to $targets, not to this app (http://127.0.0.1:$port, the port Docker really publishes). Something else may be on the internet: tailscale funnel reset"
 fi
+# R13-04: the COMPLETE configuration, not only the proxy URLs: any other entry (a TCP forward, a second host or path, a tailnet-only
+# service...) is a failure, whatever the proxy line says.
+if [ "$rc" = 0 ] && [ -n "$port" ]; then
+  tr_funnel_exactly_one_proxy "http://127.0.0.1:$port" || fail "the Funnel configuration is not exactly one HTTPS proxy to this app: something else may be served. Stop it now:  tailscale funnel reset"
+fi
 exit $rc
