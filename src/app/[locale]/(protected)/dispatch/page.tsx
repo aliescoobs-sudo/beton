@@ -2,7 +2,16 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { getRequestClock } from '@/app/request-clock';
 import { getPool } from '@/lib/db/pools';
 import { isRealDate } from '@/modules/ledger';
-import { getDispatchDay, listDrivers, listTruckDefaultDrivers } from '@/modules/operations';
+import {
+  getDelayStats,
+  getDispatchDay,
+  getTimingBoard,
+  listDrivers,
+  listTruckDefaultDrivers,
+  type DelayStats,
+  type TimingBoard,
+} from '@/modules/operations';
+import { TimingBoardPanel } from '@/modules/operations/ui/timing-board';
 import { DispatchBoard } from '@/modules/operations/ui/dispatch-board';
 import { DriverForm } from '@/modules/operations/ui/driver-form';
 import { formatM3 } from '@/modules/operations/ui/format';
@@ -13,7 +22,17 @@ const formatDate = (iso: string): string => iso.split('-').reverse().join('/');
 import { can } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/next';
 import { Button, EmptyState, Input, PageHeader, StatusPill, Table, Td, Th } from '@/ui';
-import { createDriverAction, saveDispatchAction, setTruckDefaultDriverAction } from './actions';
+import {
+  createDriverAction,
+  postponeTripAction,
+  reassignTripAction,
+  saveDispatchAction,
+  setTripEstimateAction,
+  setTruckDefaultDriverAction,
+} from './actions';
+
+const addDays = (iso: string, n: number) =>
+  new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 
 /** The day's dispatch: each order of the day cut into truck rotations, with truck, driver and times. Quantities and times only. */
 export default async function DispatchPage({
@@ -37,6 +56,18 @@ export default async function DispatchPage({
   const canDrivers = can(user.role, 'drivers.write');
   const drivers = await listDrivers(pool, user);
   const truckDefaults = await listTruckDefaultDrivers(pool, user);
+  // T5: the timing of the day, for the roles that may read it (the database refuses every other role, and a plant manager sees his plant).
+  const timingRoles: readonly string[] = ['owner', 'app_admin', 'plant_manager'];
+  let timing: TimingBoard | null = null;
+  let stats: DelayStats | null = null;
+  if (timingRoles.includes(user.role)) {
+    timing = await getTimingBoard(pool, user, date, (await getRequestClock()).now().getTime());
+    stats = await getDelayStats(pool, user, addDays(date, -13), date);
+  }
+  const routeLabels: Record<string, string> = {};
+  for (const truck of timing?.trucks ?? [])
+    for (const b of truck.trips)
+      routeLabels[`${b.trip.plantId ?? ''}|${b.trip.zoneId ?? ''}`] = b.trip.zoneName ?? '—';
 
   return (
     <div className="space-y-10">
@@ -102,6 +133,24 @@ export default async function DispatchPage({
         <p role="status" className="text-sm font-semibold" data-testid="dispatch-message">
           {t('dispatch.saved', { count: Number(query.saved) })}
         </p>
+      )}
+
+      {timing && (
+        <TimingBoardPanel
+          key={`timing-${date}-${timing.trucks.map((x) => x.trips.map((b) => b.trip.tripId + Object.keys(b.trip.steps).length).join(',')).join(';')}`}
+          trucks={timing.trucks}
+          estimates={timing.estimates}
+          routeLabels={routeLabels}
+          movable={{
+            trucks: day.value.trucks.filter((k) => k.available).map((k) => ({ id: k.id, code: k.code })),
+            drivers: day.value.drivers.map((d) => ({ id: d.id, code: d.code, name: d.name })),
+          }}
+          canAct={canWrite && timingRoles.includes(user.role)}
+          stats={stats}
+          reassign={reassignTripAction}
+          postpone={postponeTripAction}
+          setEstimate={setTripEstimateAction}
+        />
       )}
 
       <DispatchBoard

@@ -1,7 +1,42 @@
 import { getPool } from '@/lib/db/pools';
 import { defaultFieldCipher } from '@/modules/master-data';
 import { getDriverDay, getPumpDay } from '@/modules/field';
+import { getRequestClock } from '@/app/request-clock';
+import { getTimingBoard, type TripAlert } from '@/modules/operations';
+import type { TripTimingView } from '@/modules/field/domain/timing-view';
 import { fieldJson, fieldRoute } from '../context';
+
+/** The driver's own timing: the plan, the delay so far, the projected return and the state of each rotation. A failure here never hides the day. */
+async function timingOf(
+  user: Parameters<typeof getTimingBoard>[1],
+  date: string,
+): Promise<Record<string, TripTimingView>> {
+  try {
+    const nowMs = (await getRequestClock()).now().getTime();
+    const board = await getTimingBoard(getPool('app'), user, date, nowMs);
+    const out: Record<string, TripTimingView> = {};
+    for (const truck of board.trucks)
+      for (const t of truck.trips) {
+        const dayStart = t.trip.dayStartMs;
+        const alert: TripAlert = t.alert;
+        out[t.trip.tripId] = {
+          plan: t.trip.plan,
+          projectedBackMin: Math.round((t.projection.projectedBackMs - dayStart) / 60_000),
+          cumulativeDelayMin: t.cumulativeDelayMin,
+          alert: {
+            level: alert.level,
+            slipMin: alert.slipMin,
+            nextOrderCode: alert.nextOrderCode,
+            cause: alert.cause,
+            overMin: alert.overMin,
+          },
+        };
+      }
+    return out;
+  } catch {
+    return {};
+  }
+}
 
 // @permission driver or pump_operator session: the day of the signed-in driver (own rotations only, never a price)
 export async function GET(request: Request): Promise<Response> {
@@ -25,6 +60,7 @@ export async function GET(request: Request): Promise<Response> {
       userId: user.id,
       date,
       ...(await getDriverDay(getPool('app'), user, date, cipher)),
+      timing: await timingOf(user, date),
     });
   });
 }

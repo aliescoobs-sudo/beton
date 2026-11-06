@@ -9,16 +9,19 @@ handleHelp(import.meta.url);
 
 if (existsSync('.env.local')) process.loadEnvFile('.env.local');
 if (existsSync('.env.ops')) process.loadEnvFile('.env.ops');
-const { loadMaintenanceEnv } = await import('../src/lib/env.ts');
+const { loadMaintenanceEnv, loadSeedUrl } = await import('../src/lib/env.ts');
 const { businessDateOf, realClock } = await import('../src/modules/clock/index.ts');
 const { armTrainingDay } = await import('./training-day.ts');
 try {
   const env = loadMaintenanceEnv(process.env);
   if (!env.TRAINING_MODE || env.APP_ENV === 'production' || env.REAL_DATA)
     throw new Error('rearm:training needs TRAINING_MODE=true, APP_ENV not production and REAL_DATA off');
-  const r = await armTrainingDay(env, businessDateOf(realClock.now()));
+  const r = await armTrainingDay(
+    { ...env, DATABASE_URL_SEED: loadSeedUrl(process.env) },
+    businessDateOf(realClock.now()),
+  );
   console.log(
-    `Training day ${r.date} armed: ${r.ordersCreated} orders created, ${r.ordersCancelled} unproduced orders of the day cancelled, ${r.rotationsPlanned} rotations planned. Accounts unchanged.`,
+    `Training day ${r.date} armed: ${r.ordersCreated} orders created, ${r.ordersCancelled} unproduced orders of the day cancelled, ${r.rotationsPlanned} rotations planned${r.lateRotation ? ', one rotation already on the road and running late' : ''}. Accounts unchanged.`,
   );
 } catch (error) {
   console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);

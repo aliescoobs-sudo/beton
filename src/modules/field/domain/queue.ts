@@ -2,7 +2,15 @@
 // network is back. The server stores a key once, so a replay (a lost answer, a second tab) changes nothing. A leaf with no import.
 
 export type QueueAction =
-  | { kind: 'step'; key: string; tripId: string; step: string; at: string; volumeL?: number }
+  | {
+      kind: 'step';
+      key: string;
+      tripId: string;
+      step: string;
+      at: string;
+      volumeL?: number;
+      reason?: 'traffic' | 'site_wait' | 'breakdown' | 'other';
+    }
   | {
       kind: 'emergency';
       key: string;

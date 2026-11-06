@@ -8,6 +8,9 @@ import { runMigrations } from '../scripts/db-migrate';
 import { wipeTrainingDatabase } from '../scripts/reset-training';
 import { seedTraining } from '../scripts/seed-training';
 import { armTrainingDay } from '../scripts/training-day';
+import { businessDateOf, realClock } from '../src/modules/clock';
+import { getTimingBoard } from '../src/modules/operations';
+import { minuteOfDay } from '../src/modules/operations/domain/trip-times';
 import { testEnv } from './db-env';
 
 // T1: the training seed, run once on a scratch database. Fictitious data only; one account per role; credentials written once to a file
@@ -229,14 +232,14 @@ describe('the training day is dated from the business day (T5)', () => {
   });
   it('re-arming the same day does not double the rotations; arming the next morning gives that day its own', async () => {
     const before = await notStarted(today);
-    const first = await armTrainingDay(training, today);
+    const first = await armTrainingDay({ ...training, DATABASE_URL_SEED: env.DATABASE_URL_SEED }, today);
     expect(first.rotationsPlanned).toBeGreaterThanOrEqual(6);
     const again = await notStarted(today);
     expect(again.map((r) => r.code)).toEqual(before.map((r) => r.code));
     for (const r of again) expect(Number(r.n)).toBeLessThanOrEqual(3);
     const tomorrow = addDays(today, 1);
     expect(await notStarted(tomorrow)).toHaveLength(0);
-    await armTrainingDay(training, tomorrow);
+    await armTrainingDay({ ...training, DATABASE_URL_SEED: env.DATABASE_URL_SEED }, tomorrow);
     const next = await notStarted(tomorrow);
     expect(next).toHaveLength(3);
     for (const r of next) expect(Number(r.n)).toBeGreaterThanOrEqual(2);
@@ -248,5 +251,56 @@ describe('the training day is dated from the business day (T5)', () => {
       DATABASE_URL_APP: env.DATABASE_URL_APP.replace(/\/[^/]+$/, '/belgobeton_test'),
     };
     await expect(armTrainingDay(other, today)).rejects.toThrow(/training marker/);
+  });
+});
+
+describe('the training day carries timing: history, estimates and a rotation running late (T5 phase 2)', () => {
+  const today = businessDateOf(realClock.now());
+  const ownerSession = async () => {
+    const u = (
+      await migrator.query<{ id: string; name: string; email: string }>(
+        `select id, name, email from "user" where email like 'proprietaire@%'`,
+      )
+    ).rows[0]!;
+    return {
+      ...u,
+      role: 'owner',
+      locale: 'fr',
+      twoFactorEnabled: false,
+      reenrolRequired: false,
+      stepUpVerified: true,
+    } as never;
+  };
+  const app = new pg.Pool({ connectionString: env.DATABASE_URL_APP, max: 2 });
+  afterAll(() => app.end());
+
+  it('at least 30 completed rotations of the history carry their stage delays', async () => {
+    expect(
+      await count(`select count(distinct trip_id)::text n from trip_delay where step = 'back'`),
+    ).toBeGreaterThanOrEqual(30);
+    expect(
+      await count(`select count(*)::text n from trip_delay where stage_delay_min is not null`),
+    ).toBeGreaterThan(100);
+  });
+  it('the estimates of a route come from the history of its completed rotations, and an override is audited', async () => {
+    const board = await getTimingBoard(app, await ownerSession(), today, realClock.now().getTime());
+    const sources = Object.values(board.estimates).flatMap((e) => Object.values(e).map((v) => v.source));
+    expect(sources).toContain('history');
+    expect(
+      await count(
+        `select count(*)::text n from audit_event where table_name = 'trip_estimate_override' and action = 'insert'`,
+      ),
+    ).toBeGreaterThanOrEqual(1);
+  });
+  it('one rotation is on the road and late: its truck is critical and names the next order', async () => {
+    if (minuteOfDay(realClock.now().toISOString()) < 85) return; // the rotation would have to start yesterday
+    const board = await getTimingBoard(app, await ownerSession(), today, realClock.now().getTime());
+    const critical = board.trucks.filter((t) => t.alert.level === 'critical');
+    expect(critical.length).toBeGreaterThanOrEqual(1);
+    const t = critical.find((x) => (x.trips[0]!.cumulativeDelayMin ?? 0) >= 25)!;
+    expect(t).toBeDefined();
+    expect(t.status).toBe('en_route');
+    expect(t.alert.slipMin).toBeGreaterThan(0);
+    expect(t.alert.nextOrderCode).toMatch(/^CMD-/);
   });
 });

@@ -179,6 +179,7 @@ const actionSchema = z.discriminatedUnion('kind', [
     step: z.string(),
     at: z.iso.datetime(),
     volumeL: z.number().int().min(1).max(100_000).optional(),
+    reason: z.enum(['traffic', 'site_wait', 'breakdown', 'other']).optional(),
   }),
   z.object({
     kind: z.literal('emergency'),
@@ -236,8 +237,8 @@ export async function syncActions(
       const status = await inRequest(appPool, driver, async (tx): Promise<'recorded' | 'replayed'> => {
         if (a.kind === 'step') {
           const r = await tx.query<{ r: 'recorded' | 'replayed' }>(
-            'select public.driver_report($1, $2, $3, $4, $5) as r',
-            [a.tripId, a.step, a.at, a.key, a.volumeL ?? null],
+            'select public.driver_report($1, $2, $3, $4, $5, $6) as r',
+            [a.tripId, a.step, a.at, a.key, a.volumeL ?? null, a.reason ?? null],
           );
           return r.rows[0]?.r ?? 'recorded';
         }

@@ -2,7 +2,14 @@
 
 import { getRequestClock } from '@/app/request-clock';
 import { getPool } from '@/lib/db/pools';
-import { createDriver, saveDispatch, setTruckDefaultDriver } from '@/modules/operations';
+import {
+  createDriver,
+  postponeTrip,
+  reassignTrip,
+  saveDispatch,
+  setTripEstimate,
+  setTruckDefaultDriver,
+} from '@/modules/operations';
 import { authorize, ForbiddenError, type Permission } from '@/modules/platform-security';
 import { currentAuthState } from '@/modules/platform-security/next';
 
@@ -50,6 +57,50 @@ export async function setTruckDefaultDriverAction(input: {
 }): Promise<{ ok: true } | Failure> {
   return guarded('drivers.write', async (user) => {
     const result = await setTruckDefaultDriver(getPool('app'), user, input);
+    return result.ok ? { ok: true as const } : { ok: false as const, error: result.error };
+  });
+}
+
+// @permission dispatch.write (plant manager of the plant, owner, app_admin): moves a rotation that has not started to another truck and driver, with a reason; recorded
+export async function reassignTripAction(input: {
+  tripId: string;
+  truckId: string;
+  driverId: string | null;
+  reason: string;
+}): Promise<{ ok: true } | Failure> {
+  return guarded('dispatch.write', async (user) => {
+    const today = (await getRequestClock()).today();
+    const result = await reassignTrip(
+      getPool('app'),
+      user,
+      { ...input, overrideReason: input.reason },
+      { today },
+    );
+    return result.ok ? { ok: true as const } : { ok: false as const, error: result.error };
+  });
+}
+
+// @permission dispatch.write (plant manager of the plant, owner, app_admin): postpones a rotation that has not started, with a reason; recorded
+export async function postponeTripAction(input: {
+  tripId: string;
+  reason: string;
+}): Promise<{ ok: true } | Failure> {
+  return guarded('dispatch.write', async (user) => {
+    const result = await postponeTrip(getPool('app'), user, input);
+    return result.ok ? { ok: true as const } : { ok: false as const, error: result.error };
+  });
+}
+
+// @permission dispatch.write (plant manager of the plant, owner, app_admin): overrides the default estimate of a stage for a route, with a reason; audited
+export async function setTripEstimateAction(input: {
+  plantId: string;
+  zoneId: string | null;
+  stage: Parameters<typeof setTripEstimate>[2]['stage'];
+  minutes: number;
+  reason: string;
+}): Promise<{ ok: true } | Failure> {
+  return guarded('dispatch.write', async (user) => {
+    const result = await setTripEstimate(getPool('app'), user, input);
     return result.ok ? { ok: true as const } : { ok: false as const, error: result.error };
   });
 }

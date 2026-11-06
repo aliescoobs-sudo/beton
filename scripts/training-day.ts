@@ -4,11 +4,18 @@
 // Fictitious data only, written through the application's own services as the training accounts' roles: the same rules, row-level
 // security and audit as a screen entry. Not an entry point.
 import pg from 'pg';
+import { withRlsContext } from '../src/lib/db/rls-context.ts';
+import { realClock } from '../src/modules/clock/index.ts';
+import { insertLoadRows } from '../src/modules/operations/service/delivery-service.ts';
+import { minuteOfDay } from '../src/modules/operations/domain/trip-times.ts';
+import { setParameter } from '../src/modules/platform-security/service/parameter-service.ts';
+import { SYSTEM_ACTOR_ID } from '../src/modules/platform-security/auth/actors.ts';
 import { createOrder, createPurchase, createQuote } from '../src/modules/ledger/index.ts';
 import {
   cancelUnproducedOrder,
   saveDispatch,
   setStockThreshold,
+  setTripEstimate,
   setTruckDefaultDriver,
 } from '../src/modules/operations/index.ts';
 import {
@@ -25,12 +32,16 @@ import { emailOf } from './training-lib.ts';
 export interface DayEnv {
   DATABASE_URL_APP: string;
   DATABASE_URL_MIGRATOR: string;
+  /** The seed login: writes the rotation that is already on the road (the plant's own rows), as the pilot scenario does. */
+  DATABASE_URL_SEED?: string;
 }
 export interface ArmedDay {
   date: string;
   ordersCreated: number;
   ordersCancelled: number;
   rotationsPlanned: number;
+  /** A rotation already on the road and running late was set up (a critical alert is visible on the board). */
+  lateRotation: boolean;
 }
 
 class DayError extends Error {}
@@ -54,6 +65,9 @@ export async function armTrainingDay(
 ): Promise<ArmedDay> {
   const app = new pg.Pool({ connectionString: env.DATABASE_URL_APP, max: 4 });
   const migrator = new pg.Pool({ connectionString: env.DATABASE_URL_MIGRATOR, max: 1 });
+  const seed = env.DATABASE_URL_SEED
+    ? new pg.Pool({ connectionString: env.DATABASE_URL_SEED, max: 1 })
+    : null;
   try {
     if (
       (opts.requireMarker ?? true) &&
@@ -158,6 +172,27 @@ export async function armTrainingDay(
           ),
         ),
       );
+    // 2b. T5 phase 2: the plan starts a quarter of an hour from now (a day started in the morning is not "late" for the whole afternoon),
+    //     and one rotation is already on the road and running late, so that a critical alert is visible as soon as a trainee looks.
+    const nowMin = minuteOfDay(realClock.now().toISOString());
+    await setParameter(
+      app,
+      owner,
+      'day_start_min',
+      nowMin >= 420 && nowMin <= 1020 ? Math.min(1020, Math.ceil((nowMin + 15) / 15) * 15) : 420,
+    );
+    const lateRotation = seed
+      ? await seedLateRotation(app, seed, migrator, owner, crew[2]!, {
+          tetId: tet.id,
+          today,
+          nowMin,
+          clientId: clients[3]!.id,
+          typeId: typeId('B20'),
+          zoneId: zones[1]!.id,
+          sales,
+        })
+      : false;
+
     // rotations of the first three orders dealt to the crew in turn: each driver gets 2 or 3 deliveries in sequence
     const rotations: { orderId: string; truckId: string; driverId: string; volumeL: number }[] = [];
     let n = 0;
@@ -273,8 +308,173 @@ export async function armTrainingDay(
           { today },
         ),
       );
-    return { date: today, ordersCreated: 6, ordersCancelled: cancelled, rotationsPlanned: saved.rotations };
+    // 7. The timing history and overrides (T5 phase 2): the delays of every completed rotation of the seed, as if each tap had been recorded,
+    //    so that the estimates (medians of the last completed rotations) and the statistics have something to show; and one estimate override.
+    await backfillTripDelays(migrator);
+    const oued = zones.find((z) => z.name === 'Oued Laou');
+    if (oued)
+      await setTripEstimate(app, managerTet, {
+        plantId: tet.id,
+        zoneId: oued.id,
+        stage: 'to_site',
+        minutes: 70,
+        reason: 'Route de la corniche en travaux',
+      });
+    return {
+      date: today,
+      ordersCreated: 6,
+      ordersCancelled: cancelled,
+      rotationsPlanned: saved.rotations,
+      lateRotation,
+    };
   } finally {
-    await Promise.all([app.end(), migrator.end()]);
+    await Promise.all([app.end(), migrator.end(), seed?.end()]);
   }
+}
+
+/**
+ * One rotation of the Tétouan truck T3 and its driver, already on the road and running late: loaded and departed 28
+ * minutes after its plan, so that, with the estimates, its return slips past the start of the truck's next rotation (planned from its
+ * back). Written the way the pilot scenario writes history (the plant's own rows), in the system's name. Skipped before 01:25 local time
+ * (the rotation would have to start yesterday) and when the driver already has a rotation on the road.
+ */
+async function seedLateRotation(
+  app: pg.Pool,
+  seed: pg.Pool,
+  migrator: pg.Pool,
+  owner: SessionUser,
+  crew: { truck: { id: string }; driver: { id: string } },
+  o: {
+    tetId: string;
+    today: string;
+    nowMin: number;
+    clientId: string;
+    typeId: string;
+    zoneId: string;
+    sales: SessionUser;
+  },
+): Promise<boolean> {
+  if (o.nowMin < 85) return false;
+  const running = await migrator.query(
+    `select 1 from trip_plan p where p.driver_id = $1 and p.trip_date = $2
+        and exists (select 1 from trip_event e where e.trip_id = p.id and e.step = 'departed')
+        and not exists (select 1 from trip_event e where e.trip_id = p.id and e.step = 'back')
+        and not exists (select 1 from trip_plan_cancellation c where c.trip_id = p.id)`,
+    [crew.driver.id, o.today],
+  );
+  if (running.rowCount) return false;
+  const order = must(
+    'late order',
+    await createOrder(
+      app,
+      o.sales,
+      {
+        clientId: o.clientId,
+        plantId: o.tetId,
+        zoneId: o.zoneId,
+        concreteTypeId: o.typeId,
+        volumeL: 16_000,
+        deliveryDate: o.today,
+        plan: { preset: 'cash' },
+      },
+      { today: o.today },
+    ),
+  );
+  const at = (minute: number) => new Date(realClock.now().getTime() - (o.nowMin - minute) * 60_000);
+  const m = o.nowMin;
+  try {
+    await withRlsContext(
+      seed,
+      { userId: SYSTEM_ACTOR_ID, role: 'system', requestId: 'training-late-rotation' },
+      async (tx) => {
+        await tx.query(`select set_config('app.plant_id', $1, true)`, [o.tetId]);
+        const recette = (
+          await tx.query<{ id: string }>(`select public.recette_in_force($1, $2, $3::date) as id`, [
+            o.typeId,
+            o.tetId,
+            o.today,
+          ])
+        ).rows[0]?.id;
+        if (!recette) throw new DayError('training day: no recette in force for the late rotation');
+        const trip = (
+          await tx.query<{ id: string }>(
+            `insert into trip_plan (id, batch_id, trip_date, order_id, seq, truck_id, driver_id, volume_l, load_min, depart_min, arrive_min,
+                                unload_end_min, back_min, created_by)
+         values (gen_random_uuid(), gen_random_uuid(), $1, $2, 1, $3, $4, 16000, $5, $6, $7, $8, $9, $10) returning id`,
+            [
+              o.today,
+              order.id,
+              crew.truck.id,
+              crew.driver.id,
+              m - 80,
+              m - 70,
+              m - 40,
+              m - 10,
+              m + 20,
+              SYSTEM_ACTOR_ID,
+            ],
+          )
+        ).rows[0]!.id;
+        const load = await insertLoadRows(
+          tx,
+          { id: SYSTEM_ACTOR_ID },
+          {
+            orderId: order.id,
+            truckId: crew.truck.id,
+            volumeL: 16_000,
+            date: o.today,
+            recetteId: recette,
+            loadedAt: at(m - 75).toISOString(),
+          },
+        );
+        await tx.query(
+          `insert into trip_event (id, trip_id, step, at, delivery_id, created_by) values (gen_random_uuid(), $1, 'loaded', $2, $3, $4)`,
+          [trip, at(m - 75), load.id, SYSTEM_ACTOR_ID],
+        );
+        // departed 28 minutes after the plan (planned m-70, tapped m-42)
+        await tx.query(
+          `insert into trip_event (id, trip_id, step, at, created_by) values (gen_random_uuid(), $1, 'departed', $2, $3)`,
+          [trip, at(m - 42), SYSTEM_ACTOR_ID],
+        );
+      },
+    );
+  } catch (error) {
+    // The client's credit is used up by earlier arms: the order is held for the owner's approval and cannot be loaded. The order stays as
+    // an item for the owner to release; there is no late rotation this time.
+    if (/waiting for approval/.test(String((error as Error).message))) return false;
+    throw error;
+  }
+  return true;
+}
+
+/**
+ * The delay of every tap already recorded as an event (the seed's completed rotations and the late one), as `driver_report` would have
+ * stored it. Maintenance login, fictitious data, only for taps that have no delay row yet.
+ */
+export async function backfillTripDelays(migrator: pg.Pool): Promise<number> {
+  return withRlsContext(
+    migrator,
+    { userId: SYSTEM_ACTOR_ID, role: 'system', requestId: 'training-delay-history' },
+    async (tx) => {
+      const r = await tx.query(
+        `insert into trip_delay (id, trip_id, driver_id, plant_id, trip_date, zone_id, step, planned_at, tapped_at, stage_delay_min, cumulative_delay_min, created_by)
+       select gen_random_uuid(), x.trip_id, x.driver_id, x.plant_id, x.trip_date, x.zone_id, x.step, x.planned_at, x.at,
+              round(extract(epoch from ((x.at - lag(x.at) over w) - (x.planned_at - lag(x.planned_at) over w))) / 60)::int,
+              round(extract(epoch from (x.at - x.planned_at)) / 60)::int, $1
+         from (select p.id as trip_id, p.driver_id, p.plant_id, p.trip_date, o.zone_id, e.step, e.at,
+                      public._plan_time(p.trip_date, case e.step when 'departed' then p.depart_min when 'arrived' then p.arrive_min
+                        when 'unloading_started' then p.arrive_min when 'unloading_finished' then p.unload_end_min else p.back_min end) as planned_at
+                 from public.trip_plan p
+                 join public.sales_order o on o.id = p.order_id
+                 join public.trip_event e on e.trip_id = p.id
+                where p.driver_id is not null
+                  and e.step in ('departed', 'arrived', 'unloading_started', 'unloading_finished', 'back')
+                  and not exists (select 1 from public.trip_delay d where d.trip_id = p.id and d.step = e.step)) x
+       window w as (partition by x.trip_id order by array_position(array['departed', 'arrived', 'unloading_started', 'unloading_finished', 'back'], x.step))
+       on conflict (trip_id, step) do nothing`,
+        [SYSTEM_ACTOR_ID],
+      );
+      return r.rowCount ?? 0;
+    },
+  );
 }

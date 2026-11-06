@@ -19,6 +19,13 @@ import {
   type QueueAction,
   type SyncOutcome,
 } from '../domain/index-client';
+import {
+  clockOfMinutes,
+  type DelayReason,
+  DELAY_REASONS,
+  signedMinutes,
+  type TripTimingView,
+} from '../domain/timing-view';
 import { DAY_KEY, forgetAll, forgetRead, QUEUE_KEY } from './offline-store';
 import { dropPhoto, queuedPhotos, queuePhoto, sendPhoto, shrinkPhoto } from './photo-queue';
 
@@ -118,7 +125,15 @@ interface PumpJob {
   m3Pumped: number | null;
 }
 type Day =
-  | { kind: 'driver'; userId: string; date: string; trips: Trip[]; instructions: Instruction[] }
+  | {
+      kind: 'driver';
+      userId: string;
+      date: string;
+      trips: Trip[];
+      instructions: Instruction[];
+      /** T5: the plan's times, the delay so far and the state, by rotation (the driver's own). */
+      timing?: Record<string, TripTimingView>;
+    }
   | { kind: 'pump_operator'; userId: string; date: string; jobs: PumpJob[] };
 
 const deviceId = (): string => {
@@ -141,6 +156,8 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
   const [message, setMessage] = useState<string | null>(null);
   const [sheet, setSheet] = useState<{ tripId: string } | null>(null);
   const [asking, setAsking] = useState<{ tripId: string } | null>(null);
+  // The optional reason for a delay, chosen before the tap that is late (T5); it travels with that tap.
+  const [reasons, setReasons] = useState<Record<string, DelayReason | ''>>({});
   // Photos of signed BLs waiting on the phone (by rotation) and the last refusal told to the driver.
   const [photosWaiting, setPhotosWaiting] = useState<Record<string, number>>({});
   const syncing = useRef(false);
@@ -365,7 +382,16 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
 
   function tapStep(trip: Trip, step: string, volumeL?: number) {
     const at = new Date().toISOString();
-    push({ kind: 'step', key: newKey(), tripId: trip.id, step, at, ...(volumeL ? { volumeL } : {}) });
+    const reason = reasons[trip.id];
+    push({
+      kind: 'step',
+      key: newKey(),
+      tripId: trip.id,
+      step,
+      at,
+      ...(volumeL ? { volumeL } : {}),
+      ...(reason ? { reason } : {}),
+    });
     applyLocal((d) =>
       d.kind !== 'driver'
         ? d
@@ -606,6 +632,16 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
                     </>
                   )}
                 </p>
+                {day.timing?.[trip.id] && (
+                  <TimingPanel
+                    view={day.timing[trip.id]!}
+                    orderCode={trip.orderCode}
+                    t={t}
+                    reason={reasons[trip.id] ?? ''}
+                    onReason={(r) => setReasons((m) => ({ ...m, [trip.id]: r }))}
+                    canChoose={next !== null && !('wait' in next)}
+                  />
+                )}
                 <ol className="space-y-1 text-xl">
                   {(
                     [
@@ -983,5 +1019,80 @@ function EmergencySheet({
         ))}
       </ul>
     </Sheet>
+  );
+}
+
+/** The plan's times, the delay so far, the banner of the state, and the optional reason for a late tap. Informational: nothing here ranks anybody. */
+function TimingPanel({
+  view,
+  orderCode,
+  t,
+  reason,
+  onReason,
+  canChoose,
+}: {
+  view: TripTimingView;
+  orderCode: string;
+  t: ReturnType<typeof useTranslations>;
+  reason: DelayReason | '';
+  onReason: (r: DelayReason | '') => void;
+  canChoose: boolean;
+}) {
+  const late = view.alert.level !== 'none' || (view.cumulativeDelayMin ?? 0) > 5;
+  return (
+    <div className="space-y-2" data-testid={`timing-${orderCode}`}>
+      <p className="text-xl">
+        {t('timing.planned', {
+          load: clockOfMinutes(view.plan.loadMin),
+          back: clockOfMinutes(view.plan.backMin),
+        })}
+        {view.cumulativeDelayMin !== null && (
+          <>
+            {' · '}
+            <bdi dir="ltr" data-testid={`delay-${orderCode}`}>
+              {t('timing.delay', { min: signedMinutes(view.cumulativeDelayMin) })}
+            </bdi>
+          </>
+        )}
+      </p>
+      {view.alert.level === 'critical' && (
+        <p
+          role="alert"
+          className="rounded-xl bg-red-700 p-3 text-2xl font-extrabold text-white"
+          data-testid={`alert-critical-${orderCode}`}
+        >
+          {t('timing.critical', { min: view.alert.slipMin, order: view.alert.nextOrderCode ?? '' })}
+        </p>
+      )}
+      {view.alert.level === 'watch' && (
+        <p
+          role="status"
+          className="rounded-xl bg-amber-200 p-3 text-2xl font-bold text-black"
+          data-testid={`alert-watch-${orderCode}`}
+        >
+          {view.alert.cause === 'late_start'
+            ? t('timing.lateStart', { min: view.alert.overMin })
+            : t('timing.watch', { min: view.alert.overMin })}
+        </p>
+      )}
+      {canChoose && late && (
+        <label className="block text-xl">
+          {t('timing.reasonLabel')}
+          <select
+            className="input mt-1 w-full text-xl"
+            value={reason}
+            onChange={(e) => onReason(e.target.value as DelayReason | '')}
+            data-testid={`reason-${orderCode}`}
+          >
+            <option value="">{t('timing.reason.none')}</option>
+            {DELAY_REASONS.map((r) => (
+              <option key={r} value={r}>
+                {t(`timing.reason.${r}`)}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+    </div>
   );
 }
