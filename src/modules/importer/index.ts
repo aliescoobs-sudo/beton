@@ -31,3 +31,15 @@ export {
   toRecords,
 } from './domain/sheet';
 export { type Parsed, parseImportAmount, parseWholeNumber } from './domain/values';
+export {
+  assertImportEnvironment,
+  importWorkbook,
+  ImportRefused,
+  rollbackImport,
+  type RollbackReport,
+  type SheetReport,
+  type WorkbookOptions,
+  type WorkbookReport,
+} from './service/workbook-import';
+export { type ImportEnvironment, importEnvironmentProblem } from './domain/guard';
+export { formatRollbackReport, formatWorkbookReport } from './service/report';

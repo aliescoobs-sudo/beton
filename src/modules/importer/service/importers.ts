@@ -691,8 +691,17 @@ async function plan(
     const records = rawRecords.map((r) => ({ row: r.row, values: full('opening_balances', r.values) }));
     const state = await getOpeningState(appPool, actor);
     const date = state.openingDate ?? ctx.openingDate ?? null;
-    const clients = new Map((await listClients(appPool, actor)).map((c) => [c.code, c.id]));
-    const suppliers = new Map((await listSuppliers(appPool, actor)).map((s) => [s.code, s.id]));
+    // a party is named by its code or by its exact name (the company's files know names; the codes are made when the party is created)
+    const clients = new Map<string, string>();
+    for (const c of await listClients(appPool, actor)) {
+      clients.set(c.code.toLowerCase(), c.id);
+      clients.set(c.name.trim().toLowerCase(), c.id);
+    }
+    const suppliers = new Map<string, string>();
+    for (const x of await listSuppliers(appPool, actor)) {
+      suppliers.set(x.code.toLowerCase(), x.id);
+      suppliers.set(x.name.trim().toLowerCase(), x.id);
+    }
     const has = new Set(state.parties.map((p) => `${p.kind}:${p.partyId}`));
     if (!date) {
       return {
@@ -709,12 +718,12 @@ async function plan(
       const party = alias(v.party);
       const id =
         party === 'client'
-          ? clients.get(v.code.trim().toUpperCase())
+          ? clients.get(v.code.trim().toLowerCase())
           : party === 'supplier'
-            ? suppliers.get(v.code.trim().toUpperCase())
+            ? suppliers.get(v.code.trim().toLowerCase())
             : undefined;
       const amount = parseImportAmount(v.amount);
-      if (!id) planned.push({ row, label: v.code, error: 'unknown client or supplier code' });
+      if (!id) planned.push({ row, label: v.code, error: 'unknown client or supplier (code or exact name)' });
       else if (!amount.ok || amount.value <= 0)
         planned.push({
           row,

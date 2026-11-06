@@ -30,6 +30,7 @@ export const SERVICE_AUDIT_ACTIONS = [
   'clock_advance',
   'view',
   'password_reset',
+  'import',
 ] as const;
 
 const eventSchema = z.object({
