@@ -1,5 +1,12 @@
 import { expect, test } from '@playwright/test';
-import { E2E_BASE_URL, E2E_PASSWORD, E2E_TRAINING_URL, E2E_TRAINING_USER } from './fixtures';
+import {
+  E2E_BASE_URL,
+  E2E_PASSWORD,
+  E2E_TRAINING_ACCOUNTANT,
+  E2E_TRAINING_URL,
+  E2E_TRAINING_USER,
+  totpFromDisplayedKey,
+} from './fixtures';
 
 // T1: the training instance (a second server with TRAINING_MODE=true on the same database). The banner is on every page in the user's
 // language, a training account signs in with a password alone, and none of this exists on the other server.
@@ -59,4 +66,43 @@ test('the same account has to enrol on a normal server', async ({ page }) => {
   await page.fill('input[name=password]', E2E_PASSWORD);
   await page.click('button[type=submit]');
   await expect(page).toHaveURL(`${E2E_BASE_URL}/fr/enrol`);
+});
+
+async function trainingSignIn(page: import('@playwright/test').Page, email: string) {
+  await page.goto(`${E2E_TRAINING_URL}/fr/login`);
+  await page.fill('input[name=email]', email);
+  await page.fill('input[name=password]', E2E_PASSWORD);
+  await page.click('button[type=submit]');
+  await expect(page).toHaveURL(`${E2E_TRAINING_URL}/fr`);
+}
+
+test('R12-07: only owner, app_admin and accountant may reach the optional enrolment; anybody else is sent home', async ({
+  page,
+}) => {
+  // an office-sales training account: no link in the banner, and the page itself refuses it
+  await trainingSignIn(page, E2E_TRAINING_USER.email);
+  await expect(page.getByTestId('training-enrol-link')).toHaveCount(0);
+  await page.goto(`${E2E_TRAINING_URL}/fr/enrol`);
+  await expect(page).toHaveURL(`${E2E_TRAINING_URL}/fr`);
+  await expect(page.getByTestId('totp-qr')).toHaveCount(0);
+});
+
+test('R12-07: a training accountant enrols a real authenticator with a server-made QR code and the real code then works', async ({
+  page,
+}) => {
+  await trainingSignIn(page, E2E_TRAINING_ACCOUNTANT.email);
+  await page.getByTestId('training-enrol-link').click();
+  await expect(page).toHaveURL(`${E2E_TRAINING_URL}/fr/enrol`);
+  await page.fill('input[name=password]', E2E_PASSWORD);
+  await page.click('button[type=submit]');
+  // the QR code is made on our server (an inline image, nothing fetched from outside)
+  await expect(page.getByTestId('totp-qr')).toBeVisible();
+  expect(await page.getByTestId('totp-qr').getAttribute('src')).toMatch(/^data:image\/svg\+xml;base64,/);
+  const key = (await page.getByTestId('totp-secret').textContent()) ?? '';
+  await page.check('input[type=checkbox]');
+  await page.fill('input[name=code]', await totpFromDisplayedKey(key));
+  await page.click('button[type=submit]');
+  await expect(page).toHaveURL(`${E2E_TRAINING_URL}/fr`);
+  // the link is gone: the account now has a real authenticator
+  await expect(page.getByTestId('training-enrol-link')).toHaveCount(0);
 });

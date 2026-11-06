@@ -2,6 +2,7 @@
 
 import { getPool } from '@/lib/db/pools';
 import { getEnv } from '@/lib/server-env';
+import { offersFinanceEnrolment } from '@/lib/training';
 import { currentAuthState } from '../auth/request-state';
 import { authSecretCipher } from '../auth/secret-cipher';
 import { pendingTotpQr } from '../service/totp-enrolment';
@@ -14,8 +15,11 @@ import { pendingTotpQr } from '../service/totp-enrolment';
  */
 export async function totpQrForEnrolment(): Promise<string | null> {
   const state = await currentAuthState();
+  // R12-07: also the voluntary enrolment of a training account of a finance role (same rule as the enrolment page), never anybody else.
   const enrolling =
-    state.kind === 'needs_enrolment' || (state.kind === 'authenticated' && state.user.reenrolRequired);
+    state.kind === 'needs_enrolment' ||
+    (state.kind === 'authenticated' &&
+      (state.user.reenrolRequired || (getEnv().TRAINING_MODE && offersFinanceEnrolment(state.user))));
   if (!enrolling) return null;
   const { id, email, reenrolRequired } = state.user;
   return pendingTotpQr(getPool('auth'), authSecretCipher(getEnv()).decrypt, {

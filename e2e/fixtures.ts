@@ -23,6 +23,11 @@ export const E2E_TRAINING_USER = {
   email: 'e2e-formation@formation.beton.invalid',
   name: 'Compte Formation E2E',
 } as const;
+/** A training accountant: the optional real-authenticator enrolment of R12-07 (enrolled once by its spec). */
+export const E2E_TRAINING_ACCOUNTANT = {
+  email: 'e2e-comptable@formation.beton.invalid',
+  name: 'Comptable Formation E2E',
+} as const;
 export const E2E_PASSWORD = 'correct-horse-battery-staple';
 export const E2E_USERS = {
   fr: { email: 'e2e-fr@belgobeton.test', name: 'Utilisateur E2E' },

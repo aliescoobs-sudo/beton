@@ -9,6 +9,7 @@ import { testEnv } from '../tests/db-env';
 import {
   E2E_BASE_URL,
   E2E_CSP,
+  E2E_TRAINING_ACCOUNTANT,
   E2E_TRAINING_USER,
   E2E_MD,
   E2E_OWNER,
@@ -55,6 +56,13 @@ export default async function globalSetup() {
       ...E2E_TRAINING_USER,
       password: E2E_PASSWORD,
       role: 'office_sales',
+      locale: 'fr',
+    });
+    await createUser(auth, authPool, {
+      actor: bootstrap,
+      ...E2E_TRAINING_ACCOUNTANT,
+      password: E2E_PASSWORD,
+      role: 'accountant',
       locale: 'fr',
     });
     await createUser(auth, authPool, {
