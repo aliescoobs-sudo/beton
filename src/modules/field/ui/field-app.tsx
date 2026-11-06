@@ -7,15 +7,11 @@ import {
   applyOutcomes,
   EMERGENCY_OPTIONS,
   enqueue,
-  judgeDay,
-  mustWipeForAccount,
   newKey,
   nextDriverTap,
   nextPumpStep,
-  readStoredDay,
   readStoredQueue,
   rewrapDay,
-  wrapDay,
   type QueueAction,
   type SyncOutcome,
 } from '../domain/index-client';
@@ -26,6 +22,7 @@ import {
   signedMinutes,
   type TripTimingView,
 } from '../domain/timing-view';
+import { createDayController } from './day-controller';
 import { DAY_KEY, forgetAll, forgetRead, QUEUE_KEY } from './offline-store';
 import { dropPhoto, queuedPhotos, queuePhoto, sendPhoto, shrinkPhoto } from './photo-queue';
 
@@ -165,8 +162,6 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
   const queueRef = useRef<QueueAction[]>([]);
   // The account the phone's local work belongs to (F02): the taps and the photos are sent by that account only.
   const ownerRef = useRef<string | null>(null);
-  // R12-04: each read of the day takes a number; an answer that arrives after a newer read, a sign-out or a refusal is ignored.
-  const epoch = useRef(0);
 
   const saveQueue = useCallback((q: QueueAction[]) => {
     queueRef.current = q;
@@ -175,82 +170,46 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
       localStorage.setItem(QUEUE_KEY, JSON.stringify({ userId: ownerRef.current, actions: q }));
   }, []);
 
-  // The server refused this phone's session (expired, revoked, device released): nothing that names a client stays on screen or on the
-  // phone. The work waiting to be sent stays, tied to its account, and goes out after that account signs in again.
-  const refused = useCallback(async () => {
-    epoch.current++; // whatever answer is still on its way belongs to a session that is over
-    await forgetRead();
-    setDay(null);
-    setSession('out');
-  }, []);
-
-  const loadDay = useCallback(async () => {
-    const mine = ++epoch.current;
-    // R12-04: the read is bounded. A connection that stalls instead of failing ends as "no network" after this long.
-    const ctl = new AbortController();
-    const deadline = setTimeout(() => ctl.abort(), SESSION_READ_TIMEOUT_MS);
-    try {
-      const res = await fetch('/api/field/session', { cache: 'no-store', signal: ctl.signal });
-      if (mine !== epoch.current) return;
-      if (res.status === 401) return await refused();
-      if (!res.ok) throw new Error('bad');
-      const data = (await res.json()) as Day;
-      if (mine !== epoch.current) return;
-      // Another account on this phone: its day, its taps and its photos are erased before this account sees anything of them.
-      const photos = await queuedPhotos().catch(() => []);
-      const holders = [
-        readStoredDay<Day>(localStorage.getItem(DAY_KEY), Date.now())?.userId,
-        ownerRef.current,
-        ...photos.map((p) => p.userId),
-      ];
-      if (mustWipeForAccount(data.userId, holders)) {
-        await forgetAll();
-        saveQueue([]);
-        setPhotosWaiting({});
-      }
-      ownerRef.current = data.userId;
-      localStorage.setItem(DAY_KEY, JSON.stringify(wrapDay(data.userId, data, Date.now())));
-      localStorage.setItem(QUEUE_KEY, JSON.stringify({ userId: data.userId, actions: queueRef.current }));
-      setDay(data);
-      setSession('in');
-      setOnline(true);
-    } catch {
-      if (mine !== epoch.current) return; // an obsolete read that failed says nothing about the present
-      // No network: the last day read stays on screen, for the account that read it and for a limited time only.
-      const kept = readStoredDay<Day>(localStorage.getItem(DAY_KEY), Date.now());
-      if (kept) {
-        ownerRef.current = kept.userId;
-        setDay(kept.day);
-        setSession('in');
-      } else {
-        await forgetRead();
-        setDay(null);
-        setSession('out');
-      }
-      setOnline(false);
-    } finally {
-      clearTimeout(deadline);
-    }
-  }, [refused, saveQueue]);
-
-  // R11-06: the limit is enforced while the page is open and when it comes back, and revocation is looked for whether or not there is
-  // queued work: a day that is stale is read from the server again (a refusal erases it); a day that is no longer valid and cannot be
-  // renewed is erased and the sign-in is shown.
+  // R13-03: the reading of the day, its refusal and its expiry live in the day controller (testable with slow storage): the screen is
+  // cleared synchronously, storage cleanup runs on its own, and the epoch is checked after every await before anything is committed.
   const shown = useRef(false);
-  const recheck = useCallback(async () => {
-    if (!shown.current) return;
-    const verdict = judgeDay(localStorage.getItem(DAY_KEY), Date.now());
-    if (verdict === 'fresh') return;
-    if (verdict === 'none') {
-      // R12-04: no valid day any more. It leaves the screen and the phone NOW, whatever the network does; the read that follows
-      // can only bring a new day back if the server vouches for it.
-      epoch.current++;
-      await forgetRead();
-      setDay(null);
-      setSession('unknown');
-    }
-    await loadDay();
-  }, [loadDay]);
+  const controllerRef = useRef<ReturnType<typeof createDayController<Day>> | null>(null);
+  // made on first use, inside a callback (it reads refs and the clock, which a render must not)
+  const getController = useCallback(() => {
+    controllerRef.current ??= createDayController<Day>({
+      fetchSession: (signal) => fetch('/api/field/session', { cache: 'no-store', signal }),
+      now: () => Date.now(),
+      local: {
+        get: (k) => localStorage.getItem(k),
+        set: (k, v) => localStorage.setItem(k, v),
+      },
+      forgetRead,
+      forgetAll,
+      queuedPhotos,
+      owner: {
+        get: () => ownerRef.current,
+        set: (id) => {
+          ownerRef.current = id;
+        },
+      },
+      queueNow: () => queueRef.current,
+      ui: {
+        setDay,
+        setSession,
+        setOnline,
+        clearWaiting: () => {
+          saveQueue([]);
+          setPhotosWaiting({});
+        },
+      },
+      readTimeoutMs: SESSION_READ_TIMEOUT_MS,
+      isShown: () => shown.current,
+    });
+    return controllerRef.current;
+  }, [saveQueue]);
+  const loadDay = useCallback(() => getController().loadDay(), [getController]);
+  const refused = useCallback(() => getController().refused(), [getController]);
+  const recheck = useCallback(() => getController().recheck(), [getController]);
 
   const sync = useCallback(async () => {
     if (syncing.current || queueRef.current.length === 0) return;
@@ -261,7 +220,7 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ actions: queueRef.current }),
       });
-      if (res.status === 401) return await refused(); // the queue stays: it is sent after the next sign-in
+      if (res.status === 401) return refused(); // the queue stays: it is sent after the next sign-in
       if (!res.ok) return;
       const { outcomes } = (await res.json()) as { outcomes: SyncOutcome[] };
       saveQueue(applyOutcomes(queueRef.current, outcomes));
@@ -461,14 +420,11 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
     const photos = (await queuedPhotos().catch(() => [])).filter((x) => x.userId === ownerRef.current);
     const waiting = queueRef.current.length + photos.length;
     if (waiting > 0 && !window.confirm(t('signOutPending', { count: waiting }))) return;
-    epoch.current++; // a read still on its way belongs to the session that is ending
-    await fetch('/api/field/logout', { method: 'POST' }).catch(() => null);
-    await forgetAll();
-    ownerRef.current = null;
+    // R13-03: the screen is cleared at once (and any read still on its way is void); the server call and the erasing follow on their own.
+    getController().signedOut();
     saveQueue([]);
     setPhotosWaiting({});
-    setDay(null);
-    setSession('out');
+    await fetch('/api/field/logout', { method: 'POST' }).catch(() => null);
   }
 
   const big = 'w-full rounded-2xl px-4 py-6 text-3xl font-extrabold leading-tight';
