@@ -52,6 +52,13 @@ La première fois, compte quelques minutes (image, base, données de formation).
 ✅ À la fin : « The training instance is running on this machine only: http://127.0.0.1:3000 ». Ouvre **http://localhost:3000/fr/login** dans Safari sur l'iMac :
 tu vois la bannière rouge « Version de formation — données fictives ».
 
+**Volume neuf et jeton de naissance (R13-01).** La toute première fois que la pile démarre, l'image postgres exécute **une seule fois** `scripts/training/db-init/10-birth-token.sql`
+sur le volume tout neuf : il écrit un *jeton de naissance*. Le seed de formation l'exige et le consomme avant d'écrire quoi que ce soit : un volume plus ancien, une sauvegarde
+restaurée ou une base montée à la main n'a pas de jeton, et le seed la refuse (« not born fresh on a stock training volume »). Il prouve aussi que la base est vide sans
+estimations ni lecture filtrée : une table déjà utilisée dont le filtrage par ligne peut cacher les lignes est refusée. Donc un **ancien** volume de formation ne peut plus
+être « re-seedé » : supprime-le (`./scripts/training/dc.sh down -v`, cela efface aussi le fichier des comptes et les pièces) puis relance `./scripts/training-up.sh`.
+(`reset:training`, lui, est la remise à zéro par l'opérateur d'une base qui porte déjà le marqueur : il crée un nouveau jeton.) Migrations : toutes, jusqu'à 0118, et celles de la finance.
+
 **8. Donner à chacun SON compte (jamais la liste entière)**
 `./scripts/training/show-accounts.sh` affiche seulement les **noms** des comptes, sans secret.
 ✅ Une liste : propriétaire, administrateur, bureau ventes/achats, deux chefs de centrale, comptable, trois chauffeurs et un pompiste.
@@ -68,7 +75,7 @@ b. Sur https://login.tailscale.com/admin → **DNS** : active **MagicDNS** et **
 c. Donne d'abord cette adresse à l'application : `./scripts/training/set-url.sh https://TON-ADRESSE.ts.net`
 ✅ Il écrit « the app now accepts requests from https://… ».
 d. Ouvre l'accès : `./scripts/training/go-public.sh https://TON-ADRESSE.ts.net`
-✅ Il **refuse** si l'adresse n'est pas celle donnée à l'application, si l'application n'est pas en mode formation ou pas prête ; sinon il lance `tailscale funnel` sur le bon port.
+✅ Il commence par `tailscale funnel reset` et relit l'état : si la fermeture ne peut pas être confirmée il s'arrête avec **« CLOSURE UNCONFIRMED — check Tailscale manually »** (ferme alors Funnel toi-même dans Tailscale et vérifie depuis l'extérieur). Après ouverture il contrôle tout l'état : un seul proxy HTTPS vers l'application, toute autre entrée provoque un refus et la fermeture. Il ne dit jamais « fermé » sans l'avoir relu. Il **refuse** si l'adresse n'est pas celle donnée à l'application, si l'application n'est pas en mode formation ou pas prête ; sinon il lance `tailscale funnel` sur le bon port.
 S'il dit que Funnel n'est pas autorisé, il affiche un lien ; ouvre-le, accepte, relance `go-public.sh`.
 e. Teste depuis un **téléphone en 4G** (pas le Wi-Fi de la maison) **tout le parcours** : la page de connexion avec la bannière rouge, connexion avec un compte de formation, une modification, déconnexion.
 Puis `tailscale funnel reset` : l'adresse ne doit plus répondre. Rouvre avec `go-public.sh` quand la formation commence.
@@ -89,7 +96,7 @@ Puis `tailscale funnel reset` : l'adresse ne doit plus répondre. Rouvre avec `g
 `docs/reviews/CODEX-REVIEW-R12.md` donne un feu vert conditionnel pour une formation surveillée, web et téléphone, avec des données fictives seulement. Les sept
 conditions sont obligatoires ; note chacune (sans aucun secret) avant `go-public.sh`. Le Funnel reste fermé tant que les sept ne sont pas notées sur l'iMac.
 1. **Version approuvée et volume neuf.** Une copie propre du commit relu et le digest du build vert de CE commit (`pick-image.sh`) ; l'application et `ops` qui
-   tournent utilisent ce digest. Toutes les migrations sont appliquées (jusqu'à 0117 et celles de la finance). Le projet `belgobeton-training` d'origine sur un volume
+   tournent utilisent ce digest. Toutes les migrations sont appliquées (jusqu'à 0118 et celles de la finance ; le jeton de naissance est encore intact quand le seed démarre et c'est lui qui le consomme). Le projet `belgobeton-training` d'origine sur un volume
    de base de données **neuf** et dédié, rempli par le seed de formation : aucun import, aucune restauration partielle, aucune base métier réutilisée, aucun marqueur
    posé à la main. Garde la preuve que le volume a été créé et que le seed est allé au bout.
 2. **Mode et isolation des identifiants.** Dans l'application **qui tourne** : formation activée, données réelles et simulation coupées, `APP_ENV=training`,
