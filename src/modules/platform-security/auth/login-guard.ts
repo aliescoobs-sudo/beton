@@ -78,6 +78,59 @@ export async function ipIsLocked(deps: LoginGuardDeps, ip: string | null): Promi
   return (rows[0]?.n ?? 0) >= p['auth.lockout_ip_failures'];
 }
 
+/**
+ * R12-03: admission for the phone sign-in. One attempt is RESERVED per IP before any expensive work (Argon2), in one transaction under
+ * an advisory lock for that IP, so parallel requests are counted one after the other and the limit cannot be overshot by a burst. Every
+ * attempt that is not released afterwards counts: a wrong PIN, one that locks the driver, an unknown code, a bad shape, a foreign phone.
+ * An unknown or malformed IP shares one "unknown" bucket (fail closed: never "not locked"). The field namespace (`fieldip:`) keeps these
+ * rows apart from the office sign-in's counters. Returns false when the IP has used its attempts for the window.
+ */
+export async function reserveFieldAttempt(deps: LoginGuardDeps, ip: string | null): Promise<boolean> {
+  const hmac = keyedHash(deps.hmacKey, `fieldip:${ip ?? 'unknown'}`);
+  const p = await deps.parameters();
+  const now = deps.clock.now();
+  const since = new Date(now.getTime() - p['auth.lockout_window_minutes'] * 60_000);
+  const client = await deps.pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('select pg_advisory_xact_lock(hashtextextended($1, 0))', [
+      `fieldip:${hmac.toString('hex')}`,
+    ]);
+    const { rows } = await client.query<{ used: number }>(
+      `select (count(*) filter (where not success) - count(*) filter (where success))::int as used
+         from login_attempt where ip_hmac = $1 and at > $2`,
+      [hmac, since],
+    );
+    if (Math.max(0, rows[0]?.used ?? 0) >= p['auth.lockout_ip_failures']) {
+      await client.query('COMMIT');
+      return false;
+    }
+    await client.query(
+      'insert into login_attempt (at, identifier_hmac, ip_hmac, success) values ($1, $2, $3, false)',
+      [now, keyedHash(deps.hmacKey, 'id:field-phone-attempt'), hmac],
+    );
+    await client.query('COMMIT');
+    return true;
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+/** A reserved attempt that turned out to be a correct sign-in is given back (a success row offsets one reservation). */
+export async function releaseFieldAttempt(deps: LoginGuardDeps, ip: string | null): Promise<void> {
+  await deps.pool.query(
+    'insert into login_attempt (at, identifier_hmac, ip_hmac, success) values ($1, $2, $3, true)',
+    [
+      deps.clock.now(),
+      keyedHash(deps.hmacKey, 'id:field-phone-attempt'),
+      keyedHash(deps.hmacKey, `fieldip:${ip ?? 'unknown'}`),
+    ],
+  );
+}
+
 export async function recordLogin(
   deps: LoginGuardDeps,
   identifier: string,
