@@ -1,6 +1,5 @@
 import type pg from 'pg';
 import { realClock } from '@/modules/clock';
-import { parseCentimes } from '@/lib/money';
 import {
   createClient,
   createComponent,
@@ -31,12 +30,15 @@ import {
 import {
   addPartyOpeningBalance,
   enterOpeningDate,
+  getInvoiceSequence,
   getOpeningState,
   listInstruments,
   receiveInstrument,
+  setInvoiceSequence,
 } from '@/modules/ledger';
 import type { SessionUser } from '@/modules/platform-security';
-import { type Sheet, toIsoDate, toRecords } from '../domain/sheet';
+import { type DateFormat, type Sheet, toIsoDate, toRecords } from '../domain/sheet';
+import { parseImportAmount, parseWholeNumber } from '../domain/values';
 
 // Excel importers (REQUIREMENTS-V1 §14). Every row goes through the same parser and the same service as the screen, so the same
 // rules, row-level security and audit apply. A DRY RUN (the default) validates every row, looks for what exists already, writes
@@ -48,11 +50,13 @@ export const IMPORT_KINDS = [
   'clients',
   'suppliers',
   'trucks',
+  'pumps',
   'selling_prices',
   'opening_balances',
   'cheques_in_transit',
   'components',
   'recipes',
+  'invoice_sequence',
 ] as const;
 export type ImportKind = (typeof IMPORT_KINDS)[number];
 
@@ -78,15 +82,23 @@ interface Planned {
   exists?: boolean;
   apply?: () => Promise<string | null>;
 }
-interface Ctx {
+export interface Ctx {
   appPool: pg.Pool;
   actor: SessionUser;
+  /** The header names accepted per field when the sheet's mapping file gives them (default: COLUMNS of the kind). */
+  columns?: Record<string, readonly string[]>;
+  /** 1-based row of the headers (default 1). */
+  headerRow?: number;
+  /** The order of a text date (default 'dmy'). */
+  dateFormat?: DateFormat;
+  /** The plant code used when a row has no plant of its own (prices, recipes, trucks). */
+  defaultPlant?: string;
   openingDate?: string;
   /** The business date the instruments are received on (default: today). */
   today?: string;
 }
 
-const COLUMNS = {
+export const COLUMNS = {
   concrete_types: {
     code: ['code', 'type', 'classe'],
     label: ['label', 'libelle', 'désignation', 'designation', 'nom'],
@@ -115,10 +127,19 @@ const COLUMNS = {
     kind: ['kind', 'type', 'genre'],
     plant: ['plant', 'centrale', 'site'],
   },
+  // Pump trucks: the same columns as the trucks; the kind is always "pump" and its code P1, P2...
+  pumps: {
+    code: ['code', 'pompe', 'camion'],
+    plate: ['plate', 'immatriculation', 'matricule'],
+    capacity: ['capacity', 'capacite', 'capacité', 'm3', 'capacite m3'],
+    plant: ['plant', 'centrale', 'site'],
+  },
+  // The reference (list) price per m³ HT of a concrete type from a date; with a plant it is that plant's price, without it the price of all.
   selling_prices: {
     type: ['type', 'code', 'classe', 'beton'],
     price: ['price', 'prix', 'prix ht', 'prix m3'],
     from: ['from', 'date', 'a partir du', 'à partir du', 'effective'],
+    plant: ['plant', 'centrale', 'site'],
   },
   opening_balances: {
     party: ['party', 'tiers', 'type tiers'],
@@ -150,6 +171,12 @@ const COLUMNS = {
     qty: ['qty', 'quantity', 'quantite', 'quantité', 'dosage', 'par m3', 'qte'],
     unit: ['unit', 'unite', 'unité'],
     from: ['from', 'date', 'a partir du', 'à partir du', 'effective'],
+    plant: ['plant', 'centrale', 'site'],
+  },
+  // The last invoice number of the year already issued on paper: the next invoice is last + 1.
+  invoice_sequence: {
+    year: ['year', 'annee', 'année', 'exercice'],
+    last: ['last', 'dernier numero', 'dernier numéro', 'dernier numero de facture', 'numero', 'numéro'],
   },
 } as const satisfies Record<ImportKind, Record<string, readonly string[]>>;
 
@@ -162,6 +189,21 @@ const full = <K extends ImportKind>(
     keyof (typeof COLUMNS)[K],
     string
   >;
+
+/** The fields without which a sheet is unusable (the other columns are optional). */
+export const REQUIRED_FIELDS: Record<ImportKind, string[]> = {
+  concrete_types: ['code', 'label'],
+  clients: ['name', 'kind'],
+  suppliers: ['name', 'category'],
+  trucks: ['code', 'plate'],
+  pumps: ['code', 'plate'],
+  selling_prices: ['type', 'price', 'from'],
+  opening_balances: ['party', 'code', 'amount'],
+  cheques_in_transit: ['client', 'method', 'number', 'amount', 'written'],
+  components: ['nameFr', 'unit'],
+  recipes: ['type', 'component', 'qty', 'from'],
+  invoice_sequence: ['year', 'last'],
+};
 
 const KIND_ALIASES: Record<string, string> = {
   company: 'company',
@@ -196,20 +238,9 @@ async function plan(
   sheet: Sheet,
   ctx: Ctx,
 ): Promise<{ planned: Planned[]; missing: string[] }> {
-  const { records: rawRecords, missing } = toRecords(sheet, COLUMNS[kind]);
+  const { records: rawRecords, missing } = toRecords(sheet, ctx.columns ?? COLUMNS[kind], ctx.headerRow ?? 1);
   // the optional columns do not make a file unusable
-  const required: Record<ImportKind, string[]> = {
-    concrete_types: ['code', 'label'],
-    clients: ['name', 'kind'],
-    suppliers: ['name', 'category'],
-    trucks: ['code', 'plate'],
-    selling_prices: ['type', 'price', 'from'],
-    opening_balances: ['party', 'code', 'amount'],
-    cheques_in_transit: ['client', 'method', 'number', 'amount', 'written'],
-    components: ['nameFr', 'unit'],
-    recipes: ['type', 'component', 'qty', 'from'],
-  };
-  const realMissing = missing.filter((m) => required[kind].includes(m));
+  const realMissing = missing.filter((m) => REQUIRED_FIELDS[kind].includes(m));
   if (realMissing.length) return { planned: [], missing: realMissing };
   const { appPool, actor } = ctx;
   const planned: Planned[] = [];
@@ -315,17 +346,18 @@ async function plan(
         });
       }
     }
-  } else if (kind === 'trucks') {
-    const records = rawRecords.map((r) => ({ row: r.row, values: full('trucks', r.values) }));
+  } else if (kind === 'trucks' || kind === 'pumps') {
+    const records = rawRecords.map((r) => ({ row: r.row, values: full(kind, r.values) }));
     const have = new Set((await listTrucks(appPool, actor)).flatMap((t) => [t.code, t.plate.toUpperCase()]));
     const plants = new Map(
       (await listPlants(appPool, actor)).filter((p) => p.status === 'active').map((p) => [p.code, p.id]),
     );
     const seen = new Set<string>();
     for (const { row, values: v } of records) {
-      const kindV = v.kind ? alias(v.kind) : 'mixer';
+      const kindV = kind === 'pumps' ? 'pump' : 'kind' in v && v.kind ? alias(v.kind as string) : 'mixer';
       const cap = v.capacity ? parseCapacityM3(v.capacity) : null;
-      const plantId = v.plant ? (plants.get(v.plant.trim().toUpperCase()) ?? 'unknown') : null;
+      const plantCode = (v.plant || ctx.defaultPlant || '').trim().toUpperCase();
+      const plantId = plantCode ? (plants.get(plantCode) ?? 'unknown') : null;
       if (plantId === 'unknown') {
         planned.push({ row, label: v.code, error: 'unknown plant code' });
         continue;
@@ -363,31 +395,54 @@ async function plan(
   } else if (kind === 'selling_prices') {
     const records = rawRecords.map((r) => ({ row: r.row, values: full('selling_prices', r.values) }));
     const types = new Map((await listConcreteTypes(appPool, actor)).map((t) => [t.code, t.id]));
+    const plants = new Map(
+      (await listPlants(appPool, actor)).filter((p) => p.status === 'active').map((p) => [p.code, p.id]),
+    );
     const existing = (await listSellingPrices(appPool, actor)).filter((p) => p.clientId === null);
+    const seen = new Set<string>();
     for (const { row, values: v } of records) {
       const typeId = types.get(v.type.trim().toUpperCase());
-      const cents = parseCentimes(v.price);
-      const from = toIsoDate(v.from);
-      const label = `${v.type} ${v.from}`;
+      const amount = parseImportAmount(v.price);
+      const from = toIsoDate(v.from, ctx.dateFormat);
+      const plantCode = (v.plant || ctx.defaultPlant || '').trim().toUpperCase();
+      const plantId = plantCode ? (plants.get(plantCode) ?? 'unknown') : null;
+      const label = `${v.type} ${plantCode || 'all plants'} ${v.from}`;
+      const key = `${typeId}|${plantId}|${from}`;
       if (!typeId) planned.push({ row, label, error: 'unknown concrete type (import the types first)' });
-      else if (cents === null || cents <= 0)
-        planned.push({ row, label, error: 'price in MAD HT per m³, at most two decimals' });
-      else if (!from) planned.push({ row, label, error: 'date not understood (dd/mm/yyyy or yyyy-mm-dd)' });
-      else if (existing.some((p) => p.concreteTypeId === typeId && p.effectiveFrom === from))
+      else if (plantId === 'unknown') planned.push({ row, label, error: 'unknown plant code' });
+      else if (!amount.ok || amount.value <= 0)
+        planned.push({
+          row,
+          label,
+          error: `price in MAD HT per m³: ${amount.ok ? 'must be above zero' : amount.reason}`,
+        });
+      else if (!from)
+        planned.push({
+          row,
+          label,
+          error: `date not understood or ambiguous (expected ${ctx.dateFormat ?? 'dmy'})`,
+        });
+      else if (
+        existing.some((p) => p.concreteTypeId === typeId && p.plantId === plantId && p.effectiveFrom === from)
+      )
         planned.push({ row, label, exists: true });
-      else
+      else if (seen.has(key)) planned.push({ row, label, error: 'twice in the file' });
+      else {
+        seen.add(key);
         planned.push({
           row,
           label,
           apply: async () => {
             const r = await createListPrice(appPool, actor, {
               concreteTypeId: typeId,
-              priceHtPerM3Centimes: cents,
+              priceHtPerM3Centimes: amount.value,
               effectiveFrom: from,
+              ...(plantId ? { plantId } : {}),
             });
             return r.ok ? null : fail(r);
           },
         });
+      }
     }
   } else if (kind === 'components') {
     const records = rawRecords.map((r) => ({ row: r.row, values: full('components', r.values) }));
@@ -434,6 +489,9 @@ async function plan(
   } else if (kind === 'recipes') {
     const records = rawRecords.map((r) => ({ row: r.row, values: full('recipes', r.values) }));
     const types = new Map((await listConcreteTypes(appPool, actor)).map((t) => [t.code, t.id]));
+    const plants = new Map(
+      (await listPlants(appPool, actor)).filter((p) => p.status === 'active').map((p) => [p.code, p.id]),
+    );
     const components = await listComponents(appPool, actor);
     const byRef = new Map<string, (typeof components)[number]>();
     for (const c of components) {
@@ -444,19 +502,38 @@ async function plan(
     type Line = { row: number; componentId: string; qtyPerM3: number };
     const groups = new Map<
       string,
-      { row: number; type: string; typeId: string; from: string; lines: Line[]; bad: boolean }
+      {
+        row: number;
+        type: string;
+        typeId: string;
+        plantId: string | null;
+        plantCode: string;
+        from: string;
+        lines: Line[];
+        bad: boolean;
+      }
     >();
     for (const { row, values: v } of records) {
       const typeId = types.get(v.type.trim().toUpperCase());
-      const from = toIsoDate(v.from);
+      const from = toIsoDate(v.from, ctx.dateFormat);
       const comp = byRef.get(v.component.trim().toLowerCase());
+      const plantCode = (v.plant || ctx.defaultPlant || '').trim().toUpperCase();
+      const plantId = plantCode ? (plants.get(plantCode) ?? 'unknown') : null;
       const label = `${v.type} ${v.from} ${v.component}`;
       if (!typeId) {
         planned.push({ row, label, error: 'unknown concrete type (import the types first)' });
         continue;
       }
+      if (plantId === 'unknown') {
+        planned.push({ row, label, error: 'unknown plant code' });
+        continue;
+      }
       if (!from) {
-        planned.push({ row, label, error: 'date not understood (dd/mm/yyyy or yyyy-mm-dd)' });
+        planned.push({
+          row,
+          label,
+          error: `date not understood or ambiguous (expected ${ctx.dateFormat ?? 'dmy'})`,
+        });
         continue;
       }
       if (!comp) {
@@ -469,11 +546,13 @@ async function plan(
         planned.push({ row, label, error: `quantity per m³ in ${unit}: ${qty.error}` });
         continue;
       }
-      const key = `${typeId}|${from}`;
+      const key = `${typeId}|${plantId}|${from}`;
       const group = groups.get(key) ?? {
         row,
         type: v.type.trim().toUpperCase(),
         typeId,
+        plantId,
+        plantCode,
         from,
         lines: [],
         bad: false,
@@ -485,9 +564,11 @@ async function plan(
       groups.set(key, group);
     }
     for (const g of groups.values()) {
-      const label = `${g.type} from ${g.from} (${g.lines.length} lines)`;
+      const label = `${g.type} ${g.plantCode || 'all plants'} from ${g.from} (${g.lines.length} lines)`;
       if (g.bad) continue; // the row error above already blocks the file
-      const versions = await listRecetteVersions(appPool, actor, g.typeId);
+      const versions = (await listRecetteVersions(appPool, actor, g.typeId)).filter(
+        (x) => (x.plantId ?? null) === g.plantId,
+      );
       if (versions.some((x) => x.effectiveFrom === g.from)) planned.push({ row: g.row, label, exists: true });
       else if (versions.some((x) => x.effectiveFrom > g.from))
         planned.push({
@@ -502,6 +583,7 @@ async function plan(
           apply: async () => {
             const r = await createRecetteVersion(appPool, actor, g.typeId, {
               effectiveFrom: g.from,
+              ...(g.plantId ? { plantId: g.plantId } : {}),
               lines: g.lines.map((l) => ({ componentId: l.componentId, qtyPerM3: l.qtyPerM3 })),
             });
             return r.ok ? null : fail(r);
@@ -529,17 +611,25 @@ async function plan(
         : ['lcn', 'effet'].includes(v.method.trim().toLowerCase())
           ? 'lcn'
           : null;
-      const cents = parseCentimes(v.amount);
-      const written = toIsoDate(v.written);
+      const amount = parseImportAmount(v.amount);
+      const written = toIsoDate(v.written, ctx.dateFormat);
       const label = `${v.number} ${v.client}`;
       const key = `${clientId}|${v.number.toLowerCase()}|${v.bank.toLowerCase()}`;
       if (!clientId) planned.push({ row, label, error: 'unknown client (code or exact name)' });
       else if (!method) planned.push({ row, label, error: 'type must be cheque or lcn' });
       else if (!v.number.trim()) planned.push({ row, label, error: 'the cheque or LCN number is required' });
-      else if (cents === null || cents <= 0)
-        planned.push({ row, label, error: 'amount in MAD, positive, at most two decimals' });
+      else if (!amount.ok || amount.value <= 0)
+        planned.push({
+          row,
+          label,
+          error: `amount in MAD: ${amount.ok ? 'must be above zero' : amount.reason}`,
+        });
       else if (!written)
-        planned.push({ row, label, error: 'date not understood (dd/mm/yyyy or yyyy-mm-dd)' });
+        planned.push({
+          row,
+          label,
+          error: `date not understood or ambiguous (expected ${ctx.dateFormat ?? 'dmy'})`,
+        });
       else if (have.has(key)) planned.push({ row, label, exists: true });
       else if (seen.has(key)) planned.push({ row, label, error: 'twice in the file' });
       else {
@@ -554,7 +644,7 @@ async function plan(
               {
                 clientId,
                 method,
-                amountCentimes: cents,
+                amountCentimes: amount.value,
                 number: v.number,
                 bank: nul(v.bank),
                 writtenDate: written,
@@ -564,6 +654,37 @@ async function plan(
             return r.ok ? null : fail(r);
           },
         });
+      }
+    }
+  } else if (kind === 'invoice_sequence') {
+    const records = rawRecords.map((r) => ({ row: r.row, values: full('invoice_sequence', r.values) }));
+    const seenYears = new Set<number>();
+    for (const { row, values: v } of records) {
+      const year = parseWholeNumber(v.year, 2000, 2999);
+      const last = parseWholeNumber(v.last, 1, 99_999_999);
+      const label = `${v.year}: ${v.last}`;
+      if (!year.ok) planned.push({ row, label, error: `year: ${year.reason}` });
+      else if (!last.ok) planned.push({ row, label, error: `last invoice number: ${last.reason}` });
+      else if (seenYears.has(year.value)) planned.push({ row, label, error: 'this year twice in the file' });
+      else {
+        seenYears.add(year.value);
+        const now = await getInvoiceSequence(appPool, actor, year.value);
+        if (now !== null && now === last.value) planned.push({ row, label, exists: true });
+        else if (now !== null && now > last.value)
+          planned.push({
+            row,
+            label,
+            error: `numbers up to ${now} are already issued: the sequence only moves forward`,
+          });
+        else
+          planned.push({
+            row,
+            label,
+            apply: async () => {
+              const r = await setInvoiceSequence(appPool, actor, { year: year.value, last: last.value });
+              return r.ok ? null : fail(r);
+            },
+          });
       }
     }
   } else {
@@ -592,10 +713,14 @@ async function plan(
           : party === 'supplier'
             ? suppliers.get(v.code.trim().toUpperCase())
             : undefined;
-      const cents = parseCentimes(v.amount);
+      const amount = parseImportAmount(v.amount);
       if (!id) planned.push({ row, label: v.code, error: 'unknown client or supplier code' });
-      else if (cents === null || cents <= 0)
-        planned.push({ row, label: v.code, error: 'amount in MAD, positive, at most two decimals' });
+      else if (!amount.ok || amount.value <= 0)
+        planned.push({
+          row,
+          label: v.code,
+          error: `amount in MAD: ${amount.ok ? 'must be above zero' : amount.reason}`,
+        });
       else if (has.has(`${party}:${id}`)) planned.push({ row, label: v.code, exists: true });
       else {
         has.add(`${party}:${id}`);
@@ -611,7 +736,7 @@ async function plan(
             }
             const r = await addPartyOpeningBalance(appPool, actor, {
               ...(party === 'client' ? { clientId: id } : { supplierId: id }),
-              amountCentimes: cents,
+              amountCentimes: amount.value,
               reference: nul(v.reference) ?? null,
             });
             return r.ok ? null : fail(r);
@@ -667,3 +792,7 @@ export function formatReport(report: ImportReport): string {
   ].filter(Boolean);
   return lines.join('\n');
 }
+
+/** The fields of a kind and the header names accepted by default (the starting point of a mapping file). */
+export const defaultColumnsOf = (kind: ImportKind): Record<string, readonly string[]> => COLUMNS[kind];
+export const fieldsOf = (kind: ImportKind): string[] => Object.keys(COLUMNS[kind]);

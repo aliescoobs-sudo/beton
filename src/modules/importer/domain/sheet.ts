@@ -256,8 +256,10 @@ const fold = (s: string) =>
 export function toRecords(
   sheet: Sheet,
   columns: Record<string, readonly string[]>,
+  /** 1-based row that holds the headers (default 1); the rows above it (a title, a date) are ignored. */
+  headerRow = 1,
 ): { records: { row: number; values: Record<string, string> }[]; missing: string[] } {
-  const header = (sheet[0] ?? []).map(fold);
+  const header = (sheet[headerRow - 1] ?? []).map(fold);
   const index: Record<string, number> = {};
   const missing: string[] = [];
   for (const [field, names] of Object.entries(columns)) {
@@ -265,11 +267,11 @@ export function toRecords(
     if (i < 0) missing.push(field);
     else index[field] = i;
   }
-  const records = sheet.slice(1).flatMap((cells, k) => {
+  const records = sheet.slice(headerRow).flatMap((cells, k) => {
     if (cells.every((c) => c === '')) return [];
     const values: Record<string, string> = {};
     for (const [field, i] of Object.entries(index)) values[field] = (cells[i] ?? '').trim();
-    return [{ row: k + 2, values }];
+    return [{ row: headerRow + k + 1, values }];
   });
   return { records, missing };
 }

@@ -1,5 +1,15 @@
 // Public surface of the importer (R9). Other modules import only from here.
 export {
+  APPLY_ORDER,
+  type MappingKind,
+  MAPPING_KINDS,
+  mappingForSheet,
+  parseMapping,
+  type SheetMapping,
+} from './domain/mapping';
+export {
+  defaultColumnsOf,
+  fieldsOf,
   formatReport,
   IMPORT_KINDS,
   type ImportKind,

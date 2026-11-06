@@ -221,6 +221,22 @@ export async function setInvoiceTiming(
   }
 }
 
+/** The last invoice number recorded for a year, or null when none. Only the owner reads the sequence (null for any other role). */
+export async function getInvoiceSequence(
+  appPool: pg.Pool,
+  actor: SessionUser,
+  year: number,
+): Promise<number | null> {
+  await require(appPool, actor, 'documents.sequence');
+  const { rows } = await inRequest(appPool, actor, (tx) =>
+    tx.query<{ last_value: number }>(
+      `select last_value from doc_sequence where prefix = 'FA' and year = $1`,
+      [year],
+    ),
+  );
+  return rows[0]?.last_value ?? null;
+}
+
 /** The company's last invoice number of the year: the next invoice is last + 1. Forward only. */
 export async function setInvoiceSequence(
   appPool: pg.Pool,

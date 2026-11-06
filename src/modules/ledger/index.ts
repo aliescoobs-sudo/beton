@@ -107,6 +107,7 @@ export {
   type MyDocumentRequest,
   type PendingDocumentRequest,
   requestDocument,
+  getInvoiceSequence,
   setInvoiceSequence,
   setInvoiceTiming,
   releaseDocumentRequest,
