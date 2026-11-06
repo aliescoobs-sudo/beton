@@ -12,7 +12,7 @@ import {
   syntheticValidWorkbook,
 } from '../src/modules/importer';
 import { defaultMappings } from '../src/modules/importer';
-import { createPlant } from '../src/modules/master-data';
+import { createPlant, listPlants, updatePlant } from '../src/modules/master-data';
 import type { SessionUser } from '../src/modules/platform-security/auth/session-gate';
 import { testEnv } from './db-env';
 import { realSessionUser } from './helpers/actors';
@@ -21,7 +21,13 @@ import { realSessionUser } from './helpers/actors';
 const env = testEnv();
 const app = new pg.Pool({ connectionString: env.DATABASE_URL_APP, max: 3 });
 const migrator = new pg.Pool({ connectionString: env.DATABASE_URL_MIGRATOR, max: 1 });
-afterAll(() => Promise.all([app.end(), migrator.end()]));
+afterAll(async () => {
+  // the plants are the shared test database's: leave no active extra plant behind (an order then asks for its plant)
+  for (const plant of await listPlants(app, stepped)) {
+    if (plants.includes(plant.code)) await updatePlant(app, stepped, plant.id, { status: 'archived' });
+  }
+  await Promise.all([app.end(), migrator.end()]);
+});
 const PROD: ImportEnvironment = { trainingMode: false, realData: true, simulationEnabled: false };
 const tag = randomUUID().replace(/-/g, '').slice(0, 6).toUpperCase();
 const letters = (n: number, from = 0) =>

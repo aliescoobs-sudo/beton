@@ -11,6 +11,7 @@ import {
   listRecetteVersions,
   listSellingPrices,
   listTrucks,
+  updatePlant,
 } from '../src/modules/master-data';
 import { getInvoiceSequence } from '../src/modules/ledger';
 import type { SessionUser } from '../src/modules/platform-security/auth/session-gate';
@@ -22,7 +23,14 @@ import { buildXlsx } from './helpers/xlsx-writer';
 // Synthetic data only.
 const env = testEnv();
 const app = new pg.Pool({ connectionString: env.DATABASE_URL_APP, max: 3 });
-afterAll(() => app.end());
+afterAll(async () => {
+  // the plants are the shared test database's: leave no active extra plant behind (an order then asks for its plant)
+  for (const plant of await listPlants(app, owner)) {
+    if ([PLANT_A, PLANT_B].includes(plant.code))
+      await updatePlant(app, owner, plant.id, { status: 'archived' });
+  }
+  await app.end();
+});
 let owner: SessionUser;
 const tag = randomUUID().replace(/-/g, '').slice(0, 6).toUpperCase();
 const letters = (n: number) =>
