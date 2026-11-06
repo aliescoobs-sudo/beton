@@ -154,10 +154,10 @@ describe('the training seed (T1)', () => {
       provenance: 'unverified-test-database',
       env: training,
       today: new Date().toISOString().slice(0, 10),
-      credentialsFile: path.join(dir, 'second.txt'),
+      credentialsFile: path.join(dir, 'training-accounts.second.local.txt'),
     });
     expect(again.applied).toBe(false);
-    expect(existsSync(path.join(dir, 'second.txt'))).toBe(false);
+    expect(existsSync(path.join(dir, 'training-accounts.second.local.txt'))).toBe(false);
   });
 });
 

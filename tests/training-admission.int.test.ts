@@ -6,6 +6,7 @@ import {
   readdirSync,
   statSync,
   symlinkSync,
+  writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -310,5 +311,56 @@ describe('seed provenance: the birth token (R13-01)', () => {
     await noToken();
     await mintBirthToken(training);
     expect(await hasBirthToken(training)).toBe(true);
+  });
+});
+
+// R13 small item: the stale staged-credentials sweep runs before the marker and emptiness checks, so it also runs after an interrupted
+// half-seed and on an already seeded database.
+describe('stale staged credentials are swept first', () => {
+  const stale = () => {
+    const d = mkdtempSync(path.join(tmpdir(), 'bb-sweep-'));
+    chmodSync(d, 0o700);
+    const staged = path.join(d, 'training-accounts.staging-0123456789ab.local.txt');
+    writeFileSync(staged, 'password: leftover\n', { mode: 0o600 });
+    return { dir: d, staged, final: path.join(d, 'training-accounts.local.txt') };
+  };
+  const fresh = async () => {
+    await recreateDatabase(training, TRAINING_TEST_DATABASE);
+    await runMigrations(env.DATABASE_URL_MIGRATOR);
+  };
+  const asSuper = async (sql: string) => {
+    const c = new pg.Client({ connectionString: superuserUrl(training, TRAINING_TEST_DATABASE) });
+    await c.connect();
+    try {
+      await c.query(sql);
+    } finally {
+      await c.end();
+    }
+  };
+  it('after an interrupted half-seed (the database now refused as not empty) the leftover is gone', async () => {
+    await fresh();
+    await asSuper(
+      `select set_config('app.user_id', '${SYSTEM_ACTOR_ID}', false), set_config('app.role', 'system', false);
+       insert into client (id, code, name, kind) values (gen_random_uuid(), 'CLT-7777', 'Reste', 'company')`,
+    );
+    const s = stale();
+    await expect(
+      seedTraining({ env: training, today: '2026-11-06', credentialsFile: s.final }),
+    ).rejects.toThrow(/not empty/);
+    expect(existsSync(s.staged)).toBe(false);
+  });
+  it('on an already marked database the leftover is gone too, and nothing else is touched', async () => {
+    await fresh();
+    await asSuper('insert into public.training_marker default values');
+    const s = stale();
+    const r = await seedTraining({
+      provenance: 'unverified-test-database',
+      env: training,
+      today: '2026-11-06',
+      credentialsFile: s.final,
+    });
+    expect(r.applied).toBe(false);
+    expect(existsSync(s.staged)).toBe(false);
+    expect(existsSync(s.final)).toBe(false);
   });
 });

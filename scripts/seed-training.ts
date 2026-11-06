@@ -201,15 +201,15 @@ export async function seedTraining(opts: SeedTrainingOptions): Promise<SeedTrain
   const seed = new pg.Pool({ connectionString: env.DATABASE_URL_SEED, max: 2 });
   const migrator = new pg.Pool({ connectionString: env.DATABASE_URL_MIGRATOR, max: 1 });
   try {
+    // R11-04 / R13: a destination that cannot be trusted is found before anything else, and a staged file left by an earlier crash
+    // (a half-seed that was interrupted, or a seeded database that is being asked again) is removed FIRST, whatever the checks below say.
+    validateCredentialsPath(opts.credentialsFile);
+    sweepStaleStagedCredentials(opts.credentialsFile);
     if ((await migrator.query('select 1 from public.training_marker')).rowCount)
       return { applied: false, accounts: 0, credentialsFile: null };
     await assertSeedTargetEmpty(migrator);
     // R13-01: provenance. Checked (without being consumed) before the first write; consumed right after the destination is vetted.
     if (needToken && !(await hasBirthToken(env))) throw new SeedError(PROVENANCE_REFUSAL);
-    // R11-04: a destination that cannot be trusted is found before the first write, not after the database is full.
-    validateCredentialsPath(opts.credentialsFile);
-    // R12-02: a staged file left by an earlier crash is removed before anything new is written.
-    sweepStaleStagedCredentials(opts.credentialsFile);
     // Claimed atomically: two seeds cannot both pass, and one seed cannot be run twice on the same volume.
     if (needToken && !(await claimBirthToken(env))) throw new SeedError(PROVENANCE_REFUSAL);
 
