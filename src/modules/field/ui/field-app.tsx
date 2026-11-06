@@ -26,6 +26,8 @@ import { dropPhoto, queuedPhotos, queuePhoto, sendPhoto, shrinkPhoto } from './p
 // phone's own time and sent when there is a network; the last day read is kept for the road. No price exists in anything it gets.
 
 const DEVICE_KEY = 'bb_field_device';
+/** R12-04: how long a read of the day may take before it counts as "no network". */
+const SESSION_READ_TIMEOUT_MS = 10_000;
 
 /**
  * F07: the site address is shown as text with a copy button; nothing is sent to a third party. The external map link only
@@ -146,6 +148,8 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
   const queueRef = useRef<QueueAction[]>([]);
   // The account the phone's local work belongs to (F02): the taps and the photos are sent by that account only.
   const ownerRef = useRef<string | null>(null);
+  // R12-04: each read of the day takes a number; an answer that arrives after a newer read, a sign-out or a refusal is ignored.
+  const epoch = useRef(0);
 
   const saveQueue = useCallback((q: QueueAction[]) => {
     queueRef.current = q;
@@ -157,17 +161,24 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
   // The server refused this phone's session (expired, revoked, device released): nothing that names a client stays on screen or on the
   // phone. The work waiting to be sent stays, tied to its account, and goes out after that account signs in again.
   const refused = useCallback(async () => {
+    epoch.current++; // whatever answer is still on its way belongs to a session that is over
     await forgetRead();
     setDay(null);
     setSession('out');
   }, []);
 
   const loadDay = useCallback(async () => {
+    const mine = ++epoch.current;
+    // R12-04: the read is bounded. A connection that stalls instead of failing ends as "no network" after this long.
+    const ctl = new AbortController();
+    const deadline = setTimeout(() => ctl.abort(), SESSION_READ_TIMEOUT_MS);
     try {
-      const res = await fetch('/api/field/session', { cache: 'no-store' });
+      const res = await fetch('/api/field/session', { cache: 'no-store', signal: ctl.signal });
+      if (mine !== epoch.current) return;
       if (res.status === 401) return await refused();
       if (!res.ok) throw new Error('bad');
       const data = (await res.json()) as Day;
+      if (mine !== epoch.current) return;
       // Another account on this phone: its day, its taps and its photos are erased before this account sees anything of them.
       const photos = await queuedPhotos().catch(() => []);
       const holders = [
@@ -187,6 +198,7 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
       setSession('in');
       setOnline(true);
     } catch {
+      if (mine !== epoch.current) return; // an obsolete read that failed says nothing about the present
       // No network: the last day read stays on screen, for the account that read it and for a limited time only.
       const kept = readStoredDay<Day>(localStorage.getItem(DAY_KEY), Date.now());
       if (kept) {
@@ -199,6 +211,8 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
         setSession('out');
       }
       setOnline(false);
+    } finally {
+      clearTimeout(deadline);
     }
   }, [refused, saveQueue]);
 
@@ -208,7 +222,16 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
   const shown = useRef(false);
   const recheck = useCallback(async () => {
     if (!shown.current) return;
-    if (judgeDay(localStorage.getItem(DAY_KEY), Date.now()) === 'fresh') return;
+    const verdict = judgeDay(localStorage.getItem(DAY_KEY), Date.now());
+    if (verdict === 'fresh') return;
+    if (verdict === 'none') {
+      // R12-04: no valid day any more. It leaves the screen and the phone NOW, whatever the network does; the read that follows
+      // can only bring a new day back if the server vouches for it.
+      epoch.current++;
+      await forgetRead();
+      setDay(null);
+      setSession('unknown');
+    }
     await loadDay();
   }, [loadDay]);
 
@@ -412,6 +435,7 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
     const photos = (await queuedPhotos().catch(() => [])).filter((x) => x.userId === ownerRef.current);
     const waiting = queueRef.current.length + photos.length;
     if (waiting > 0 && !window.confirm(t('signOutPending', { count: waiting }))) return;
+    epoch.current++; // a read still on its way belongs to the session that is ending
     await fetch('/api/field/logout', { method: 'POST' }).catch(() => null);
     await forgetAll();
     ownerRef.current = null;

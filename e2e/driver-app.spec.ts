@@ -364,6 +364,34 @@ test('R11-06: a local tap does not extend the 18 hours, and a page left open cro
   await context.setOffline(false);
 });
 
+test('R12-04: the day leaves the screen at expiry even while the refresh is still pending', async ({
+  page,
+}) => {
+  await openAndSignIn(page);
+  await expect(page.getByTestId(`trip-${orderCode}`)).toBeVisible();
+  // from now on the server never answers a read of the day (a stalled connection, not a failed one)
+  let held = 0;
+  let answered = 0;
+  await page.route('**/api/field/session', () => {
+    held++; // never fulfilled, never continued
+  });
+  // the server last vouched for the day 18 h minus 25 s ago
+  await page.evaluate(() => {
+    const v = JSON.parse(localStorage.getItem('bb_field_day')!);
+    v.savedAt = Date.now() - (18 * 3600_000 - 25_000);
+    localStorage.setItem('bb_field_day', JSON.stringify(v));
+  });
+  page.on('response', (r) => {
+    if (r.url().includes('/api/field/session')) answered++;
+  });
+  // the page crosses the limit by itself: the client's trip is gone from the screen and from the phone, with the read still pending
+  await expect(page.getByTestId(`trip-${orderCode}`)).toBeHidden({ timeout: 90_000 });
+  expect((await localState(page)).day).toBeNull();
+  expect(held).toBeGreaterThan(0);
+  expect(answered).toBe(0);
+  await expect(page.getByText(orderCode)).toHaveCount(0);
+});
+
 test('R11-06: a revoked session is found without any queued work', async ({ page, context }) => {
   await openAndSignIn(page);
   await expect(page.getByTestId(`trip-${orderCode}`)).toBeVisible();
