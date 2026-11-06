@@ -113,6 +113,9 @@ const envObject = z.object({
   // R11-02: lets a TRAINING_MODE server run on a database without the training marker. For the e2e training server ONLY (it shares the
   // e2e database); refused with APP_ENV=production, REAL_DATA=true, and by the training compose file's own test.
   TRAINING_ALLOW_UNMARKED: flag,
+  // R12-01: the positive signal that this process is the test runner's server (Playwright sets it on its own web servers). TRAINING_ALLOW_UNMARKED
+  // is accepted only together with it, NODE_ENV=test and a throwaway test database; a deployed training service has none of the three.
+  E2E_TEST_RUNNER: z.string().optional(),
   ASSISTANT_ENABLED: flag,
   ASSISTANT_PROVIDER: z
     .enum(['fake', 'anthropic'], { error: 'must be "fake" or "anthropic"' })
@@ -197,6 +200,14 @@ const envSchema = envObject.superRefine((env, ctx) => {
       message: 'only with TRAINING_MODE=true, and never with APP_ENV=production or REAL_DATA=true',
     });
   }
+  if (env.TRAINING_ALLOW_UNMARKED && !isTestRunnerServer(env)) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['TRAINING_ALLOW_UNMARKED'],
+      message:
+        'refused: this escape exists for the end-to-end test server only (E2E_TEST_RUNNER=playwright, NODE_ENV=test, a throwaway test database). A deployed training service never starts without the training marker',
+    });
+  }
   if (env.TRAINING_MODE && env.REAL_DATA) {
     ctx.addIssue({
       code: 'custom',
@@ -225,6 +236,21 @@ const envSchema = envObject.superRefine((env, ctx) => {
 });
 
 export type Env = z.infer<typeof envSchema>;
+
+/** Throwaway databases of the test runners (scripts/db-bootstrap.ts). Never a training or production database. */
+const TEST_DATABASES = ['belgobeton_e2e', 'belgobeton_test'];
+function isTestRunnerServer(env: {
+  E2E_TEST_RUNNER?: string;
+  NODE_ENV: string;
+  DATABASE_URL_APP: string;
+}): boolean {
+  if (env.E2E_TEST_RUNNER !== 'playwright' || env.NODE_ENV !== 'test') return false;
+  try {
+    return TEST_DATABASES.includes(new URL(env.DATABASE_URL_APP).pathname.replace(/^\//, ''));
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Maintenance scripts only (migrate, bootstrap, audit verify, owner 2FA reset): the runtime environment above deliberately has no

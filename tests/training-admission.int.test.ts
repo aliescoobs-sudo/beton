@@ -5,7 +5,7 @@ import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { TRAINING_TEST_DATABASE, ensureRoles, recreateDatabase, superuserUrl } from '../scripts/db-bootstrap';
 import { runMigrations } from '../scripts/db-migrate';
-import { seedTraining } from '../scripts/seed-training';
+import { assertSeedTargetEmpty, seedTraining } from '../scripts/seed-training';
 import { SYSTEM_ACTOR_ID } from '../src/modules/platform-security/auth/actors';
 import { testEnv } from './db-env';
 
@@ -122,4 +122,58 @@ describe('credentials output (R11-04)', () => {
     expect((statSync(file).mode & 0o777).toString(8)).toBe('600');
     expect((await migrator.query('select 1 from public.training_marker')).rowCount).toBe(1);
   }, 600_000);
+});
+
+describe('seed admission looks at all business state (R12-01)', () => {
+  const asSuper = async (sql: string) => {
+    const c = new pg.Client({ connectionString: superuserUrl(training, TRAINING_TEST_DATABASE) });
+    await c.connect();
+    try {
+      await c.query(
+        `select set_config('app.user_id', '${SYSTEM_ACTOR_ID}', false), set_config('app.role', 'system', false)`,
+      );
+      await c.query(`set session_replication_role = replica`); // the row guards of finance are not what is under test
+      await c.query(sql);
+    } finally {
+      await c.end();
+    }
+  };
+  const fresh = async () => {
+    await recreateDatabase(training, TRAINING_TEST_DATABASE);
+    await runMigrations(env.DATABASE_URL_MIGRATOR);
+  };
+  const statsFlush = () => new Promise((r) => setTimeout(r, 1500));
+  it('a freshly migrated database passes: migrations leave no row anywhere in public or finance', async () => {
+    await fresh();
+    await expect(assertSeedTargetEmpty(migrator)).resolves.toBeUndefined();
+  });
+  it('a row in a finance table alone is refused, naming the table and no content', async () => {
+    await fresh();
+    await asSuper(
+      `insert into finance.finance_category (id, code, label, nature, kind, created_by)
+       values (gen_random_uuid(), 'SECRETCODE', 'Libellé réel', 'fixed', 'expense', '${SYSTEM_ACTOR_ID}')`,
+    );
+    await statsFlush();
+    const refusal = assertSeedTargetEmpty(migrator);
+    await expect(refusal).rejects.toThrow(/finance\.finance_category/);
+    await expect(refusal).rejects.not.toThrow(/SECRETCODE|Libellé/);
+    await expect(seedTraining({ env: training, today: '2026-11-06', credentialsFile: file })).rejects.toThrow(
+      /not empty/,
+    );
+    expect((await migrator.query('select 1 from public.training_marker')).rowCount).toBe(0);
+  });
+  it('a table the maintenance login cannot read (row-level security) is still caught', async () => {
+    await fresh();
+    await asSuper(`insert into code_sequence (key, last_value) values ('ZZZ', 5)`);
+    await statsFlush();
+    expect((await migrator.query('select 1 from code_sequence')).rowCount).toBe(0); // invisible to a plain read
+    await expect(assertSeedTargetEmpty(migrator)).rejects.toThrow(/public\.code_sequence/);
+  });
+  it('lists the tables from the catalog: a table created later is covered without editing a list', async () => {
+    await fresh();
+    await asSuper(`create table public.t4_future_table (id int)`);
+    await asSuper(`insert into public.t4_future_table values (1)`);
+    await statsFlush();
+    await expect(assertSeedTargetEmpty(migrator)).rejects.toThrow(/public\.t4_future_table/);
+  });
 });

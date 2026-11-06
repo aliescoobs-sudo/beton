@@ -39,6 +39,9 @@ services:
       TRAINING_MODE: 'true'
       REAL_DATA: 'false'
       SIMULATION_ENABLED: 'false'
+      # R12-01: the test-only escapes are forced off here, whatever .env.training says (the environment schema refuses them anyway).
+      TRAINING_ALLOW_UNMARKED: 'false'
+      E2E_TEST_RUNNER: ''
       # One proxy in front (Tailscale Funnel, or Caddy on a VPS) appends the client address to X-Forwarded-For.
       TRUSTED_PROXY_HOPS: '1'
       FILE_STORE_DIR: /data/file-store

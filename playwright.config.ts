@@ -72,6 +72,7 @@ export default defineConfig({
         TRAINING_MODE: 'true',
         // the e2e database is shared and carries no training marker (it must not: the main e2e server would refuse it)
         TRAINING_ALLOW_UNMARKED: 'true',
+        E2E_TEST_RUNNER: 'playwright',
         APP_ENV: 'training',
         ASSISTANT_PROVIDER: 'fake',
         FIELD_APP_ENABLED: 'true',

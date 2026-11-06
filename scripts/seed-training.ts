@@ -101,22 +101,43 @@ const session = (u: {
  * accounts, parties, orders, trucks or invoices is somebody's data (or a half-finished seed): refused before the first write, with
  * the way out (a fresh database). The marker is written last, only once everything else, the credentials file included, is done.
  */
-const NOT_EMPTY_TABLES = [
-  '"user"',
-  'client',
-  'supplier',
-  'sales_order',
-  'purchase',
-  'truck',
-  'driver',
-  'invoice',
-  'payment_instrument',
-] as const;
+/**
+ * Tables the migrations themselves fill with reference data, as `schema.table`. A fresh database after every migration holds NO row in
+ * any table of `public` or `finance` (checked when this was written), so the list is empty; a migration that starts seeding a table adds
+ * it here on purpose. Everything else must be empty.
+ */
+export const SEED_REFERENCE_TABLES: readonly string[] = [];
+
+/**
+ * R12-01: the whole business state, not nine probes. Every table of `public` and `finance` is listed from the catalog (so a table added
+ * tomorrow is covered the day it exists) and must be empty unless it is on the reference allowlist. A table is also judged by the
+ * database's own live-row statistics, because row-level security hides some tables' rows from the maintenance login: a table that
+ * cannot be read is not assumed empty. The refusal names tables only, never a row.
+ */
 export async function assertSeedTargetEmpty(migrator: pg.Pool): Promise<void> {
+  const { rows: tables } = await migrator.query<{ schema: string; name: string; live: string }>(
+    `select n.nspname as schema, c.relname as name, coalesce(st.n_live_tup, 0)::text as live
+       from pg_class c
+       join pg_namespace n on n.oid = c.relnamespace
+       left join pg_stat_all_tables st on st.relid = c.oid
+      where c.relkind in ('r', 'p') and n.nspname in ('public', 'finance')
+      order by 1, 2`,
+  );
   const holding: string[] = [];
-  for (const t of NOT_EMPTY_TABLES)
-    if ((await migrator.query(`select 1 from public.${t} limit 1`)).rowCount)
-      holding.push(t.replaceAll('"', ''));
+  for (const t of tables) {
+    const full = `${t.schema}.${t.name}`;
+    if (SEED_REFERENCE_TABLES.includes(full)) continue;
+    // A table this login may not even read cannot be shown empty: it counts as holding state (fail closed).
+    let visible: number | null = 1;
+    try {
+      visible = (
+        await migrator.query(`select 1 from ${pgFormatIdent(t.schema)}.${pgFormatIdent(t.name)} limit 1`)
+      ).rowCount;
+    } catch (error) {
+      if ((error as { code?: string }).code !== '42501') throw error;
+    }
+    if (visible || Number(t.live) > 0) holding.push(full);
+  }
   if (holding.length)
     throw new SeedError(
       `training seed refused: this database is not empty (${holding.join(', ')} hold rows) and carries no training marker. ` +
@@ -124,6 +145,8 @@ export async function assertSeedTargetEmpty(migrator: pg.Pool): Promise<void> {
         'never point training at an existing database.',
     );
 }
+
+const pgFormatIdent = (name: string): string => `"${name.replaceAll('"', '""')}"`;
 
 export async function seedTraining(opts: SeedTrainingOptions): Promise<SeedTrainingResult> {
   const { env, today } = opts;

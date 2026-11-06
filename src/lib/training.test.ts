@@ -37,14 +37,40 @@ describe('TRAINING_MODE in the environment (T1)', () => {
     // outside training the keys are accepted as before
     expect(() => loadEnv({ ...valid, VAPID_PUBLIC_KEY: pub, VAPID_PRIVATE_KEY: priv })).not.toThrow();
   });
-  it('R11-02: TRAINING_ALLOW_UNMARKED exists for the e2e server only: needs training mode, never production or real data', () => {
+  it('R11-02 / R12-01: TRAINING_ALLOW_UNMARKED is the end-to-end server only: positive runner signal, NODE_ENV=test, a throwaway test database', () => {
     const t = { ...valid, TRAINING_MODE: 'true', APP_ENV: 'training', NODE_ENV: 'production' };
     expect(loadEnv(t).TRAINING_ALLOW_UNMARKED).toBe(false);
-    expect(loadEnv({ ...t, TRAINING_ALLOW_UNMARKED: 'true' }).TRAINING_ALLOW_UNMARKED).toBe(true);
+    const e2e = {
+      ...t,
+      NODE_ENV: 'test',
+      DATABASE_URL_APP: 'postgres://app:pw@db:5432/belgobeton_e2e',
+      E2E_TEST_RUNNER: 'playwright',
+      TRAINING_ALLOW_UNMARKED: 'true',
+    };
+    expect(loadEnv(e2e).TRAINING_ALLOW_UNMARKED).toBe(true);
     expect(() => loadEnv({ ...valid, TRAINING_ALLOW_UNMARKED: 'true' })).toThrow(/TRAINING_ALLOW_UNMARKED/);
-    expect(() =>
-      loadEnv({ ...valid, TRAINING_MODE: 'true', TRAINING_ALLOW_UNMARKED: 'true', REAL_DATA: 'true' }),
-    ).toThrow();
+    expect(() => loadEnv({ ...e2e, REAL_DATA: 'true' })).toThrow();
+  });
+  it('R12-01 runtime: a deployed training service (APP_ENV=training, TRAINING_MODE=true, REAL_DATA=false) refuses the escape however it is set', () => {
+    const deployed = {
+      ...valid,
+      TRAINING_MODE: 'true',
+      APP_ENV: 'training',
+      REAL_DATA: 'false',
+      NODE_ENV: 'production',
+      TRAINING_ALLOW_UNMARKED: 'true',
+    };
+    expect(() => loadEnv(deployed)).toThrow(/TRAINING_ALLOW_UNMARKED/);
+    // a runner signal alone, or NODE_ENV=test alone, or a test-looking name alone, is not enough
+    expect(() => loadEnv({ ...deployed, E2E_TEST_RUNNER: 'playwright' })).toThrow(/TRAINING_ALLOW_UNMARKED/);
+    expect(() => loadEnv({ ...deployed, NODE_ENV: 'test' })).toThrow(/TRAINING_ALLOW_UNMARKED/);
+    expect(() => loadEnv({ ...deployed, DATABASE_URL_APP: 'postgres://a:p@db:5432/belgobeton_e2e' })).toThrow(
+      /TRAINING_ALLOW_UNMARKED/,
+    );
+    // all three but on the training database: still refused
+    expect(() => loadEnv({ ...deployed, NODE_ENV: 'test', E2E_TEST_RUNNER: 'playwright' })).toThrow(
+      /TRAINING_ALLOW_UNMARKED/,
+    );
   });
   it('the production environment is untouched by the training variables being absent', () => {
     expect(() =>

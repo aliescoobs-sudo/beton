@@ -37,7 +37,10 @@ describe('the training stack (T1)', () => {
     expect(app).not.toMatch(/APP_ENV: production|REAL_DATA: 'true'/);
   });
   it('R11-02: nothing in the training stack can switch off the marker requirement', () => {
-    expect(compose).not.toMatch(/TRAINING_ALLOW_UNMARKED/);
+    // the app block forces the escapes off (a runtime test in src/lib/training.test.ts proves the schema refuses them anyway)
+    expect(block('app')).toMatch(/TRAINING_ALLOW_UNMARKED: 'false'/);
+    expect(block('app')).toMatch(/E2E_TEST_RUNNER: ''/);
+    expect(compose).not.toMatch(/TRAINING_ALLOW_UNMARKED: 'true'/);
     expect(initEnv).not.toMatch(/TRAINING_ALLOW_UNMARKED/);
   });
   it('R11-04: the credentials file lives in a Docker volume made private to the container user, not in a shared host folder', () => {
