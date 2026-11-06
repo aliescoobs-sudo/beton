@@ -1,8 +1,8 @@
 // The training instance's data (T1): two plants, fictitious parties with obviously fake identifiers, trucks and pumps, recipes and
 // reference prices per plant, orders, purchases, receipts, transfers, cheques and payments in every state, and one account per role.
 // Fictitious data only. Refuses unless TRAINING_MODE=true and APP_ENV is not production; writes a marker so the server knows this
-// database is a training database. Credentials are generated once and written to `training-accounts.local.txt` (ignored by git);
-// they are never printed.
+// database is a training database. Credentials are generated once and written to the file named by TRAINING_ACCOUNTS_FILE (required, no
+// default: a private folder outside any checkout or build context; in the containers /app/out/training-accounts.local.txt); never printed.
 //   corepack pnpm seed:training         (an already seeded database is left alone: use `reset:training`)
 import { existsSync } from 'node:fs';
 import pg from 'pg';
@@ -53,6 +53,7 @@ import {
   discardCredentialsFile,
   renderCredentialsFile,
   stageCredentialsFile,
+  sweepStaleStagedCredentials,
   type StagedCredentials,
   validateCredentialsPath,
 } from './training-lib.ts';
@@ -165,6 +166,8 @@ export async function seedTraining(opts: SeedTrainingOptions): Promise<SeedTrain
     await assertSeedTargetEmpty(migrator);
     // R11-04: a destination that cannot be trusted is found before the first write, not after the database is full.
     validateCredentialsPath(opts.credentialsFile);
+    // R12-02: a staged file left by an earlier crash is removed before anything new is written.
+    sweepStaleStagedCredentials(opts.credentialsFile);
 
     const issued: IssuedCredential[] = [];
     const cipher = fieldCipherFrom(parseKeyring(env.FIELD_ENCRYPTION_KEYS));
@@ -548,10 +551,12 @@ export async function seedTraining(opts: SeedTrainingOptions): Promise<SeedTrain
           'The accounts exist but nobody knows their passwords and the database is not marked: remove the training volume and start again.',
       );
     }
-    commitCredentialsFile(staged);
     try {
+      commitCredentialsFile(staged);
       await migrator.query('insert into public.training_marker default values');
     } catch (error) {
+      // the rename failed (commit already removed the staged file) or the marker could not be written: nothing secret stays behind
+      discardCredentialsFile(staged.tmp);
       discardCredentialsFile(staged.final);
       throw error;
     }
@@ -611,6 +616,16 @@ async function addPumpOperator(app: pg.Pool, actor: SessionUser, name: string) {
   ).rows[0]!;
 }
 
+/** R12-02: no default. The output path is explicit, and `validateCredentialsPath` refuses a checkout or a build context. */
+function requireOutputPath(): string {
+  const file = process.env.TRAINING_ACCOUNTS_FILE;
+  if (!file)
+    throw new Error(
+      'TRAINING_ACCOUNTS_FILE is required: the path of the credentials file, in a private folder outside the checkout (the training stack sets /app/out/training-accounts.local.txt).',
+    );
+  return file;
+}
+
 if (import.meta.main) {
   const { handleHelp } = await import('./cli-help');
   handleHelp(import.meta.url);
@@ -623,7 +638,7 @@ if (import.meta.main) {
     const result = await seedTraining({
       env,
       today: businessDateOf(realClock.now()),
-      credentialsFile: process.env.TRAINING_ACCOUNTS_FILE ?? 'training-accounts.local.txt',
+      credentialsFile: requireOutputPath(),
     });
     console.log(
       result.applied

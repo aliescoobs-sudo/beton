@@ -19,4 +19,5 @@ keys
 reports
 
 training-accounts*.local.txt
+.training-accounts*
 out/

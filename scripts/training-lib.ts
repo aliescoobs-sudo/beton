@@ -7,6 +7,8 @@ import {
   fsyncSync,
   lstatSync,
   openSync,
+  readdirSync,
+  realpathSync,
   renameSync,
   unlinkSync,
   writeSync,
@@ -125,16 +127,43 @@ export function renderCredentialsFile(
 /** The names `.gitignore` and `.dockerignore` cover (training-accounts*.local.txt): a custom path must still match. */
 export const CREDENTIALS_NAME = /^training-accounts[A-Za-z0-9._-]*\.local\.txt$/;
 
+/**
+ * R12-02: the one place credentials may be written inside a container: the stock private volume. Anywhere else, the folder must not be
+ * inside a checkout or a Docker build context (a folder, or an ancestor, that holds .git, a Dockerfile or a .dockerignore).
+ */
+export const STOCK_ACCOUNTS_DIR = '/app/out';
+const BUILD_CONTEXT_MARKERS = ['.git', 'Dockerfile', '.dockerignore'];
+
+function insideCheckoutOrBuildContext(dir: string): boolean {
+  let d = dir;
+  for (;;) {
+    if (BUILD_CONTEXT_MARKERS.some((m) => lstatSync(path.join(d, m), { throwIfNoEntry: false }))) return true;
+    const up = path.dirname(d);
+    if (up === d) return false;
+    d = up;
+  }
+}
+
+/** The name of a staged file: covered by `training-accounts*.local.txt` in both .gitignore and .dockerignore, never a hidden name. */
+export const STAGING_NAME = /^training-accounts\.staging-[0-9a-f]{12}\.local\.txt$/;
+/** Staged names of the first version (hidden, uncovered by the ignore rules): still swept if an old crash left one. */
+const LEGACY_STAGING_NAME = /^\.training-accounts[A-Za-z0-9._-]*\.[0-9a-f]{12}$/;
+
 /** Checks a destination for the credentials file and returns its absolute path; throws with the reason otherwise. */
 export function validateCredentialsPath(file: string): string {
   const abs = path.resolve(file);
-  if (!CREDENTIALS_NAME.test(path.basename(abs)))
+  if (!CREDENTIALS_NAME.test(path.basename(abs)) || STAGING_NAME.test(path.basename(abs)))
     throw new Error(
       `credentials file refused: "${path.basename(abs)}" is not a name the ignore rules cover (training-accounts*.local.txt)`,
     );
   const dir = lstatSync(path.dirname(abs), { throwIfNoEntry: false });
   if (!dir || dir.isSymbolicLink() || !dir.isDirectory())
     throw new Error('credentials file refused: its folder does not exist or is a link');
+  const realDir = realpathSync(path.dirname(abs));
+  if (realDir !== STOCK_ACCOUNTS_DIR && insideCheckoutOrBuildContext(realDir))
+    throw new Error(
+      `credentials file refused: its folder is inside a checkout or a Docker build context. Give the output path of a private folder outside it (in the containers: ${STOCK_ACCOUNTS_DIR}).`,
+    );
   const me = process.getuid?.();
   if (me !== undefined && dir.uid !== me)
     throw new Error('credentials file refused: its folder is not owned by the user running the seed');
@@ -158,7 +187,10 @@ export interface StagedCredentials {
 /** Writes the content to a new file made exclusively (O_EXCL, no symlink following) with mode 0600, flushed to disk. Not yet in place. */
 export function stageCredentialsFile(file: string, content: string): StagedCredentials {
   const final = validateCredentialsPath(file);
-  const tmp = path.join(path.dirname(final), `.${path.basename(final)}.${randomBytes(6).toString('hex')}`);
+  const tmp = path.join(
+    path.dirname(final),
+    `training-accounts.staging-${randomBytes(6).toString('hex')}.local.txt`,
+  );
   const fd = openSync(
     tmp,
     constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
@@ -181,9 +213,33 @@ export function stageCredentialsFile(file: string, content: string): StagedCrede
   return { tmp, final };
 }
 
-/** Puts the staged file in place (atomic rename). */
+/** Puts the staged file in place (atomic rename). A rename that fails removes the staged file: no secret is left under a staging name. */
 export function commitCredentialsFile(staged: StagedCredentials): void {
-  renameSync(staged.tmp, staged.final);
+  try {
+    renameSync(staged.tmp, staged.final);
+  } catch (error) {
+    discardCredentialsFile(staged.tmp);
+    throw error;
+  }
+}
+
+/**
+ * Deletes what an earlier crashed seed left in the credentials folder: staged files of ours (regular files, never links). Returns how
+ * many were removed. Never touches the final file.
+ */
+export function sweepStaleStagedCredentials(finalFile: string): number {
+  const dir = path.dirname(path.resolve(finalFile));
+  const me = process.getuid?.();
+  let removed = 0;
+  for (const name of readdirSync(dir)) {
+    if (!STAGING_NAME.test(name) && !LEGACY_STAGING_NAME.test(name)) continue;
+    const full = path.join(dir, name);
+    const st = lstatSync(full, { throwIfNoEntry: false });
+    if (!st || !st.isFile() || (me !== undefined && st.uid !== me)) continue;
+    unlinkSync(full);
+    removed++;
+  }
+  return removed;
 }
 
 /** Removes a staged or committed file, ignoring one that is not there. */

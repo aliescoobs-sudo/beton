@@ -34,6 +34,15 @@ export async function wipeTrainingDatabase(env: Parameters<typeof superuserUrl>[
   await ensureDatabase(env, database);
 }
 
+function requireOutputPath(): string {
+  const file = process.env.TRAINING_ACCOUNTS_FILE;
+  if (!file)
+    throw new Error(
+      'TRAINING_ACCOUNTS_FILE is required: the path of the credentials file, in a private folder outside the checkout.',
+    );
+  return file;
+}
+
 if (import.meta.main) {
   const { handleHelp } = await import('./cli-help');
   handleHelp(import.meta.url);
@@ -45,12 +54,13 @@ if (import.meta.main) {
     const env = { ...loadMaintenanceEnv(process.env), DATABASE_URL_SEED: loadSeedUrl(process.env) };
     if (!env.TRAINING_MODE || env.APP_ENV === 'production')
       throw new Error('reset:training needs TRAINING_MODE=true and APP_ENV not production');
+    const credentialsFile = requireOutputPath(); // before anything is wiped
     await wipeTrainingDatabase(env);
     await runMigrations(env.DATABASE_URL_MIGRATOR);
     const result = await seedTraining({
       env,
       today: businessDateOf(realClock.now()),
-      credentialsFile: process.env.TRAINING_ACCOUNTS_FILE ?? 'training-accounts.local.txt',
+      credentialsFile,
     });
     console.log(
       `Training database reset: ${result.accounts} accounts, new credentials written to ${result.credentialsFile} (not shown here).`,

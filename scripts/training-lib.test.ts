@@ -1,6 +1,7 @@
 import {
   chmodSync,
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
@@ -20,7 +21,9 @@ import {
   generatePin,
   commitCredentialsFile,
   renderCredentialsFile,
+  STAGING_NAME,
   stageCredentialsFile,
+  sweepStaleStagedCredentials,
   validateCredentialsPath,
 } from './training-lib';
 
@@ -118,5 +121,90 @@ describe('the credentials file (R11-04)', () => {
   it('accepts the names the ignore rules cover', () => {
     for (const n of ['training-accounts.local.txt', 'training-accounts-owner.local.txt'])
       expect(validateCredentialsPath(path.join(dir(), n))).toMatch(/training-accounts/);
+  });
+});
+
+describe('R12-02: no secret under an unignored name, nothing left behind, no checkout as output', () => {
+  const dir = () => {
+    const d = mkdtempSync(path.join(tmpdir(), 'bb-r12-'));
+    chmodSync(d, 0o700);
+    return d;
+  };
+  const ignoreRules = (file: string) =>
+    readFileSync(file, 'utf8')
+      .split('\n')
+      .filter((l) => l && !l.startsWith('#'));
+  // a gitignore glob, enough for these patterns: * is any run of characters except a slash
+  const covered = (name: string, rules: string[]) =>
+    rules.some((r) =>
+      new RegExp(`^${r.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*')}$`).test(name),
+    );
+
+  it('the staging name is covered by .gitignore and .dockerignore, and is not a hidden name', () => {
+    const d = dir();
+    const staged = stageCredentialsFile(path.join(d, 'training-accounts.local.txt'), 'x');
+    const name = path.basename(staged.tmp);
+    expect(name).toMatch(STAGING_NAME);
+    expect(name.startsWith('.')).toBe(false);
+    for (const f of ['.gitignore', '.dockerignore'])
+      expect(covered(name, ignoreRules(f)), `${f}: ${name}`).toBe(true);
+    // the old hidden staging names are covered too
+    for (const f of ['.gitignore', '.dockerignore'])
+      expect(covered('.training-accounts.local.txt.0123456789ab', ignoreRules(f))).toBe(true);
+    // and a staging name is never accepted as a final destination
+    expect(() => validateCredentialsPath(staged.tmp)).toThrow(/ignore rules/);
+  });
+  it('a rename that fails removes the staged file', () => {
+    const d = dir();
+    const final = path.join(d, 'training-accounts.local.txt');
+    const staged = stageCredentialsFile(final, 'secret');
+    mkdirSync(final); // a directory in the way: the rename cannot replace it
+    expect(() => commitCredentialsFile(staged)).toThrow();
+    expect(readdirSync(d).filter((n) => STAGING_NAME.test(n))).toEqual([]);
+  });
+  it('the startup sweep removes staged files of an earlier crash, old and new names, and nothing else', () => {
+    const d = dir();
+    const final = path.join(d, 'training-accounts.local.txt');
+    writeFileSync(final, 'keep', { mode: 0o600 });
+    writeFileSync(path.join(d, 'training-accounts.staging-0123456789ab.local.txt'), 'stale', { mode: 0o600 });
+    writeFileSync(path.join(d, '.training-accounts.local.txt.abcdef012345'), 'stale', { mode: 0o600 });
+    writeFileSync(path.join(d, 'notes.txt'), 'mine');
+    symlinkSync('/etc/hosts', path.join(d, 'training-accounts.staging-aaaaaaaaaaaa.local.txt'));
+    expect(sweepStaleStagedCredentials(final)).toBe(2);
+    expect(readdirSync(d).sort()).toEqual(
+      ['notes.txt', 'training-accounts.local.txt', 'training-accounts.staging-aaaaaaaaaaaa.local.txt'].sort(),
+    );
+    expect(readFileSync(final, 'utf8')).toBe('keep');
+  });
+  it('refuses an output inside a checkout or a Docker build context, accepts a private folder outside', () => {
+    const checkout = dir();
+    mkdirSync(path.join(checkout, '.git'));
+    expect(() => validateCredentialsPath(path.join(checkout, 'training-accounts.local.txt'))).toThrow(
+      /checkout or a Docker build context/,
+    );
+    const nested = path.join(checkout, 'sub');
+    mkdirSync(nested, { mode: 0o700 });
+    expect(() => validateCredentialsPath(path.join(nested, 'training-accounts.local.txt'))).toThrow(
+      /build context/,
+    );
+    const ctx = dir();
+    writeFileSync(path.join(ctx, 'Dockerfile'), 'FROM scratch');
+    expect(() => validateCredentialsPath(path.join(ctx, 'training-accounts.local.txt'))).toThrow(
+      /build context/,
+    );
+    // the repository itself, whatever the working folder
+    expect(() => validateCredentialsPath(path.join(process.cwd(), 'training-accounts.local.txt'))).toThrow(
+      /build context/,
+    );
+    expect(validateCredentialsPath(path.join(dir(), 'training-accounts.local.txt'))).toMatch(
+      /training-accounts/,
+    );
+  });
+  it('the command lines have no default output path', () => {
+    for (const f of ['scripts/seed-training.ts', 'scripts/reset-training.ts']) {
+      const src = readFileSync(f, 'utf8');
+      expect(src).not.toMatch(/TRAINING_ACCOUNTS_FILE \?\? /);
+      expect(src).toMatch(/TRAINING_ACCOUNTS_FILE is required/);
+    }
   });
 });
