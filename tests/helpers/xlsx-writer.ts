@@ -32,17 +32,21 @@ export function buildXlsx(
           'xl/sharedStrings.xml': `<?xml version="1.0"?><sst>${strings.map((s) => `<si><t>${esc(s)}</t></si>`).join('')}</sst>`,
         }),
   };
+  return zipFiles(files, opts.deflate);
+}
+
+function zipFiles(files: Record<string, string>, deflate: boolean | undefined): Buffer {
   const locals: Buffer[] = [];
   const central: Buffer[] = [];
   let offset = 0;
   for (const [name, content] of Object.entries(files)) {
     const raw = Buffer.from(content);
-    const data = opts.deflate ? deflateRawSync(raw) : raw;
+    const data = deflate ? deflateRawSync(raw) : raw;
     const nameBuf = Buffer.from(name);
     const local = Buffer.alloc(30);
     local.writeUInt32LE(0x04034b50, 0);
     local.writeUInt16LE(20, 4);
-    local.writeUInt16LE(opts.deflate ? 8 : 0, 8);
+    local.writeUInt16LE(deflate ? 8 : 0, 8);
     local.writeUInt32LE(data.length, 18);
     local.writeUInt32LE(raw.length, 22);
     local.writeUInt16LE(nameBuf.length, 26);
@@ -51,7 +55,7 @@ export function buildXlsx(
     c.writeUInt32LE(0x02014b50, 0);
     c.writeUInt16LE(20, 4);
     c.writeUInt16LE(20, 6);
-    c.writeUInt16LE(opts.deflate ? 8 : 0, 10);
+    c.writeUInt16LE(deflate ? 8 : 0, 10);
     c.writeUInt32LE(data.length, 20);
     c.writeUInt32LE(raw.length, 24);
     c.writeUInt16LE(nameBuf.length, 28);
@@ -67,4 +71,45 @@ export function buildXlsx(
   eocd.writeUInt32LE(dir.length, 12);
   eocd.writeUInt32LE(offset, 16);
   return Buffer.concat([...locals, dir, eocd]);
+}
+
+const escXml = (s: string) =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const colName = (i: number) => String.fromCharCode(65 + i);
+
+/**
+ * A synthetic workbook with several named sheets (inline strings, numbers as numbers), for the importer tests and the fixtures.
+ * Nothing in it comes from a real file.
+ */
+export function buildWorkbook(
+  sheets: { name: string; rows: (string | number)[][] }[],
+  deflate = false,
+): Buffer {
+  const files: Record<string, string> = {
+    '[Content_Types].xml': '<?xml version="1.0"?><Types/>',
+    'xl/workbook.xml': `<?xml version="1.0"?><workbook xmlns:r="r"><sheets>${sheets
+      .map((s, i) => `<sheet name="${escXml(s.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`)
+      .join('')}</sheets></workbook>`,
+    'xl/_rels/workbook.xml.rels': `<?xml version="1.0"?><Relationships>${sheets
+      .map((_s, i) => `<Relationship Id="rId${i + 1}" Target="worksheets/sheet${i + 1}.xml"/>`)
+      .join('')}</Relationships>`,
+  };
+  sheets.forEach((s, si) => {
+    const rows = s.rows
+      .map(
+        (r, ri) =>
+          `<row r="${ri + 1}">${r
+            .map((v, ci) => {
+              const ref = `${colName(ci)}${ri + 1}`;
+              return typeof v === 'number'
+                ? `<c r="${ref}"><v>${v}</v></c>`
+                : `<c r="${ref}" t="inlineStr"><is><t>${escXml(v)}</t></is></c>`;
+            })
+            .join('')}</row>`,
+      )
+      .join('');
+    files[`xl/worksheets/sheet${si + 1}.xml`] =
+      `<?xml version="1.0"?><worksheet><sheetData>${rows}</sheetData></worksheet>`;
+  });
+  return zipFiles(files, deflate);
 }

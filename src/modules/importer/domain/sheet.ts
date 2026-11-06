@@ -88,41 +88,77 @@ const colIndex = (ref: string): number => {
   return n - 1;
 };
 
-/** The cells of one sheet (the first by default) as rows of text. Empty cells are ''. A date cell comes as its serial number. */
-export function readXlsx(buf: Buffer, sheetIndex = 0): Sheet {
+export interface NamedSheet {
+  name: string;
+  rows: Sheet;
+}
+
+/** The sheet names in workbook order with the part that holds each, from workbook.xml and its relationships. */
+function sheetParts(buf: Buffer, zip: Map<string, ZipEntry>): { name: string; part: string }[] {
+  const byFile = [...zip.keys()]
+    .filter((k) => /^xl\/worksheets\/sheet\d+\.xml$/.test(k))
+    .sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
+  const wb = zip.get('xl/workbook.xml');
+  const rels = zip.get('xl/_rels/workbook.xml.rels');
+  const named: { name: string; part: string }[] = [];
+  if (wb && rels) {
+    const targets = new Map<string, string>();
+    for (const m of readEntry(buf, rels).matchAll(/<Relationship\b([^>]*?)\/?>/g)) {
+      const id = /\bId="([^"]*)"/.exec(m[1] ?? '')?.[1];
+      const target = /\bTarget="([^"]*)"/.exec(m[1] ?? '')?.[1];
+      if (id && target) targets.set(id, target.startsWith('/') ? target.slice(1) : `xl/${target}`);
+    }
+    for (const m of readEntry(buf, wb).matchAll(/<sheet\b([^>]*?)\/?>/g)) {
+      const attrs = m[1] ?? '';
+      const name = decode(/\bname="([^"]*)"/.exec(attrs)?.[1] ?? '');
+      const rid = /\br:id="([^"]*)"/.exec(attrs)?.[1];
+      const part = rid ? targets.get(rid) : undefined;
+      if (name && part && zip.has(part)) named.push({ name, part });
+    }
+  }
+  // A workbook without usable names (a writer that leaves them out) is read in file order as Sheet1, Sheet2...
+  return named.length ? named : byFile.map((part, i) => ({ name: `Sheet${i + 1}`, part }));
+}
+
+/** Every sheet of a workbook with its name, in workbook order. Empty cells are ''. A date cell comes as its serial number. */
+export function readXlsxSheets(buf: Buffer): NamedSheet[] {
   const zip = zipEntries(buf);
   const shared = zip.get('xl/sharedStrings.xml');
   const strings = shared
     ? [...readEntry(buf, shared).matchAll(/<si>([\s\S]*?)<\/si>/g)].map((m) => textOf(m[1] ?? ''))
     : [];
-  const sheets = [...zip.keys()]
-    .filter((k) => /^xl\/worksheets\/sheet\d+\.xml$/.test(k))
-    .sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
-  const name = sheets[sheetIndex];
-  if (!name) throw new SheetError('the workbook has no such sheet');
-  const xml = readEntry(buf, zip.get(name) as ZipEntry);
-  const rows: Sheet = [];
   let cells = 0;
-  for (const row of xml.matchAll(/<row\b[^>]*?(?:\/>|>([\s\S]*?)<\/row>)/g)) {
-    const line: string[] = [];
-    for (const c of (row[1] ?? '').matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
-      if (++cells > MAX_CELLS) throw new SheetError('too many cells');
-      const attrs = c[1] ?? '';
-      const ref = /\br="([A-Z]+)\d+"/.exec(attrs)?.[1];
-      const type = /\bt="(\w+)"/.exec(attrs)?.[1];
-      const body = c[2] ?? '';
-      let value = '';
-      if (type === 's') value = strings[Number(/<v>(\d+)<\/v>/.exec(body)?.[1])] ?? '';
-      else if (type === 'inlineStr') value = textOf(body);
-      else value = decode(/<v>([\s\S]*?)<\/v>/.exec(body)?.[1] ?? '');
-      const i = ref ? colIndex(ref) : line.length;
-      while (line.length < i) line.push('');
-      line[i] = value.trim();
+  return sheetParts(buf, zip).map(({ name, part }) => {
+    const xml = readEntry(buf, zip.get(part) as ZipEntry);
+    const rows: Sheet = [];
+    for (const row of xml.matchAll(/<row\b[^>]*?(?:\/>|>([\s\S]*?)<\/row>)/g)) {
+      const line: string[] = [];
+      for (const c of (row[1] ?? '').matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
+        if (++cells > MAX_CELLS) throw new SheetError('too many cells');
+        const attrs = c[1] ?? '';
+        const ref = /\br="([A-Z]+)\d+"/.exec(attrs)?.[1];
+        const type = /\bt="(\w+)"/.exec(attrs)?.[1];
+        const body = c[2] ?? '';
+        let value = '';
+        if (type === 's') value = strings[Number(/<v>(\d+)<\/v>/.exec(body)?.[1])] ?? '';
+        else if (type === 'inlineStr') value = textOf(body);
+        else value = decode(/<v>([\s\S]*?)<\/v>/.exec(body)?.[1] ?? '');
+        const i = ref ? colIndex(ref) : line.length;
+        while (line.length < i) line.push('');
+        line[i] = value.trim();
+      }
+      rows.push(line);
     }
-    rows.push(line);
-  }
-  while (rows.length && rows[rows.length - 1]!.every((v) => v === '')) rows.pop();
-  return rows;
+    while (rows.length && rows[rows.length - 1]!.every((v) => v === '')) rows.pop();
+    return { name, rows };
+  });
+}
+
+/** The cells of one sheet (the first by default) as rows of text. */
+export function readXlsx(buf: Buffer, sheetIndex = 0): Sheet {
+  const sheet = readXlsxSheets(buf)[sheetIndex];
+  if (!sheet) throw new SheetError('the workbook has no such sheet');
+  return sheet.rows;
 }
 
 /** CSV with a comma or semicolon (the office's Excel exports semicolons), quotes and a BOM. */
@@ -165,20 +201,45 @@ export function readCsv(text: string): Sheet {
   return rows;
 }
 
+/** A file as named sheets: every sheet of an .xlsx, or one sheet called "csv" for a CSV file. */
+export function readWorkbook(buf: Buffer): NamedSheet[] {
+  return buf.subarray(0, 2).toString('latin1') === 'PK'
+    ? readXlsxSheets(buf)
+    : [{ name: 'csv', rows: readCsv(buf.toString('utf8')) }];
+}
+
 /** The rows of a file by its first bytes ("PK" is a zip, so an .xlsx), not by its name. */
 export function readSheet(buf: Buffer): Sheet {
   return buf.subarray(0, 2).toString('latin1') === 'PK' ? readXlsx(buf) : readCsv(buf.toString('utf8'));
 }
 
-/** An Excel date serial (days since 1899-12-30) or an ISO / dd/mm/yyyy text as YYYY-MM-DD; null when it is none of them. */
-export function toIsoDate(value: string): string | null {
+export type DateFormat = 'dmy' | 'mdy' | 'iso';
+
+const validYmd = (y: number, m: number, d: number): string | null => {
+  if (y < 2000 || y > 2099 || m < 1 || m > 12 || d < 1) return null;
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return d > last ? null : `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+};
+
+/**
+ * A date as YYYY-MM-DD, or null when it is not one. Strict: an ISO date, a text date with a four-digit year in the order the mapping
+ * declares ('dmy' by default, 'mdy', or 'iso' to refuse every text but ISO), or an Excel serial of 2000 to 2099. A day or a month that
+ * does not exist (31/02, 13/13), a two-digit year, mixed separators and a text in the other order are refused, never reinterpreted.
+ */
+export function toIsoDate(value: string, format: DateFormat = 'dmy'): string | null {
   const v = value.trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
-  const dmy = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/.exec(v);
-  if (dmy) return `${dmy[3]}-${dmy[2]!.padStart(2, '0')}-${dmy[1]!.padStart(2, '0')}`;
-  if (/^\d{4,6}(\.\d+)?$/.test(v)) {
-    const ms = Date.UTC(1899, 11, 30) + Math.floor(Number(v)) * 86_400_000;
-    return new Date(ms).toISOString().slice(0, 10);
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
+  if (iso) return validYmd(Number(iso[1]), Number(iso[2]), Number(iso[3]));
+  if (format === 'iso') return null;
+  const text = /^(\d{1,2})([/.-])(\d{1,2})\2(\d{4})$/.exec(v);
+  if (text) {
+    const [a, b, y] = [Number(text[1]), Number(text[3]), Number(text[4])];
+    return format === 'dmy' ? validYmd(y, b, a) : validYmd(y, a, b);
+  }
+  if (/^\d{5}(\.\d+)?$/.test(v)) {
+    const serial = Math.floor(Number(v));
+    if (serial < 36526 || serial > 73050) return null; // 2000-01-01 to 2099-12-31
+    return new Date(Date.UTC(1899, 11, 30) + serial * 86_400_000).toISOString().slice(0, 10);
   }
   return null;
 }

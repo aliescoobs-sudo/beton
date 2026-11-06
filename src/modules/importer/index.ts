@@ -7,4 +7,17 @@ export {
   type ImportRow,
   runImport,
 } from './service/importers';
-export { readCsv, readSheet, readXlsx, type Sheet, SheetError, toIsoDate, toRecords } from './domain/sheet';
+export {
+  type DateFormat,
+  type NamedSheet,
+  readCsv,
+  readSheet,
+  readWorkbook,
+  readXlsx,
+  readXlsxSheets,
+  type Sheet,
+  SheetError,
+  toIsoDate,
+  toRecords,
+} from './domain/sheet';
+export { type Parsed, parseImportAmount, parseWholeNumber } from './domain/values';
