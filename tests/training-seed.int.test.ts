@@ -36,6 +36,7 @@ beforeAll(async () => {
   console.warn = spy;
   try {
     first = await seedTraining({
+      provenance: 'unverified-test-database',
       env: training,
       today: new Date().toISOString().slice(0, 10),
       credentialsFile: file,
@@ -150,6 +151,7 @@ describe('the training seed (T1)', () => {
   it('writes the marker last, and a second run leaves everything alone', async () => {
     expect(await count(`select count(*) n from training_marker`)).toBe(1);
     const again = await seedTraining({
+      provenance: 'unverified-test-database',
       env: training,
       today: new Date().toISOString().slice(0, 10),
       credentialsFile: path.join(dir, 'second.txt'),
@@ -171,6 +173,7 @@ describe('reset:training (T1)', () => {
     await runMigrations(env.DATABASE_URL_MIGRATOR);
     expect(await count(`select count(*) n from "user"`)).toBe(0);
     const again = await seedTraining({
+      provenance: 'unverified-test-database',
       env: training,
       today: new Date().toISOString().slice(0, 10),
       credentialsFile: file,

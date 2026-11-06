@@ -37,6 +37,12 @@ import {
   setOrderPumped,
 } from '../src/modules/operations/index.ts';
 import { armTrainingDay } from './training-day.ts';
+import {
+  PROVENANCE_REFUSAL,
+  claimBirthToken,
+  hasBirthToken,
+  isTestRunnerDatabase,
+} from './training-birth.ts';
 import { seedIntegrationScenario } from '../src/modules/operations/service/pilot-integration.ts';
 import { seedOperationsScenario } from '../src/modules/operations/service/pilot-ops.ts';
 import { seedOperationsWave2 } from '../src/modules/operations/service/pilot-ops2.ts';
@@ -64,6 +70,11 @@ export interface SeedTrainingOptions {
   /** The business date the data are dated from (the real date when absent). */
   today: string;
   credentialsFile: string;
+  /**
+   * R13-01: 'stock-volume' (the default) requires and consumes the birth token of the stack's database-initialisation step.
+   * 'unverified-test-database' skips it, and is honoured ONLY for the throwaway databases of the test runners.
+   */
+  provenance?: 'stock-volume' | 'unverified-test-database';
 }
 export interface SeedTrainingResult {
   applied: boolean;
@@ -111,25 +122,41 @@ const session = (u: {
 export const SEED_REFERENCE_TABLES: readonly string[] = [];
 
 /**
- * R12-01: the whole business state, not nine probes. Every table of `public` and `finance` is listed from the catalog (so a table added
- * tomorrow is covered the day it exists) and must be empty unless it is on the reference allowlist. A table is also judged by the
- * database's own live-row statistics, because row-level security hides some tables' rows from the maintenance login: a table that
- * cannot be read is not assumed empty. The refusal names tables only, never a row.
+ * R12-01, R13-01: the whole business state, with an exact proof of emptiness, never an estimate. Every table of `public` and `finance` is
+ * listed from the catalog (so a table added tomorrow is covered the day it exists) and must be empty unless it is on the reference
+ * allowlist. A table is accepted as empty only by one of two exact proofs:
+ *   1. its heap file has size 0: no page was ever written, so no row ever existed (the size is metadata that row-level security cannot
+ *      filter, and no statistic is involved); or
+ *   2. an exact read returns no row AND the maintenance login is not subject to a row-level policy on that table (not enabled, or it
+ *      owns the table without FORCE, or it bypasses). A table whose rows this login may not fully see FAILS CLOSED: it counts as
+ *      "cannot be shown empty", it is never read as zero.
+ * `pg_stat` estimates (n_live_tup) are not consulted. No read policy and no BYPASSRLS is granted to anybody for this. The refusal names
+ * tables only, never a row.
  */
 export async function assertSeedTargetEmpty(migrator: pg.Pool): Promise<void> {
-  const { rows: tables } = await migrator.query<{ schema: string; name: string; live: string }>(
-    `select n.nspname as schema, c.relname as name, coalesce(st.n_live_tup, 0)::text as live
+  const { rows: tables } = await migrator.query<{
+    schema: string;
+    name: string;
+    empty_file: boolean;
+    filtered: boolean;
+  }>(
+    `select n.nspname as schema, c.relname as name,
+            (c.relkind = 'p' or pg_relation_size(c.oid, 'main') = 0) as empty_file,
+            (c.relrowsecurity
+               and not (select r.rolbypassrls from pg_roles r where r.rolname = current_user)
+               and not (c.relowner = (select r.oid from pg_roles r where r.rolname = current_user) and not c.relforcerowsecurity)
+            ) as filtered
        from pg_class c
        join pg_namespace n on n.oid = c.relnamespace
-       left join pg_stat_all_tables st on st.relid = c.oid
       where c.relkind in ('r', 'p') and n.nspname in ('public', 'finance')
       order by 1, 2`,
   );
   const holding: string[] = [];
+  const unprovable: string[] = [];
   for (const t of tables) {
     const full = `${t.schema}.${t.name}`;
     if (SEED_REFERENCE_TABLES.includes(full)) continue;
-    // A table this login may not even read cannot be shown empty: it counts as holding state (fail closed).
+    if (t.empty_file) continue; // proof 1: nothing was ever written
     let visible: number | null = 1;
     try {
       visible = (
@@ -138,13 +165,19 @@ export async function assertSeedTargetEmpty(migrator: pg.Pool): Promise<void> {
     } catch (error) {
       if ((error as { code?: string }).code !== '42501') throw error;
     }
-    if (visible || Number(t.live) > 0) holding.push(full);
+    if (visible) holding.push(full);
+    else if (t.filtered) unprovable.push(full); // proof 2 impossible: rows could be hidden from this login
   }
   if (holding.length)
     throw new SeedError(
       `training seed refused: this database is not empty (${holding.join(', ')} hold rows) and carries no training marker. ` +
         'The training seed only fills a fresh database: remove the training database volume and start again (docker compose down -v), ' +
         'never point training at an existing database.',
+    );
+  if (unprovable.length)
+    throw new SeedError(
+      `training seed refused: emptiness cannot be proven for ${unprovable.join(', ')} (the tables have been written to, and row-level security may hide their rows from the maintenance login). ` +
+        'Fresh state only: remove the training database volume and start again (docker compose down -v).',
     );
 }
 
@@ -156,6 +189,12 @@ export async function seedTraining(opts: SeedTrainingOptions): Promise<SeedTrain
   if (env.APP_ENV === 'production') throw new SeedError('training seed refused: APP_ENV is "production"');
   if (env.REAL_DATA) throw new SeedError('training seed refused: REAL_DATA is "true"');
 
+  const needToken = opts.provenance !== 'unverified-test-database';
+  if (!needToken && !isTestRunnerDatabase(env.DATABASE_URL_MIGRATOR))
+    throw new SeedError(
+      'training seed refused: the provenance check can only be skipped on a test-runner database',
+    );
+
   const app = new pg.Pool({ connectionString: env.DATABASE_URL_APP, max: 4 });
   const authPool = new pg.Pool({ connectionString: env.DATABASE_URL_AUTH, max: 2 });
   const system = new pg.Pool({ connectionString: env.DATABASE_URL_SYSTEM, max: 2 });
@@ -165,10 +204,14 @@ export async function seedTraining(opts: SeedTrainingOptions): Promise<SeedTrain
     if ((await migrator.query('select 1 from public.training_marker')).rowCount)
       return { applied: false, accounts: 0, credentialsFile: null };
     await assertSeedTargetEmpty(migrator);
+    // R13-01: provenance. Checked (without being consumed) before the first write; consumed right after the destination is vetted.
+    if (needToken && !(await hasBirthToken(env))) throw new SeedError(PROVENANCE_REFUSAL);
     // R11-04: a destination that cannot be trusted is found before the first write, not after the database is full.
     validateCredentialsPath(opts.credentialsFile);
     // R12-02: a staged file left by an earlier crash is removed before anything new is written.
     sweepStaleStagedCredentials(opts.credentialsFile);
+    // Claimed atomically: two seeds cannot both pass, and one seed cannot be run twice on the same volume.
+    if (needToken && !(await claimBirthToken(env))) throw new SeedError(PROVENANCE_REFUSAL);
 
     const issued: IssuedCredential[] = [];
     const cipher = fieldCipherFrom(parseKeyring(env.FIELD_ENCRYPTION_KEYS));

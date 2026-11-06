@@ -109,6 +109,7 @@ async function main() {
     await recreateDatabase(training, TRAINING_TEST_DATABASE);
     await runMigrations(env.DATABASE_URL_MIGRATOR);
     await seedTraining({
+      provenance: 'unverified-test-database',
       env: { ...training, APP_BASE_URL: BASE },
       today: businessDateOf(realClock.now()),
       credentialsFile,

@@ -36,7 +36,7 @@ beforeAll(async () => {
   const dir = mkdtempSync(path.join(tmpdir(), 'bb-tfin-'));
   chmodSync(dir, 0o700);
   const file = path.join(dir, 'training-accounts.local.txt');
-  await seedTraining({ env: training, today: new Date().toISOString().slice(0, 10), credentialsFile: file });
+  await seedTraining({ provenance: 'unverified-test-database', env: training, today: new Date().toISOString().slice(0, 10), credentialsFile: file });
   // the test reads its own credentials file, as the operator would
   const text = readFileSync(file, 'utf8').split('\n');
   const at = text.findIndex((l) => l.startsWith('Propriétaire') || l.includes('(owner)'));

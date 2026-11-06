@@ -6,6 +6,7 @@ import pg from 'pg';
 import { ensureDatabase, superuserUrl } from './db-bootstrap.ts';
 import { runMigrations } from './db-migrate.ts';
 import { seedTraining } from './seed-training.ts';
+import { mintBirthToken } from './training-birth.ts';
 
 export async function wipeTrainingDatabase(env: Parameters<typeof superuserUrl>[0]): Promise<void> {
   const database = new URL(env.DATABASE_URL_MIGRATOR).pathname.slice(1);
@@ -32,6 +33,7 @@ export async function wipeTrainingDatabase(env: Parameters<typeof superuserUrl>[
     await admin.end();
   }
   await ensureDatabase(env, database);
+  await mintBirthToken(env); // the operator's reset of a marked training database is a legitimate new birth (R13-01)
 }
 
 function requireOutputPath(): string {

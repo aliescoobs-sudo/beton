@@ -22,6 +22,8 @@ services:
       POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
     volumes:
       - pgdata:/var/lib/postgresql/data
+      # R13-01: run once, on the FIRST creation of the volume: writes the birth token the training seed requires and consumes.
+      - ./scripts/training/db-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U postgres']
       interval: 5s
