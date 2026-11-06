@@ -28,8 +28,9 @@ const used = async (ip: string | null) =>
   Number(
     (
       await kit.authPool.query<{ n: string }>(
-        `select (count(*) filter (where not success) - count(*) filter (where success))::text as n
-           from login_attempt where ip_hmac = $1`,
+        `select count(*)::text as n from login_attempt r
+          where r.ip_hmac = $1 and not r.success
+            and not exists (select 1 from login_attempt s where s.identifier_hmac = r.identifier_hmac and s.ip_hmac = r.ip_hmac and s.success)`,
         [keyedHash(kit.env.LOOKUP_HMAC_KEY, `fieldip:${ip ?? 'unknown'}`)],
       )
     ).rows[0]?.n ?? 0,
@@ -95,12 +96,53 @@ describe('reservation helpers', () => {
   it('reserve up to the limit, then refuse; a released attempt is given back; another IP is untouched', async () => {
     const limit = (await guard().parameters())['auth.lockout_ip_failures'];
     const ip = randomIp();
-    for (let i = 0; i < limit; i++) expect(await reserveFieldAttempt(guard(), ip)).toBe(true);
-    expect(await reserveFieldAttempt(guard(), ip)).toBe(false);
-    await releaseFieldAttempt(guard(), ip);
-    expect(await reserveFieldAttempt(guard(), ip)).toBe(true);
-    expect(await reserveFieldAttempt(guard(), ip)).toBe(false);
-    expect(await reserveFieldAttempt(guard(), randomIp())).toBe(true);
+    const held = [];
+    for (let i = 0; i < limit; i++) held.push(await reserveFieldAttempt(guard(), ip));
+    expect(held.every((r) => r && r.id)).toBe(true);
+    expect(new Set(held.map((r) => r!.id)).size).toBe(limit); // each reservation has its own id
+    expect(await reserveFieldAttempt(guard(), ip)).toBeNull();
+    await releaseFieldAttempt(guard(), ip, held[0]!);
+    expect(await reserveFieldAttempt(guard(), ip)).not.toBeNull();
+    expect(await reserveFieldAttempt(guard(), ip)).toBeNull();
+    expect(await reserveFieldAttempt(guard(), randomIp())).not.toBeNull();
+  });
+  it('R13-02: a release frees only its own reservation, once, and the reservation keeps its original time', async () => {
+    const limit = (await guard().parameters())['auth.lockout_ip_failures'];
+    const ip = randomIp();
+    const held = [];
+    for (let i = 0; i < limit; i++) held.push((await reserveFieldAttempt(guard(), ip))!);
+    const at = async (id: string) =>
+      (
+        await kit.authPool.query<{ at: Date }>(
+          'select at from login_attempt where not success and identifier_hmac = $1',
+          [keyedHash(kit.env.LOOKUP_HMAC_KEY, `fieldres:${id}`)],
+        )
+      ).rows[0]!.at.getTime();
+    const before = await at(held[0]!.id);
+    await releaseFieldAttempt(guard(), ip, held[0]!);
+    await releaseFieldAttempt(guard(), ip, held[0]!); // twice: still one reservation freed
+    expect(await at(held[0]!.id)).toBe(before);
+    expect(await used(ip)).toBe(limit - 1);
+    expect(await reserveFieldAttempt(guard(), ip)).not.toBeNull();
+    expect(await reserveFieldAttempt(guard(), ip)).toBeNull();
+  });
+  it('R13-02: a success that completes after the window has moved cannot offset a later wrong attempt', async () => {
+    const params = await guard().parameters();
+    const limit = params['auth.lockout_ip_failures'];
+    const windowMs = params['auth.lockout_window_minutes'] * 60_000;
+    const ip = randomIp();
+    const t0 = Date.now() - 2 * windowMs - 60_000; // far enough back that the whole story is in the past
+    const at = (ms: number) => ({ ...guard(), clock: { ...realClock, now: () => new Date(t0 + ms) } });
+    const held = [];
+    for (let i = 0; i < limit; i++) held.push((await reserveFieldAttempt(at(i), ip))!);
+    expect(await reserveFieldAttempt(at(limit), ip)).toBeNull();
+    // the window moves on: the old reservations aged out; only now does the slow request of the first one finish, with a success
+    const later = windowMs + 60_000;
+    await releaseFieldAttempt(at(later), ip, held[0]!);
+    // a burst of wrong attempts right after: exactly the nominal budget, the late success credits none of them
+    let granted = 0;
+    for (let i = 0; i < limit + 3; i++) if (await reserveFieldAttempt(at(later + 1000 + i), ip)) granted++;
+    expect(granted).toBe(limit);
   });
   it('an unknown or malformed IP is one shared bucket that also fills up (never "not locked")', async () => {
     const limit = (await guard().parameters())['auth.lockout_ip_failures'];
@@ -117,6 +159,7 @@ describe('reservation helpers', () => {
       Array.from({ length: limit * 3 }, () => reserveFieldAttempt(guard(), ip)),
     );
     expect(grants.filter(Boolean)).toHaveLength(limit);
+    expect(new Set(grants.filter(Boolean).map((g) => g!.id)).size).toBe(limit);
     expect(await used(ip)).toBe(limit);
   });
 });

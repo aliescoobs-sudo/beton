@@ -33,8 +33,8 @@ export async function handleFieldLogin(request: Request, io: LoginIo): Promise<R
     // R11-01 / R12-03: the per-IP limit is an atomic reservation made BEFORE the expensive work. The IP is the entry the trusted
     // proxy appended (TRUSTED_PROXY_HOPS); an unknown or malformed one shares one "unknown" bucket, it is never "not locked".
     const ip = clientIp(request.headers, io.trustedHops);
-    if (!(await reserveFieldAttempt(io.guard, ip)))
-      return json(429, { error: 'LOCKED' }, { 'retry-after': '900' });
+    const reservation = await reserveFieldAttempt(io.guard, ip);
+    if (!reservation) return json(429, { error: 'LOCKED' }, { 'retry-after': '900' });
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
     // An attempt that ends in an unexpected error keeps its reservation: it still counts.
     const result = await loginDriver(
@@ -48,7 +48,7 @@ export async function handleFieldLogin(request: Request, io: LoginIo): Promise<R
         error: result.error,
       });
     }
-    await releaseFieldAttempt(io.guard, ip); // a correct sign-in gives its reservation back
+    await releaseFieldAttempt(io.guard, ip, reservation); // a correct sign-in gives back ITS OWN reservation (R13-02)
     await io.setCookie(result.value.token, result.value.maxAgeSeconds);
     return json(200, { kind: result.value.kind });
   } finally {
