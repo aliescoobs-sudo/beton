@@ -4,14 +4,13 @@ import type { RollbackReport, WorkbookReport } from './workbook-import';
 // file, so the report can be kept in ./.logs/ without keeping the company's data in it. The problems are fixed phrases.
 
 export function formatWorkbookReport(r: WorkbookReport): string {
-  const head =
-    r.mode === 'dry-run'
+  const head = r.alreadyImportedRunId
+    ? `NOTHING DONE: this exact file was already imported (run ${r.alreadyImportedRunId}).`
+    : r.mode === 'dry-run'
       ? 'DRY RUN: validated against the database in a transaction that was rolled back. Nothing was written.'
-      : r.alreadyImportedRunId
-        ? `NOTHING DONE: this exact file was already imported (run ${r.alreadyImportedRunId}).`
-        : r.applied
-          ? `IMPORT DONE in one transaction (run ${r.runId}).`
-          : 'IMPORT REFUSED: nothing was written (see the problems below).';
+      : r.applied
+        ? `IMPORT DONE in one transaction (run ${r.runId}).`
+        : 'IMPORT REFUSED: nothing was written (see the problems below).';
   const lines = [
     head,
     `file sha256 ${r.sha256} (${r.sizeBytes} bytes)`,

@@ -7,7 +7,13 @@ import { describe, expect, it } from 'vitest';
 // Regression guards for things only a real `node` / `docker compose` run notices: an entry point that no longer
 // loads under plain node (e.g. a Next-only import pulled in through a module index), or a compose file that no
 // longer interpolates. Needs no database and no secrets.
-const NOT_ENTRY_POINTS = new Set(['backup-lib.ts', 'cli-help.ts', 'prompt.ts', 'training-lib.ts']);
+const NOT_ENTRY_POINTS = new Set([
+  'backup-lib.ts',
+  'cli-help.ts',
+  'import-excel-lib.ts',
+  'prompt.ts',
+  'training-lib.ts',
+]);
 // A bare environment: no .env files, secrets or database settings leak in.
 const bareEnv: NodeJS.ProcessEnv = {
   PATH: process.env.PATH ?? '',

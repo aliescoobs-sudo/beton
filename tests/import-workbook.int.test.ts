@@ -216,6 +216,17 @@ describe('the dry run', () => {
     const r = await run(buf, 'dry-run');
     expect(r.unmappedSheets).toEqual(['Notes']);
     expect(r.fileProblems.some((p) => p.includes('"Recettes" matches no sheet'))).toBe(true);
+    // the built-in defaults name every kind: a workbook with only some of them is not a problem
+    const lax = await importWorkbook({
+      appPool: app,
+      actor: stepped,
+      file: buf,
+      mappings: MAPPINGS,
+      mode: 'dry-run',
+      environment: PROD,
+      requireEveryMappedSheet: false,
+    });
+    expect(lax.fileProblems).toEqual([]);
   });
 });
 

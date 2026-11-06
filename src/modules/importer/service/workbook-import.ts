@@ -53,6 +53,11 @@ export interface WorkbookOptions {
   mappings: readonly SheetMapping[];
   mode: 'dry-run' | 'apply';
   environment: ImportEnvironment;
+  /**
+   * Mapping files the person wrote name sheets that must be there (default true). The built-in defaults cover every kind, so a workbook
+   * that carries only some of them is fine: pass false for those.
+   */
+  requireEveryMappedSheet?: boolean;
   /** The opening date of the books, when the workbook has an opening-balances sheet and none is entered yet. */
   openingDate?: string;
   /** The business date cheques are received on (default: today). */
@@ -126,7 +131,7 @@ export async function importWorkbook(opts: WorkbookOptions): Promise<WorkbookRep
       used.add(mapping.sheet);
     }
   }
-  for (const m of opts.mappings)
+  for (const m of opts.requireEveryMappedSheet === false ? [] : opts.mappings)
     if (!used.has(m.sheet))
       report.fileProblems.push(`The mapping for sheet "${m.sheet}" matches no sheet of the file.`);
   const perKind = new Map<MappingKind, number>();

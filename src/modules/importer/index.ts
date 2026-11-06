@@ -43,3 +43,11 @@ export {
 } from './service/workbook-import';
 export { type ImportEnvironment, importEnvironmentProblem } from './domain/guard';
 export { formatRollbackReport, formatWorkbookReport } from './service/report';
+export {
+  DEFAULT_SHEET_NAMES,
+  defaultMapping,
+  defaultMappings,
+  loadMappingFiles,
+  type LoadedMappings,
+  writeDefaultMappingFiles,
+} from './service/mapping-files';
