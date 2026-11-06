@@ -128,6 +128,8 @@ export {
   type SavedDispatch,
   type SavedRotation,
   saveDispatch,
+  reassignTrip,
+  postponeTrip,
   setTruckDefaultDriver,
   type TruckDefaultDriver,
 } from './service/dispatch-service';
@@ -165,3 +167,14 @@ export {
 export { seedOperationsWave2, type Wave2Result } from './service/pilot-ops2';
 export { type IntegrationScenarioResult, seedIntegrationScenario } from './service/pilot-integration';
 export { deliveryNotePdf } from './pdf/delivery-note-pdf';
+export {
+  defaultEstimates,
+  getDelayStats,
+  getTimingBoard,
+  setTripEstimate,
+  type DelayStats,
+  type EstimateSource,
+  type EstimateView,
+  type TimingBoard,
+} from './service/timing-service';
+export * from './domain/trip-timing';

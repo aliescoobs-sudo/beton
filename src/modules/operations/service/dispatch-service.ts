@@ -294,85 +294,228 @@ export async function saveDispatch(
   if (!parsed.ok) return err('INVALID');
   const { date, rotations: wanted } = parsed.value;
   try {
-    return await inRequest(appPool, actor, async (tx): Promise<Result<SavedDispatch, DispatchError>> => {
-      const params = await readDispatchParams(tx);
-      const orders = await dayOrders(tx, date, deps.today !== undefined && date >= deps.today);
-      const trucks = await dayTrucks(tx, date);
-      const drivers = await activeDrivers(tx);
-      const live = await liveRotations(tx, date);
-      // A rotation that has started stays; the others are replaced by the new plan.
-      const fixed: Rotation[] = live.filter((r) => r.started);
-      const previous = live.filter((r) => !r.started);
-      // Orders already fully loaded drop out of `orders`; a plan for one of them is for an order with nothing left.
-      const known = new Set(orders.map((o) => o.orderId));
-      if (wanted.some((w) => !known.has(w.orderId))) return err('NOT_FOUND');
-      const seq = new Map<string, number>();
-      const draft: Rotation[] = wanted.map((w, i) => {
-        const n = (seq.get(w.orderId) ?? 0) + 1;
-        seq.set(w.orderId, n);
-        return {
-          key: `r${i}`,
-          orderId: w.orderId,
-          seq: n,
-          truckId: w.truckId,
-          driverId: w.driverId ?? null,
-          volumeL: w.volumeL,
-          // Input order is the loading order inside a truck; `retime` turns it into minutes.
-          loadMin: i,
-          departMin: i,
-          arriveMin: i,
-          unloadEndMin: i,
-          backMin: i,
-        };
-      });
-      const timed = retime(draft, orders, params, fixed);
-      const conflicts = checkDispatch(timed, { orders, trucks, drivers, params, fixed });
-      if (conflicts.some(isBlocking)) return err('BLOCKED');
+    return await inRequest(appPool, actor, async (tx) => {
+      const r = await saveDispatchIn(tx, actor, date, wanted, deps);
+      return r.ok
+        ? ok({ batchId: r.value.batchId, rotations: r.value.rotations, conflicts: r.value.conflicts })
+        : r;
+    });
+  } catch (error) {
+    return err(dispatchFailure(error));
+  }
+}
 
-      // A driver other than the truck's default needs a reason (the database refuses it too); a rotation on the default has none.
-      const truckOf = new Map(trucks.map((k) => [k.id, k]));
-      const reasons = wanted.map((w) =>
-        isDriverOverride(truckOf.get(w.truckId), w.driverId ?? null) ? (w.overrideReason ?? null) : null,
+export interface WantedRotation {
+  orderId: string;
+  truckId: string;
+  driverId?: string | null;
+  volumeL: number;
+  overrideReason?: string | null;
+}
+
+/** The body of saveDispatch inside the caller's transaction, so a plan change and its record are one step. `tripIds` follows the input order. */
+export async function saveDispatchIn(
+  tx: pg.PoolClient,
+  actor: SessionUser,
+  date: string,
+  wanted: readonly WantedRotation[],
+  deps: { today?: string } = {},
+): Promise<Result<SavedDispatch & { tripIds: string[] }, DispatchError>> {
+  const params = await readDispatchParams(tx);
+  const orders = await dayOrders(tx, date, deps.today !== undefined && date >= deps.today);
+  const trucks = await dayTrucks(tx, date);
+  const drivers = await activeDrivers(tx);
+  const live = await liveRotations(tx, date);
+  // A rotation that has started stays; the others are replaced by the new plan.
+  const fixed: Rotation[] = live.filter((r) => r.started);
+  const previous = live.filter((r) => !r.started);
+  // Orders already fully loaded drop out of `orders`; a plan for one of them is for an order with nothing left.
+  const known = new Set(orders.map((o) => o.orderId));
+  if (wanted.some((w) => !known.has(w.orderId))) return err('NOT_FOUND');
+  const seq = new Map<string, number>();
+  const draft: Rotation[] = wanted.map((w, i) => {
+    const n = (seq.get(w.orderId) ?? 0) + 1;
+    seq.set(w.orderId, n);
+    return {
+      key: `r${i}`,
+      orderId: w.orderId,
+      seq: n,
+      truckId: w.truckId,
+      driverId: w.driverId ?? null,
+      volumeL: w.volumeL,
+      // Input order is the loading order inside a truck; `retime` turns it into minutes.
+      loadMin: i,
+      departMin: i,
+      arriveMin: i,
+      unloadEndMin: i,
+      backMin: i,
+    };
+  });
+  const timed = retime(draft, orders, params, fixed);
+  const conflicts = checkDispatch(timed, { orders, trucks, drivers, params, fixed });
+  if (conflicts.some(isBlocking)) return err('BLOCKED');
+
+  // A driver other than the truck's default needs a reason (the database refuses it too); a rotation on the default has none.
+  const truckOf = new Map(trucks.map((k) => [k.id, k]));
+  const reasons = wanted.map((w) =>
+    isDriverOverride(truckOf.get(w.truckId), w.driverId ?? null) ? (w.overrideReason ?? null) : null,
+  );
+  if (
+    wanted.some((w, i) => isDriverOverride(truckOf.get(w.truckId), w.driverId ?? null) && reasons[i] === null)
+  )
+    return err('OVERRIDE_REASON');
+
+  const batchId = randomUUID();
+  for (const p of previous) {
+    await tx.query(
+      `insert into trip_plan_cancellation (id, trip_id, reason, created_by) values ($1, $2, 'replanned', $3)`,
+      [randomUUID(), p.key, actor.id],
+    );
+  }
+  const tripIds: string[] = [];
+  for (const [i, r] of timed.entries()) {
+    const id = randomUUID();
+    tripIds.push(id);
+    await tx.query(
+      `insert into trip_plan (id, batch_id, trip_date, order_id, seq, truck_id, driver_id, volume_l, load_min,
+                              depart_min, arrive_min, unload_end_min, back_min, created_by, driver_override_reason)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+      [
+        id,
+        batchId,
+        date,
+        r.orderId,
+        r.seq,
+        r.truckId,
+        r.driverId,
+        r.volumeL,
+        r.loadMin,
+        r.departMin,
+        r.arriveMin,
+        r.unloadEndMin,
+        r.backMin,
+        actor.id,
+        reasons[i] ?? null,
+      ],
+    );
+  }
+  return ok({ batchId, rotations: timed.length, conflicts, tripIds });
+}
+
+/**
+ * The plant manager moves a rotation that will start late to another truck and driver (T5). Everything that has not started is planned
+ * again by the same rules as a saved plan (a driver other than the truck's default needs a reason); the change is recorded with its reason,
+ * in the same step. A rotation that has started cannot be moved.
+ */
+export async function reassignTrip(
+  appPool: pg.Pool,
+  actor: SessionUser,
+  input: {
+    tripId: string;
+    truckId: string;
+    driverId: string | null;
+    reason: string;
+    overrideReason?: string;
+  },
+  deps: { today?: string } = {},
+): Promise<Result<{ newTripId: string }, DispatchError | 'STARTED'>> {
+  await require(appPool, actor, 'dispatch.write');
+  const reason = input.reason?.trim() ?? '';
+  if (reason.length < 3 || reason.length > 500) return err('INVALID');
+  try {
+    return await inRequest(
+      appPool,
+      actor,
+      async (tx): Promise<Result<{ newTripId: string }, DispatchError | 'STARTED'>> => {
+        const row = await tx.query<{ trip_date: string; truck_id: string; driver_id: string | null }>(
+          `select to_char(trip_date, 'YYYY-MM-DD') as trip_date, truck_id, driver_id from trip_plan p
+          where id = $1 and not exists (select 1 from trip_plan_cancellation c where c.trip_id = p.id)`,
+          [input.tripId],
+        );
+        const trip = row.rows[0];
+        if (!trip) return err('NOT_FOUND');
+        const live = await liveRotations(tx, trip.trip_date);
+        const target = live.find((r) => r.key === input.tripId);
+        if (!target) return err('NOT_FOUND');
+        if (target.started) return err('STARTED');
+        const wanted: WantedRotation[] = live
+          .filter((r) => !r.started)
+          .map((r) =>
+            r.key === input.tripId
+              ? {
+                  orderId: r.orderId,
+                  truckId: input.truckId,
+                  driverId: input.driverId,
+                  volumeL: r.volumeL,
+                  overrideReason: input.overrideReason ?? reason,
+                }
+              : {
+                  orderId: r.orderId,
+                  truckId: r.truckId,
+                  driverId: r.driverId,
+                  volumeL: r.volumeL,
+                  overrideReason: r.overrideReason,
+                },
+          );
+        const saved = await saveDispatchIn(tx, actor, trip.trip_date, wanted, deps);
+        if (!saved.ok) return saved;
+        const newTripId =
+          saved.value.tripIds[live.filter((r) => !r.started).findIndex((r) => r.key === input.tripId)]!;
+        await tx.query('select public.log_dispatch_change($1, $2, $3, $4, $5, $6, $7, $8)', [
+          'reassign',
+          input.tripId,
+          newTripId,
+          trip.truck_id,
+          input.truckId,
+          trip.driver_id,
+          input.driverId,
+          reason,
+        ]);
+        return ok({ newTripId });
+      },
+    );
+  } catch (error) {
+    return err(dispatchFailure(error));
+  }
+}
+
+/**
+ * The plant manager postpones a rotation that has not started, with a reason: it leaves the plan (a cancellation of the rotation, as
+ * `replanned` does) and its litres go back to the orders still to plan, to be placed again or taken the next day. Recorded with the reason.
+ */
+export async function postponeTrip(
+  appPool: pg.Pool,
+  actor: SessionUser,
+  input: { tripId: string; reason: string },
+): Promise<Result<true, DispatchError | 'STARTED'>> {
+  await require(appPool, actor, 'dispatch.write');
+  const reason = input.reason?.trim() ?? '';
+  if (reason.length < 3 || reason.length > 500) return err('INVALID');
+  try {
+    return await inRequest(appPool, actor, async (tx): Promise<Result<true, DispatchError | 'STARTED'>> => {
+      const row = await tx.query<{ truck_id: string; driver_id: string | null; started: boolean }>(
+        `select p.truck_id, p.driver_id, exists (select 1 from trip_event e where e.trip_id = p.id) as started
+           from trip_plan p where p.id = $1 and not exists (select 1 from trip_plan_cancellation c where c.trip_id = p.id)`,
+        [input.tripId],
       );
-      if (
-        wanted.some(
-          (w, i) => isDriverOverride(truckOf.get(w.truckId), w.driverId ?? null) && reasons[i] === null,
-        )
-      )
-        return err('OVERRIDE_REASON');
-
-      const batchId = randomUUID();
-      for (const p of previous) {
-        await tx.query(
-          `insert into trip_plan_cancellation (id, trip_id, reason, created_by) values ($1, $2, 'replanned', $3)`,
-          [randomUUID(), p.key, actor.id],
-        );
-      }
-      for (const [i, r] of timed.entries()) {
-        await tx.query(
-          `insert into trip_plan (id, batch_id, trip_date, order_id, seq, truck_id, driver_id, volume_l, load_min,
-                                  depart_min, arrive_min, unload_end_min, back_min, created_by, driver_override_reason)
-           values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
-          [
-            randomUUID(),
-            batchId,
-            date,
-            r.orderId,
-            r.seq,
-            r.truckId,
-            r.driverId,
-            r.volumeL,
-            r.loadMin,
-            r.departMin,
-            r.arriveMin,
-            r.unloadEndMin,
-            r.backMin,
-            actor.id,
-            reasons[i] ?? null,
-          ],
-        );
-      }
-      return ok({ batchId, rotations: timed.length, conflicts });
+      const trip = row.rows[0];
+      if (!trip) return err('NOT_FOUND');
+      if (trip.started) return err('STARTED');
+      await tx.query(
+        `insert into trip_plan_cancellation (id, trip_id, reason, created_by) values ($1, $2, $3, $4)`,
+        [randomUUID(), input.tripId, `Reporté : ${reason}`.slice(0, 500), actor.id],
+      );
+      await tx.query('select public.log_dispatch_change($1, $2, $3, $4, $5, $6, $7, $8)', [
+        'postpone',
+        input.tripId,
+        null,
+        trip.truck_id,
+        null,
+        trip.driver_id,
+        null,
+        reason,
+      ]);
+      return ok(true as const);
     });
   } catch (error) {
     return err(dispatchFailure(error));
