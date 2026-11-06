@@ -162,7 +162,8 @@ export async function importWorkbook(opts: WorkbookOptions): Promise<WorkbookRep
       const r = await runImport(kind, sheet.rows, {
         appPool: pool,
         actor: opts.actor,
-        apply: true, // inside the outer transaction: the dry run rolls it back below
+        apply: true, // inside the outer transaction: the dry run rolls it back below, and so does any sheet with a problem
+        applyValidRows: true, // so that a fault in one sheet does not make every sheet that refers to it look wrong
         columns,
         headerRow: mapping.headerRow,
         dateFormat: mapping.dateFormat,

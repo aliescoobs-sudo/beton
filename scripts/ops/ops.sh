@@ -2,7 +2,7 @@
 # Runs one maintenance script in the ops container with plain node: no pnpm, no corepack, no network (the ops container is on an
 # internal network and cannot download anything; CODEX-REVIEW-R9 item 10).
 #   ./scripts/ops/ops.sh db-migrate
-#   ./scripts/ops/ops.sh import-excel clients imports/clients.xlsx --apply
+#   ./scripts/ops/ops.sh import-excel --dry-run imports/book.xlsx --mapping imports/mapping
 set -euo pipefail
 script="${1:?usage: ops.sh <script name without .ts> [args…]}"
 shift

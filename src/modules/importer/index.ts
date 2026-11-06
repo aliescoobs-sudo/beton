@@ -51,3 +51,10 @@ export {
   type LoadedMappings,
   writeDefaultMappingFiles,
 } from './service/mapping-files';
+export {
+  EXPECTED_PROBLEMS,
+  syntheticProblemWorkbook,
+  syntheticValidWorkbook,
+  type SyntheticOptions,
+} from './fixtures';
+export { buildWorkbook } from './domain/xlsx-writer';

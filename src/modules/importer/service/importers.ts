@@ -91,6 +91,8 @@ export interface Ctx {
   headerRow?: number;
   /** The order of a text date (default 'dmy'). */
   dateFormat?: DateFormat;
+  /** See `runImport`: apply the valid rows of a sheet that has problems too (the caller discards everything). */
+  applyValidRows?: boolean;
   /** The plant code used when a row has no plant of its own (prices, recipes, trucks). */
   defaultPlant?: string;
   openingDate?: string;
@@ -776,7 +778,9 @@ export async function runImport(
       : { row: p.row, status: p.exists ? 'exists' : 'new', label: p.label },
   );
   const hasError = missing.length > 0 || rows.some((r) => r.status === 'error');
-  if (ctx.apply && !hasError) {
+  // `applyValidRows`: the rows without a problem of a sheet that has some are still applied. Only a caller that rolls everything back
+  // when any sheet has a problem may ask for it (the workbook import), so that later sheets are checked against them for real.
+  if (ctx.apply && (!hasError || ctx.applyValidRows)) {
     for (const [i, p] of planned.entries()) {
       if (!p.apply) continue;
       const failure = await p.apply();
