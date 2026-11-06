@@ -1,35 +1,29 @@
 #!/usr/bin/env bash
-# Warns when the Tailscale Funnel is not what it should be (T1, R11): (1) up while the running app is NOT in training mode, or (2) pointing at
-# something else than this app's own port (APP_PORT, 3000 by default). Exit 1 on a warning, 0 when all is well or when there is no Funnel / no
-# Tailscale on this machine. Run by training-up.sh. It is a warning and NOT an authorisation to go public: go-public.sh is the gate.
+# Fails (exit 1) unless the Tailscale Funnel is what it should be (T1, R11, R12-05): closed, or open with the running training app as
+# its ONE target. No Tailscale on this machine, or a Funnel clearly off: 0. Everything else, including a status it cannot read or parse,
+# is a failure. Run by training-up.sh. It checks; it never authorises: go-public.sh is the gate.
 set -uo pipefail
 cd "$(dirname "$0")/../.."
 command -v tailscale >/dev/null 2>&1 || exit 0
-status=$(tailscale funnel status 2>/dev/null || true)
-echo "$status" | grep -qi 'funnel on' || exit 0
-port=3000
-if [ -r .env.training ]; then
-  p=$(grep -E '^APP_PORT=' .env.training | tail -n1 | cut -d= -f2- | tr -d '"' || true)
-  [ -n "$p" ] && port="$p"
+dc=./scripts/training/dc.sh
+. "$(dirname "$0")/lib.sh"
+status=$(tailscale funnel status 2>&1)
+if [ $? -ne 0 ]; then echo "WARNING: cannot read the Tailscale Funnel status; treating it as unsafe. Close it:  tailscale funnel reset" >&2; exit 1; fi
+if ! printf '%s\n' "$status" | grep -qi 'funnel on'; then
+  # clearly off ("No serve config", "Funnel off", nothing at all) is fine; a text that mentions neither is not understood
+  if [ -z "$(printf '%s' "$status" | tr -d '[:space:]')" ] || printf '%s\n' "$status" | grep -Eqi 'no serve config|funnel off|not (enabled|configured)'; then exit 0; fi
+  echo "WARNING: the Funnel status is not understood, treating it as unsafe. Close it:  tailscale funnel reset" >&2
+  exit 1
 fi
 rc=0
-mode=$(./scripts/training/dc.sh exec -T app printenv TRAINING_MODE 2>/dev/null || true)
-if [ "$mode" != "true" ]; then
-  echo "WARNING: the Tailscale Funnel is up but the app is not running with TRAINING_MODE=true. Stop the Funnel now:  tailscale funnel reset" >&2
-  rc=1
+fail() { echo "WARNING: $1" >&2; rc=1; }
+port=$(tr_host_port || true)
+[ -n "$port" ] || fail "the Funnel is up but there is no running app published on exactly one loopback port. Stop the Funnel now:  tailscale funnel reset"
+[ "$(tr_app_env TRAINING_MODE || true)" = "true" ] || fail "the Tailscale Funnel is up but the app is not running with TRAINING_MODE=true. Stop the Funnel now:  tailscale funnel reset"
+targets=$(tr_proxy_targets "$status")
+if [ "$(printf '%s\n' "$targets" | grep -c .)" != 1 ]; then
+  fail "the Funnel is up but exactly one HTTP proxy target could not be read from its status ($(printf '%s\n' "$targets" | grep -c .) found). Stop it now:  tailscale funnel reset"
+elif [ -n "$port" ] && [ "$targets" != "http://127.0.0.1:$port" ]; then
+  fail "the Funnel proxies to $targets, not to this app (http://127.0.0.1:$port, the port Docker really publishes). Something else may be on the internet: tailscale funnel reset"
 fi
-# Every target the Funnel proxies to must be this app's own port on this machine.
-targets=$(echo "$status" | grep -Eo 'proxy +https?://[^ ]+' | sed -E 's/^proxy +//' || true)
-for t in $targets; do
-  hostport=${t#*://}
-  hostport=${hostport%%/*}
-  host=${hostport%%:*}
-  tport=${hostport##*:}
-  [ "$tport" = "$hostport" ] && tport=80
-  case "$host" in 127.0.0.1|localhost|::1) ;; *) echo "WARNING: the Funnel proxies to $t, which is not this machine. Stop it now:  tailscale funnel reset" >&2; rc=1; continue;; esac
-  if [ "$tport" != "$port" ]; then
-    echo "WARNING: the Funnel proxies to $t but the training app listens on port $port. Something else is on the internet: tailscale funnel reset, then  tailscale funnel --bg $port" >&2
-    rc=1
-  fi
-done
 exit $rc

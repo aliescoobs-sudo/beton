@@ -116,6 +116,7 @@ describe('health checks (AC-PROD-32)', () => {
   it('readiness reveals no version, count, host or error text', () => {
     const src = readFileSync('src/app/api/health/ready/route.ts', 'utf8');
     expect(src).not.toMatch(/error\.message|version|process\.env|hostname/);
-    expect(src.match(/status: '[a-z_]+' \}/g)?.length).toBe(3);
+    expect(src.match(/status: '[a-z_]+'/g)?.length).toBe(3);
+    expect(src).toMatch(/mode: 'training'/);
   });
 });

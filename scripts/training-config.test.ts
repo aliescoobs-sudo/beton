@@ -156,14 +156,9 @@ describe('init-env.sh really produces a working training environment', () => {
 function sandbox(dcBody: string) {
   const root = mkdtempSync(path.join(tmpdir(), 'bb-trainsh-'));
   mkdirSync(path.join(root, 'scripts/training'), { recursive: true });
-  for (const f of ['scripts/training-backup.sh', 'scripts/training/funnel-check.sh'])
-    copyFileSync(f, path.join(root, f));
+  for (const f of ['scripts/training-backup.sh']) copyFileSync(f, path.join(root, f));
   writeFileSync(path.join(root, 'scripts/training/dc.sh'), `#!/usr/bin/env bash\n${dcBody}\n`);
-  for (const f of [
-    'scripts/training-backup.sh',
-    'scripts/training/funnel-check.sh',
-    'scripts/training/dc.sh',
-  ])
+  for (const f of ['scripts/training-backup.sh', 'scripts/training/dc.sh'])
     chmodSync(path.join(root, f), 0o755);
   return root;
 }
@@ -172,36 +167,6 @@ const withStub = (dir: string, name: string, body: string) => {
   writeFileSync(path.join(dir, 'bin', name), `#!/usr/bin/env bash\n${body}\n`, { mode: 0o755 });
   return path.join(dir, 'bin');
 };
-
-describe('scripts/training/funnel-check.sh (T1)', () => {
-  const check = (funnelOn: boolean, mode: string) => {
-    const root = sandbox(`echo ${mode}`);
-    const bin = withStub(
-      root,
-      'tailscale',
-      funnelOn ? 'echo "https://x.ts.net (Funnel on)"' : 'echo "No serve config"',
-    );
-    return spawnSync('bash', [path.join(root, 'scripts/training/funnel-check.sh')], {
-      encoding: 'utf8',
-      env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
-    });
-  };
-  it('warns and fails when the Funnel is up and the app is not in training mode', () => {
-    const r = check(true, 'false');
-    expect(r.status).toBe(1);
-    expect(r.stderr).toMatch(/Funnel is up/);
-  });
-  it('is quiet when the app is in training mode, when the Funnel is down, and when there is no Tailscale', () => {
-    expect(check(true, 'true').status).toBe(0);
-    expect(check(false, 'false').status).toBe(0);
-    const root = sandbox('echo false');
-    const r = spawnSync('bash', [path.join(root, 'scripts/training/funnel-check.sh')], {
-      encoding: 'utf8',
-      env: { PATH: '/usr/bin:/bin', NODE_ENV: 'test' },
-    });
-    expect(r.status).toBe(0);
-  });
-});
 
 describe('scripts/training-backup.sh (T1)', () => {
   const backup = (dest: (root: string) => string, dump = 'PGDMP-fake') => {
@@ -438,67 +403,7 @@ describe('the Funnel is opened last, to the real port, and only for the exact im
     if (env) writeFileSync(path.join(root, '.env.training'), env, { mode: 0o600 });
     return root;
   };
-  const dcOk = `case "$*" in *printenv*) echo true;; *ready*) echo '{"status":"ready"}';; esac`;
-  const tail = (root: string, status: string, calls = 'calls.log') =>
-    withStub(
-      root,
-      'tailscale',
-      `if [ "$1 $2" = "funnel status" ]; then echo '${status}'; else echo "$*" >> "${root}/${calls}"; fi`,
-    );
-  const goPublic = (root: string, bin: string, url: string) =>
-    spawnSync('bash', [path.join(root, 'scripts/training/go-public.sh'), url], {
-      encoding: 'utf8',
-      env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, READY_TRIES: '1', READY_SLEEP: '0' },
-    });
-  const URL = 'https://imac.tail1.ts.net';
-
-  it('go-public.sh refuses when the app was told another address, and opens nothing', () => {
-    const root = sbx(['go-public.sh'], dcOk, 'APP_BASE_URL=http://127.0.0.1:3000\n');
-    const r = goPublic(root, tail(root, 'No serve config'), URL);
-    expect(r.status).toBe(1);
-    expect(r.stderr).toMatch(/set-url\.sh/);
-    expect(existsSync(path.join(root, 'calls.log'))).toBe(false);
-  });
-  it('go-public.sh refuses when the app is not in training mode or not ready, and opens nothing', () => {
-    const notTraining = sbx(['go-public.sh'], 'echo false', `APP_BASE_URL=${URL}\n`);
-    expect(goPublic(notTraining, tail(notTraining, 'x'), URL).status).toBe(1);
-    expect(existsSync(path.join(notTraining, 'calls.log'))).toBe(false);
-    const notReady = sbx(
-      ['go-public.sh'],
-      `case "$*" in *printenv*) echo true;; *) exit 1;; esac`,
-      `APP_BASE_URL=${URL}\n`,
-    );
-    const r = goPublic(notReady, tail(notReady, 'x'), URL);
-    expect(r.status).toBe(1);
-    expect(r.stderr).toMatch(/not ready/);
-    expect(existsSync(path.join(notReady, 'calls.log'))).toBe(false);
-  });
-  it("go-public.sh opens the Funnel on the app's real port once address, mode and readiness agree", () => {
-    const root = sbx(['go-public.sh'], dcOk, `APP_BASE_URL=${URL}\nAPP_PORT=3300\n`);
-    const r = goPublic(root, tail(root, 'x'), URL);
-    expect(r.status, r.stderr).toBe(0);
-    expect(readFileSync(path.join(root, 'calls.log'), 'utf8').trim()).toBe('funnel --bg 3300');
-    expect(goPublic(root, tail(root, 'x'), 'http://insecure.example').status).toBe(2);
-  });
-
-  const check = (status: string, appPort?: string) => {
-    const root = sbx(['funnel-check.sh'], `echo true`, appPort ? `APP_PORT=${appPort}\n` : '');
-    return spawnSync('bash', [path.join(root, 'scripts/training/funnel-check.sh')], {
-      encoding: 'utf8',
-      env: { ...process.env, PATH: `${tail(root, status)}:${process.env.PATH}` },
-    });
-  };
-  it('funnel-check.sh warns when the Funnel points at another port or another machine, and is quiet for the real port', () => {
-    const up = (target: string) => `https://x.ts.net (Funnel on)\n|-- / proxy ${target}`;
-    expect(check(up('http://127.0.0.1:3000')).status).toBe(0);
-    const wrong = check(up('http://127.0.0.1:8080'));
-    expect(wrong.status).toBe(1);
-    expect(wrong.stderr).toMatch(/port 3000/);
-    expect(check(up('http://127.0.0.1:3300'), '3300').status).toBe(0);
-    expect(check(up('http://127.0.0.1:3000'), '3300').status).toBe(1);
-    expect(check(up('http://192.168.1.20:3000')).stderr).toMatch(/not this machine/);
-    expect(check('No serve config').status).toBe(0);
-  });
+  // go-public.sh and funnel-check.sh are tested in the R12-05 block below.
 
   describe('pick-image.sh', () => {
     const SHA_LINE = (sha: string) => `IMAGE_REF=ghcr.io/o/belgobeton@sha256:${'c'.repeat(64)} COMMIT=${sha}`;
@@ -534,5 +439,172 @@ describe('the Funnel is opened last, to the real port, and only for the exact im
       expect(none.r.status).toBe(1);
       expect(none.r.stderr).toMatch(/IMAGE_REF/);
     });
+  });
+});
+
+// R12-05: the Funnel gate fails closed. Everything it asks of Docker, curl and tailscale is a stub driven by environment variables.
+describe('go-public.sh and funnel-check.sh fail closed (R12-05)', () => {
+  const URL = 'https://imac.tail1.ts.net';
+  const UP = (target: string) => `${URL} (Funnel on)\n|-- / proxy ${target}`;
+  const setup = (envFile = `APP_BASE_URL=${URL}\nAPP_PORT=3300\n`) => {
+    const root = mkdtempSync(path.join(tmpdir(), 'bb-r12gp-'));
+    mkdirSync(path.join(root, 'scripts/training'), { recursive: true });
+    for (const f of ['go-public.sh', 'funnel-check.sh', 'lib.sh'])
+      copyFileSync(`scripts/training/${f}`, path.join(root, 'scripts/training', f));
+    for (const f of ['go-public.sh', 'funnel-check.sh', 'lib.sh'])
+      chmodSync(path.join(root, 'scripts/training', f), 0o755);
+    writeFileSync(
+      path.join(root, 'scripts/training/dc.sh'),
+      `#!/usr/bin/env bash
+case "$*" in
+  *"ps -q app"*) printf '%s\\n' "\${STUB_CID-cid123}";;
+  *"printenv APP_BASE_URL"*) printf '%s\\n' "\${STUB_URL-${URL}}";;
+  *"printenv TRAINING_MODE"*) printf '%s\\n' "\${STUB_TRAINING-true}";;
+  *"printenv APP_ENV"*) printf '%s\\n' "\${STUB_APP_ENV-training}";;
+  *"printenv REAL_DATA"*) printf '%s\\n' "\${STUB_REAL-false}";;
+  *"printenv TRAINING_ALLOW_UNMARKED"*) printf '%s\\n' "\${STUB_UNMARKED-}";;
+esac
+`,
+      { mode: 0o755 },
+    );
+    if (envFile) writeFileSync(path.join(root, '.env.training'), envFile, { mode: 0o600 });
+    const bin = path.join(root, 'bin');
+    mkdirSync(bin);
+    const stub = (name: string, body: string) =>
+      writeFileSync(path.join(bin, name), `#!/usr/bin/env bash\n${body}\n`, { mode: 0o755 });
+    stub('docker', `[ "$1" = port ] && printf '%s' "\${STUB_PORT_LINES-127.0.0.1:3300}" && echo`);
+    stub('curl', `printf '%s' "\${STUB_READY-{\\"status\\":\\"ready\\",\\"mode\\":\\"training\\"}}"`);
+    stub(
+      'tailscale',
+      `echo "$*" >> "${root}/calls.log"
+if [ "$1 $2" = "funnel status" ]; then [ -n "\${STUB_STATUS_FAIL-}" ] && exit 1; printf '%s\\n' "\${STUB_STATUS-No serve config}"; fi`,
+    );
+    return { root, bin };
+  };
+  const run = (
+    script: string,
+    ctx: { root: string; bin: string },
+    env: Record<string, string> = {},
+    args: string[] = [],
+  ) =>
+    spawnSync('bash', [path.join(ctx.root, 'scripts/training', script), ...args], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        PATH: `${ctx.bin}:${process.env.PATH}`,
+        READY_TRIES: '1',
+        READY_SLEEP: '0',
+        ...env,
+      },
+    });
+  const calls = (ctx: { root: string }) =>
+    existsSync(path.join(ctx.root, 'calls.log'))
+      ? readFileSync(path.join(ctx.root, 'calls.log'), 'utf8').trim().split('\n')
+      : [];
+  const opened = (ctx: { root: string }) => calls(ctx).some((c) => c.startsWith('funnel --bg'));
+
+  it('opens the Funnel on the port Docker really publishes, after resetting the old one, and reads the whole status back', () => {
+    const ctx = setup();
+    const r = run('go-public.sh', ctx, { STUB_STATUS: UP('http://127.0.0.1:3300') }, [URL]);
+    expect(r.status, r.stderr).toBe(0);
+    expect(calls(ctx)).toEqual(['funnel reset', 'funnel --bg 3300', 'funnel status']);
+  });
+  it.each([
+    [
+      'the env file names another address',
+      { envFile: 'APP_BASE_URL=http://127.0.0.1:3000\nAPP_PORT=3300\n' },
+      {},
+      /set-url\.sh/,
+    ],
+    ['the RUNNING app was told another address', {}, { STUB_URL: 'https://other.ts.net' }, /RUNNING app/],
+    ['the app is not running', {}, { STUB_CID: '' }, /exactly one loopback host port/],
+    [
+      'two ports are published',
+      {},
+      { STUB_PORT_LINES: '127.0.0.1:3300\n127.0.0.1:3301' },
+      /exactly one loopback/,
+    ],
+    [
+      'the port is published on all interfaces',
+      {},
+      { STUB_PORT_LINES: '0.0.0.0:3300' },
+      /exactly one loopback/,
+    ],
+    [
+      'the env file and the running port disagree',
+      { envFile: `APP_BASE_URL=${URL}\nAPP_PORT=3000\n` },
+      {},
+      /published on 3300/,
+    ],
+    ['the app is not in training mode', {}, { STUB_TRAINING: 'false' }, /training mode/],
+    ['APP_ENV is not training', {}, { STUB_APP_ENV: 'production' }, /APP_ENV/],
+    ['real data is not clearly off', {}, { STUB_REAL: '' }, /REAL_DATA/],
+    ['the unmarked escape is set', {}, { STUB_UNMARKED: 'true' }, /escape/],
+    ['the socket does not answer', {}, { STUB_READY: '' }, /readiness/],
+    [
+      'the socket is another service (no training word)',
+      {},
+      { STUB_READY: '{"status":"ready"}' },
+      /readiness/,
+    ],
+  ])('refuses and leaves the Funnel closed when %s', (_why, over, env, msg) => {
+    const ctx = setup((over as { envFile?: string }).envFile);
+    const r = run('go-public.sh', ctx, env as Record<string, string>, [URL]);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(msg as RegExp);
+    expect(opened(ctx)).toBe(false);
+    expect(calls(ctx)[0]).toBe('funnel reset'); // closed first
+    expect(calls(ctx).at(-1)).toBe('funnel reset'); // and closed again on the way out
+  });
+  it('after opening, an unreadable, extra, wrong or unrecognised status closes the Funnel again and fails', () => {
+    for (const status of [
+      'something I do not recognise',
+      `${URL} (Funnel on)`, // on, but no proxy target parsed
+      UP('http://127.0.0.1:3300') + '\n|-- /api proxy http://127.0.0.1:9999', // a second target
+      UP('http://127.0.0.1:9999'), // another port
+      UP('http://192.168.1.20:3300'), // another machine
+    ]) {
+      const ctx = setup();
+      const r = run('go-public.sh', ctx, { STUB_STATUS: status }, [URL]);
+      expect(r.status, status).toBe(1);
+      expect(calls(ctx).at(-1), status).toBe('funnel reset');
+    }
+    const ctx = setup();
+    expect(run('go-public.sh', ctx, { STUB_STATUS_FAIL: '1' }, [URL]).status).toBe(1);
+    expect(calls(ctx).at(-1)).toBe('funnel reset');
+  });
+  it('still requires a full https address', () => {
+    expect(run('go-public.sh', setup(), {}, ['http://insecure.example']).status).toBe(2);
+  });
+
+  const check = (status: string, env: Record<string, string> = {}) => {
+    const ctx = setup();
+    return run('funnel-check.sh', ctx, { STUB_STATUS: status, ...env });
+  };
+  it('funnel-check.sh passes for a closed Funnel and for the one right target', () => {
+    expect(check('No serve config').status).toBe(0);
+    expect(check('').status).toBe(0);
+    expect(check(UP('http://127.0.0.1:3300')).status).toBe(0);
+  });
+  it('funnel-check.sh fails when the target is another port or machine, when none could be parsed, when there are two, or when the status is not understood', () => {
+    expect(check(UP('http://127.0.0.1:8080')).status).toBe(1);
+    expect(check(UP('http://192.168.1.20:3300')).stderr).toMatch(/not to this app/);
+    expect(check(`${URL} (Funnel on)`).status).toBe(1); // on, no target parsed: NOT a success
+    expect(check(UP('http://127.0.0.1:3300') + '\n|-- /x proxy http://127.0.0.1:3300').status).toBe(1);
+    expect(check('mystery output').status).toBe(1);
+    const ctx = setup();
+    expect(run('funnel-check.sh', ctx, { STUB_STATUS_FAIL: '1' }).status).toBe(1);
+  });
+  it('funnel-check.sh fails when the Funnel is up and the app is not in training mode or not running', () => {
+    expect(check(UP('http://127.0.0.1:3300'), { STUB_TRAINING: 'false' }).status).toBe(1);
+    expect(check(UP('http://127.0.0.1:3300'), { STUB_CID: '' }).status).toBe(1);
+  });
+  it('funnel-check.sh is silent on a machine without Tailscale', () => {
+    const ctx = setup();
+    const r = spawnSync('bash', [path.join(ctx.root, 'scripts/training/funnel-check.sh')], {
+      encoding: 'utf8',
+      env: { PATH: '/usr/bin:/bin', NODE_ENV: 'test' },
+    });
+    expect(r.status).toBe(0);
   });
 });
