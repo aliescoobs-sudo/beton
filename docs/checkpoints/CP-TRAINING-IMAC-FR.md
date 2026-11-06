@@ -80,6 +80,7 @@ Puis `tailscale funnel reset` : l'adresse ne doit plus répondre. Rouvre avec `g
 **Au quotidien**
 - Fermer l'accès public quand personne ne s'entraîne : `tailscale funnel reset` ✅ l'adresse ne répond plus.
 - Arrêter : `./scripts/training-down.sh` (les données restent). Redémarrer : `./scripts/training-up.sh`.
+- **Remettre une journée de travail** (moins d'une minute, comptes et mots de passe inchangés) : `./scripts/training-rearm.sh` crée les commandes du jour, planifie les rotations des trois chauffeurs, ajoute des devis, une commande à annuler, une livraison à recevoir et une alerte de stock bas. À lancer chaque matin avant la séance. Les fiches d'exercices par rôle sont dans `docs/training/`.
 - **Remettre à zéro** (efface tout, nouveaux mots de passe) : `./scripts/training-reset.sh`, tape `RESET`, puis `./scripts/training/show-accounts.sh <nom>` pour chaque stagiaire.
 - Nouvelle version : `git pull`, puis `./scripts/training/pick-image.sh` (le digest du build vert de CE commit), remplace la ligne `APP_IMAGE=` dans `.env.training`, relance `./scripts/training-up.sh`.
 - Ne jamais saisir de vraies données (vrai client, vrai téléphone, vrai chèque).

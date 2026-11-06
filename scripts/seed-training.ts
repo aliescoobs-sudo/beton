@@ -36,6 +36,7 @@ import {
   setOpeningStock,
   setOrderPumped,
 } from '../src/modules/operations/index.ts';
+import { armTrainingDay } from './training-day.ts';
 import { seedIntegrationScenario } from '../src/modules/operations/service/pilot-integration.ts';
 import { seedOperationsScenario } from '../src/modules/operations/service/pilot-ops.ts';
 import { seedOperationsWave2 } from '../src/modules/operations/service/pilot-ops2.ts';
@@ -535,6 +536,10 @@ export async function seedTraining(opts: SeedTrainingOptions): Promise<SeedTrain
       { user: { ...owner, twoFactorEnabled: true } as never, twoFactorAt: realClock.now() },
       { action: 'configure', enabled: true, leasingTreatment: 'expense' },
     );
+
+    // 8c. T5: the working day of the training instance (rotations for the three drivers, orders to dispatch and to cancel, quotes,
+    //     a delivery to receive, a low-stock alert), dated from today. `rearm:training` does the same on any later morning.
+    await armTrainingDay(env, today, { requireMarker: false });
 
     // 9. Credentials first, marker last (R11-04, R11-02). The file is staged privately and exclusively; if it cannot be written the seed
     //    stops here, with no marker, saying so. Only then is it put in place, and only then is the database marked: the marker means

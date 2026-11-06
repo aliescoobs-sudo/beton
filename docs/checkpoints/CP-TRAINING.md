@@ -87,6 +87,7 @@ Nothing here is done for you, and no token or password is ever pasted anywhere b
 ## Day to day
 - Stop: `./scripts/training-down.sh` (data kept). Start: `./scripts/training-up.sh`.
 - **Stop the Funnel** (the public address closes at once): `tailscale funnel reset`. Do this whenever nobody is training.
+- **Re-arm the day** (under a minute, accounts and passwords untouched): `./scripts/training-rearm.sh` creates today's orders, plans the three drivers' rotations in sequence, adds quotes, an order to cancel, a delivery to receive and a low-stock alert, dated from today (it cancels the day's unproduced Tétouan orders first, so it can be run again). Run it each morning before a session. The exercise cards per role are in `docs/training/`.
 - **Reset to the clean seed** (erases everything entered, new passwords): `./scripts/training-reset.sh` (asks you to type RESET), then `./scripts/training/show-accounts.sh <name>` for each trainee.
   It only ever wipes a database that carries the training marker.
 - **New version:** `git pull`, then `./scripts/training/pick-image.sh` (the digest of the green build of exactly that commit), replace the `APP_IMAGE=` line in `.env.training` with it, run `./scripts/training-up.sh` (it migrates and waits for readiness).

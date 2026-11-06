@@ -12,6 +12,7 @@ const NOT_ENTRY_POINTS = new Set([
   'cli-help.ts',
   'import-excel-lib.ts',
   'prompt.ts',
+  'training-day.ts',
   'training-lib.ts',
 ]);
 // A bare environment: no .env files, secrets or database settings leak in.

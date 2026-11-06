@@ -7,6 +7,7 @@ import { TRAINING_TEST_DATABASE, ensureRoles, recreateDatabase } from '../script
 import { runMigrations } from '../scripts/db-migrate';
 import { wipeTrainingDatabase } from '../scripts/reset-training';
 import { seedTraining } from '../scripts/seed-training';
+import { armTrainingDay } from '../scripts/training-day';
 import { testEnv } from './db-env';
 
 // T1: the training seed, run once on a scratch database. Fictitious data only; one account per role; credentials written once to a file
@@ -177,4 +178,75 @@ describe('reset:training (T1)', () => {
     const oldSecrets = [...before.matchAll(/(?:mot de passe|PIN) : (\S+)/g)].map((m) => m[1]!);
     for (const s of oldSecrets) expect(after).not.toContain(s);
   }, 600_000);
+});
+
+describe('the training day is dated from the business day (T5)', () => {
+  const addDays = (iso: string, n: number) =>
+    new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+  const today = new Date().toISOString().slice(0, 10);
+  const notStarted = async (date: string) =>
+    (
+      await migrator.query<{ code: string; n: string }>(
+        `select d.code, count(p.id)::text as n from driver d
+           join trip_plan p on p.driver_id = d.id and p.trip_date = $1
+          where d.user_id is not null and d.kind = 'driver'
+            and not exists (select 1 from trip_plan_cancellation x where x.trip_id = p.id)
+            and not exists (select 1 from trip_event e where e.trip_id = p.id)
+          group by d.code order by d.code`,
+        [date],
+      )
+    ).rows;
+  it('after the seed each of the three phone drivers has 2 or 3 rotations still to do today', async () => {
+    const rows = await notStarted(today);
+    expect(rows).toHaveLength(3);
+    for (const r of rows) {
+      expect(Number(r.n)).toBeGreaterThanOrEqual(2);
+      expect(Number(r.n)).toBeLessThanOrEqual(3);
+    }
+  });
+  it('the history is dated before today and the other roles find work: quotes, an unplanned order, an order to cancel, low stock', async () => {
+    expect(
+      await count(
+        `select count(*)::text n from trip_plan where trip_date < '${today}' and trip_date >= '${addDays(today, -40)}'`,
+      ),
+    ).toBeGreaterThan(10);
+    expect(await count(`select count(*)::text n from quote`)).toBeGreaterThanOrEqual(2);
+    expect(
+      await count(
+        `select count(*)::text n from sales_order o where o.delivery_date = '${today}' and o.reverses_id is null
+            and not exists (select 1 from sales_order r where r.reverses_id = o.id)
+            and not exists (select 1 from trip_plan p where p.order_id = o.id)`,
+      ),
+    ).toBeGreaterThanOrEqual(1);
+    expect(
+      await count(`select count(*)::text n from sales_order where delivery_date = '${addDays(today, 1)}'`),
+    ).toBeGreaterThanOrEqual(1);
+    expect(
+      await count(
+        `select count(*)::text n from audit_event where table_name = 'stock_threshold' and action = 'insert'`,
+      ),
+    ).toBeGreaterThanOrEqual(1);
+  });
+  it('re-arming the same day does not double the rotations; arming the next morning gives that day its own', async () => {
+    const before = await notStarted(today);
+    const first = await armTrainingDay(training, today);
+    expect(first.rotationsPlanned).toBeGreaterThanOrEqual(6);
+    const again = await notStarted(today);
+    expect(again.map((r) => r.code)).toEqual(before.map((r) => r.code));
+    for (const r of again) expect(Number(r.n)).toBeLessThanOrEqual(3);
+    const tomorrow = addDays(today, 1);
+    expect(await notStarted(tomorrow)).toHaveLength(0);
+    await armTrainingDay(training, tomorrow);
+    const next = await notStarted(tomorrow);
+    expect(next).toHaveLength(3);
+    for (const r of next) expect(Number(r.n)).toBeGreaterThanOrEqual(2);
+  }, 120_000);
+  it('refuses a database without the training marker', async () => {
+    const other = {
+      ...training,
+      DATABASE_URL_MIGRATOR: env.DATABASE_URL_MIGRATOR.replace(/\/[^/]+$/, '/belgobeton_test'),
+      DATABASE_URL_APP: env.DATABASE_URL_APP.replace(/\/[^/]+$/, '/belgobeton_test'),
+    };
+    await expect(armTrainingDay(other, today)).rejects.toThrow(/training marker/);
+  });
 });
