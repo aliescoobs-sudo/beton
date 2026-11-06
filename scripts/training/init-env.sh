@@ -9,10 +9,17 @@ cd "$(dirname "$0")/../.."
 base="${APP_BASE_URL:-http://127.0.0.1:3000}"
 domain="${APP_DOMAIN:-}"
 image="${APP_IMAGE:?set APP_IMAGE (ghcr.io/<owner>/belgobeton@sha256:<digest>)}"
-[ ! -e .env.training ] && [ ! -e .env.training.ops ] || { echo "init-env.sh: .env.training or .env.training.ops already exists: not overwritten" >&2; exit 1; }
+for f in .env.training .env.training.ops; do
+  { [ -e "$f" ] || [ -L "$f" ]; } && { echo "init-env.sh: $f already exists (or is a link): not overwritten" >&2; exit 1; }
+done
 rnd() { openssl rand -hex 24; }
 key() { openssl rand -base64 32; }
 umask 077
+# R12: the two files are created EXCLUSIVELY (noclobber = O_EXCL): a file or a link planted between the check above and the write makes the
+# write fail instead of being followed. Mode 0600 from the start (umask), and a failure removes what this run created.
+set -C
+created=()
+trap 'rc=$?; if [ "$rc" -ne 0 ]; then for f in "${created[@]:-}"; do [ -n "$f" ] && rm -f -- "$f"; done; fi' EXIT
 pw_app=$(rnd) pw_auth=$(rnd) pw_system=$(rnd) pw_migrator=$(rnd) pw_backup=$(rnd) pw_seed=$(rnd) pw_super=$(rnd)
 {
   echo "APP_DOMAIN=$domain"
@@ -39,12 +46,14 @@ ASSISTANT_DET_ENABLED=true
 TRANSFERS_ENABLED=true
 FINANCE_ENABLED=true
 FLAGS
-} > .env.training
+} > .env.training || { echo "init-env.sh: could not create .env.training exclusively (planted file or link?): nothing written" >&2; exit 1; }
+created+=(.env.training)
 {
   echo "POSTGRES_SUPERUSER_PASSWORD=$pw_super"
   echo "DATABASE_URL_MIGRATOR=postgres://belgobeton_migrator:$pw_migrator@db:5432/belgobeton"
   echo "DATABASE_URL_BACKUP=postgres://belgobeton_backup:$pw_backup@db:5432/belgobeton"
   echo "DATABASE_URL_SEED=postgres://belgobeton_seed:$pw_seed@db:5432/belgobeton"
-} > .env.training.ops
+} > .env.training.ops || { echo "init-env.sh: could not create .env.training.ops exclusively (planted file or link?): nothing written" >&2; exit 1; }
+created+=(.env.training.ops)
 chmod 600 .env.training .env.training.ops
 echo "init-env.sh: wrote .env.training and .env.training.ops (chmod 600). Not shown here."

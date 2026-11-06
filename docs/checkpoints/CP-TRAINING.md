@@ -111,3 +111,36 @@ properly would need the dump, the `filestore` volume and the secret files carrie
 until that is written and rehearsed, plan a new seed and new credentials, and tell the trainees before the move.
 The production instance is another matter: it uses `docker-compose.prod.yml`, `APP_ENV=production`
 and the runbook, and it cannot be started with training mode or on a training database.
+
+## Mandatory conditions before the Funnel is opened (R12)
+`docs/reviews/CODEX-REVIEW-R12.md` gives a conditional GO for supervised web-and-phone training with fictitious data only. All seven conditions are
+mandatory; record each one (without any secret) before `go-public.sh`. Funnel stays closed until all seven are recorded on the actual iMac.
+1. **Approved artifact and fresh volume.** A clean checkout of the reviewed commit and the digest of ITS successful image workflow (`pick-image.sh`); the running
+   app and ops use that digest. All migrations applied (through 0117 and the finance ones). The stock `belgobeton-training` project on a genuinely NEW dedicated
+   database volume initialised by the training seed: no import, no partial restore, no reused business database, no hand-inserted marker. Keep evidence that the
+   volume was created and the seed completed.
+2. **Mode and credential isolation.** In the RUNNING app: training on, real data and simulation off, `APP_ENV=training`, `TRAINING_ALLOW_UNMARKED` absent or
+   false (the compose file forces it off and the environment check refuses it outside the test runner), no VAPID or provider credentials, the red banner. No
+   maintenance, superuser or seed credentials and no accounts volume in the app. The credentials stay in the stock private volume only (`/app/out`: uid 10001,
+   folder 0700, file 0600, checked by metadata). Never run the seed with a local or custom output path in a checkout (the seed now refuses one). Use a
+   trusted, non-shared checkout and an exclusive operator account for `init-env.sh` and the scripts that rewrite secrets.
+3. **Handling the credentials.** FileVault on, automatic login off, screen lock on. Docker really uses the Keychain helper, the token is `read:packages` only, the
+   GHCR package is private. Give each trainee exactly their own block with `show-accounts.sh <exact login or code>`, check that ONE block is shown, never
+   record, photograph or redirect it. Reset any credential whose handling is uncertain: the business data is fictitious, the credentials are not.
+4. **Close, configure, verify, publish.** `tailscale funnel reset` first, and confirm from outside that the address is closed. No host database port; the app on
+   the expected loopback port only. `set-url.sh <https address>`, restart, then `go-public.sh <https address>`: it re-resets, reads the port and the address
+   from the RUNNING app, requires the training readiness answer from that very socket and exactly one proxy target in the full Funnel status. A stale env file,
+   a ready container that is not the one on the port, or a silent check is not enough. Then a short supervised check from mobile data.
+5. **Phone sign-in acceptance on the real proxy.** Parallel wrong PINs cannot exceed the per-driver five-failure lock; a correct PIN after the lock does not clear
+   it; the bound, foreign and released phone cases behave. The per-IP limit locks an address through the actual Funnel, a forged or malformed
+   `X-Forwarded-For` does not change or disable the client address selected, and an unknown address falls in one shared bucket. Accept only the remaining
+   burst and availability risk, with an operator ready to close the Funnel. If the trusted-IP behaviour or the per-driver lock cannot be shown, the phone
+   app is not exposed.
+6. **Roles, offline and finance acceptance.** Unauthorised direct requests and wrong-origin writes are refused; the two plant managers are separated; logout and
+   device revocation work; an empty-queue phone revalidates; the day leaves the screen at expiry even when the network stalls. Locked, dedicated phones;
+   sign out and clear the local day and queued photos at handover; do not describe the 18 hours as a proven confidentiality boundary. Finance: password-only
+   is refused, the owner, app_admin or accountant enrols a real authenticator (QR or manual key), a real fresh code makes writes work, the accountant exports.
+   No synthetic-factor finance exception exists.
+7. **Supervision and closure.** Open it only during a supervised session, with no real client, supplier, cheque, document or photo. Complete login, a change and
+   logout over HTTPS from mobile data, web and phone. Reset the Funnel afterwards and confirm from outside that it is closed; repeat after any interruption or
+   reboot (`--bg` persists). The nightly dumps are same-host, database-only recovery, not a portable backup; the December VPS starts with a fresh seed.

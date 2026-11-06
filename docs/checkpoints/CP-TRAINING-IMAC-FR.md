@@ -83,3 +83,40 @@ Puis `tailscale funnel reset` : l'adresse ne doit plus répondre. Rouvre avec `g
 - **Remettre à zéro** (efface tout, nouveaux mots de passe) : `./scripts/training-reset.sh`, tape `RESET`, puis `./scripts/training/show-accounts.sh <nom>` pour chaque stagiaire.
 - Nouvelle version : `git pull`, puis `./scripts/training/pick-image.sh` (le digest du build vert de CE commit), remplace la ligne `APP_IMAGE=` dans `.env.training`, relance `./scripts/training-up.sh`.
 - Ne jamais saisir de vraies données (vrai client, vrai téléphone, vrai chèque).
+
+## Conditions obligatoires avant d'ouvrir le Funnel (R12)
+`docs/reviews/CODEX-REVIEW-R12.md` donne un feu vert conditionnel pour une formation surveillée, web et téléphone, avec des données fictives seulement. Les sept
+conditions sont obligatoires ; note chacune (sans aucun secret) avant `go-public.sh`. Le Funnel reste fermé tant que les sept ne sont pas notées sur l'iMac.
+1. **Version approuvée et volume neuf.** Une copie propre du commit relu et le digest du build vert de CE commit (`pick-image.sh`) ; l'application et `ops` qui
+   tournent utilisent ce digest. Toutes les migrations sont appliquées (jusqu'à 0117 et celles de la finance). Le projet `belgobeton-training` d'origine sur un volume
+   de base de données **neuf** et dédié, rempli par le seed de formation : aucun import, aucune restauration partielle, aucune base métier réutilisée, aucun marqueur
+   posé à la main. Garde la preuve que le volume a été créé et que le seed est allé au bout.
+2. **Mode et isolation des identifiants.** Dans l'application **qui tourne** : formation activée, données réelles et simulation coupées, `APP_ENV=training`,
+   `TRAINING_ALLOW_UNMARKED` absent ou à false (le fichier compose le force à false, et la vérification d'environnement le refuse hors du lanceur de tests), pas de clés
+   VAPID ni de fournisseur, la bannière rouge. Aucun identifiant de maintenance, de super-utilisateur ou de seed, et pas de volume des comptes dans l'application. Les
+   identifiants restent dans le volume privé d'origine (`/app/out` : uid 10001, dossier 0700, fichier 0600, vérifiés par leurs métadonnées). Ne jamais lancer le seed avec
+   un chemin de sortie local ou personnalisé dans une copie du dépôt (le seed le refuse maintenant). Copie de confiance, non partagée, et compte opérateur exclusif
+   pour `init-env.sh` et les scripts qui réécrivent les secrets.
+3. **Manipulation des identifiants.** FileVault activé, ouverture automatique de session coupée, verrouillage d'écran activé. Docker utilise vraiment l'assistant
+   Trousseau, le jeton est `read:packages` seulement, le paquet GHCR est privé. Donne à chacun exactement son bloc avec `show-accounts.sh <identifiant ou code exact>`,
+   vérifie qu'UN SEUL bloc s'affiche, sans jamais l'enregistrer, le photographier ni le rediriger. Réinitialise tout identifiant dont le sort est incertain : les données
+   sont fictives, les identifiants ne le sont pas.
+4. **Fermer, configurer, vérifier, publier.** D'abord `tailscale funnel reset`, et vérifie de l'extérieur que l'adresse ne répond plus. Aucun port de base de données sur
+   l'hôte ; l'application sur le seul port local attendu. `set-url.sh <adresse https>`, redémarrage, puis `go-public.sh <adresse https>` : il refait un reset, lit le port
+   et l'adresse dans l'application **en cours d'exécution**, exige la réponse « prêt, formation » de cette prise précise et une seule cible proxy dans l'état complet du
+   Funnel. Un fichier d'environnement périmé, un conteneur prêt qui n'est pas celui du port, ou un contrôle silencieux ne suffisent pas. Puis un bref essai surveillé en
+   données mobiles.
+5. **Connexion du téléphone sur le vrai relais.** Des PIN faux en parallèle ne dépassent pas le verrou de cinq échecs par chauffeur ; un bon PIN après le verrou ne le
+   lève pas ; les cas de téléphone lié, étranger ou libéré se comportent bien. La limite par adresse verrouille une adresse à travers le vrai Funnel, un `X-Forwarded-For`
+   falsifié ou malformé ne change ni ne désactive l'adresse retenue, et une adresse inconnue tombe dans un seul panier commun. On n'accepte que le risque restant de rafale et
+   de disponibilité, avec un opérateur prêt à fermer le Funnel. Si le comportement de l'adresse de confiance ou le verrou par chauffeur ne peut pas être montré, on
+   n'expose pas l'application téléphone.
+6. **Rôles, hors-ligne et finance.** Les requêtes directes non autorisées et les écritures d'une autre origine sont refusées ; les deux chefs de centrale sont séparés ;
+   la déconnexion et la révocation d'un téléphone fonctionnent ; un téléphone sans file d'attente se revalide ; la journée disparaît de l'écran à l'expiration même si le
+   réseau reste bloqué. Téléphones dédiés et verrouillés ; déconnexion et effacement de la journée et des photos en attente à chaque remise ; ne pas présenter les 18
+   heures comme une frontière de confidentialité prouvée. Finance : le mot de passe seul est refusé, le propriétaire, l'administrateur ou le comptable active une vraie
+   application d'authentification (QR ou clé), un vrai code frais fait fonctionner les écritures, le comptable exporte. Aucune exception de facteur fictif n'existe.
+7. **Surveillance et clôture.** N'ouvre que pendant une séance surveillée, sans vrai client, fournisseur, chèque, document ni photo. Fais une connexion, un changement et
+   une déconnexion en HTTPS depuis les données mobiles, sur le web et sur le téléphone. Referme le Funnel ensuite et vérifie de l'extérieur qu'il est fermé ; recommence après
+   toute coupure ou redémarrage (`--bg` persiste). Les sauvegardes de nuit sont une reprise sur la même machine, base seule, pas une sauvegarde transportable ; la VPS de
+   décembre repart d'un seed neuf.

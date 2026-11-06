@@ -76,7 +76,7 @@ describe('the training stack (T1)', () => {
   });
   it('generates the secrets with openssl, writes them to the two files only, and never overwrites', () => {
     expect(initEnv).toMatch(/openssl rand/);
-    expect(initEnv).toMatch(/already exists: not overwritten/);
+    expect(initEnv).toMatch(/already exists.*not overwritten/);
     expect(initEnv).toMatch(/chmod 600 \.env\.training \.env\.training\.ops/);
   });
   it('turns on every module flag that exists, and has no flag for the portals', () => {
@@ -635,5 +635,75 @@ if [ "$1 $2" = "funnel status" ]; then [ -n "\${STUB_STATUS_FAIL-}" ] && exit 1;
       env: { PATH: '/usr/bin:/bin', NODE_ENV: 'test' },
     });
     expect(r.status).toBe(0);
+  });
+});
+
+describe('init-env.sh creates its files exclusively, never through a link (R12)', () => {
+  const setup = () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'bb-initenv-'));
+    mkdirSync(path.join(root, 'scripts/training'), { recursive: true });
+    copyFileSync('scripts/training/init-env.sh', path.join(root, 'scripts/training/init-env.sh'));
+    return root;
+  };
+  const run = (root: string, extraPath = '') =>
+    spawnSync('bash', [path.join(root, 'scripts/training/init-env.sh')], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        PATH: `${extraPath}${process.env.PATH}`,
+        APP_IMAGE: `ghcr.io/o/belgobeton@sha256:${'a'.repeat(64)}`,
+      },
+    });
+  it('refuses an existing file and an existing link (dangling or not), and writes nothing', () => {
+    for (const plant of ['file', 'dangling', 'link']) {
+      const root = setup();
+      const victim = path.join(root, 'victim.txt');
+      writeFileSync(victim, 'keep');
+      if (plant === 'file') writeFileSync(path.join(root, '.env.training.ops'), 'mine');
+      if (plant === 'dangling') symlinkSync(path.join(root, 'nowhere'), path.join(root, '.env.training'));
+      if (plant === 'link') symlinkSync(victim, path.join(root, '.env.training.ops'));
+      const r = run(root);
+      expect(r.status, plant).toBe(1);
+      expect(r.stderr, plant).toMatch(/not overwritten/);
+      expect(readFileSync(victim, 'utf8')).toBe('keep');
+      expect(existsSync(path.join(root, 'nowhere'))).toBe(false);
+    }
+  });
+  it('a link planted AFTER the check (while the secrets are generated) is not followed, and the run leaves nothing behind', () => {
+    const root = setup();
+    const victim = path.join(root, 'victim.txt');
+    writeFileSync(victim, 'keep');
+    const realOpenssl = spawnSync('which', ['openssl'], { encoding: 'utf8' }).stdout.trim();
+    const bin = path.join(root, 'bin');
+    mkdirSync(bin);
+    // the stub plants the link on its first call, then behaves as openssl
+    writeFileSync(
+      path.join(bin, 'openssl'),
+      `#!/usr/bin/env bash\n[ -e "${root}/.planted" ] || { touch "${root}/.planted"; ln -s "${victim}" "${root}/.env.training"; }\nexec "${realOpenssl}" "$@"\n`,
+      { mode: 0o755 },
+    );
+    const r = run(root, `${bin}:`);
+    expect(r.status).not.toBe(0);
+    expect(readFileSync(victim, 'utf8')).toBe('keep'); // the link was not written through
+    expect(existsSync(path.join(root, '.env.training.ops'))).toBe(false);
+  });
+  it('the source creates exclusively (noclobber) with a private umask', () => {
+    expect(initEnv).toMatch(/set -C/);
+    expect(initEnv).toMatch(/umask 077/);
+  });
+});
+
+describe('the seven mandatory pre-opening conditions of R12 are in both guides', () => {
+  it.each([
+    ['docs/checkpoints/CP-TRAINING.md', /Mandatory conditions before the Funnel is opened \(R12\)/],
+    ['docs/checkpoints/CP-TRAINING-IMAC-FR.md', /Conditions obligatoires avant d'ouvrir le Funnel \(R12\)/],
+  ])('%s', (file, heading) => {
+    const doc = readFileSync(file, 'utf8');
+    expect(doc).toMatch(heading);
+    const section = doc.slice(doc.search(heading));
+    const numbered = [...section.matchAll(/^(\d)\. \*\*/gm)].map((m) => Number(m[1]));
+    expect(numbered).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    for (const needle of ['go-public.sh', 'show-accounts.sh', 'TRAINING_ALLOW_UNMARKED', 'funnel reset'])
+      expect(section).toContain(needle);
   });
 });
