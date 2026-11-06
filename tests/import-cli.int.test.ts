@@ -18,6 +18,8 @@ const migrator = new pg.Pool({ connectionString: env.DATABASE_URL_MIGRATOR, max:
 mkdirSync('.logs', { recursive: true });
 const dir = mkdtempSync(join('.logs', 't2-cli-'));
 afterAll(async () => {
+  // the synthetic authenticator row is not a real sealed record: leave none for the key-rotation suite to trip over
+  await migrator.query(`delete from "twoFactor" where "userId" = $1`, [userId]).catch(() => undefined);
   await migrator.end();
   rmSync(dir, { recursive: true, force: true });
 });
