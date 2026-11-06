@@ -3,10 +3,12 @@
 import { randomBytes, randomInt } from 'node:crypto';
 import {
   closeSync,
+  existsSync,
   constants,
   fsyncSync,
   lstatSync,
   openSync,
+  readFileSync,
   readdirSync,
   realpathSync,
   renameSync,
@@ -132,6 +134,34 @@ export const CREDENTIALS_NAME = /^training-accounts[A-Za-z0-9._-]*\.local\.txt$/
  * inside a checkout or a Docker build context (a folder, or an ancestor, that holds .git, a Dockerfile or a .dockerignore).
  */
 export const STOCK_ACCOUNTS_DIR = '/app/out';
+
+/**
+ * R13: the stock exception is for a MOUNTED volume, not for a pathname. A directory is a mount point when the kernel lists it as one
+ * (/proc/self/mountinfo, field 5, on Linux) or, where that file does not exist, when it lives on another device than its parent.
+ */
+export function isMountPoint(dir: string): boolean {
+  try {
+    const real = realpathSync(dir);
+    if (existsSync('/proc/self/mountinfo')) {
+      const unescape = (v: string) =>
+        v.replace(/\\([0-7]{3})/g, (_m, o: string) => String.fromCharCode(parseInt(o, 8)));
+      return readFileSync('/proc/self/mountinfo', 'utf8')
+        .split('\n')
+        .some((line) => unescape(line.split(' ')[4] ?? '') === real);
+    }
+    const here = lstatSync(real);
+    const up = lstatSync(path.dirname(real));
+    return real === path.dirname(real) || here.dev !== up.dev; // the root is a mount
+  } catch {
+    return false;
+  }
+}
+
+export interface PathChecks {
+  /** The stock volume path and the mount test: injectable for tests only; the defaults are the container's. */
+  stockDir?: string;
+  isMount?: (dir: string) => boolean;
+}
 const BUILD_CONTEXT_MARKERS = ['.git', 'Dockerfile', '.dockerignore'];
 
 function insideCheckoutOrBuildContext(dir: string): boolean {
@@ -150,7 +180,9 @@ export const STAGING_NAME = /^training-accounts\.staging-[0-9a-f]{12}\.local\.tx
 const LEGACY_STAGING_NAME = /^\.training-accounts[A-Za-z0-9._-]*\.[0-9a-f]{12}$/;
 
 /** Checks a destination for the credentials file and returns its absolute path; throws with the reason otherwise. */
-export function validateCredentialsPath(file: string): string {
+export function validateCredentialsPath(file: string, checks: PathChecks = {}): string {
+  const stockDir = checks.stockDir ?? STOCK_ACCOUNTS_DIR;
+  const isMount = checks.isMount ?? isMountPoint;
   const abs = path.resolve(file);
   if (!CREDENTIALS_NAME.test(path.basename(abs)) || STAGING_NAME.test(path.basename(abs)))
     throw new Error(
@@ -160,7 +192,8 @@ export function validateCredentialsPath(file: string): string {
   if (!dir || dir.isSymbolicLink() || !dir.isDirectory())
     throw new Error('credentials file refused: its folder does not exist or is a link');
   const realDir = realpathSync(path.dirname(abs));
-  if (realDir !== STOCK_ACCOUNTS_DIR && insideCheckoutOrBuildContext(realDir))
+  // the stock exception needs the folder to be an actual mount (the private accounts volume), not merely to have that name
+  if (!(realDir === stockDir && isMount(realDir)) && insideCheckoutOrBuildContext(realDir))
     throw new Error(
       `credentials file refused: its folder is inside a checkout or a Docker build context. Give the output path of a private folder outside it (in the containers: ${STOCK_ACCOUNTS_DIR}).`,
     );

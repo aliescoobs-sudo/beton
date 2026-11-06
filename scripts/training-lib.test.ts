@@ -5,6 +5,7 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   statSync,
   symlinkSync,
   writeFileSync,
@@ -24,6 +25,7 @@ import {
   STAGING_NAME,
   stageCredentialsFile,
   sweepStaleStagedCredentials,
+  isMountPoint,
   validateCredentialsPath,
 } from './training-lib';
 
@@ -199,6 +201,30 @@ describe('R12-02: no secret under an unignored name, nothing left behind, no che
     expect(validateCredentialsPath(path.join(dir(), 'training-accounts.local.txt'))).toMatch(
       /training-accounts/,
     );
+  });
+  it('R13: the stock path exception needs a real mount point, not a pathname', () => {
+    // a build-context folder (it holds a Dockerfile) that is named like the stock volume
+    const stock = dir();
+    writeFileSync(path.join(stock, 'Dockerfile'), 'FROM scratch');
+    const file = path.join(stock, 'training-accounts.local.txt');
+    const real = realpathSync(stock);
+    // the name alone is not enough: not a mount, so the checkout / build-context rule applies
+    expect(() => validateCredentialsPath(file, { stockDir: real, isMount: () => false })).toThrow(
+      /build context/,
+    );
+    // the same folder as the stock volume that IS mounted: accepted
+    expect(validateCredentialsPath(file, { stockDir: real, isMount: () => true })).toMatch(
+      /training-accounts/,
+    );
+    // a mounted folder that is not the stock path gets no exception
+    expect(() => validateCredentialsPath(file, { stockDir: '/app/out', isMount: () => true })).toThrow(
+      /build context/,
+    );
+  });
+  it('R13: isMountPoint is true for the filesystem root and for a mounted folder, false for an ordinary folder', () => {
+    expect(isMountPoint('/')).toBe(true);
+    expect(isMountPoint(dir())).toBe(false);
+    expect(isMountPoint(path.join(tmpdir(), 'bb-does-not-exist-xyz'))).toBe(false);
   });
   it('the command lines have no default output path', () => {
     for (const f of ['scripts/seed-training.ts', 'scripts/reset-training.ts']) {
