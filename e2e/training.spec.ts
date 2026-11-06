@@ -106,3 +106,11 @@ test('R12-07: a training accountant enrols a real authenticator with a server-ma
   // the link is gone: the account now has a real authenticator
   await expect(page.getByTestId('training-enrol-link')).toHaveCount(0);
 });
+
+test('T5: a training account is not offered to switch on alerts (push is off there)', async ({ page }) => {
+  await trainingSignIn(page, E2E_TRAINING_USER.email);
+  await page.goto(`${E2E_TRAINING_URL}/fr/notifications`);
+  await expect(page.getByRole('heading').first()).toBeVisible();
+  await expect(page.getByRole('button', { name: /Activer les alertes/ })).toHaveCount(0);
+  await expect(page.getByText(/Activer les alertes/)).toHaveCount(0);
+});
