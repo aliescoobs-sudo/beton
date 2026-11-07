@@ -519,4 +519,23 @@ describe('the overlap policy: no double-booking without an audited override', ()
     expect(r.ok, JSON.stringify(r)).toBe(true);
     if (r.ok) expect(r.value.conflicts).toContain('NO_DRIVER');
   });
+
+  it('a reassignment answers only for the rotation it moves: an unrelated double-booking of the day is reported, not refused', async () => {
+    const date = nextDay();
+    const [o1, o2, o3] = [await newOrder(date), await newOrder(date), await newOrder(date)];
+    // the same driver on two trucks at once, written straight into the plan (what another writer, or an old day, may have left)
+    await newTrip(date, o1.id, truckA, driverRow1);
+    await newTrip(date, o2.id, truckB, driverRow1);
+    const t3 = await newTrip(date, o3.id, truckC, null);
+    const r = await reassignTrip(app, pmA, {
+      tripId: t3,
+      truckId: truckA,
+      driverId: null,
+      reason: 'Camion plus proche',
+    });
+    expect(r.ok, JSON.stringify(r)).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.conflicts).toContain('DRIVER_OVERLAP');
+    expect(r.value.overlapOverride).toBe(false);
+  });
 });

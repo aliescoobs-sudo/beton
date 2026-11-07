@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { Button, Input, Select, StatusPill } from '@/ui';
 import { ESTIMATE_STAGES, type BoardTruck, type EstimateStage } from '../domain/trip-timing';
+import { carryMessage, takeCarriedMessage } from './carried-message';
 import type { DelayStats, EstimateView } from '../service/timing-service';
 
 type Done = { ok: true; conflicts?: string[] } | { ok: false; error: string };
@@ -49,7 +50,11 @@ export function TimingBoardPanel(props: TimingBoardProps) {
   const router = useRouter();
   const [overlapAsked, setOverlapAsked] = useState(false);
   const [acting, setActing] = useState<{ tripId: string; kind: 'reassign' | 'postpone' } | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  // The board is keyed by its rotations, so a reassignment (new rotation ids) rebuilds it after the refresh: the confirmation, with what the
+  // new plan still has wrong, is handed to the new instance (module memory: empty on a first load, so no hydration mismatch).
+  const [message, setMessage] = useState<string | null>(() => {
+    return takeCarriedMessage();
+  });
   const [error, setError] = useState<string | null>(null);
 
   async function run(job: Promise<Done>) {
@@ -64,7 +69,9 @@ export function TimingBoardPanel(props: TimingBoardProps) {
     setOverlapAsked(false);
     // What the new plan still has wrong is shown, never dropped.
     const left = (r.conflicts ?? []).map((c) => tc(c as never)).join(', ');
-    setMessage(left ? `${t('done')} ${t('conflictsLeft', { list: left })}` : t('done'));
+    const text = left ? `${t('done')} ${t('conflictsLeft', { list: left })}` : t('done');
+    setMessage(text);
+    carryMessage(text);
     router.refresh();
   }
 
