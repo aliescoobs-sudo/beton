@@ -623,7 +623,11 @@ async function plan(
       const unit = v.unit.trim() || defaultEntryUnit(comp.baseUnit);
       const qty = parseEntryQty(v.qty, comp.baseUnit, unit);
       if (!qty.ok) {
-        planned.push({ row, label, error: `quantity per m³ in ${unit}: ${qty.error}` });
+        planned.push({
+          row,
+          label,
+          error: `quantity per m³ (check the quantity and the unit columns): ${qty.error}`,
+        });
         continue;
       }
       const key = `${typeId}|${plantId}|${from}`;

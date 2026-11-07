@@ -1,7 +1,8 @@
 import type { RollbackReport, WorkbookReport } from './workbook-import';
 
-// The text report of a run: the sheet, the row number and the problem. Never the cells, never a name, ICE, phone or amount from the
-// file, so the report can be kept in ./.logs/ without keeping the company's data in it. The problems are fixed phrases.
+// The text report of a run: the sheet's position ("Sheet 2"), its kind, the row number and a fixed phrase. Never a cell, never a sheet's
+// real name, never a name, ICE, phone or amount from the file (R14-09). The in-memory WorkbookReport still carries each row's `label`,
+// which IS the file's own text: the object is sensitive and is never printed or stored; only this formatter's output is.
 
 export function formatWorkbookReport(r: WorkbookReport): string {
   const head = r.alreadyImportedRunId

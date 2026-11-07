@@ -1,5 +1,7 @@
 // Helpers of scripts/import-excel.ts, kept apart so they can be tested: reading the arguments, the typed confirmation, and the
 // second factor check. Not an entry point.
+import { chmodSync, lstatSync, mkdirSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
 import { createOTP } from '@better-auth/utils/otp';
 import type pg from 'pg';
 import type { Env } from '../src/lib/env.ts';
@@ -101,4 +103,31 @@ export async function verifyTotp(
   if (!rows[0]) return false;
   const secret = await authSecretCipher(env).decrypt(rows[0].secret);
   return createOTP(secret).verify(code.trim());
+}
+
+/**
+ * R14-09: what the CLI says about an error it did not expect. Only a fixed code, and for a database error its SQLSTATE: never the
+ * message, because a PostgreSQL message or detail can quote the row that failed (a name, an ICE, an amount).
+ */
+export function safeErrorLine(error: unknown): string {
+  const code = (error as { code?: unknown } | null)?.code;
+  if (typeof code === 'string' && /^[0-9A-Z]{5}$/.test(code))
+    return `DATABASE_ERROR ${code}: the database refused an operation; nothing more is shown here because its message can quote a row.`;
+  if (typeof code === 'string' && /^[A-Z_]{3,30}$/.test(code)) return `SYSTEM_ERROR ${code}`;
+  return 'UNEXPECTED_ERROR: the import stopped on an error that is not described here (no detail is printed: it could contain data of the file).';
+}
+
+/**
+ * R14-09: a report file is created 0600 (owner only), exclusively, inside a 0700 folder that is not a link. Returns the path.
+ * The folder's own mode is tightened: a report names sheets by position and rows by number, but it is still data about the company.
+ */
+export function writePrivateReport(dir: string, name: string, text: string, now: Date): string {
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const st = lstatSync(dir);
+  if (st.isSymbolicLink() || !st.isDirectory())
+    throw new Error('report folder refused: it is a link or not a folder');
+  chmodSync(dir, 0o700);
+  const file = path.join(dir, `import-${name}-${now.toISOString().replace(/[:.]/g, '-')}.txt`);
+  writeFileSync(file, `${text}\n`, { mode: 0o600, flag: 'wx' });
+  return file;
 }

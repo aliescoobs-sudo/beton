@@ -205,18 +205,18 @@ describe('the dry run', () => {
       'dry-run',
     );
     const text = formatWorkbookReport(r);
-    expect(text).toContain('[Prix] selling_prices');
+    expect(text).toMatch(/\[Sheet \d+\] selling_prices/); // by position (R14-09)
     expect(text).toMatch(/row 2: price in MAD HT per m³: ambiguous amount/);
     expect(text).toMatch(/row 3: date not understood or ambiguous/);
-    expect(text).toMatch(/\[Clients\][^\n]*\n\s+row 2: invalid row/);
+    expect(text).toMatch(/\[Sheet \d+\] clients[^\n]*\n\s+row 2: invalid row/);
     expect(text).not.toContain(CLIENT);
     expect(text).toContain(r.sha256);
   });
   it('says so when a mapped sheet is missing from the file and lists a sheet nobody mapped', async () => {
     const buf = buildWorkbook([...sheets().slice(0, 2), { name: 'Notes', rows: [['x']] }]);
     const r = await run(buf, 'dry-run');
-    expect(r.unmappedSheets).toEqual(['Notes']);
-    expect(r.fileProblems.some((p) => p.includes('"Recettes" matches no sheet'))).toBe(true);
+    expect(r.unmappedSheets).toEqual(['Sheet 3']); // by position, never by the name the file gave it (R14-09)
+    expect(r.fileProblems.some((p) => p.includes('(kind recipes) matches no sheet'))).toBe(true);
     // the built-in defaults name every kind: a workbook with only some of them is not a problem
     const lax = await importWorkbook({
       appPool: app,

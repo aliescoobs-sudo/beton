@@ -25,7 +25,11 @@ export class ImportRefused extends Error {
   }
 }
 
+/** The only name of a sheet that leaves the importer: its position in the workbook. A sheet's real name is untrusted text and is never printed. */
+export const sheetAlias = (index: number): string => `Sheet ${index + 1}`;
+
 export interface SheetReport {
+  /** "Sheet 1" ... "Sheet n" (R14-09): the position in the workbook, never the name the file gave it. */
   sheet: string;
   kind: MappingKind;
   report: ImportReport;
@@ -42,7 +46,7 @@ export interface WorkbookReport {
   alreadyImportedRunId: string | null;
   runId: string | null;
   sheets: SheetReport[];
-  /** Sheets of the workbook that no mapping names: left alone, listed so a forgotten sheet is seen. */
+  /** Sheets of the workbook that no mapping names, by alias ("Sheet 3"): left alone, listed so a forgotten sheet is seen. */
   unmappedSheets: string[];
   /** Problems with the file or its mappings as a whole (unreadable file, a mapped sheet that is not there, two mappings for a sheet). */
   fileProblems: string[];
@@ -124,18 +128,18 @@ export async function importWorkbook(opts: WorkbookOptions): Promise<WorkbookRep
     sheets = readWorkbook(opts.file);
   } catch (error) {
     if (error instanceof SheetError) {
-      report.fileProblems.push(`The file cannot be read: ${error.message}`);
+      report.fileProblems.push(`The file cannot be read: ${error.message}`); // a fixed phrase of the reader, never a cell
       return report;
     }
     throw error;
   }
 
   // which sheet goes with which mapping (a mapped sheet missing from the file, or two mappings on one sheet, are file problems)
-  const work: { sheet: NamedSheet; mapping: SheetMapping }[] = [];
+  const work: { sheet: NamedSheet; mapping: SheetMapping; alias: string }[] = [];
   const used = new Set<string>();
   for (const [index, sheet] of sheets.entries()) {
     const mapping = mappingForSheet(opts.mappings, sheet.name, sheets.length);
-    if (!mapping) report.unmappedSheets.push(sheet.name);
+    if (!mapping) report.unmappedSheets.push(sheetAlias(index));
     else {
       // R14-04: the reader never evaluates a formula. A sheet with formula cells is refused unless its mapping explicitly accepts the
       // cached values (which can be stale), and then the report says how many cells were read that way.
@@ -143,13 +147,13 @@ export async function importWorkbook(opts: WorkbookOptions): Promise<WorkbookRep
         report.fileProblems.push(
           `Sheet ${index + 1} has ${sheet.formulaCells} formula cell(s). Formulas are not evaluated and their stored values may be stale: paste the values (Paste Special > Values) and save again, or set "allowCachedFormulaValues": true in this sheet's mapping.`,
         );
-      work.push({ sheet, mapping });
+      work.push({ sheet, mapping, alias: sheetAlias(index) });
       used.add(mapping.sheet);
     }
   }
   for (const m of opts.requireEveryMappedSheet === false ? [] : opts.mappings)
     if (!used.has(m.sheet))
-      report.fileProblems.push(`The mapping for sheet "${m.sheet}" matches no sheet of the file.`);
+      report.fileProblems.push(`A mapping (kind ${m.kind}) matches no sheet of the file.`);
   const perKind = new Map<MappingKind, number>();
   for (const w of work) perKind.set(w.mapping.kind, (perKind.get(w.mapping.kind) ?? 0) + 1);
   for (const [kind, n] of perKind)
@@ -175,7 +179,7 @@ export async function importWorkbook(opts: WorkbookOptions): Promise<WorkbookRep
       return report;
     }
 
-    for (const { sheet, mapping } of work) {
+    for (const { sheet, mapping, alias } of work) {
       const kind = mapping.kind as ImportKind;
       const columns = { ...defaultColumnsOf(kind), ...mapping.columns };
       const r = await runImport(kind, sheet.rows, {
@@ -191,7 +195,7 @@ export async function importWorkbook(opts: WorkbookOptions): Promise<WorkbookRep
         today: opts.today,
       });
       report.sheets.push({
-        sheet: sheet.name,
+        sheet: alias,
         kind: mapping.kind,
         report: r,
         formulaCellsRead: mapping.allowCachedFormulaValues ? sheet.formulaCells : 0,

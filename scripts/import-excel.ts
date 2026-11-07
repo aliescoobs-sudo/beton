@@ -11,7 +11,7 @@
 // --rollback takes out of use what a run created (archive, cancel; nothing is deleted) and lists what stays sealed by design.
 // Refused when TRAINING_MODE=true, on a simulated database, on a database with the training marker, and unless REAL_DATA=true.
 // Sheets and headers: docs/IMPORT-EXCEL.md. Without --mapping the built-in French sheet names and usual headers apply.
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import pg from 'pg';
 import { loadEnv } from '../src/lib/env.ts';
 import { realClock } from '../src/modules/clock/index.ts';
@@ -37,7 +37,9 @@ import {
   findImportAccount,
   parseArgs,
   rollbackPhrase,
+  safeErrorLine,
   verifyTotp,
+  writePrivateReport,
 } from './import-excel-lib';
 import { createPrompt } from './prompt';
 
@@ -73,9 +75,7 @@ if (environment.trainingMode) {
 }
 
 const logReport = (name: string, text: string) => {
-  mkdirSync('.logs', { recursive: true });
-  const path = `.logs/import-${name}-${realClock.now().toISOString().replace(/[:.]/g, '-')}.txt`;
-  writeFileSync(path, `${text}\n`);
+  const path = writePrivateReport('.logs', name, text, realClock.now());
   console.log(`(report saved in ${path})`);
 };
 
@@ -208,7 +208,11 @@ try {
     // R14-03: a failed or unknown end of the transaction is never "done". 4 = outcome unknown (check before running again), 1 = failed.
     console.error(`${error.code}: ${error.message}`);
     process.exitCode = error.code === 'COMMIT_OUTCOME_UNKNOWN' ? 4 : 1;
-  } else throw error;
+  } else {
+    // R14-09: an unexpected error is normalized HERE. Nothing of its message is printed (it can quote a row), and the exit is non-zero.
+    console.error(safeErrorLine(error));
+    process.exitCode = 5;
+  }
 } finally {
   prompt.close();
   await Promise.all([appPool.end(), authPool.end()]);

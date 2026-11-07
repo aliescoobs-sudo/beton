@@ -126,7 +126,7 @@ describe('dry run, confirmation, second factor', () => {
   it('a dry run reports row numbers and problems, no cell of the file, and writes nothing', async () => {
     const r = cli(['--dry-run', book, '--account', email], PROD);
     expect(r.code).toBe(1); // the Prix sheet names an unknown type: the file has a problem
-    expect(r.out).toMatch(/\[Prix\] selling_prices/);
+    expect(r.out).toMatch(/\[Sheet \d+\] selling_prices/);
     expect(r.out).toMatch(/row 2: unknown concrete type/);
     expect(r.out).not.toContain(CLIENT);
     expect(r.out).toMatch(/sha256 [0-9a-f]{64}/);

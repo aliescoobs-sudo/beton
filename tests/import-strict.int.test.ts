@@ -99,3 +99,62 @@ describe('strict reading reaches the report (R14-04)', () => {
     expect(r.fileProblems.join(' ')).toMatch(/never closed/);
   });
 });
+
+describe('a report never carries a cell or a sheet name (R14-09)', () => {
+  it('a name in the unit column and a name for the sheet appear nowhere in the text report', async () => {
+    const secretCell = 'Ali Benjelloun Secret';
+    const secretSheet = 'Feuille Confidentielle';
+    const file = buildWorkbook([
+      {
+        name: 'Types',
+        rows: [
+          ['Code', 'Libellé'],
+          ['QZR9', 'Béton fictif'],
+        ],
+      },
+      {
+        name: 'Composants',
+        rows: [
+          ['Nom', 'Unité'],
+          ['Ciment Fictif Rapport', 'g'],
+        ],
+      },
+      // the recipe's unit cell holds a person's name; the unit was interpolated into the message before R14-09
+      {
+        name: 'Recettes',
+        rows: [
+          ['Type', 'Composant', 'Quantité', 'Unité', 'Date'],
+          ['QZR9', 'Ciment Fictif Rapport', '350', secretCell, '01/12/2026'],
+        ],
+      },
+      { name: secretSheet, rows: [['x'], ['y']] },
+    ]);
+    const maps: SheetMapping[] = ['Types:concrete_types', 'Composants:components', 'Recettes:recipes'].map(
+      (x) => ({
+        version: 1,
+        sheet: x.split(':')[0]!,
+        kind: x.split(':')[1] as SheetMapping['kind'],
+        headerRow: 1,
+        dateFormat: 'dmy',
+        columns: {},
+      }),
+    );
+    const r = await importWorkbook({
+      appPool: app,
+      actor: owner,
+      file,
+      mappings: maps,
+      mode: 'dry-run',
+      environment: PROD,
+      requireEveryMappedSheet: false,
+    });
+    const text = formatWorkbookReport(r);
+    expect(r.totals.error + r.totals.failed).toBeGreaterThan(0); // the bad unit is reported...
+    expect(text).not.toContain(secretCell); // ...without the cell
+    expect(text).not.toContain('Ali');
+    expect(text).not.toContain(secretSheet);
+    expect(r.unmappedSheets).toEqual(['Sheet 4']);
+    expect(text).toMatch(/Sheet 4/);
+    for (const s of r.sheets) expect(s.sheet).toMatch(/^Sheet \d+$/);
+  });
+});
