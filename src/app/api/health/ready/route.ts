@@ -5,7 +5,7 @@ import { getEnv } from '@/lib/server-env';
 
 // @permission none (readiness for the reverse proxy and the monitor: the database answers and every migration of this build is
 // applied. The answer is a status word only: no build id, no count, no host, no error text. A training instance adds the word
-// `training` so that scripts/training/go-public.sh can tell the socket it will publish is a training app.)
+// `training` so that an operator's script can tell the socket is a training app.)
 let expected: number | undefined;
 function expectedMigrations(): number {
   expected ??= (

@@ -19,27 +19,24 @@ $ops db-bootstrap
 $ops db-migrate
 $ops seed-training
 $dc up -d app
-# R11: the instance is only called up once it answers its readiness check (database reachable, migrations applied). Opening it to the
-# internet is a separate, later step (go-public.sh), which checks it again.
+# R11: the instance is only called up once it answers its readiness check (database reachable, migrations applied).
 ready=no
 for _ in $(seq 1 "${READY_TRIES:-30}"); do
   if $dc exec -T app wget -qO- http://127.0.0.1:3000/api/health/ready 2>/dev/null | grep -q '"ready"'; then ready=yes; break; fi
   sleep "${READY_SLEEP:-5}"
 done
 [ "$ready" = yes ] || { echo "training-up.sh: the app did not become ready: look at  ./scripts/training/dc.sh logs app" >&2; exit 1; }
-# R14-07: a failed Funnel check stops the start-up with its status; the "local only" reassurance below is printed ONLY when the check passed.
-if ! ./scripts/training/funnel-check.sh; then
-  echo "training-up.sh: the Tailscale Funnel check FAILED, so this instance is NOT confirmed local-only. Fix or close the Funnel (tailscale funnel reset), then run this again." >&2
-  exit 1
-fi
+# R15A-06: LOCAL ONLY. The instance is not published and there is no public helper any more. This script does NOT look for a tunnel or any
+# other publisher and says nothing about one: keeping the Mac free of them is the operator's responsibility (docs/checkpoints/CP-TRAINING.md, step 8).
 cat <<'NEXT'
 
-The training instance is running and ready, and the Funnel check passed (nothing is published, or exactly this app):  http://127.0.0.1:3000
+The training instance is running and answered its readiness check, on this Mac:  http://127.0.0.1:3000   (http://localhost:3000 after  ./scripts/training/set-url.sh http://localhost:3000)
+
+This start-up does not check whether anything publishes this Mac to a network or to the internet. The operator is responsible for there being no
+tunnel, proxy or port forward (CP-TRAINING.md, step 8). Nothing printed here is evidence that the instance is local-only.
 
 Next, by hand:
   1. Hand each trainee ONLY their own account (never the whole list):   ./scripts/training/show-accounts.sh <name>
-  2. To open it to the internet (docs/checkpoints/CP-TRAINING.md, step 8), in this order:
-        a. give the app its public address FIRST:                       ./scripts/training/set-url.sh https://<your-machine>.<tailnet>.ts.net
-        b. then open the Funnel (it refuses if the address or readiness is wrong):   ./scripts/training/go-public.sh https://<your-machine>.<tailnet>.ts.net
-  3. Stop everything with  ./scripts/training-down.sh   (and  tailscale funnel reset  to close the public address).
+  2. One browser profile per training identity; never hand a phone over by signing out and in again in the same page; if something is stuck, stop that exercise.
+  3. Stop everything with  ./scripts/training-down.sh
 NEXT

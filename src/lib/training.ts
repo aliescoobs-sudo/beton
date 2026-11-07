@@ -33,8 +33,7 @@ export function trainingBootProblem(input: {
 
 /**
  * A warning (not a stop) at boot: the public address looks like a Tailscale Funnel / Serve name (*.ts.net) while TRAINING_MODE is off,
- * which would be a non-training server on the internet through the training machine's tunnel. The host script funnel-check.sh asks the
- * same question from outside the container.
+ * which would be a non-training server on the internet through the training machine's tunnel.
  */
 export function funnelWarning(input: { trainingMode: boolean; appBaseUrl: string }): string | null {
   if (input.trainingMode) return null;

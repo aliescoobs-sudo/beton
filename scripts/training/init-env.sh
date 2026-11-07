@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Writes .env.training and .env.training.ops with fresh random secrets (once; refuses to overwrite). Needs openssl.
 #   APP_IMAGE=ghcr.io/<owner>/belgobeton@sha256:<digest> ./scripts/training/init-env.sh
-#   APP_BASE_URL (optional) is the public address people type: the Tailscale Funnel URL once it exists (`set-url.sh` changes it later),
-#   or the domain of a VPS. The app only accepts writes that come from that address.
+#   APP_BASE_URL (optional) is the address people type: local only, http://127.0.0.1:3000 by default (`set-url.sh http://localhost:3000`
+#   changes it later). The app only accepts writes that come from that address.
 # The secrets are written to the two files only (chmod 600) and are not printed.
 set -euo pipefail
 cd "$(dirname "$0")/../.."

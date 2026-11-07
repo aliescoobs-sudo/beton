@@ -1,5 +1,8 @@
 # Installer la version de formation sur l'iMac (en français, pas à pas)
 
+**Règle actuelle (R15A-06) : la version de formation tourne UNIQUEMENT EN LOCAL, sur un seul Mac, à l'adresse `http://localhost:3000`. Rien n'est public, aucun tunnel**
+(ni Tailscale Funnel ou Serve, ni proxy inverse, ni redirection de port). Les anciens outils de publication (`go-public.sh`, le contrôle Funnel) sont supprimés.
+
 Pour Ali. À faire **sur l'iMac**, dans l'application **Terminal** (Applications → Utilitaires → Terminal). Tape chaque commande, appuie sur Entrée, et vérifie
 ce que tu dois voir avant de passer à la suivante. Si ce n'est pas ce qui est écrit : **arrête-toi** et demande de l'aide. Les données sont fictives : tu ne peux rien casser de réel.
 Ne copie jamais un mot de passe ou un jeton dans un message, un mail ou un fichier du projet : tu les tapes seulement là où le Terminal les demande.
@@ -10,13 +13,13 @@ Le Terminal demande ton mot de passe Mac (rien ne s'affiche quand tu tapes : c'e
 ✅ Tu dois voir `sleep 0` et `autorestart 1`. Branche l'iMac en **Ethernet** si tu peux.
 
 **1 bis. Garder le disque chiffré (FileVault) et ne PAS activer la connexion automatique**
-L'iMac contiendra des secrets (comptes de formation, jeton GitHub, accès Tailscale) : il faut le protéger comme un ordinateur qui garde des mots de passe.
+L'iMac contiendra des secrets (comptes de formation, jeton GitHub) : il faut le protéger comme un ordinateur qui garde des mots de passe.
 Réglages Système → Confidentialité et sécurité → **FileVault : activé** ; Utilisateurs et groupes → **Connexion automatique : désactivée** ; un mot de passe sur ta session et un verrouillage d'écran.
 ⚠️ Conséquence : après une coupure de courant, l'iMac redémarre mais **rien ne repart tant que tu n'as pas tapé le mot de passe** à l'écran FileVault. Préviens les
 stagiaires que la formation peut être indisponible jusqu'à ce que tu déverrouilles l'iMac.
 
 **2. Installer les outils** (si `brew` n'existe pas, installe d'abord Homebrew depuis https://brew.sh en suivant leur commande)
-`brew install colima docker docker-compose docker-credential-helper git gh tailscale`
+`brew install colima docker docker-compose docker-credential-helper git gh`
 ✅ À la fin, `colima version` et `docker --version` affichent un numéro de version.
 
 **3. Démarrer le moteur Docker (Colima)** : 4 Go de mémoire, 20 Go de disque minimum libres
@@ -49,7 +52,7 @@ qu'il a publié avec son commit, et **refuse** s'il n'y en a pas ou si le commit
 **7. Démarrer**
 `./scripts/training-up.sh`
 La première fois, compte quelques minutes (image, base, données de formation).
-✅ À la fin : « The training instance is running on this machine only: http://127.0.0.1:3000 ». Ouvre **http://localhost:3000/fr/login** dans Safari sur l'iMac :
+✅ À la fin : « The training instance is running and answered its readiness check, on this Mac ». Ouvre **http://127.0.0.1:3000/fr/login** dans Safari sur l'iMac (ou **http://localhost:3000/fr/login** après l'étape 9) :
 tu vois la bannière rouge « Version de formation — données fictives ».
 
 **Volume neuf et marqueur de naissance (R13-01, R14-13).** La toute première fois que la pile démarre, l'image postgres exécute **une seule fois** `scripts/training/db-init/10-birth-token.sql`
@@ -67,64 +70,56 @@ Pour un stagiaire : `./scripts/training/show-accounts.sh CH-02` (le **code exact
 de code d'authentification : le mot de passe suffit (seulement dans cette version). **Exception : la finance.** Le propriétaire, l'administrateur et le comptable qui veulent essayer la finance
 activent une vraie application d'authentification (lien dans la bannière rouge) : la finance n'accepte jamais le mot de passe seul.
 
-**9. Rendre l'iMac joignable depuis Internet (Tailscale Funnel) : en dernier, et dans cet ordre**
-a. `sudo brew services start tailscale` puis `sudo tailscale up` : il affiche un lien, ouvre-le, crée/ouvre ton compte Tailscale gratuit et valide la machine.
-✅ `tailscale status` liste l'iMac.
-b. Sur https://login.tailscale.com/admin → **DNS** : active **MagicDNS** et **HTTPS Certificates**. La console montre le nom de la machine : l'adresse sera `https://NOM.TON-RESEAU.ts.net`
-(**rien n'est public encore**).
-c. Donne d'abord cette adresse à l'application : `./scripts/training/set-url.sh https://TON-ADRESSE.ts.net`
-✅ Il écrit « the app now accepts requests from https://… ».
-d. Ouvre l'accès : `./scripts/training/go-public.sh https://TON-ADRESSE.ts.net`
-✅ Il commence par `tailscale funnel reset` et relit l'état : si la fermeture ne peut pas être confirmée il s'arrête avec **« CLOSURE UNCONFIRMED — check Tailscale manually »** (ferme alors Funnel toi-même dans Tailscale et vérifie depuis l'extérieur). Après ouverture il contrôle tout l'état : un seul proxy HTTPS vers l'application, toute autre entrée provoque un refus et la fermeture. Il ne dit jamais « fermé » sans l'avoir relu. **Tout se décide sur l'état structuré complet (`tailscale funnel status --json`, validé par `python3`)** : `python3` est obligatoire ; un Tailscale trop ancien (sans `--json`) ou une erreur du démon sont chacun un refus (le message les distingue), et le texte n'est jamais un repli. Il **refuse** si l'adresse n'est pas celle donnée à l'application, si l'application n'est pas en mode formation ou pas prête ; sinon il lance `tailscale funnel` sur le bon port.
-S'il dit que Funnel n'est pas autorisé, il affiche un lien ; ouvre-le, accepte, relance `go-public.sh`.
-e. Teste depuis un **téléphone en 4G** (pas le Wi-Fi de la maison) **tout le parcours** : la page de connexion avec la bannière rouge, connexion avec un compte de formation, une modification, déconnexion.
-Puis `tailscale funnel reset` : l'adresse ne doit plus répondre. Rouvre avec `go-public.sh` quand la formation commence.
+**9. En local seulement : rien n'est publié (R15A-06)**
+L'application s'utilise sur CE Mac, dans ses navigateurs, à `http://localhost:3000`. Elle n'accepte les écritures que de l'adresse exacte de `APP_BASE_URL`, et `init-env.sh` écrit
+`http://127.0.0.1:3000` par défaut : lance une fois `./scripts/training/set-url.sh http://localhost:3000` pour que l'adresse que tu tapes soit celle que l'application attend
+(`set-url.sh` n'accepte que des adresses locales). ✅ Il écrit « the app now accepts requests from http://localhost:3000 ».
+**Aucun tunnel, pas de Tailscale Funnel ou Serve, pas de proxy inverse, pas de redirection de port, pas de `--profile public`.**
+**C'est la responsabilité de l'opérateur que le Mac n'ait aucun publieur.** Ni `training-up.sh` ni aucun autre script ne cherche Tailscale ou un autre tunnel, et un démarrage réussi n'en dit rien.
+Avant la première séance, et après chaque redémarrage, vérifie toi-même que rien ne publie ce Mac : aucun client ou service de tunnel actif (éléments de connexion et services en arrière-plan du Mac,
+aucune redirection sur ta box) et qu'une requête vers l'adresse du Mac depuis un autre appareil est refusée. Si tu en trouves un : arrête la séance, supprime-le et remets les données à zéro.
+**Téléphones.** L'écran téléphone s'essaie dans un navigateur de ce Mac (fenêtre étroite ou mode appareil du navigateur), pas sur un vrai téléphone à travers un réseau.
+**Règle d'exploitation de l'écran téléphone (R15A) :** utilise un **PROFIL DE NAVIGATEUR SÉPARÉ** pour chaque identité de formation (un chauffeur par profil) ; ne fais **jamais passer un téléphone**
+d'une personne à l'autre en te déconnectant puis en te reconnectant dans la même page ; ferme l'ancienne page ou l'ancien profil avant qu'une autre personne commence ; et si quelque chose reste
+bloqué (une déconnexion qui ne finit pas, une photo qui reste en attente, une journée qui ne s'efface pas), **ARRÊTE l'exercice de ce profil** au lieu de continuer par-dessus une session bloquée. Images synthétiques seulement.
 
 **10. Sauvegarde de nuit** (dans un dossier hors du projet)
 `crontab -e` puis ajoute la ligne : `30 2 * * * cd $HOME/belgobeton && ./scripts/training-backup.sh >> $HOME/belgobeton-training-backup.log 2>&1`
 ✅ Pour tester tout de suite : `./scripts/training-backup.sh` écrit « wrote …/belgobeton-training-backups/training-….dump ».
 
 **Au quotidien**
-- Fermer l'accès public quand personne ne s'entraîne : `tailscale funnel reset` ✅ l'adresse ne répond plus.
+- Rien n'est public (étape 9) : il n'y a pas d'adresse à fermer. Quand personne ne s'entraîne, `./scripts/training-down.sh` arrête l'instance.
 - Arrêter : `./scripts/training-down.sh` (les données restent). Redémarrer : `./scripts/training-up.sh`.
 - **Remettre une journée de travail** (moins d'une minute, comptes et mots de passe inchangés) : `./scripts/training-rearm.sh` crée les commandes du jour, planifie les rotations des trois chauffeurs, ajoute des devis, une commande à annuler, une livraison à recevoir et une alerte de stock bas. À lancer chaque matin avant la séance. Les fiches d'exercices par rôle sont dans `docs/training/`. **À lancer AVANT la connexion des stagiaires, et pas tout-ou-rien** : il annule toutes les commandes éligibles du jour à Tétouan (pas seulement les siennes) en plusieurs transactions ; une exécution interrompue peut laisser une journée à moitié remise (relancer, ou réinitialiser).
 - **Remettre à zéro** (efface tout, nouveaux mots de passe) : `./scripts/training-reset.sh`, tape `RESET`, puis `./scripts/training/show-accounts.sh <nom>` pour chaque stagiaire.
 - Nouvelle version : `git pull`, puis `./scripts/training/pick-image.sh` (le digest du build vert de CE commit), remplace la ligne `APP_IMAGE=` dans `.env.training`, relance `./scripts/training-up.sh`.
 - Ne jamais saisir de vraies données (vrai client, vrai téléphone, vrai chèque).
 
-## Conditions obligatoires avant d'ouvrir le Funnel (R12)
-`docs/reviews/CODEX-REVIEW-R12.md` donne un feu vert conditionnel pour une formation surveillée, web et téléphone, avec des données fictives seulement. Les sept
-conditions sont obligatoires ; note chacune (sans aucun secret) avant `go-public.sh`. Le Funnel reste fermé tant que les sept ne sont pas notées sur l'iMac.
+## Conditions obligatoires avant un exercice local surveillé (R12, réduites à la règle « local seulement » par R15A-06)
+`docs/reviews/CODEX-REVIEW-R12.md` a donné un feu vert conditionnel pour une formation surveillée avec des données fictives seulement, et `docs/reviews/CODEX-REVIEW-R15A.md` le maintient pour des
+exercices locaux surveillés sur un seul Mac. Les conditions ci-dessous sont obligatoires ; note chacune (sans aucun secret) sur le Mac avant une séance.
 1. **Version approuvée et volume neuf.** Une copie propre du commit relu et le digest du build vert de CE commit (`pick-image.sh`) ; l'application et `ops` qui
-   tournent utilisent ce digest. Toutes les migrations sont appliquées (jusqu'à 0118 et celles de la finance ; le jeton de naissance est encore intact quand le seed démarre et c'est lui qui le consomme). Le projet `belgobeton-training` d'origine sur un volume
+   tournent utilisent ce digest. Toutes les migrations sont appliquées (jusqu'à 0121 et celles de la finance ; le jeton de naissance est encore intact quand le seed démarre et c'est lui qui le consomme). Le projet `belgobeton-training` d'origine sur un volume
    de base de données **neuf** et dédié, rempli par le seed de formation : aucun import, aucune restauration partielle, aucune base métier réutilisée, aucun marqueur
-   posé à la main. Garde la preuve que le volume a été créé et que le seed est allé au bout.
+   posé à la main, aucune base d'une ancienne version dont la ligne de naissance n'a pas de nom (la remise à zéro la refuse). Garde la preuve que le volume a été créé et que le seed est allé au bout.
 2. **Mode et isolation des identifiants.** Dans l'application **qui tourne** : formation activée, données réelles et simulation coupées, `APP_ENV=training`,
    `TRAINING_ALLOW_UNMARKED` absent ou à false (le fichier compose le force à false, et la vérification d'environnement le refuse hors du lanceur de tests), pas de clés
    VAPID ni de fournisseur, la bannière rouge. Aucun identifiant de maintenance, de super-utilisateur ou de seed, et pas de volume des comptes dans l'application. Les
    identifiants restent dans le volume privé d'origine (`/app/out` : uid 10001, dossier 0700, fichier 0600, vérifiés par leurs métadonnées). Ne jamais lancer le seed avec
-   un chemin de sortie local ou personnalisé dans une copie du dépôt (le seed le refuse maintenant). Copie de confiance, non partagée, et compte opérateur exclusif
-   pour `init-env.sh` et les scripts qui réécrivent les secrets.
+   un chemin de sortie local ou personnalisé dans une copie du dépôt (le seed le refuse). Copie de confiance, non partagée, et compte opérateur exclusif
+   pour `init-env.sh` et les scripts qui réécrivent les secrets. Un seul opérateur lance le seed et la remise à zéro ; ne lance jamais un second seed ou une remise à zéro tant qu'un précédent pourrait reprendre.
 3. **Manipulation des identifiants.** FileVault activé, ouverture automatique de session coupée, verrouillage d'écran activé. Docker utilise vraiment l'assistant
    Trousseau, le jeton est `read:packages` seulement, le paquet GHCR est privé. Donne à chacun exactement son bloc avec `show-accounts.sh <identifiant ou code exact>`,
    vérifie qu'UN SEUL bloc s'affiche, sans jamais l'enregistrer, le photographier ni le rediriger. Réinitialise tout identifiant dont le sort est incertain : les données
    sont fictives, les identifiants ne le sont pas.
-4. **Fermer, configurer, vérifier, publier.** D'abord `tailscale funnel reset`, et vérifie de l'extérieur que l'adresse ne répond plus. Aucun port de base de données sur
-   l'hôte ; l'application sur le seul port local attendu. `set-url.sh <adresse https>`, redémarrage, puis `go-public.sh <adresse https>` : il refait un reset, lit le port
-   et l'adresse dans l'application **en cours d'exécution**, exige la réponse « prêt, formation » de cette prise précise et une seule cible proxy dans l'état complet du
-   Funnel. Un fichier d'environnement périmé, un conteneur prêt qui n'est pas celui du port, ou un contrôle silencieux ne suffisent pas. Puis un bref essai surveillé en
-   données mobiles.
-5. **Connexion du téléphone sur le vrai relais.** Des PIN faux en parallèle ne dépassent pas le verrou de cinq échecs par chauffeur ; un bon PIN après le verrou ne le
-   lève pas ; les cas de téléphone lié, étranger ou libéré se comportent bien. La limite par adresse verrouille une adresse à travers le vrai Funnel, un `X-Forwarded-For`
-   falsifié ou malformé ne change ni ne désactive l'adresse retenue, et une adresse inconnue tombe dans un seul panier commun. On n'accepte que le risque restant de rafale et
-   de disponibilité, avec un opérateur prêt à fermer le Funnel. Si le comportement de l'adresse de confiance ou le verrou par chauffeur ne peut pas être montré, on
-   n'expose pas l'application téléphone.
+4. **En local seulement, vérifié par l'opérateur.** L'application sur le seul port de boucle locale (`127.0.0.1:3000`), aucun port de base de données sur l'hôte, `APP_BASE_URL` une adresse
+   locale (`http://localhost:3000`), aucun tunnel ni publieur sur le Mac (étape 9 ; les scripts ne le vérifient pas et rien de ce qu'ils affichent n'en est une preuve).
+5. **Connexion du téléphone.** Des PIN faux en parallèle ne dépassent pas le verrou de cinq échecs par chauffeur ; un bon PIN après le verrou ne le lève pas ; les cas de téléphone lié,
+   étranger ou libéré se comportent bien. (La limite par adresse est exercée par ses tests ; en local toutes les requêtes viennent de la même adresse.)
 6. **Rôles, hors-ligne et finance.** Les requêtes directes non autorisées et les écritures d'une autre origine sont refusées ; les deux chefs de centrale sont séparés ;
    la déconnexion et la révocation d'un téléphone fonctionnent ; un téléphone sans file d'attente se revalide ; la journée disparaît de l'écran à l'expiration même si le
-   réseau reste bloqué. Téléphones dédiés et verrouillés ; déconnexion et effacement de la journée et des photos en attente à chaque remise ; ne pas présenter les 18
+   réseau reste bloqué. Profils de navigateur séparés, un par identité, et la règle d'exploitation de l'étape 9 ; ne pas présenter les 18
    heures comme une frontière de confidentialité prouvée. Finance : le mot de passe seul est refusé, le propriétaire, l'administrateur ou le comptable active une vraie
    application d'authentification (QR ou clé), un vrai code frais fait fonctionner les écritures, le comptable exporte. Aucune exception de facteur fictif n'existe.
-7. **Surveillance et clôture.** N'ouvre que pendant une séance surveillée, sans vrai client, fournisseur, chèque, document ni photo. Fais une connexion, un changement et
-   une déconnexion en HTTPS depuis les données mobiles, sur le web et sur le téléphone. Referme le Funnel ensuite et vérifie de l'extérieur qu'il est fermé ; recommence après
-   toute coupure ou redémarrage (`--bg` persiste). Les sauvegardes de nuit sont une reprise sur la même machine, base seule, pas une sauvegarde transportable ; la VPS de
-   décembre repart d'un seed neuf.
+7. **Surveillance et clôture.** Séances surveillées seulement, sans vrai client, fournisseur, chèque, document ni photo. Arrête l'instance quand personne ne s'entraîne
+   (`training-down.sh`). Les sauvegardes de nuit sont une reprise sur la même machine, base seule, pas une sauvegarde transportable.

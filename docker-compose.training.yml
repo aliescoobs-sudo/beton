@@ -1,6 +1,7 @@
-# BELGOBETON TRAINING instance (T1): fictitious data only, a production build. NOT a production stack. Runs on the training iMac
-# (linux/amd64 under Colima) and, unchanged, on a VPS: the only difference is who makes it public (see CP-TRAINING.md).
-#   iMac:  the app is published on 127.0.0.1:${APP_PORT:-3000} only; Tailscale Funnel carries it to the internet over HTTPS.
+# BELGOBETON TRAINING instance (T1): fictitious data only, a production build. NOT a production stack. Runs on the training Mac
+# (linux/amd64 under Colima), LOCAL ONLY (R15A-06; see CP-TRAINING.md): the app is published on 127.0.0.1:${APP_PORT:-3000} only, nothing is
+# public and no tunnel is used. The `public` profile below is NOT part of the current policy; it is kept only for a later, separately reviewed
+# VPS step (it would need its own review before anything is published):
 #   VPS:   add the Caddy profile (./scripts/training/dc.sh --profile public up -d) with APP_DOMAIN set: Caddy takes 80 and 443 and gets the
 #          certificate; the app stays on 127.0.0.1.
 # TRAINING_MODE=true shows a banner on every page, lets the training accounts use a password alone, and switches imports and every
@@ -44,7 +45,7 @@ services:
       # R12-01: the test-only escapes are forced off here, whatever .env.training says (the environment schema refuses them anyway).
       TRAINING_ALLOW_UNMARKED: 'false'
       E2E_TEST_RUNNER: ''
-      # One proxy in front (Tailscale Funnel, or Caddy on a VPS) appends the client address to X-Forwarded-For.
+      # One proxy in front (Caddy on a VPS) appends the client address to X-Forwarded-For. LOCALLY there is no proxy: see decision 192.
       TRUSTED_PROXY_HOPS: '1'
       FILE_STORE_DIR: /data/file-store
     # Loopback only: nothing on the local network, nothing on the internet, except through the proxy you start on purpose.
