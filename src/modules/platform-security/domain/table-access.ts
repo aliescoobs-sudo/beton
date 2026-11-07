@@ -394,18 +394,18 @@ export const TABLE_ACCESS = {
     kind: 'rls',
     read: {
       owner: 'all',
-      partner: 'all',
-      office: 'all',
+      partner: 'none',
+      office: 'none',
       plant: 'all',
       system: 'none',
       anonymous: 'none',
-      support: 'all',
+      support: 'none',
     },
     force: true,
     audited: true,
     noDelete: true,
     exception:
-      'R4 (DECISIONS 141): what the driver reports that tracking does not hold (loading started, the m3 unloaded). Written only by driver_report (SECURITY DEFINER, the driver of the rotation); read by the company roles, never by another driver. No price.',
+      'R4 (DECISIONS 141): what the driver reports that tracking does not hold (loading started, the m3 unloaded). Written only by driver_report (SECURITY DEFINER, the driver of the rotation). Migration 0122: nothing in the application reads it with the app login (every reader is a SECURITY DEFINER function), so only the owner and the plant manager of the plant (own plant) read it directly; partner, office and support no longer do. Never another driver. No price.',
   },
   trip_emergency: {
     kind: 'rls',
@@ -1518,7 +1518,7 @@ export const TABLE_ACCESS = {
     noDelete: true,
     insertOnly: true,
     exception:
-      'operations O10: what really happened on a planned rotation, one row per trip and step (loaded, departed, arrived, unloading started and finished, back), in order and never before the previous step; the first step links the load. Times and quantities only. Insert-only; waiting time and delays are derived. Owner, partner and plant record.',
+      'operations O10: what really happened on a planned rotation, one row per trip and step (loaded, departed, arrived, unloading started and finished, back), in order and never before the previous step; the first step links the load. Times and quantities only. Insert-only; waiting time and delays are derived. Owner, partner and plant record. Migration 0122: a plant manager reads the events of his own plant only; partner and support keep the read (the dispatch board).',
   },
   fuel_fill: {
     kind: 'rls',
