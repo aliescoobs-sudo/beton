@@ -231,6 +231,7 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
         saveQueue(applyOutcomes(queueRef.current, outcomes));
       },
       listPhotos: queuedPhotos,
+      enqueuePhoto: (photo, stillCurrent) => queuePhoto({ key: newKey(), ...photo }, stillCurrent),
       sendPhoto,
       dropPhoto,
       owner: () => ownerRef.current,
@@ -259,20 +260,9 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
 
   async function takePhoto(trip: Trip, file: File | undefined) {
     if (!file) return;
-    try {
-      const blob = await shrinkPhoto(file);
-      if (!ownerRef.current) throw new Error('no account');
-      await queuePhoto({
-        key: newKey(),
-        tripId: trip.id,
-        takenAt: new Date().toISOString(),
-        blob,
-        userId: ownerRef.current,
-      });
-    } catch {
-      return setMessage(t('photo.refused'));
-    }
-    await flushPhotos();
+    // R15A-04: owner and session generation are captured when the capture STARTS and kept through encoding, storage and the flush.
+    const result = await getSession().capturePhoto(trip.id, () => shrinkPhoto(file));
+    if (result === 'refused') setMessage(t('photo.refused'));
   }
 
   useEffect(() => {

@@ -32,6 +32,14 @@ export interface SessionPorts<P extends QueuedPhotoRef> {
   /** Commits the server's answer to the stored queue. Called only while the sync's session is alive. */
   applyOutcomes(json: unknown): void;
   listPhotos(): Promise<P[]>;
+  /**
+   * Stores a prepared photo (R15A-04). `stillCurrent` must be asked after any wait inside the port and in the same synchronous step
+   * that issues the write; answers whether the photo was kept.
+   */
+  enqueuePhoto(
+    photo: { tripId: string; takenAt: string; blob: Blob; userId: string },
+    stillCurrent: () => boolean,
+  ): Promise<boolean>;
   sendPhoto(photo: P, signal: AbortSignal): Promise<'sent' | 'retry' | 'drop'>;
   dropPhoto(key: string): Promise<void>;
   owner(): string | null;
@@ -243,6 +251,47 @@ export function createFieldSession<P extends QueuedPhotoRef>(ports: SessionPorts
     while (logoutTransports.size > 0) await Promise.all([...logoutTransports]);
   }
 
+  /**
+   * R15A-04: a photo is taken, prepared (slow encoding), stored and sent under ONE guard and ONE owner, both captured when the capture
+   * starts (before any await). If the session ends or changes owner at any point, nothing is stored (checked before the write and
+   * inside it) and the flush that follows keeps the same guard. 'refused': nothing could be prepared or there is no account.
+   * 'stale': the session it started in is over.
+   */
+  async function capturePhoto(
+    tripId: string,
+    prepare: () => Promise<Blob>,
+  ): Promise<'queued' | 'refused' | 'stale'> {
+    const owner = ports.owner();
+    const guard = owner ? day.openWork() : null;
+    if (!owner || !guard) return 'refused';
+    const current = () => guard.alive() && ports.owner() === owner;
+    let handedOn = false;
+    try {
+      let blob: Blob;
+      try {
+        blob = await prepare();
+      } catch {
+        return current() ? 'refused' : 'stale';
+      }
+      if (!current()) return 'stale'; // refused BEFORE the enqueue
+      let kept: boolean;
+      try {
+        kept = await ports.enqueuePhoto(
+          { tripId, takenAt: new Date().toISOString(), blob, userId: owner },
+          current,
+        );
+      } catch {
+        return current() ? 'refused' : 'stale';
+      }
+      if (!kept || !current()) return 'stale';
+      handedOn = true;
+      await flushUnder(guard); // the originating guard goes through the flush
+      return 'queued';
+    } finally {
+      if (!handedOn) guard.done();
+    }
+  }
+
   /** A successful sign-in: a new generation, then the first read and send. */
   async function signedIn(): Promise<void> {
     day.signedIn();
@@ -253,7 +302,7 @@ export function createFieldSession<P extends QueuedPhotoRef>(ports: SessionPorts
   return {
     sync,
     flushPhotos,
-    flushUnder,
+    capturePhoto,
     signOut,
     signedIn,
     logoutsSettled,

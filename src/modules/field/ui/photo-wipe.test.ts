@@ -97,3 +97,22 @@ describe('a delayed wipe never erases what was queued after it began (R15A-03)',
     expect(await keys()).toEqual(['b1']);
   });
 });
+
+describe('queuePhoto is generation-aware (R15A-04)', () => {
+  it('writes nothing when the session is no longer current after the database opened', async () => {
+    expect(await queuePhoto(photo('late', 'A'), () => false)).toBe(false);
+    expect(await keys()).toEqual([]);
+  });
+
+  it('takes the row out again when the session ended while the write was on its way', async () => {
+    let calls = 0;
+    const kept = await queuePhoto(photo('mid', 'A'), () => ++calls === 1); // current before the write, over after it
+    expect(kept).toBe(false);
+    expect(await keys()).toEqual([]);
+  });
+
+  it('keeps the row while the session stays current', async () => {
+    expect(await queuePhoto(photo('ok', 'A'), () => true)).toBe(true);
+    expect(await keys()).toEqual(['ok']);
+  });
+});

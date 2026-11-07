@@ -57,6 +57,18 @@ function rig(opts?: { honourAbort?: boolean; confirm?: boolean }) {
     forgetAll: async (): Promise<void> => undefined,
     listPhotos: async (): Promise<Photo[]> => photos.map((p) => ({ ...p })),
     logout: (async () => undefined) as (signal: AbortSignal) => Promise<unknown>,
+    enqueue: (async (photo: { tripId: string; userId: string }, stillCurrent: () => boolean) => {
+      if (!stillCurrent()) return false;
+      photos.push({
+        key: `p${photos.length + 1}-${photo.userId}`,
+        tripId: photo.tripId,
+        userId: photo.userId,
+      });
+      return true;
+    }) as (
+      photo: { tripId: string; takenAt: string; blob: Blob; userId: string },
+      stillCurrent: () => boolean,
+    ) => Promise<boolean>,
   };
   const dayPorts: DayPorts<TestDay> = {
     fetchSession: async () => {
@@ -98,6 +110,7 @@ function rig(opts?: { honourAbort?: boolean; confirm?: boolean }) {
       queue = [];
     },
     listPhotos: () => hooks.listPhotos(),
+    enqueuePhoto: (photo, stillCurrent) => hooks.enqueue(photo, stillCurrent),
     sendPhoto: (p, signal) => {
       log.uploads.push(p.key);
       return hooks.upload(p, signal);
@@ -526,5 +539,77 @@ describe('one sign-out operation guards every stage (R15A-02)', () => {
     r.controller.signedIn();
     expect(op.openDrain()).toBeNull();
     expect(r.controller.isFenced()).toBe(false);
+  });
+});
+
+describe('photo capture is tied to the session it started in (R15A-04)', () => {
+  const blob = new Blob(['x']);
+
+  it('a capture in an unchanged session is stored under its owner and flushed with the same guard', async () => {
+    const r = rig();
+    r.setQueue([]);
+    const result = await r.session.capturePhoto('t1', async () => blob);
+    expect(result).toBe('queued');
+    expect(r.log.uploads).toEqual(['p1-u1']);
+  });
+
+  it('encoding stalls across logout and another login: nothing is stored for the new owner and nothing is flushed', async () => {
+    const r = rig({ confirm: true });
+    r.setQueue([]);
+    const encoding = deferred<Blob>();
+    const capture = r.session.capturePhoto('t1', () => encoding.promise); // A takes a BL photo
+    await tick();
+    await r.session.signOut();
+    r.setOwner('u2'); // B signs in
+    r.hooks.session = async () => ({ userId: 'u2', label: 'day-2' });
+    await r.session.signedIn();
+    encoding.resolve(blob);
+    expect(await capture).toBe('stale');
+    expect(r.getPhotos()).toEqual([]); // not queued under B
+    expect(r.log.uploads).toEqual([]);
+  });
+
+  it('A to A: the encoding released after the same account signed in again stores nothing', async () => {
+    const r = rig({ confirm: true });
+    r.setQueue([]);
+    const encoding = deferred<Blob>();
+    const capture = r.session.capturePhoto('t1', () => encoding.promise);
+    await tick();
+    await r.session.signOut();
+    r.setOwner('u1');
+    await r.session.signedIn();
+    encoding.resolve(blob);
+    expect(await capture).toBe('stale');
+    expect(r.getPhotos()).toEqual([]);
+    expect(r.log.uploads).toEqual([]);
+  });
+
+  it('the storage write is generation-aware: the session ends while the database is opening', async () => {
+    const r = rig({ confirm: true });
+    r.setQueue([]);
+    const opening = deferred();
+    const writes: string[] = [];
+    r.hooks.enqueue = async (photo, stillCurrent) => {
+      await opening.promise; // the database is opening
+      if (!stillCurrent()) return false;
+      writes.push(photo.userId);
+      return true;
+    };
+    const capture = r.session.capturePhoto('t1', async () => blob);
+    await tick();
+    await r.session.signOut();
+    r.setOwner('u2');
+    await r.session.signedIn();
+    opening.resolve();
+    expect(await capture).toBe('stale');
+    expect(writes).toEqual([]);
+    expect(r.log.uploads).toEqual([]);
+  });
+
+  it('no capture starts while a sign-out has fenced', async () => {
+    const r = rig({ confirm: true });
+    r.setQueue([]);
+    await r.session.signOut();
+    expect(await r.session.capturePhoto('t1', async () => blob)).toBe('refused');
   });
 });
