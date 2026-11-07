@@ -23,8 +23,9 @@ import {
   type TripTimingView,
 } from '../domain/timing-view';
 import { createDayController } from './day-controller';
+import { createFieldSession } from './field-session';
 import { DAY_KEY, forgetAll, forgetRead, QUEUE_KEY } from './offline-store';
-import { dropPhoto, queuedPhotos, queuePhoto, sendPhoto, shrinkPhoto } from './photo-queue';
+import { dropPhoto, type QueuedPhoto, queuedPhotos, queuePhoto, sendPhoto, shrinkPhoto } from './photo-queue';
 
 // The phone app. One big button per step, an emergency button that is always there, large text. Every tap is queued with the
 // phone's own time and sent when there is a network; the last day read is kept for the road. No price exists in anything it gets.
@@ -32,6 +33,8 @@ import { dropPhoto, queuedPhotos, queuePhoto, sendPhoto, shrinkPhoto } from './p
 const DEVICE_KEY = 'bb_field_device';
 /** R12-04: how long a read of the day may take before it counts as "no network". */
 const SESSION_READ_TIMEOUT_MS = 10_000;
+/** R14-06: the whole last send of a sign-out may take this long; the screen is never held longer by a stuck network or storage. */
+const SIGN_OUT_DEADLINE_MS = 8_000;
 
 /**
  * F07: the site address is shown as text with a copy button; nothing is sent to a third party. The external map link only
@@ -157,8 +160,6 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
   const [reasons, setReasons] = useState<Record<string, DelayReason | ''>>({});
   // Photos of signed BLs waiting on the phone (by rotation) and the last refusal told to the driver.
   const [photosWaiting, setPhotosWaiting] = useState<Record<string, number>>({});
-  const syncing = useRef(false);
-  const flushing = useRef(false);
   const queueRef = useRef<QueueAction[]>([]);
   // The account the phone's local work belongs to (F02): the taps and the photos are sent by that account only.
   const ownerRef = useRef<string | null>(null);
@@ -208,52 +209,50 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
     return controllerRef.current;
   }, [saveQueue]);
   const loadDay = useCallback(() => getController().loadDay(), [getController]);
-  const refused = useCallback(() => getController().refused(), [getController]);
   const recheck = useCallback(() => getController().recheck(), [getController]);
 
-  const sync = useCallback(async () => {
-    if (syncing.current || queueRef.current.length === 0) return;
-    syncing.current = true;
-    try {
-      const res = await fetch('/api/field/sync', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ actions: queueRef.current }),
-      });
-      if (res.status === 401) return refused(); // the queue stays: it is sent after the next sign-in
-      if (!res.ok) return;
-      const { outcomes } = (await res.json()) as { outcomes: SyncOutcome[] };
-      saveQueue(applyOutcomes(queueRef.current, outcomes));
-      setOnline(true);
-      await loadDay();
-    } catch {
-      setOnline(false);
-    } finally {
-      syncing.current = false;
-    }
-  }, [loadDay, saveQueue, refused]);
-
+  // R14-06: the sync, the photo upload and the sign-out share ONE session generation with the day controller (field-session.ts).
+  const sessionRef = useRef<ReturnType<typeof createFieldSession<QueuedPhoto>> | null>(null);
+  const getSession = useCallback(() => {
+    sessionRef.current ??= createFieldSession<QueuedPhoto>({
+      day: getController(),
+      postSync: (signal) =>
+        fetch('/api/field/sync', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ actions: queueRef.current }),
+          signal,
+        }),
+      queueLength: () => queueRef.current.length,
+      applyOutcomes: (json) => {
+        const { outcomes } = json as { outcomes: SyncOutcome[] };
+        saveQueue(applyOutcomes(queueRef.current, outcomes));
+      },
+      listPhotos: queuedPhotos,
+      sendPhoto,
+      dropPhoto,
+      owner: () => ownerRef.current,
+      ui: {
+        setOnline,
+        refusedPhoto: () => setMessage(t('photo.refused')),
+        photosWaiting: (rest) =>
+          setPhotosWaiting(
+            rest.reduce<Record<string, number>>((m, p) => ({ ...m, [p.tripId]: (m[p.tripId] ?? 0) + 1 }), {}),
+          ),
+        clearWaiting: () => {
+          saveQueue([]);
+          setPhotosWaiting({});
+        },
+      },
+      confirmPending: (count) => window.confirm(t('signOutPending', { count })),
+      logoutRequest: () => fetch('/api/field/logout', { method: 'POST' }),
+      drainDeadlineMs: SIGN_OUT_DEADLINE_MS,
+    });
+    return sessionRef.current;
+  }, [getController, saveQueue, t]);
+  const sync = useCallback(() => getSession().sync(), [getSession]);
   // Sends the waiting photos one by one. The server answers for each: stored, try again later, or refused for good.
-  const flushPhotos = useCallback(async () => {
-    if (flushing.current) return;
-    flushing.current = true;
-    try {
-      const all = (await queuedPhotos().catch(() => [])).filter((p) => p.userId === ownerRef.current);
-      for (const p of all) {
-        const verdict = await sendPhoto(p);
-        if (verdict === 'retry') break;
-        await dropPhoto(p.key);
-        if (verdict === 'drop') setMessage(t('photo.refused'));
-      }
-      const rest = (await queuedPhotos().catch(() => [])).filter((p) => p.userId === ownerRef.current);
-      setPhotosWaiting(
-        rest.reduce<Record<string, number>>((m, p) => ({ ...m, [p.tripId]: (m[p.tripId] ?? 0) + 1 }), {}),
-      );
-      if (all.length > rest.length) await loadDay();
-    } finally {
-      flushing.current = false;
-    }
-  }, [loadDay, t]);
+  const flushPhotos = useCallback(() => getSession().flushPhotos(), [getSession]);
 
   async function takePhoto(trip: Trip, file: File | undefined) {
     if (!file) return;
@@ -403,29 +402,14 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
       }),
     }).catch(() => null);
     if (!res) return setMessage(t('errors.network'));
-    if (res.ok) {
-      await loadDay();
-      return void sync();
-    }
+    if (res.ok) return void (await getSession().signedIn());
     const body = (await res.json().catch(() => ({}))) as { error?: string };
     setMessage(
       t(`errors.${body.error === 'LOCKED' || body.error === 'OTHER_DEVICE' ? body.error : 'WRONG'}` as never),
     );
   }
 
-  async function signOut() {
-    // What can still be sent goes first; what cannot is told to the driver, because signing out erases it with the rest.
-    await sync();
-    await flushPhotos();
-    const photos = (await queuedPhotos().catch(() => [])).filter((x) => x.userId === ownerRef.current);
-    const waiting = queueRef.current.length + photos.length;
-    if (waiting > 0 && !window.confirm(t('signOutPending', { count: waiting }))) return;
-    // R13-03: the screen is cleared at once (and any read still on its way is void); the server call and the erasing follow on their own.
-    getController().signedOut();
-    saveQueue([]);
-    setPhotosWaiting({});
-    await fetch('/api/field/logout', { method: 'POST' }).catch(() => null);
-  }
+  const signOut = () => getSession().signOut();
 
   const big = 'w-full rounded-2xl px-4 py-6 text-3xl font-extrabold leading-tight';
 

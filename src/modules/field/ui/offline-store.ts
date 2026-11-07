@@ -2,6 +2,7 @@
 // taps are in localStorage with their owner; the photos of signed BLs are in IndexedDB with theirs; the service worker's Cache Storage
 // holds only the app shell and the framework's static files (never the day). `forgetRead` erases what names a client; `forgetAll` also
 // erases the work waiting to be sent (an explicit sign-out, or another account taking over the phone).
+import type { WipeScope } from './day-controller';
 import { wipePhotos } from './photo-queue';
 
 export const QUEUE_KEY = 'bb_field_queue';
@@ -33,10 +34,13 @@ export async function forgetRead(): Promise<void> {
   await wipeCaches();
 }
 
-/** Everything: the day, the caches, the queue of taps and the photos waiting. */
-export async function forgetAll(): Promise<void> {
+/**
+ * The day, the caches, the queue of taps and the photos waiting. The day and the queue go synchronously, before any await; the photos
+ * are erased within the scope only (R14-06): a wipe that is delayed by slow storage must not reach the photos a NEWER sign-in queued.
+ */
+export async function forgetAll(scope: WipeScope = 'everything'): Promise<void> {
   localStorage.removeItem(DAY_KEY);
   localStorage.removeItem(QUEUE_KEY);
   await wipeCaches();
-  await wipePhotos().catch(() => undefined);
+  await wipePhotos(scope).catch(() => undefined);
 }
