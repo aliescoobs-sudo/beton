@@ -1,12 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import {
-  type ImportEnvironment,
-  importWorkbook,
-  type SheetMapping,
-  type WorkbookReport,
-} from '../src/modules/importer';
+import { type ImportEnvironment, type SheetMapping, type WorkbookReport } from '../src/modules/importer';
+import { importWorkbook, rollbackImport } from './helpers/import-proof';
 import type { SessionUser } from '../src/modules/platform-security/auth/session-gate';
 import { testEnv } from './db-env';
 import { realSessionUser } from './helpers/actors';

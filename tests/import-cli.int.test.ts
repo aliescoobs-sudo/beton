@@ -5,7 +5,12 @@ import { join } from 'node:path';
 import { createOTP } from '@better-auth/utils/otp';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { writeDefaultMappingFiles } from '../src/modules/importer';
+import {
+  defaultMappings,
+  importConfirmation,
+  rollbackConfirmation,
+  writeDefaultMappingFiles,
+} from '../src/modules/importer';
 import { authSecretCipher } from '../src/modules/platform-security/auth/secret-cipher';
 import { testEnv } from './db-env';
 import { realActor } from './helpers/actors';
@@ -151,6 +156,10 @@ describe('dry run, confirmation, second factor', () => {
       },
     ]);
   const totp = () => createOTP(secret).totp();
+  // a code of the NEXT 30-second step: the application's one-time-step rule refuses a second use of the current one (R14-11)
+  const nextTotp = () => createOTP(secret).hotp(Math.floor(Date.now() / 30_000) + 1);
+  const phraseFor = (sha: string) =>
+    importConfirmation({ fileSha256: sha, mappings: defaultMappings(), openingDate: null }).phrase;
 
   it('the wrong confirmation, or three wrong codes, write nothing; the failures are audited', async () => {
     writeFileSync(good, sheetFor(CLIENT));
@@ -163,7 +172,7 @@ describe('dry run, confirmation, second factor', () => {
     const wrongCodes = cli(
       ['--apply', good, '--account', email],
       PROD,
-      `IMPORT ${sha.slice(0, 12)}\n000000\n111111\n222222\n`,
+      `${phraseFor(sha)}\n000000\n111111\n222222\n`,
     );
     expect(wrongCodes.code).toBe(1);
     expect(wrongCodes.out).toMatch(/Second factor not given/);
@@ -178,11 +187,7 @@ describe('dry run, confirmation, second factor', () => {
 
   it('with the typed phrase and a good code it applies in one transaction, audited with the hash; a second run does nothing', async () => {
     const sha = /sha256 ([0-9a-f]{64})/.exec(cli(['--dry-run', good, '--account', email], PROD).out)![1]!;
-    const ok = cli(
-      ['--apply', good, '--account', email],
-      PROD,
-      `IMPORT ${sha.slice(0, 12)}\n${await totp()}\n`,
-    );
+    const ok = cli(['--apply', good, '--account', email], PROD, `${phraseFor(sha)}\n${await totp()}\n`);
     expect(ok.code, ok.out).toBe(0);
     expect(ok.out).toMatch(/IMPORT DONE/);
     expect(await count('client', `name = '${CLIENT}'`)).toBe(1);
@@ -216,8 +221,8 @@ describe('dry run, confirmation, second factor', () => {
           [sha],
         )
       ).rows[0]!.row_id;
-    const phrase = `ROLLBACK ${runId!.slice(-12)}`;
-    const back = cli(['--rollback', runId!, '--account', email], PROD, `${phrase}\n${await totp()}\n`);
+    const phrase = rollbackConfirmation(runId!).phrase;
+    const back = cli(['--rollback', runId!, '--account', email], PROD, `${phrase}\n${await nextTotp()}\n`);
     expect(back.code, back.out).toBe(0);
     expect(back.out).toMatch(/ROLLBACK DONE/);
     expect(await count('client', `name = '${CLIENT}' and status = 'archived'`)).toBe(1);

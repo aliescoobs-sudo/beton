@@ -5,12 +5,11 @@ import {
   EXPECTED_PROBLEMS,
   formatWorkbookReport,
   type ImportEnvironment,
-  importWorkbook,
   readWorkbook,
-  rollbackImport,
   syntheticProblemWorkbook,
   syntheticValidWorkbook,
 } from '../src/modules/importer';
+import { importWorkbook, rollbackImport } from './helpers/import-proof';
 import { defaultMappings } from '../src/modules/importer';
 import { createPlant, listPlants, updatePlant } from '../src/modules/master-data';
 import type { SessionUser } from '../src/modules/platform-security/auth/session-gate';
@@ -128,6 +127,15 @@ describe('the valid book', () => {
   });
 });
 
+const KIND_OF_SHEET: Record<string, string> = {
+  Clients: 'clients',
+  Camions: 'trucks',
+  Prix: 'selling_prices',
+  Soldes: 'opening_balances',
+  Cheques: 'cheques_in_transit',
+  Facture: 'invoice_sequence',
+};
+
 describe('the book with problems', () => {
   it('names each known fault by sheet and row, applies nothing, and shows no cell', async () => {
     // another prefix: the valid book above is in this database already, and a row that exists is not a row that is wrong
@@ -137,8 +145,14 @@ describe('the book with problems', () => {
     expect(r.applied).toBe(false);
     const text = formatWorkbookReport(r);
     for (const [sheet, row, phrase] of EXPECTED_PROBLEMS) {
+      // sheets are named by position in the report (R14-09): the block of a sheet is found by its kind
+      const kind = KIND_OF_SHEET[sheet];
       const block =
-        text.split('\n[').find((b) => b.startsWith(`${sheet}]`) || b.startsWith(`[${sheet}]`)) ?? '';
+        text
+          .split('\n')
+          .slice(text.split('\n').findIndex((l) => new RegExp(`^\\[Sheet \\d+\\] ${kind}:`).test(l)))
+          .join('\n')
+          .split('\n[')[0] ?? '';
       expect(block, `${sheet} row ${row}`).toMatch(new RegExp(`row ${row}: [^\\n]*${phrase}`));
     }
     expect(text).not.toContain('FICTIF');

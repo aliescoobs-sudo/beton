@@ -10,12 +10,10 @@ export {
 export {
   defaultColumnsOf,
   fieldsOf,
-  formatReport,
   IMPORT_KINDS,
   type ImportKind,
   type ImportReport,
   type ImportRow,
-  runImport,
 } from './service/importers';
 export {
   type DateFormat,
@@ -41,6 +39,7 @@ export {
   type WorkbookOptions,
   type WorkbookReport,
 } from './service/workbook-import';
+export { importConfirmation, rollbackConfirmation, type StepUpProof } from './domain/confirmation';
 export { ImportTransactionError, type ImportTransactionCode } from './service/tx-end';
 export { type ImportEnvironment, importEnvironmentProblem } from './domain/guard';
 export { formatRollbackReport, formatWorkbookReport } from './service/report';

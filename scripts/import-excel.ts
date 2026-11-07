@@ -33,12 +33,12 @@ import { withRlsContext } from '../src/lib/db/rls-context.ts';
 import { uuidv7 } from '../src/lib/uuidv7.ts';
 import { handleHelp } from './cli-help';
 import {
-  confirmationPhrase,
   findImportAccount,
+  importConfirmation,
   parseArgs,
-  rollbackPhrase,
+  rollbackConfirmation,
   safeErrorLine,
-  verifyTotp,
+  verifyImportCode,
   writePrivateReport,
 } from './import-excel-lib';
 import { createPrompt } from './prompt';
@@ -102,8 +102,9 @@ try {
   }
   const actor = { ...account, locale: 'fr' as const, twoFactorEnabled: true, reenrolRequired: false };
 
-  // the second factor: three tries, every failure and the success are audited
-  const stepUp = async (): Promise<boolean> => {
+  // the second factor (R14-11): the code is verified with the application's own protections (atomic used-step claim, persisted failure
+  // budget, eligibility re-checked) and bound to ONE operation. Three tries per command, every failure and the success are audited.
+  const stepUp = async (operation: string): Promise<boolean> => {
     const note = (action: 'step_up' | 'permission_denied', reason: string) =>
       withRlsContext(
         appPool,
@@ -112,12 +113,24 @@ try {
       );
     for (let attempt = 1; attempt <= 3; attempt++) {
       const code = await prompt.secret('Authenticator code (6 digits): ');
-      if (await verifyTotp(authPool, env, account!.id, code)) {
-        await note('step_up', 'excel import');
+      const verdict = await verifyImportCode(authPool, env, { userId: account!.id, code });
+      if (verdict === 'ok') {
+        await note('step_up', `excel import (${operation.slice(0, 20)})`);
         return true;
       }
-      await note('permission_denied', 'excel import: wrong authenticator code');
-      console.error('Wrong code.');
+      if (verdict === 'ineligible')
+        throw new ImportRefused('ROLE', 'This account may no longer run the import: nothing was done.');
+      if (verdict === 'locked') {
+        await note('permission_denied', 'excel import: too many wrong codes (locked)');
+        console.error(
+          'Too many wrong or reused codes for this account: it is locked for a while (the same limit as the sign-in). Nothing was done.',
+        );
+        return false;
+      }
+      await note('permission_denied', 'excel import: wrong or reused authenticator code');
+      console.error(
+        'Wrong code (a code that was already used anywhere is refused too: wait for the next one).',
+      );
     }
     return false;
   };
@@ -126,17 +139,17 @@ try {
     console.log(
       `Rollback of run ${args.target}: archives what it created and cancels its cheques; nothing is deleted.`,
     );
-    if (
-      (await prompt.ask(`Type ${rollbackPhrase(args.target)} to confirm: `)) !== rollbackPhrase(args.target)
-    )
+    const rb = rollbackConfirmation(args.target);
+    if ((await prompt.ask(`Type ${rb.phrase} to confirm: `)) !== rb.phrase)
       throw new ImportRefused('STEP_UP_REQUIRED', 'Confirmation not typed: nothing was done.');
-    if (!(await stepUp()))
+    if (!(await stepUp(rb.operation)))
       throw new ImportRefused('STEP_UP_REQUIRED', 'Second factor not given: nothing was done.');
     const r = await rollbackImport({
       appPool,
       actor: { ...actor, stepUpVerified: true },
       runId: args.target,
       environment,
+      stepUp: { userId: actor.id, operation: rb.operation },
     });
     const text = formatRollbackReport(r);
     console.log(text);
@@ -184,15 +197,27 @@ try {
       process.exitCode = 1;
     } else if (dry.alreadyImportedRunId) process.exitCode = 0;
     else {
-      const phrase = confirmationPhrase(dry.sha256);
-      if ((await prompt.ask(`Type ${phrase} to apply this file to the production database: `)) !== phrase)
+      // Extra 1: the phrase covers the FULL file hash, the mappings and the opening date; the code is bound to the same operation (R14-11)
+      const conf = importConfirmation({
+        fileSha256: dry.sha256,
+        mappings: loaded.mappings,
+        openingDate: args.openingDate ?? null,
+      });
+      console.log(
+        `Confirmation covers: file sha256 ${dry.sha256}; ${loaded.mappings.length} mapping(s); opening date ${args.openingDate ?? 'none given'}.`,
+      );
+      if (
+        (await prompt.ask(`Type ${conf.phrase} to apply this file to the production database: `)) !==
+        conf.phrase
+      )
         throw new ImportRefused('STEP_UP_REQUIRED', 'Confirmation not typed: nothing was written.');
-      if (!(await stepUp()))
+      if (!(await stepUp(conf.operation)))
         throw new ImportRefused('STEP_UP_REQUIRED', 'Second factor not given: nothing was written.');
       const done = await importWorkbook({
         ...base,
         actor: { ...actor, stepUpVerified: true },
         mode: 'apply',
+        stepUp: { userId: actor.id, operation: conf.operation },
       });
       const text = formatWorkbookReport(done);
       console.log(text);

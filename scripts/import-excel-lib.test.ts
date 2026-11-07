@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { confirmationPhrase, parseArgs, rollbackPhrase } from './import-excel-lib';
+import { importConfirmation, parseArgs, rollbackConfirmation } from './import-excel-lib';
 
 describe('import:excel arguments', () => {
   it('reads each mode with its value and the options', () => {
@@ -46,12 +46,52 @@ describe('import:excel arguments', () => {
     );
     expect(parseArgs([]).problems.join()).toMatch(/choose/);
   });
-  it('the typed phrase is tied to the file (or the run), so it cannot be reused for another one', () => {
-    const a = 'a'.repeat(64);
-    const b = `b${'a'.repeat(63)}`;
-    expect(confirmationPhrase(a)).toBe('IMPORT aaaaaaaaaaaa');
-    expect(confirmationPhrase(a)).not.toBe(confirmationPhrase(b));
-    expect(rollbackPhrase('0192f7c0-0000-7000-8000-0123456789ab')).toBe('ROLLBACK 0123456789ab');
+  it('the typed phrase covers the FULL hash of the file, the mappings and the opening date (Extra 1)', () => {
+    const file = 'a'.repeat(64);
+    const m = [{ sheet: 'Clients', kind: 'clients', columns: { name: ['Nom'] } }];
+    const base = importConfirmation({ fileSha256: file, mappings: m, openingDate: '2026-01-01' });
+    expect(base.phrase).toMatch(/^IMPORT [0-9a-f]{64}$/);
+    // the key order of a mapping does not matter, a changed value does
+    expect(
+      importConfirmation({
+        fileSha256: file,
+        mappings: [{ columns: { name: ['Nom'] }, kind: 'clients', sheet: 'Clients' }],
+        openingDate: '2026-01-01',
+      }).phrase,
+    ).toBe(base.phrase);
+    expect(
+      importConfirmation({ fileSha256: `b${file.slice(1)}`, mappings: m, openingDate: '2026-01-01' }).phrase,
+    ).not.toBe(base.phrase);
+    expect(
+      importConfirmation({
+        fileSha256: file,
+        mappings: [{ ...m[0], kind: 'suppliers' }],
+        openingDate: '2026-01-01',
+      }).phrase,
+    ).not.toBe(base.phrase);
+    expect(importConfirmation({ fileSha256: file, mappings: m, openingDate: '2026-02-01' }).phrase).not.toBe(
+      base.phrase,
+    );
+    expect(importConfirmation({ fileSha256: file, mappings: m, openingDate: null }).phrase).not.toBe(
+      base.phrase,
+    );
+    // two files that share the first 12 hex digits (the old 48-bit prefix) no longer share a phrase
+    expect(
+      importConfirmation({
+        fileSha256: `${file.slice(0, 12)}${'c'.repeat(52)}`,
+        mappings: m,
+        openingDate: null,
+      }).phrase,
+    ).not.toBe(
+      importConfirmation({
+        fileSha256: `${file.slice(0, 12)}${'d'.repeat(52)}`,
+        mappings: m,
+        openingDate: null,
+      }).phrase,
+    );
+    expect(rollbackConfirmation('0192f7c0-0000-7000-8000-0123456789ab').phrase).toBe(
+      'ROLLBACK 0192f7c0-0000-7000-8000-0123456789ab',
+    );
   });
 });
 

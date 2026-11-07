@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { runImport } from '../src/modules/importer';
+import { runImport } from '../src/modules/importer/service/importers';
 import { readSheet } from '../src/modules/importer';
 import {
   createComponent,

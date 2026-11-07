@@ -4,12 +4,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   formatWorkbookReport,
   type ImportEnvironment,
-  importWorkbook,
   ImportRefused,
-  rollbackImport,
   type SheetMapping,
   type WorkbookReport,
 } from '../src/modules/importer';
+import { importWorkbook, rollbackImport } from './helpers/import-proof';
 import type { SessionUser } from '../src/modules/platform-security/auth/session-gate';
 import { testEnv } from './db-env';
 import { realSessionUser } from './helpers/actors';

@@ -6,6 +6,7 @@ import { realClock } from '@/modules/clock';
 import { cancelInstrument } from '@/modules/ledger';
 import { recordAuditEvent, type SessionUser } from '@/modules/platform-security';
 import { APPLY_ORDER, mappingForSheet, type MappingKind, type SheetMapping } from '../domain/mapping';
+import { importConfirmation, rollbackConfirmation, type StepUpProof } from '../domain/confirmation';
 import { type ImportEnvironment, importEnvironmentProblem } from '../domain/guard';
 import { type NamedSheet, readWorkbook, SheetError } from '../domain/sheet';
 import { defaultColumnsOf, type ImportKind, type ImportReport, runImport } from './importers';
@@ -65,6 +66,11 @@ export interface WorkbookOptions {
    * that carries only some of them is fine: pass false for those.
    */
   requireEveryMappedSheet?: boolean;
+  /**
+   * R14-11: required for `apply`. The verified second-factor code, bound to the account and to THIS operation: the importer recomputes the
+   * operation from the file, the mappings and the opening date it is about to apply and refuses a proof that names another one.
+   */
+  stepUp?: StepUpProof;
   /** The opening date of the books, when the workbook has an opening-balances sheet and none is entered yet. */
   openingDate?: string;
   /** The business date cheques are received on (default: today). */
@@ -89,11 +95,21 @@ export async function assertImportEnvironment(appPool: pg.Pool, env: ImportEnvir
   if (problem) throw new ImportRefused('ENVIRONMENT', problem);
 }
 
-export function assertActor(actor: SessionUser, mode: 'dry-run' | 'apply') {
+export function assertActor(
+  actor: SessionUser,
+  mode: 'dry-run' | 'apply',
+  /** For `apply`: the proof of the verified code and the operation it must be bound to (R14-11). */
+  proof?: { given: StepUpProof | undefined; operation: string },
+) {
   if (!IMPORT_ROLES.includes(actor.role))
     throw new ImportRefused('ROLE', 'Only the owner or an app_admin account may run the import.');
   if (mode === 'apply' && actor.stepUpVerified !== true)
     throw new ImportRefused('STEP_UP_REQUIRED', 'Applying an import needs a fresh second factor (step-up).');
+  if (mode === 'apply' && (proof?.given?.userId !== actor.id || proof.given.operation !== proof.operation))
+    throw new ImportRefused(
+      'STEP_UP_REQUIRED',
+      'The second-factor code was not given for this operation (this file, these mappings and this opening date): nothing was done.',
+    );
 }
 
 const emptyTotals = (): WorkbookReport['totals'] => ({
@@ -107,9 +123,16 @@ const emptyTotals = (): WorkbookReport['totals'] => ({
 
 /** Validates a workbook and, in `apply` mode, writes it in one audited transaction. */
 export async function importWorkbook(opts: WorkbookOptions): Promise<WorkbookReport> {
-  assertActor(opts.actor, opts.mode);
-  await assertImportEnvironment(opts.appPool, opts.environment);
   const hash = sha256(opts.file);
+  assertActor(opts.actor, opts.mode, {
+    given: opts.stepUp,
+    operation: importConfirmation({
+      fileSha256: hash,
+      mappings: opts.mappings,
+      openingDate: opts.openingDate ?? null,
+    }).operation,
+  });
+  await assertImportEnvironment(opts.appPool, opts.environment);
   const report: WorkbookReport = {
     sha256: hash,
     sizeBytes: opts.file.length,
@@ -314,8 +337,13 @@ export async function rollbackImport(opts: {
   runId: string;
   environment: ImportEnvironment;
   today?: string;
+  /** R14-11: the verified code, bound to this rollback (`rollbackConfirmation(runId).operation`). */
+  stepUp?: StepUpProof;
 }): Promise<RollbackReport> {
-  assertActor(opts.actor, 'apply');
+  assertActor(opts.actor, 'apply', {
+    given: opts.stepUp,
+    operation: rollbackConfirmation(opts.runId).operation,
+  });
   await assertImportEnvironment(opts.appPool, opts.environment);
   const today = opts.today ?? realClock.now().toISOString().slice(0, 10);
   const report: RollbackReport = {

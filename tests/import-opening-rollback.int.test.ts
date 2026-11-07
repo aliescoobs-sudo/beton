@@ -3,13 +3,8 @@ import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { recreateDatabase, SCENARIO_TEST_DATABASE } from '../scripts/db-bootstrap';
 import { runMigrations } from '../scripts/db-migrate';
-import {
-  formatRollbackReport,
-  type ImportEnvironment,
-  importWorkbook,
-  rollbackImport,
-  type SheetMapping,
-} from '../src/modules/importer';
+import { formatRollbackReport, type ImportEnvironment, type SheetMapping } from '../src/modules/importer';
+import { importWorkbook, rollbackImport } from './helpers/import-proof';
 import { withRlsContext } from '../src/lib/db/rls-context';
 import type { SessionUser } from '../src/modules/platform-security/auth/session-gate';
 import { testEnv } from './db-env';
