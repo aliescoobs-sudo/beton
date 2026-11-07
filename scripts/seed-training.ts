@@ -56,10 +56,12 @@ import {
   emailOf,
   generatePassword,
   generatePin,
+  acquireSeedLock,
   commitCredentialsFile,
   discardCredentialsFile,
   renderCredentialsFile,
   stageCredentialsFile,
+  type SeedLock,
   sweepStaleStagedCredentials,
   type StagedCredentials,
   validateCredentialsPath,
@@ -200,11 +202,15 @@ export async function seedTraining(opts: SeedTrainingOptions): Promise<SeedTrain
   const system = new pg.Pool({ connectionString: env.DATABASE_URL_SYSTEM, max: 2 });
   const seed = new pg.Pool({ connectionString: env.DATABASE_URL_SEED, max: 2 });
   const migrator = new pg.Pool({ connectionString: env.DATABASE_URL_MIGRATOR, max: 1 });
+  let lock: SeedLock | undefined;
   try {
     // R11-04 / R13: a destination that cannot be trusted is found before anything else, and a staged file left by an earlier crash
     // (a half-seed that was interrupted, or a seeded database that is being asked again) is removed FIRST, whatever the checks below say.
     validateCredentialsPath(opts.credentialsFile);
-    sweepStaleStagedCredentials(opts.credentialsFile);
+    // R14-12: the whole seed/output lifecycle is under one lock, taken BEFORE the sweep and held to the end. A second seed that finds the
+    // lock live is refused before it sweeps, claims the token or writes anything; the sweep only removes provably abandoned files.
+    lock = acquireSeedLock(opts.credentialsFile);
+    sweepStaleStagedCredentials(opts.credentialsFile, lock);
     if ((await migrator.query('select 1 from public.training_marker')).rowCount)
       return { applied: false, accounts: 0, credentialsFile: null };
     await assertSeedTargetEmpty(migrator);
@@ -610,6 +616,7 @@ export async function seedTraining(opts: SeedTrainingOptions): Promise<SeedTrain
     }
     return { applied: true, accounts: issued.length, credentialsFile: opts.credentialsFile };
   } finally {
+    lock?.release();
     await Promise.all([app.end(), authPool.end(), system.end(), seed.end(), migrator.end()]);
   }
 }

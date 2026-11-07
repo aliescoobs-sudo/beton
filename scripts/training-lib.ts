@@ -13,6 +13,7 @@ import {
   realpathSync,
   renameSync,
   unlinkSync,
+  utimesSync,
   writeSync,
 } from 'node:fs';
 import path from 'node:path';
@@ -256,11 +257,114 @@ export function commitCredentialsFile(staged: StagedCredentials): void {
   }
 }
 
+// ---- R14-12: the whole seed/output lifecycle is under ONE lock; the sweep only removes provably abandoned staging files -------------------
+/** The lock file of the seed in the credentials folder (never a credentials name; no secret in it). */
+export const SEED_LOCK_NAME = 'training-accounts.seed.lock';
+/** A lock whose last heartbeat is older than this is abandoned (its seed died). A live seed touches it every HEARTBEAT_MS. */
+export const SEED_LOCK_STALE_MS = 60_000;
+const SEED_LOCK_HEARTBEAT_MS = 10_000;
+/** A staged file younger than this is never swept, even under our own lock (a second line of defence for a lock taken over). */
+export const STAGING_MIN_AGE_MS = 10 * 60_000;
+
+export class SeedLockError extends Error {}
+
+export interface SeedLock {
+  readonly file: string;
+  /** True while this process still holds it (not released, and nobody took the file over). */
+  held(): boolean;
+  release(): void;
+}
+
 /**
- * Deletes what an earlier crashed seed left in the credentials folder: staged files of ours (regular files, never links). Returns how
- * many were removed. Never touches the final file.
+ * Takes the seed lock of the credentials folder, exclusively (O_EXCL, no link followed), and keeps it alive with a heartbeat. Another seed
+ * that finds it live (heartbeat within SEED_LOCK_STALE_MS) is refused: it must not sweep, seed or stage anything. A lock whose heartbeat
+ * stopped is taken over once. Call BEFORE the sweep and hold it until the seed has finished (marker written or everything discarded).
  */
-export function sweepStaleStagedCredentials(finalFile: string): number {
+export function acquireSeedLock(
+  finalFile: string,
+  opts: { now?: () => number; staleMs?: number; heartbeatMs?: number } = {},
+): SeedLock {
+  const now = opts.now ?? Date.now;
+  const staleMs = opts.staleMs ?? SEED_LOCK_STALE_MS;
+  const file = path.join(path.dirname(path.resolve(finalFile)), SEED_LOCK_NAME);
+  const token = randomBytes(12).toString('hex');
+  const create = (): boolean => {
+    try {
+      const fd = openSync(
+        file,
+        constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
+        0o600,
+      );
+      try {
+        writeSync(fd, JSON.stringify({ token, pid: process.pid, at: now() }));
+      } finally {
+        closeSync(fd);
+      }
+      return true;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'EEXIST') return false;
+      throw new SeedLockError(
+        `the credentials folder cannot take the seed lock (${(error as NodeJS.ErrnoException).code ?? 'error'}): nothing was seeded or claimed. Use a folder this user can write (mode 0700).`,
+      );
+    }
+  };
+  if (!create()) {
+    const st = lstatSync(file, { throwIfNoEntry: false });
+    if (st && (!st.isFile() || now() - st.mtimeMs <= staleMs))
+      throw new SeedLockError(
+        'another training seed holds the credentials folder (its lock is live): wait for it to finish; nothing was swept, written or removed',
+      );
+    // abandoned: its heartbeat stopped. Removed once; if another seed wins the race for the new lock, this one is refused too.
+    if (st) unlinkSync(file);
+    if (!create())
+      throw new SeedLockError(
+        'another training seed took the credentials folder at the same moment: nothing was done',
+      );
+  }
+  let released = false;
+  const mine = (): boolean => {
+    try {
+      return (JSON.parse(readFileSync(file, 'utf8')) as { token?: string }).token === token;
+    } catch {
+      return false;
+    }
+  };
+  const beat = setInterval(() => {
+    try {
+      if (mine()) utimesSync(file, new Date(now()), new Date(now()));
+    } catch {
+      // the next beat tries again
+    }
+  }, opts.heartbeatMs ?? SEED_LOCK_HEARTBEAT_MS);
+  beat.unref();
+  return {
+    file,
+    held: () => !released && mine(),
+    release: () => {
+      if (released) return;
+      released = true;
+      clearInterval(beat);
+      if (mine()) discardCredentialsFile(file); // only our own lock file is ever removed
+    },
+  };
+}
+
+/**
+ * Deletes what an earlier crashed seed left in the credentials folder: staged files of ours (regular files, never links) that are
+ * PROVABLY abandoned: the caller holds the seed lock (so no other seed is writing) AND the file is older than STAGING_MIN_AGE_MS.
+ * Returns how many were removed. Never touches the final file, and refuses to run without a held lock.
+ */
+export function sweepStaleStagedCredentials(
+  finalFile: string,
+  lock: SeedLock,
+  opts: { now?: () => number; minAgeMs?: number } = {},
+): number {
+  if (!lock.held())
+    throw new SeedLockError(
+      'the stale staging sweep needs the seed lock: refusing to touch the credentials folder',
+    );
+  const now = opts.now ?? Date.now;
+  const minAge = opts.minAgeMs ?? STAGING_MIN_AGE_MS;
   const dir = path.dirname(path.resolve(finalFile));
   const me = process.getuid?.();
   let removed = 0;
@@ -269,6 +373,7 @@ export function sweepStaleStagedCredentials(finalFile: string): number {
     const full = path.join(dir, name);
     const st = lstatSync(full, { throwIfNoEntry: false });
     if (!st || !st.isFile() || (me !== undefined && st.uid !== me)) continue;
+    if (now() - st.mtimeMs < minAge) continue; // maybe in use: not provably abandoned
     unlinkSync(full);
     removed++;
   }

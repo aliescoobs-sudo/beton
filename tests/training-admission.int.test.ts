@@ -7,6 +7,7 @@ import {
   statSync,
   symlinkSync,
   writeFileSync,
+  utimesSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -16,6 +17,7 @@ import { TRAINING_TEST_DATABASE, ensureRoles, recreateDatabase, superuserUrl } f
 import { runMigrations } from '../scripts/db-migrate';
 import { assertSeedTargetEmpty, seedTraining } from '../scripts/seed-training';
 import { claimBirthToken, hasBirthToken, mintBirthToken } from '../scripts/training-birth';
+import { acquireSeedLock } from '../scripts/training-lib';
 import { SYSTEM_ACTOR_ID } from '../src/modules/platform-security/auth/actors';
 import { testEnv } from './db-env';
 
@@ -112,7 +114,7 @@ describe('credentials output (R11-04)', () => {
     expect((await migrator.query('select 1 from plant')).rowCount).toBe(0);
     expect((await migrator.query('select 1 from "user"')).rowCount).toBe(0);
   });
-  it('a credentials write that fails at the end stops the seed with no marker and says so', async () => {
+  it('R14-12: a credentials folder that cannot be written is refused BEFORE anything is seeded or the token is claimed (the lock needs it)', async () => {
     await fresh();
     const dir = folder(0o500); // passes the folder check, but nothing can be created in it
     try {
@@ -123,22 +125,13 @@ describe('credentials output (R11-04)', () => {
           today: '2026-11-05',
           credentialsFile: path.join(dir, 'training-accounts.local.txt'),
         }),
-      ).rejects.toThrow(/NOT completed/);
+      ).rejects.toThrow(/cannot take the seed lock/);
     } finally {
       chmodSync(dir, 0o700);
     }
     expect((await migrator.query('select 1 from public.training_marker')).rowCount).toBe(0);
+    expect((await migrator.query('select 1 from plant')).rowCount).toBe(0); // nothing was written
     expect(readdirSync(dir)).toEqual([]);
-    // the half-seeded database is refused from now on (R11-02)
-    const ok = folder(0o700);
-    await expect(
-      seedTraining({
-        provenance: 'unverified-test-database',
-        env: training,
-        today: '2026-11-05',
-        credentialsFile: path.join(ok, 'training-accounts.local.txt'),
-      }),
-    ).rejects.toThrow(/not empty/);
   }, 600_000);
   it('a good run leaves one private file, no temporary file, and the marker', async () => {
     await fresh();
@@ -322,6 +315,8 @@ describe('stale staged credentials are swept first', () => {
     chmodSync(d, 0o700);
     const staged = path.join(d, 'training-accounts.staging-0123456789ab.local.txt');
     writeFileSync(staged, 'password: leftover\n', { mode: 0o600 });
+    const old = new Date(Date.now() - 3_600_000); // R14-12: only a provably abandoned file (older than the threshold) is swept
+    utimesSync(staged, old, old);
     return { dir: d, staged, final: path.join(d, 'training-accounts.local.txt') };
   };
   const fresh = async () => {
@@ -362,5 +357,32 @@ describe('stale staged credentials are swept first', () => {
     expect(r.applied).toBe(false);
     expect(existsSync(s.staged)).toBe(false);
     expect(existsSync(s.final)).toBe(false);
+  });
+  it("R14-12: a seed that finds another seed's lock live is refused and leaves that seed's staged file alone, whatever the database says", async () => {
+    await fresh();
+    await asSuper(
+      `select set_config('app.user_id', '${SYSTEM_ACTOR_ID}', false), set_config('app.role', 'system', false);
+       insert into client (id, code, name, kind) values (gen_random_uuid(), 'CLT-7778', 'Reste', 'company')`,
+    );
+    const s = stale();
+    const young = path.join(s.dir, 'training-accounts.staging-aaaaaaaaaaaa.local.txt');
+    writeFileSync(young, 'password: seed A, in progress\n', { mode: 0o600 });
+    const lockA = acquireSeedLock(s.final); // seed A is running
+    try {
+      await expect(
+        seedTraining({ env: training, today: '2026-11-06', credentialsFile: s.final }),
+      ).rejects.toThrow(/another training seed holds/);
+      expect(existsSync(young)).toBe(true); // A's live stage survived B's attempt
+      expect(existsSync(s.staged)).toBe(true); // B swept nothing at all
+    } finally {
+      lockA.release();
+    }
+    // once A is done, the old leftover goes and the young file (an hour younger than the threshold) is still spared
+    await expect(
+      seedTraining({ env: training, today: '2026-11-06', credentialsFile: s.final }),
+    ).rejects.toThrow(/not empty/);
+    expect(existsSync(s.staged)).toBe(false);
+    expect(existsSync(young)).toBe(true);
+    expect(existsSync(path.join(s.dir, 'training-accounts.seed.lock'))).toBe(false); // the lock is released on every way out
   });
 });

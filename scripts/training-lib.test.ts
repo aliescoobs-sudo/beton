@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
   existsSync,
@@ -8,11 +9,13 @@ import {
   realpathSync,
   statSync,
   symlinkSync,
+  utimesSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { realClock } from '../src/modules/clock';
 import { parsePin } from '../src/modules/field/domain/pin';
 import { checkPassword } from '../src/modules/platform-security/auth/password-policy';
 import {
@@ -20,7 +23,10 @@ import {
   emailOf,
   generatePassword,
   generatePin,
+  acquireSeedLock,
   commitCredentialsFile,
+  SEED_LOCK_NAME,
+  SeedLockError,
   renderCredentialsFile,
   STAGING_NAME,
   stageCredentialsFile,
@@ -172,11 +178,88 @@ describe('R12-02: no secret under an unignored name, nothing left behind, no che
     writeFileSync(path.join(d, '.training-accounts.local.txt.abcdef012345'), 'stale', { mode: 0o600 });
     writeFileSync(path.join(d, 'notes.txt'), 'mine');
     symlinkSync('/etc/hosts', path.join(d, 'training-accounts.staging-aaaaaaaaaaaa.local.txt'));
-    expect(sweepStaleStagedCredentials(final)).toBe(2);
+    const old = new Date(realClock.now().getTime() - 3_600_000);
+    for (const n of [
+      'training-accounts.staging-0123456789ab.local.txt',
+      '.training-accounts.local.txt.abcdef012345',
+    ])
+      utimesSync(path.join(d, n), old, old);
+    const lock = acquireSeedLock(final);
+    expect(sweepStaleStagedCredentials(final, lock)).toBe(2);
+    lock.release();
     expect(readdirSync(d).sort()).toEqual(
       ['notes.txt', 'training-accounts.local.txt', 'training-accounts.staging-aaaaaaaaaaaa.local.txt'].sort(),
     );
     expect(readFileSync(final, 'utf8')).toBe('keep');
+  });
+  describe('R14-12: the seed lock and the abandoned-file rule', () => {
+    const mk = () => {
+      const d = dir();
+      return { d, final: path.join(d, 'training-accounts.local.txt') };
+    };
+    it("a second seed is refused while the first one's lock is live, and the lock goes when it is released", () => {
+      const { d, final } = mk();
+      const a = acquireSeedLock(final);
+      expect(() => acquireSeedLock(final)).toThrow(SeedLockError);
+      expect(a.held()).toBe(true);
+      a.release();
+      expect(existsSync(path.join(d, SEED_LOCK_NAME))).toBe(false);
+      acquireSeedLock(final).release();
+    });
+    it('an abandoned lock (no heartbeat) is taken over once; a live one never is', () => {
+      const { d, final } = mk();
+      let t = 1_000_000;
+      const clock = { now: () => t, heartbeatMs: 3_600_000 };
+      const dead = acquireSeedLock(final, clock); // its heartbeat never runs in this test
+      const lockFile = path.join(d, SEED_LOCK_NAME);
+      utimesSync(lockFile, new Date(t), new Date(t));
+      t += 30_000;
+      expect(() => acquireSeedLock(final, clock)).toThrow(SeedLockError); // 30 s: still live
+      t += 60_000;
+      const taker = acquireSeedLock(final, clock); // 90 s without a beat: abandoned
+      expect(taker.held()).toBe(true);
+      expect(dead.held()).toBe(false); // the old holder no longer holds anything...
+      dead.release();
+      expect(existsSync(lockFile)).toBe(true); // ...and its release does not remove the new holder's lock
+      taker.release();
+      expect(existsSync(lockFile)).toBe(false);
+    });
+    it('the sweep refuses to run without a held lock', () => {
+      const { final } = mk();
+      const lock = acquireSeedLock(final);
+      lock.release();
+      expect(() => sweepStaleStagedCredentials(final, lock)).toThrow(/needs the seed lock/);
+    });
+    it('the sweep spares a young staged file (another seed may be writing it) and removes an old one', () => {
+      const { d, final } = mk();
+      const young = path.join(d, 'training-accounts.staging-111111111111.local.txt');
+      const old = path.join(d, 'training-accounts.staging-222222222222.local.txt');
+      writeFileSync(young, 'x', { mode: 0o600 });
+      writeFileSync(old, 'x', { mode: 0o600 });
+      const hourAgo = new Date(realClock.now().getTime() - 3_600_000);
+      utimesSync(old, hourAgo, hourAgo);
+      const lock = acquireSeedLock(final);
+      expect(sweepStaleStagedCredentials(final, lock)).toBe(1);
+      expect(existsSync(young)).toBe(true);
+      expect(existsSync(old)).toBe(false);
+      lock.release();
+    });
+    it('the lock is exclusive between processes: a second process cannot take it', () => {
+      const { final } = mk();
+      const a = acquireSeedLock(final);
+      const r = spawnSync(
+        process.execPath,
+        [
+          '--import',
+          './scripts/register-ts-paths.mjs',
+          '-e',
+          `import('./scripts/training-lib.ts').then(m => { try { m.acquireSeedLock(${JSON.stringify(final)}); process.exit(0); } catch (e) { process.exit(e instanceof m.SeedLockError ? 3 : 4); } })`,
+        ],
+        { encoding: 'utf8' },
+      );
+      expect(r.status).toBe(3);
+      a.release();
+    });
   });
   it('refuses an output inside a checkout or a Docker build context, accepts a private folder outside', () => {
     const checkout = dir();
