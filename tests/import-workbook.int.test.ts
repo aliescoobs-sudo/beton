@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { realClock } from '../src/modules/clock';
 import {
   formatWorkbookReport,
   type ImportEnvironment,
@@ -19,6 +20,9 @@ const env = testEnv();
 const app = new pg.Pool({ connectionString: env.DATABASE_URL_APP, max: 3 });
 const migrator = new pg.Pool({ connectionString: env.DATABASE_URL_MIGRATOR, max: 1 });
 afterAll(() => Promise.all([app.end(), migrator.end()]));
+// Extra 3: one business day for the whole file, read once from the clock. The cheques are received on it and the rollback cancels them on it;
+// a literal date here made the test fail the day after it was written (the cancellation date was before the received date).
+const TODAY = realClock.now().toISOString().slice(0, 10);
 const PROD: ImportEnvironment = { trainingMode: false, realData: true, simulationEnabled: false };
 let owner: SessionUser;
 let stepped: SessionUser;
@@ -123,6 +127,7 @@ const run = (buf: Buffer, mode: 'dry-run' | 'apply', actor = stepped, environmen
     mode,
     environment,
     openingDate: '2026-01-01',
+    today: TODAY,
   });
 const count = async (table: string, where = 'true') =>
   Number(
@@ -373,7 +378,7 @@ describe('the way back', () => {
       actor: stepped,
       runId: done.runId!,
       environment: PROD,
-      today: '2026-11-06',
+      today: TODAY,
     });
     expect(back.blocked).toEqual([]);
     expect(back.archived).toMatchObject({ client: 1, supplier: 1, concrete_type: 1, component: 1 });
