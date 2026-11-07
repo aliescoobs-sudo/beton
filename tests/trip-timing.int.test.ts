@@ -741,3 +741,100 @@ describe('the explanation never leaves the restricted tables (R14-02)', () => {
     ).toBeGreaterThan(0);
   });
 });
+
+describe('the estimate reader authorizes positively and enforces scope itself (R14-05)', () => {
+  const estimate = (u: SessionUser, plant: string | null, zone: string | null = null, stage = 'to_site') =>
+    asRole(u, (tx) =>
+      tx.query<{ minutes: number; source: string }>('select * from public.trip_stage_estimate($1, $2, $3)', [
+        plant,
+        zone,
+        stage,
+      ]),
+    );
+  const refusedEstimate = async (p: Promise<unknown>) =>
+    p.then(
+      () => false,
+      (e: Error) => /may not read the estimate/.test(e.message),
+    );
+  let driver3: SessionUser;
+  let driverRow3 = '';
+  beforeAll(async () => {
+    driver3 = await userRow('driver', null);
+    driverRow3 = await newDriver(`Chauffeur trois ${marker}`, driver3);
+  });
+
+  it('a manager reads his own plant only; another plant, no plant and no role are refused', async () => {
+    expect((await estimate(pmA, plantA)).rowCount).toBeGreaterThanOrEqual(0);
+    expect(await refusedEstimate(estimate(pmB, plantA)), 'foreign plant manager').toBe(true);
+    expect(await refusedEstimate(estimate(pmA, plantB)), 'the other plant').toBe(true);
+    expect(await refusedEstimate(estimate(pmA, null)), 'a null plant').toBe(true);
+    expect((await estimate(owner, plantB)).rowCount).toBeGreaterThanOrEqual(0);
+    expect((await estimate(appAdmin, plantA)).rowCount).toBeGreaterThanOrEqual(0);
+  });
+
+  it('no role context is refused (the old test was NULL, not true, and fell through); neither are the roles that read no timing', async () => {
+    for (const role of [undefined, '']) {
+      const c = await app.connect();
+      try {
+        await c.query('begin');
+        await c.query(`select set_config('app.user_id', $1, true)`, [owner.id]);
+        if (role !== undefined) await c.query(`select set_config('app.role', $1, true)`, [role]);
+        await expect(
+          c.query('select * from public.trip_stage_estimate($1, null, $2)', [plantA, 'to_site']),
+          String(role),
+        ).rejects.toThrow(/may not read the estimate/);
+      } finally {
+        await c.query('rollback');
+        c.release();
+      }
+    }
+    for (const u of [accountant, partner, support, sales, purchases])
+      expect(await refusedEstimate(estimate(u, plantA)), u.role).toBe(true);
+  });
+
+  it('a driver reads only a plant and a route he is planned on', async () => {
+    // driver1 is planned at plant A (no zone), driver2 at both plants (an earlier test moved a rotation to him), driver3 nowhere yet
+    expect((await estimate(driver1, plantA)).rowCount).toBeGreaterThanOrEqual(0);
+    expect(await refusedEstimate(estimate(driver1, plantB)), 'foreign plant').toBe(true);
+    expect(await refusedEstimate(estimate(driver3, plantA)), 'foreign driver').toBe(true);
+    expect(await refusedEstimate(estimate(driver3, plantB)), 'foreign driver, other plant').toBe(true);
+    expect((await estimate(driver2, plantB)).rowCount).toBeGreaterThanOrEqual(0);
+    expect(await refusedEstimate(estimate(driver1, plantA, randomUUID())), 'a route he is not on').toBe(true);
+    expect(await refusedEstimate(estimate(driver1, null)), 'a null plant he is not on').toBe(true);
+  });
+
+  /** A completed rotation of plant A (no zone) by this driver, `d` minutes to site, written as the plant's tracking would. */
+  async function completed(offset: number, driverId: string, d: number) {
+    const o = await asOwner(plantA, (tx) =>
+      insertOrder(tx, owner.id, { ...master, clientId: scene.clientId }, DAY),
+    );
+    const t = await newTrip(plantA, scene.truckId, driverId, 300, 1, o.id);
+    await sudo(`update trip_plan set trip_date = $2 where id = $1`, [t, addDays(DAY, offset)]);
+    const base = new Date(localMidnightMs(addDays(DAY, offset)) + 6 * 3600_000);
+    for (const [step, plus] of [
+      ['departed', 0],
+      ['arrived', d],
+      ['unloading_started', d + 5],
+      ['unloading_finished', d + 35],
+      ['back', d + 65],
+    ] as const)
+      await sudo(
+        `insert into trip_event (id, trip_id, step, at, created_by) values (gen_random_uuid(), $1, $2, $3, $4)`,
+        [t, step, new Date(base.getTime() + plus * 60_000), SYSTEM_ACTOR_ID],
+      );
+  }
+
+  it('a driver gets a median only with at least three different drivers behind it; the manager has no such floor', async () => {
+    // the history test above left five completed rotations of plant A by ONE driver: enough for the manager, one person for a driver
+    expect((await estimate(pmA, plantA)).rows[0]).toMatchObject({ source: 'history' });
+    expect((await estimate(driver1, plantA)).rows[0]?.source, 'one driver behind the median').not.toBe(
+      'history',
+    );
+    await completed(-1, driverRow2, 30);
+    expect((await estimate(driver2, plantA)).rows[0]?.source, 'two drivers').not.toBe('history');
+    await completed(-2, driverRow3, 28);
+    for (const u of [driver1, driver2, driver3])
+      expect((await estimate(u, plantA)).rows[0]?.source, `${u.role} with three drivers`).toBe('history');
+    expect((await estimate(pmA, plantA)).rows[0]).toMatchObject({ source: 'history' });
+  });
+});
