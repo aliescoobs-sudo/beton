@@ -325,3 +325,14 @@ Implemented and tested with unit, fake-port or scratch-database evidence; none o
 - [x] **R14-14** `a59debe`: 17 screenshots regenerated (throwaway database, port 3190, separate build), page-success assertion, fiction label, invented driver labels. Three images were looked at by hand; the rest are guarded by the assertion and the label code.
 - [x] **Small** `97aa82b`: decision 179 corrected, rearm documented (before sign-in, not all-or-nothing), the late-rotation seed test runs at a fixed hour.
 **Not done / open:** the sales guide mentions *Devis*/*Commandes* screens the sales office profile does not have; a database-level overlap trigger; the full e2e (after group C, on AC power); `import-workbook` time-dependent test (group C).
+
+### Group C — the importer (`docs/reviews/CODEX-REVIEW-R14.md`, scope C), decisions 196 to 203
+Implemented and tested with unit and integration evidence on synthetic workbooks only. **Not an acceptance of the importer as a real-data gate:** that needs the independent review (R15b) and a rehearsal on a production-mode copy.
+- [x] **R14-03** `f9df8a5`: applied/rolled back only after a confirmed commit; failed vs unknown outcome; destroyed connections; injected failures (not a real commit-time constraint).
+- [x] **R14-04** `303c8e2`: 1904 workbooks, duplicate headers, unclosed CSV quotes and formula cells refused (cached values only by explicit mapping).
+- [x] **R14-08** `a31cda1`: advisory lock; payload-equal idempotency; conflicts and duplicate opening balances block the file.
+- [x] **R14-09** `f2c8b8a`: sheet positions and fixed codes in reports and CLI output; private log files; IMPORT-EXCEL.md corrected (row audit holds values).
+- [x] **R14-10** `93f849a`: real opening tables in the soft-rollback inventory, unknown tables listed; correction procedure written.
+- [x] **R14-11** `a0af786`: atomic TOTP step claim, persisted failure budget, eligibility rechecked, code bound to the operation; typed phrase over the full hash, mappings and opening date; `runImport` no longer exported.
+- [x] **Extra 3** `b8a7d86`: the date-dependent rollback test fixed.
+**Not proven here:** a real commit-time failure of the database, a real file, the real headers, an app_admin's complete rollback inventory (the owner's is complete), the proof object against a hostile caller with database access.
