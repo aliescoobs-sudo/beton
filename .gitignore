@@ -24,3 +24,6 @@ reports/
 training-accounts*.local.txt
 .training-accounts*
 out/
+
+# images written into this folder by another tool (logo studies for other clients): never part of this repository
+generated_images/
