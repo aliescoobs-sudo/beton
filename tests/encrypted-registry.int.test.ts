@@ -87,21 +87,29 @@ describe('a pump job address is re-sealed by the rotation like any other (F06)',
     const k2 = `k2x:${Buffer.alloc(32, 22).toString('base64')}`;
     const old = fieldCipherFrom(parseKeyring(current));
     const marker = randomUUID().slice(0, 8);
-    const truck = await createTruck(app, owner, {
-      code: `P${100 + Math.floor(Math.random() * 890)}`,
-      plate: `PR-${marker}`,
-      kind: 'pump',
-    });
-    if (!truck.ok) throw new Error(truck.error);
+    // Codes are drawn at random from a small space in a database that keeps the rows of every earlier run, so a draw can collide with an
+    // existing code. Each draw is retried with a new code until one is free (a collision is a normal refusal, never a failure of the test).
+    let truck: Awaited<ReturnType<typeof createTruck>> | undefined;
+    for (let attempt = 0; attempt < 60 && !truck?.ok; attempt++)
+      truck = await createTruck(app, owner, {
+        code: `P${100 + Math.floor(Math.random() * 890)}`,
+        plate: `PR-${marker}-${attempt}`,
+        kind: 'pump',
+      });
+    if (!truck?.ok) throw new Error(`no free pump-truck code after 60 draws: ${truck?.error ?? 'none'}`);
     const sealed = old.seal(`12 rue du Chantier ${marker}`);
-    const operator = (
-      await withRlsContext(app, { userId: owner.id, role: 'owner', requestId: marker }, (tx) =>
-        tx.query<{ id: string }>(
-          `insert into driver (id, code, name, created_by, kind) values (gen_random_uuid(), $1, $2, $3, 'pump_operator') returning id`,
-          [`CH-${6000 + Math.floor(Math.random() * 3000)}`, `Op ${marker}`, owner.id],
-        ),
-      )
-    ).rows[0]!.id;
+    let operator: string | undefined;
+    for (let attempt = 0; attempt < 60 && !operator; attempt++)
+      operator = (
+        await withRlsContext(app, { userId: owner.id, role: 'owner', requestId: marker }, (tx) =>
+          tx.query<{ id: string }>(
+            `insert into driver (id, code, name, created_by, kind) values (gen_random_uuid(), $1, $2, $3, 'pump_operator')
+               on conflict do nothing returning id`,
+            [`CH-${6000 + Math.floor(Math.random() * 3000)}`, `Op ${marker}`, owner.id],
+          ),
+        )
+      ).rows[0]?.id;
+    if (!operator) throw new Error('no free operator code after 60 draws');
     const id = await withRlsContext(
       migrator,
       { userId: owner.id, role: 'owner', requestId: marker },
