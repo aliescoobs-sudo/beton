@@ -98,6 +98,7 @@ const SHOTS: { key: string; label: RegExp; pages: [string, string][] }[] = [
 ];
 
 async function main() {
+  process.env.E2E_TEST_RUNNER ??= 'training-screens'; // R14-13: the positive runner signal the throwaway-database seed escape needs
   const env = testEnv(TRAINING_TEST_DATABASE);
   const training = { ...env, TRAINING_MODE: true as const, APP_ENV: 'training' as const };
   const dir = mkdtempSync(path.join(tmpdir(), 'bb-screens-'));

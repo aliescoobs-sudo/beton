@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, readFileSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import pg from 'pg';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { TRAINING_TEST_DATABASE, ensureRoles, recreateDatabase } from '../scripts/db-bootstrap';
 import { runMigrations } from '../scripts/db-migrate';
 import { wipeTrainingDatabase } from '../scripts/reset-training';
@@ -162,9 +162,33 @@ describe('the training seed (T1)', () => {
 });
 
 describe('reset:training (T1)', () => {
+  it('R14-13: the helper itself refuses without the mode flags, whatever the CLI did', async () => {
+    const base = { ...testEnv(TRAINING_TEST_DATABASE) };
+    await expect(wipeTrainingDatabase({ ...base, TRAINING_MODE: false })).rejects.toThrow(
+      /TRAINING_MODE=true/,
+    );
+    await expect(
+      wipeTrainingDatabase({ ...base, TRAINING_MODE: true, APP_ENV: 'production' }),
+    ).rejects.toThrow(/APP_ENV not production/);
+    await expect(wipeTrainingDatabase({ ...base, TRAINING_MODE: true, REAL_DATA: true })).rejects.toThrow(
+      /REAL_DATA off/,
+    );
+    expect(await count(`select count(*) n from training_marker`)).toBe(1); // nothing was dropped
+  });
+  it('R14-13: without a runner signal, a marked database on a cluster with no birth row for it is not reset', async () => {
+    vi.stubEnv('VITEST', '');
+    try {
+      await expect(wipeTrainingDatabase(training)).rejects.toThrow(/no birth row for it/);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+    expect(await count(`select count(*) n from training_marker`)).toBe(1);
+  });
   it('refuses to wipe a database that does not carry the training marker', async () => {
     // belgobeton_test is a plain test database: no marker, so it is never dropped
-    await expect(wipeTrainingDatabase(testEnv())).rejects.toThrow(/does not carry the training marker/);
+    await expect(
+      wipeTrainingDatabase({ ...testEnv(), TRAINING_MODE: true, APP_ENV: 'training' }),
+    ).rejects.toThrow(/does not carry the training marker/);
     expect(await count(`select count(*) n from training_marker`)).toBe(1); // the training database is untouched by that attempt
   });
   it('wipes the training database and seeds it again with new credentials', async () => {

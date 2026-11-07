@@ -41,6 +41,7 @@ import {
   PROVENANCE_REFUSAL,
   claimBirthToken,
   hasBirthToken,
+  databaseNameOf,
   isTestRunnerDatabase,
 } from './training-birth.ts';
 import { seedIntegrationScenario } from '../src/modules/operations/service/pilot-integration.ts';
@@ -215,9 +216,10 @@ export async function seedTraining(opts: SeedTrainingOptions): Promise<SeedTrain
       return { applied: false, accounts: 0, credentialsFile: null };
     await assertSeedTargetEmpty(migrator);
     // R13-01: provenance. Checked (without being consumed) before the first write; consumed right after the destination is vetted.
-    if (needToken && !(await hasBirthToken(env))) throw new SeedError(PROVENANCE_REFUSAL);
+    const database = databaseNameOf(env.DATABASE_URL_MIGRATOR);
+    if (needToken && !(await hasBirthToken(env, database))) throw new SeedError(PROVENANCE_REFUSAL);
     // Claimed atomically: two seeds cannot both pass, and one seed cannot be run twice on the same volume.
-    if (needToken && !(await claimBirthToken(env))) throw new SeedError(PROVENANCE_REFUSAL);
+    if (needToken && !(await claimBirthToken(env, database))) throw new SeedError(PROVENANCE_REFUSAL);
 
     const issued: IssuedCredential[] = [];
     const cipher = fieldCipherFrom(parseKeyring(env.FIELD_ENCRYPTION_KEYS));

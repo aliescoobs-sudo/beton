@@ -67,14 +67,19 @@ Nothing here is done for you, and no token or password is ever pasted anywhere b
    `./scripts/training/show-accounts.sh` lists the account names (no secret), `./scripts/training/show-accounts.sh <exact login or code>` (e.g. `CH-02`, `comptable`) shows one block; a generic word or the shared domain matches several accounts and is refused before anything secret is printed. Hand it over in
    person, then clear the screen and its history (Command-K). Never circulate the whole list: no screenshot, no message, no `script` or other terminal recording,
    no redirection of the output to a file (`--all` exists for the rare case you need everything, and says so).
-   **Fresh volume and the birth token (R13-01).** The first time the stack is started, the postgres image runs `scripts/training/db-init/10-birth-token.sql` (mounted
-   read-only into the database container) **once**, on the brand-new volume: it writes one *birth token* into the cluster. `seed:training` needs that token, and uses it up
-   (atomically) before it writes anything: a volume that existed before this step, a restored dump or a hand-built database has no token and the seed refuses it
-   (`not born fresh on a stock training volume`). It also proves the database empty without statistics: every table of `public` and `finance` must have an empty heap file, or
-   be read exactly with the maintenance login not subject to row-level security; a table that has been written to and whose rows row-level security may hide from that login
-   **fails closed** (no `pg_stat` estimate is used, and no read policy or `BYPASSRLS` was added for it). So an OLD training volume cannot be seeded again: remove it
-   (`./scripts/training/dc.sh down -v`, which also erases the accounts file and the file store) and run `training-up.sh` again. `reset:training` is the operator's own
-   reset of a database that carries the marker: it mints a new token after dropping that database. Migrations: all of them through 0118, plus the finance ones.
+   **Fresh volume and the birth marker (R13-01, R14-13).** The first time the stack is started, the postgres image runs `scripts/training/db-init/10-birth-token.sql` (mounted
+   read-only into the database container) **once**, on the brand-new volume: it writes one *birth marker* into the cluster's maintenance database. `seed:training` needs it,
+   binds it to the business database name and uses it up (atomically) before it writes anything. **What this proves, and what it does not.** It refuses the ordinary
+   mistakes: a database restored or hand-built on a cluster that never had the marker, a second seed on the same volume, a seed for another database name. It is a
+   consumable marker, **not** a signed token or an attestation: whoever can restore the maintenance database, a whole cluster or a physical snapshot can carry an *unused*
+   marker into another cluster, and a superuser can write one; a completed business dump can also carry the training marker. **A successful seed is therefore not proof that the
+   volume is new.** Establishing that the volume is fresh and dedicated stays your own check, outside this code. The seed also proves the database empty without statistics:
+   every table of `public` and `finance` must have an empty heap file, or be read exactly with the maintenance login not subject to row-level security; a table that has been
+   written to and whose rows row-level security may hide from that login **fails closed**. An OLD training volume cannot be seeded again: remove it
+   (`./scripts/training/dc.sh down -v`, which also erases the accounts file and the file store) and run `training-up.sh` again. `reset:training` is the operator's own reset of a
+   database that carries the training marker; the helper itself checks the mode (training on, not production, real data off) and that the cluster has a birth row for that
+   database, and then mints a new marker bound to it. The only skip of the marker is for the throwaway test databases and needs a positive test-runner signal as well as the
+   database name; no deployed command offers it. Migrations: all of them through 0118, plus the finance ones.
 8. **Make it public with Tailscale Funnel: last, and in this order.**
    a. `sudo brew services start tailscale` then `sudo tailscale up` — it prints a link: open it, sign in (create the free Tailscale account), approve the machine.
    b. In the Tailscale admin console (<https://login.tailscale.com/admin>): **DNS** → turn on **MagicDNS** and **HTTPS Certificates**. The console shows the

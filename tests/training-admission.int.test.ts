@@ -16,7 +16,12 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { TRAINING_TEST_DATABASE, ensureRoles, recreateDatabase, superuserUrl } from '../scripts/db-bootstrap';
 import { runMigrations } from '../scripts/db-migrate';
 import { assertSeedTargetEmpty, seedTraining } from '../scripts/seed-training';
-import { claimBirthToken, hasBirthToken, mintBirthToken } from '../scripts/training-birth';
+import {
+  claimBirthToken,
+  hasBirthToken,
+  isTestRunnerDatabase,
+  mintBirthToken,
+} from '../scripts/training-birth';
 import { acquireSeedLock } from '../scripts/training-lib';
 import { SYSTEM_ACTOR_ID } from '../src/modules/platform-security/auth/actors';
 import { testEnv } from './db-env';
@@ -270,7 +275,7 @@ describe('seed provenance: the birth token (R13-01)', () => {
     const f = out();
     const r = await seedTraining({ env: training, today: '2026-11-06', credentialsFile: f });
     expect(r.applied).toBe(true);
-    expect(await hasBirthToken(training)).toBe(false);
+    expect(await hasBirthToken(training, TRAINING_TEST_DATABASE)).toBe(false);
     // the volume is spent: a new empty database on it is refused (a seed is not repeated on a volume; reset:training mints a new token)
     await fresh();
     await expect(
@@ -280,11 +285,32 @@ describe('seed provenance: the birth token (R13-01)', () => {
   it('the token is claimed atomically: of two concurrent claims only one wins', async () => {
     await bornFresh();
     const wins = await Promise.all([
-      claimBirthToken(training),
-      claimBirthToken(training),
-      claimBirthToken(training),
+      claimBirthToken(training, TRAINING_TEST_DATABASE),
+      claimBirthToken(training, TRAINING_TEST_DATABASE),
+      claimBirthToken(training, TRAINING_TEST_DATABASE),
     ]);
     expect(wins.filter(Boolean)).toHaveLength(1);
+  });
+  it('R14-13: the claim binds the token to the business database: another name cannot use it, and a spent one stays bound', async () => {
+    await bornFresh();
+    expect(await hasBirthToken(training, 'some_other_database')).toBe(true); // unbound until the first claim
+    expect(await claimBirthToken(training, TRAINING_TEST_DATABASE)).toBe(true);
+    expect(await hasBirthToken(training, TRAINING_TEST_DATABASE)).toBe(false); // spent
+    expect(await claimBirthToken(training, 'some_other_database')).toBe(false);
+    // a token minted for one database is useless to another
+    await mintBirthToken(training, TRAINING_TEST_DATABASE);
+    expect(await hasBirthToken(training, 'some_other_database')).toBe(false);
+    expect(await claimBirthToken(training, 'some_other_database')).toBe(false);
+    expect(await hasBirthToken(training, TRAINING_TEST_DATABASE)).toBe(true);
+  });
+  it('R14-13: the test-runner escape also needs a positive runner signal, not only an allowlisted name', () => {
+    const url = training.DATABASE_URL_MIGRATOR;
+    expect(isTestRunnerDatabase(url, { VITEST: 'true' })).toBe(true);
+    expect(isTestRunnerDatabase(url, { E2E_TEST_RUNNER: 'playwright' })).toBe(true);
+    expect(isTestRunnerDatabase(url, {})).toBe(false);
+    expect(isTestRunnerDatabase(url, { NODE_ENV: 'test' })).toBe(false);
+    expect(isTestRunnerDatabase(url, { E2E_TEST_RUNNER: '' })).toBe(false);
+    expect(isTestRunnerDatabase(url.replace(/\/[^/]+$/, '/belgobeton'), { VITEST: 'true' })).toBe(false);
   });
   it('the skip is for the test-runner databases only', async () => {
     const live = {
@@ -302,8 +328,8 @@ describe('seed provenance: the birth token (R13-01)', () => {
   });
   it('a reset mints a new token after dropping a marked training database', async () => {
     await noToken();
-    await mintBirthToken(training);
-    expect(await hasBirthToken(training)).toBe(true);
+    await mintBirthToken(training, TRAINING_TEST_DATABASE);
+    expect(await hasBirthToken(training, TRAINING_TEST_DATABASE)).toBe(true);
   });
 });
 

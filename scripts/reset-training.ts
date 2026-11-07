@@ -6,10 +6,27 @@ import pg from 'pg';
 import { ensureDatabase, superuserUrl } from './db-bootstrap.ts';
 import { runMigrations } from './db-migrate.ts';
 import { seedTraining } from './seed-training.ts';
-import { mintBirthToken } from './training-birth.ts';
+import { databaseNameOf, hasBirthRow, isTestRunnerDatabase, mintBirthToken } from './training-birth.ts';
 
-export async function wipeTrainingDatabase(env: Parameters<typeof superuserUrl>[0]): Promise<void> {
-  const database = new URL(env.DATABASE_URL_MIGRATOR).pathname.slice(1);
+export async function wipeTrainingDatabase(
+  env: Parameters<typeof superuserUrl>[0] & {
+    TRAINING_MODE?: boolean;
+    APP_ENV?: string;
+    REAL_DATA?: boolean;
+  },
+): Promise<void> {
+  const database = databaseNameOf(env.DATABASE_URL_MIGRATOR);
+  // R14-13: the helper itself checks the mode (it used to rely on its CLI): training on, not production, no real data.
+  if (!env.TRAINING_MODE || env.APP_ENV === 'production' || env.REAL_DATA)
+    throw new Error(
+      'Refusing to wipe: this needs TRAINING_MODE=true, APP_ENV not production and REAL_DATA off.',
+    );
+  // ...and a birth row of THIS database on this cluster (spent or not): a marked database restored on a cluster that never had one
+  // cannot be reset here. A throwaway test database of a test runner is the only exception.
+  if (!isTestRunnerDatabase(env.DATABASE_URL_MIGRATOR) && !(await hasBirthRow(env, database)))
+    throw new Error(
+      `Refusing to wipe "${database}": this cluster has no birth row for it (it was not born through the stock training path). Remove the volume and start again.`,
+    );
   const migrator = new pg.Pool({ connectionString: env.DATABASE_URL_MIGRATOR, max: 1 });
   try {
     const hasTable = await migrator.query(
@@ -33,7 +50,7 @@ export async function wipeTrainingDatabase(env: Parameters<typeof superuserUrl>[
     await admin.end();
   }
   await ensureDatabase(env, database);
-  await mintBirthToken(env); // the operator's reset of a marked training database is a legitimate new birth (R13-01)
+  await mintBirthToken(env, database); // the operator's reset of a marked training database is a legitimate new birth (R13-01)
 }
 
 function requireOutputPath(): string {
