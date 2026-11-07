@@ -287,13 +287,20 @@ export interface RollbackReport {
 const ARCHIVABLE = ['client', 'supplier', 'truck', 'concrete_type', 'component'] as const;
 // Sealed by design (insert-only versions, the opening of the books, a forward-only sequence): a correction is a newer version or a
 // reversing entry from the screen, never a deletion. Child rows of the reversible kinds are not listed.
-const SEALED = [
+// R14-10: the REAL table names (the first version listed `opening_balance` and `party_opening_balance`, which do not exist, so the opening
+// of the books was never reported). `ledger_opening` is the singleton row holding the opening date; `opening_party_balance` the balances.
+export const SEALED_TABLES = [
   'selling_price',
   'recette',
-  'opening_balance',
-  'party_opening_balance',
+  'ledger_opening',
+  'opening_party_balance',
   'doc_sequence',
+  'code_sequence', // the counters of the generated codes (CLT-…, FRN-…): forward-only, found by the unclassified net of R14-10
 ] as const;
+const SEALED: readonly string[] = SEALED_TABLES;
+// Rows a run writes as part of something it already reports (the lines of a recipe, the purchase unit of a component, the events of a
+// cheque): not listed on their own.
+const CHILD_TABLES: readonly string[] = ['recette_line', 'purchase_unit', 'payment_instrument_event'];
 
 /**
  * The way back after a file was applied: everything the run CREATED is taken out of use, nothing is deleted. Clients, suppliers,
@@ -370,8 +377,12 @@ export async function rollbackImport(opts: {
           if (r.ok) report.cancelledInstruments++;
           else
             report.blocked.push(`cheque or LCN ${id}: ${String(r.error)} (it has moved on since the import)`);
-        } else if ((SEALED as readonly string[]).includes(table)) {
+        } else if (SEALED.includes(table)) {
           report.staysAsRecorded[table] = (report.staysAsRecorded[table] ?? 0) + 1;
+        } else if (!CHILD_TABLES.includes(table) && table !== 'import') {
+          // R14-10: a table this code does not know is still LISTED (by its name), never silently left out of the inventory
+          report.staysAsRecorded[`${table} (unclassified)`] =
+            (report.staysAsRecorded[`${table} (unclassified)`] ?? 0) + 1;
         }
       }
     });
