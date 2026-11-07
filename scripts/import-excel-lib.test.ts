@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { realClock } from '../src/modules/clock';
 import { importConfirmation, parseArgs, rollbackConfirmation } from './import-excel-lib';
 
 describe('import:excel arguments', () => {
@@ -125,6 +126,6 @@ describe('R14-09: what the CLI prints and stores', () => {
     expect(() => writePrivateReport(dir, 'dry-run', 'again', new Date('2026-11-07T08:00:00Z'))).toThrow(); // exclusive
     const link = path.join(base, 'link');
     symlinkSync(dir, link);
-    expect(() => writePrivateReport(link, 'x', 't', new Date())).toThrow(/link/);
+    expect(() => writePrivateReport(link, 'x', 't', realClock.now())).toThrow(/link/);
   });
 });

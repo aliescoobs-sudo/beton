@@ -5,6 +5,7 @@ import path from 'node:path';
 import { createOTP } from '@better-auth/utils/otp';
 import type pg from 'pg';
 import type { Env } from '../src/lib/env.ts';
+import { realClock } from '../src/modules/clock/index.ts';
 import { keyedHash } from '../src/lib/crypto/hmac.ts';
 import { readParameters } from '../src/modules/platform-security/index.ts';
 import { authSecretCipher } from '../src/modules/platform-security/auth/secret-cipher.ts';
@@ -111,7 +112,7 @@ export async function verifyImportCode(
   env: Pick<Env, 'AUTH_SECRET' | 'AUTH_SECRETS' | 'LOOKUP_HMAC_KEY'>,
   input: { userId: string; code: string; now?: Date },
 ): Promise<CodeVerdict> {
-  const now = input.now ?? new Date();
+  const now = input.now ?? realClock.now();
   const params = await readParameters(authPool);
   const id = keyedHash(env.LOOKUP_HMAC_KEY, `id:import-cli:${input.userId}`);
   const ip = keyedHash(env.LOOKUP_HMAC_KEY, 'ip:import-cli');
