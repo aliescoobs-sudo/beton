@@ -4,6 +4,8 @@ Données **fictives**. Compte à utiliser : le code du pompiste (« Pompiste Dé
 
 ## À essayer
 1. **Travail du jour** : à Chefchaouen, la commande B30 est pompée : tu vois la pompe P1, le chantier et l'heure d'arrivée prévue.
-2. **Étapes** : arrivée, installation, début du pompage, fin du pompage, départ. Résultat : chaque tap est horodaté et visible du chef de centrale.
+2. **Étapes** : « Arrivé », « Installé », « Pompage commencé », « Pompage terminé », « Parti ». Résultat : chaque tap est horodaté et visible du chef de centrale.
+
+**Règle d'exploitation (R15A) :** un navigateur (profil) séparé par personne ; ne te passe jamais le téléphone en sortant puis en te reconnectant dans la même page ; si quelque chose reste bloqué, **arrête l'exercice** de ce profil.
 
 Captures : `docs/training/screens/pompiste-*.png` (jeu de données fictif).

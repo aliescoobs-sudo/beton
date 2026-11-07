@@ -3,6 +3,9 @@
 Une fiche par rôle, en français et en arabe standard. Données fictives, aucun mot de passe.
 Chaque matin, avant la séance : `./scripts/training-rearm.sh` (moins d'une minute ; garde les comptes et mots de passe, remet des livraisons du jour à faire). **À lancer AVANT que les stagiaires se connectent**, jamais pendant la séance : la remise à zéro annule toutes les commandes éligibles du jour à Tétouan (pas seulement celles qu'elle a créées) et n'est **pas tout-ou-rien** (plusieurs transactions : une exécution interrompue peut laisser une journée à moitié remise ; relancez-la).
 
+**Local seulement, un profil de navigateur par identité (R15A).** La version de formation tourne sur un seul Mac, à `http://localhost:3000`, rien n'est public. Un profil de navigateur séparé par identité de formation ; ne jamais passer un téléphone d'une personne à l'autre en se déconnectant puis en se reconnectant dans la même page ; si quelque chose reste bloqué, arrêter l'exercice au lieu de continuer par-dessus.
+**Menus vérifiés (2026-11-07)** contre la navigation réelle de chaque rôle (`src/app/shell/nav-model.ts`) : chaque fiche ne cite que des écrans que le rôle a vraiment.
+
 | Rôle | FR | AR |
 |---|---|---|
 | Bureau ventes | [ventes.fr.md](ventes.fr.md) | [ventes.ar.md](ventes.ar.md) |

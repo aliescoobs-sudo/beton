@@ -5,9 +5,11 @@ Données **fictives**. Compte à utiliser : le code chauffeur remis en main prop
 ## À essayer
 1. **Liste du jour** : tu vois tes livraisons dans l'ordre (client, chantier, volume). Aucun prix.
 2. **Retard et motif** : sur la fiche de chaque livraison tu vois l'heure prévue, ton écart et, si la rotation suivante risque de partir en retard, un bandeau rouge (« Retard prévu… ») ou orange (« Étape plus longue que prévu »). Si tu es en retard, choisis au besoin un motif (circulation, attente sur le chantier, panne, autre) **avant** d'appuyer sur l'étape. Résultat : l'écart de chaque étape est enregistré ; le chef de centrale le voit sur son tableau. Aucune note, aucun classement.
-3. **Faire une rotation** : appuie sur le bouton de l'étape proposée : début de chargement, départ (après le bon de livraison de la centrale), arrivée, début de déchargement, fin de déchargement, retour. Résultat : l'étape se cale sur l'heure du téléphone et la rotation suivante devient l'étape en cours.
+3. **Faire une rotation** : appuie sur le bouton de l'étape proposée : « Chargement commencé », « Camion parti de la centrale » (après le bon de livraison de la centrale), « Arrivé sur le chantier », « Déchargement commencé », « Déchargement terminé », « De retour à la centrale ». Résultat : l'étape se cale sur l'heure du téléphone et la rotation suivante devient l'étape en cours.
 4. **Coupure réseau** : passe en mode avion, appuie sur une étape, remets le réseau. Résultat : l'étape est envoyée avec l'heure où tu as appuyé.
-5. **Urgence** : bouton d'urgence (panne, accident…) : le chef de centrale reçoit une alerte et peut te donner une instruction.
-6. **Fin de journée** : *Se déconnecter* efface la journée du téléphone.
+5. **Urgence** : bouton *Urgence* (panne, accident…) : le chef de centrale reçoit une alerte et peut te donner une instruction.
+6. **Fin de journée** : le bouton *Sortir* efface la journée du téléphone. S'il reste des éléments à envoyer, le téléphone te le dit et te demande si tu veux quand même sortir.
+
+**Règle d'exploitation (R15A) :** un navigateur (profil) séparé par chauffeur ; ne te passe jamais le téléphone en sortant puis en te reconnectant dans la même page ; si *Sortir* ne finit pas ou si une photo reste en attente, **arrête l'exercice** de ce profil au lieu de continuer par-dessus.
 
 Captures : `docs/training/screens/chauffeur-*.png` (jeu de données fictif).
