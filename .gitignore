@@ -12,6 +12,7 @@ file-store/
 playwright-report/
 test-results/
 .next-e2e/
+.next-training/
 
 # test and run logs
 .logs/

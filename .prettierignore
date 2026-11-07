@@ -7,3 +7,4 @@ docs
 messages/ar.json
 *.txt
 .next-e2e
+.next-training
