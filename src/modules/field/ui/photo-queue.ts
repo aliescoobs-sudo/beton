@@ -10,6 +10,19 @@ export interface QueuedPhoto {
   blob: Blob;
   /** The account that took it: another account never sends it, and signing out or switching account erases it (F02). */
   userId: string;
+  /**
+   * R15A-03: a creation stamp, taken when the photo is queued (before any wait), increasing within and across page loads. A wipe
+   * captures a cutoff when it STARTS and erases only photos stamped at or before it; a photo without a stamp (older than this field)
+   * counts as old.
+   */
+  seq?: number;
+}
+
+let lastSeq = 0;
+/** The next creation stamp. Also the cutoff a wipe captures when it starts: nothing queued after that moment is at or below it. */
+export function nextPhotoSeq(): number {
+  lastSeq = Math.max(lastSeq + 1, Date.now() * 1000);
+  return lastSeq;
 }
 
 const DB = 'belgobeton-field';
@@ -33,11 +46,34 @@ async function run<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRe
   });
 }
 
-export const queuePhoto = (p: QueuedPhoto) => run('readwrite', (s) => s.put(p)).then(() => undefined);
+/**
+ * R15A-04: `stillCurrent` is asked AFTER the (possibly slow) database opening and in the same synchronous step that issues the write,
+ * so a session that ended while the photo was being prepared or the database was opening never gets its photo stored. If the session
+ * ends while the write is on its way, the row is taken out again. Answers whether the photo was kept.
+ */
+export async function queuePhoto(p: QueuedPhoto, stillCurrent: () => boolean = () => true): Promise<boolean> {
+  const row: QueuedPhoto = { ...p, seq: p.seq ?? nextPhotoSeq() };
+  const db = await open();
+  if (!stillCurrent()) return false;
+  await new Promise<void>((resolve, reject) => {
+    const req = db.transaction(STORE, 'readwrite').objectStore(STORE).put(row);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+  if (stillCurrent()) return true;
+  await dropPhoto(row.key).catch(() => undefined);
+  return false;
+}
 export const queuedPhotos = () => run<QueuedPhoto[]>('readonly', (s) => s.getAll());
-/** Erases the photos within the scope in ONE transaction (R14-06): the photos of one account, of all but one, or all of them. */
-export async function wipePhotos(scope: WipeScope = 'everything'): Promise<void> {
-  if (scope === 'everything') return void (await run('readwrite', (s) => s.clear()));
+/**
+ * Erases the photos within the scope in ONE transaction (R14-06, R15A-03): the photos of one account, of all but one, or all of them,
+ * and ONLY those stamped at or before `cutoff`, which the wipe captured when it started. A negative owner predicate ("all but B") that
+ * runs late is therefore never the authority to erase what a later session queued.
+ */
+export async function wipePhotos(
+  scope: WipeScope = 'everything',
+  cutoff: number = nextPhotoSeq(),
+): Promise<void> {
   const db = await open();
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE, 'readwrite');
@@ -45,8 +81,14 @@ export async function wipePhotos(scope: WipeScope = 'everything'): Promise<void>
     cursor.onsuccess = () => {
       const c = cursor.result;
       if (!c) return;
-      const owner = (c.value as QueuedPhoto).userId;
-      if ('only' in scope ? owner === scope.only : owner !== scope.except) c.delete();
+      const row = c.value as QueuedPhoto;
+      const inScope =
+        scope === 'everything'
+          ? true
+          : 'only' in scope
+            ? row.userId === scope.only
+            : row.userId !== scope.except;
+      if (inScope && (row.seq ?? 0) <= cutoff) c.delete();
       c.continue();
     };
     tx.oncomplete = () => resolve();

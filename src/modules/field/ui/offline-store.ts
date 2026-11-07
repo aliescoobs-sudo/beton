@@ -3,7 +3,7 @@
 // holds only the app shell and the framework's static files (never the day). `forgetRead` erases what names a client; `forgetAll` also
 // erases the work waiting to be sent (an explicit sign-out, or another account taking over the phone).
 import type { WipeScope } from './day-controller';
-import { wipePhotos } from './photo-queue';
+import { nextPhotoSeq, wipePhotos } from './photo-queue';
 
 export const QUEUE_KEY = 'bb_field_queue';
 export const DAY_KEY = 'bb_field_day';
@@ -36,11 +36,14 @@ export async function forgetRead(): Promise<void> {
 
 /**
  * The day, the caches, the queue of taps and the photos waiting. The day and the queue go synchronously, before any await; the photos
- * are erased within the scope only (R14-06): a wipe that is delayed by slow storage must not reach the photos a NEWER sign-in queued.
+ * are erased within the scope AND up to the cutoff captured at the start (R14-06, R15A-03): a wipe delayed by slow storage never reaches the
+ * photos queued after it began, whoever queued them.
  */
 export async function forgetAll(scope: WipeScope = 'everything'): Promise<void> {
+  // R15A-03: the cutoff is taken NOW, before any wait. Whatever is queued after this moment is not this wipe's to erase.
+  const cutoff = nextPhotoSeq();
   localStorage.removeItem(DAY_KEY);
   localStorage.removeItem(QUEUE_KEY);
   await wipeCaches();
-  await wipePhotos(scope).catch(() => undefined);
+  await wipePhotos(scope, cutoff).catch(() => undefined);
 }
