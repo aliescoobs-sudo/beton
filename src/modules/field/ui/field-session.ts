@@ -12,6 +12,8 @@ export interface SessionDay {
   signedOut(): void;
   signedIn(): void;
   openWork(kind: 'background' | 'drain'): WorkGuard | null;
+  /** The session generation now (a sign-out operation belongs to the one it started in). */
+  generation(): number;
   fence(): void;
   unfence(): void;
 }
@@ -42,17 +44,23 @@ export interface SessionPorts<P extends QueuedPhotoRef> {
   };
   /** Asks the driver whether to sign out although `count` things are still waiting. */
   confirmPending(count: number): boolean;
-  /** The server call of the sign-out. */
-  logoutRequest(): Promise<unknown>;
+  /** The server call of the sign-out. It must honour the signal (an aborted fetch's response is discarded by the browser). */
+  logoutRequest(signal: AbortSignal): Promise<unknown>;
   /** Overall limit of the sign-out's last send (ms). */
   drainDeadlineMs: number;
+  /** Overall limit of the logout request (ms): after it the request is aborted and a new sign-in may go on (R15A-01). */
+  logoutDeadlineMs: number;
 }
 
 export function createFieldSession<P extends QueuedPhotoRef>(ports: SessionPorts<P>) {
   const day = ports.day;
   let syncRunning: Promise<void> | null = null;
   let flushRunning: Promise<void> | null = null;
-  let signingOut = false;
+  // R15A-01: a sign-out belongs to the generation that started it. A second press in the SAME generation joins the running one; a press in
+  // a later generation (after a new sign-in) is a new operation, whatever became of an older one or of its server call.
+  let activeSignOut: { gen: number; promise: Promise<void> } | null = null;
+  // Every logout request still on its way. Each has its own abort and its own deadline; none of them can hold back another sign-out.
+  const logoutTransports = new Set<Promise<void>>();
 
   async function runSync(guard: WorkGuard): Promise<void> {
     try {
@@ -149,39 +157,71 @@ export function createFieldSession<P extends QueuedPhotoRef>(ports: SessionPorts
    * overall deadline. 3) if things are still waiting, the driver is told. 4) the screen is cleared at once (a new generation), the
    * server call and the erasing follow on their own. The phone stays fenced until the next sign-in.
    */
-  async function signOut(): Promise<void> {
-    if (signingOut) return;
-    signingOut = true;
-    try {
-      day.fence();
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      const expired = new Promise<'expired'>((resolve) => {
-        timer = setTimeout(() => resolve('expired'), ports.drainDeadlineMs);
-      });
-      const drain = (async () => {
-        await sync('drain');
-        await flushPhotos('drain');
-        return ports.listPhotos().catch(() => [] as P[]);
-      })();
-      const result = await Promise.race([drain, expired]);
-      clearTimeout(timer);
-      let photos: P[];
-      if (result === 'expired') {
-        // The deadline: whatever is still on its way is aborted; the sign-out goes on with what is known.
-        drain.catch(() => undefined);
-        photos = [];
-      } else photos = result.filter((x) => x.userId === ports.owner());
-      const waiting = ports.queueLength() + photos.length + (result === 'expired' ? 1 : 0);
-      if (waiting > 0 && !ports.confirmPending(waiting)) {
-        day.unfence();
-        return;
-      }
-      day.signedOut();
-      ports.ui.clearWaiting();
-      await ports.logoutRequest().catch(() => null);
-    } finally {
-      signingOut = false;
+  function signOut(): Promise<void> {
+    if (activeSignOut && activeSignOut.gen === day.generation()) return activeSignOut.promise;
+    const entry = { gen: day.generation(), promise: Promise.resolve() };
+    activeSignOut = entry;
+    entry.promise = runSignOut().finally(() => {
+      if (activeSignOut === entry) activeSignOut = null;
+    });
+    return entry.promise;
+  }
+
+  async function runSignOut(): Promise<void> {
+    day.fence();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const expired = new Promise<'expired'>((resolve) => {
+      timer = setTimeout(() => resolve('expired'), ports.drainDeadlineMs);
+    });
+    const drain = (async () => {
+      await sync('drain');
+      await flushPhotos('drain');
+      return ports.listPhotos().catch(() => [] as P[]);
+    })();
+    const result = await Promise.race([drain, expired]);
+    clearTimeout(timer);
+    let photos: P[];
+    if (result === 'expired') {
+      // The deadline: whatever is still on its way is aborted; the sign-out goes on with what is known.
+      drain.catch(() => undefined);
+      photos = [];
+    } else photos = result.filter((x) => x.userId === ports.owner());
+    const waiting = ports.queueLength() + photos.length + (result === 'expired' ? 1 : 0);
+    if (waiting > 0 && !ports.confirmPending(waiting)) {
+      day.unfence();
+      return;
     }
+    day.signedOut();
+    ports.ui.clearWaiting();
+    await sendLogout();
+  }
+
+  /** The server call of one sign-out: its own abort, its own deadline. It never throws and it always settles. */
+  function sendLogout(): Promise<void> {
+    const ctl = new AbortController();
+    const transport = new Promise<void>((resolve) => {
+      const deadline = setTimeout(() => {
+        ctl.abort(); // the browser discards the response of an aborted request: it cannot apply a cookie after this point
+        resolve();
+      }, ports.logoutDeadlineMs);
+      ports
+        .logoutRequest(ctl.signal)
+        .catch(() => null)
+        .finally(() => {
+          clearTimeout(deadline);
+          resolve();
+        });
+    }).finally(() => void logoutTransports.delete(transport));
+    logoutTransports.add(transport);
+    return transport;
+  }
+
+  /**
+   * Resolves when no logout request is on its way (each one is bounded by its deadline). The sign-in form waits for this BEFORE it
+   * sends the login, so a late "delete the cookie" answer of an older logout can never land after a newer login's cookie.
+   */
+  async function logoutsSettled(): Promise<void> {
+    while (logoutTransports.size > 0) await Promise.all([...logoutTransports]);
   }
 
   /** A successful sign-in: a new generation, then the first read and send. */
@@ -191,5 +231,5 @@ export function createFieldSession<P extends QueuedPhotoRef>(ports: SessionPorts
     await sync();
   }
 
-  return { sync, flushPhotos, signOut, signedIn, isSigningOut: () => signingOut };
+  return { sync, flushPhotos, signOut, signedIn, logoutsSettled, isSigningOut: () => activeSignOut !== null };
 }

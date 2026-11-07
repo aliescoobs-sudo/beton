@@ -56,6 +56,7 @@ function rig(opts?: { honourAbort?: boolean; confirm?: boolean }) {
     upload: (async () => 'sent') as (p: Photo, signal: AbortSignal) => Promise<'sent' | 'retry' | 'drop'>,
     forgetAll: async (): Promise<void> => undefined,
     listPhotos: async (): Promise<Photo[]> => photos.map((p) => ({ ...p })),
+    logout: (async () => undefined) as (signal: AbortSignal) => Promise<unknown>,
   };
   const dayPorts: DayPorts<TestDay> = {
     fetchSession: async () => {
@@ -113,8 +114,12 @@ function rig(opts?: { honourAbort?: boolean; confirm?: boolean }) {
       log.confirms.push(count);
       return opts?.confirm ?? true;
     },
-    logoutRequest: async () => void log.logouts++,
+    logoutRequest: (signal) => {
+      log.logouts++;
+      return hooks.logout(signal);
+    },
     drainDeadlineMs: 8_000,
+    logoutDeadlineMs: 6_000,
   });
   return {
     controller,
@@ -315,5 +320,112 @@ describe('delayed IndexedDB and Cache Storage (R14-06)', () => {
     r.setOwner(null);
     r.controller.signedOut();
     expect(r.log.wipes).toEqual(['everything']);
+  });
+});
+
+describe('an unresolved old logout never blocks a later one (R15A-01)', () => {
+  it('a permanently pending logout request, then re-login, then another logout: the second logout still fences, clears and sends', async () => {
+    const r = rig();
+    r.setQueue([]);
+    r.hooks.logout = () => new Promise(() => undefined); // A's request never answers and ignores the abort
+    vi.useFakeTimers();
+    const first = r.session.signOut();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(r.ui.session).toBe('out'); // the screen did not wait for the request
+    // B signs in while A's request is still pending (the form would wait; here the deadline has passed)
+    await vi.advanceTimersByTimeAsync(6_001);
+    await first; // bounded by its own deadline, although the port never settled
+    r.setOwner('u2');
+    r.hooks.session = async () => ({ userId: 'u2', label: 'day-2' });
+    await r.session.signedIn();
+    expect(r.ui.session).toBe('in');
+    expect(r.controller.isFenced()).toBe(false);
+    r.hooks.logout = async () => undefined;
+    const before = r.log.logouts;
+    await r.session.signOut();
+    expect(r.log.logouts).toBe(before + 1); // B's logout was sent, not swallowed
+    expect(r.ui.session).toBe('out');
+    expect(r.ui.day).toBeNull();
+    expect(r.controller.isFenced()).toBe(true);
+    expect(r.log.wipes.at(-1)).toEqual({ only: 'u2' });
+  });
+
+  it("B can sign out while A's logout request is STILL on its way (before any deadline)", async () => {
+    const r = rig();
+    r.setQueue([]);
+    const pending: AbortSignal[] = [];
+    r.hooks.logout = (signal) => {
+      pending.push(signal);
+      return new Promise(() => undefined);
+    };
+    vi.useFakeTimers();
+    void r.session.signOut();
+    await vi.advanceTimersByTimeAsync(10);
+    r.setOwner('u2');
+    r.hooks.session = async () => ({ userId: 'u2', label: 'day-2' });
+    await r.session.signedIn();
+    const second = r.session.signOut();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(r.log.logouts).toBe(2);
+    expect(r.ui.session).toBe('out');
+    expect(pending[0]?.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(6_001);
+    await second;
+    expect(pending.every((s) => s.aborted)).toBe(true); // each request has its own deadline and was aborted
+  });
+
+  it('a second press in the same generation joins the running sign-out instead of starting another', async () => {
+    const r = rig({ confirm: true });
+    const gate = deferred();
+    r.hooks.post = async () => {
+      await gate.promise;
+      return { status: 200, ok: true, json: async () => ({ outcomes: [] }) };
+    };
+    const a = r.session.signOut();
+    const b = r.session.signOut();
+    gate.resolve();
+    await Promise.all([a, b]);
+    expect(r.log.logouts).toBe(1);
+    expect(r.log.confirms.length).toBeLessThanOrEqual(1);
+  });
+
+  it('the sign-in form waits for a logout on its way; a late answer therefore cannot follow a new login', async () => {
+    const r = rig();
+    r.setQueue([]);
+    const answer = deferred();
+    const order: string[] = [];
+    r.hooks.logout = async () => {
+      await answer.promise;
+      order.push('logout-answered');
+    };
+    void r.session.signOut();
+    await tick();
+    const settled = r.session.logoutsSettled().then(() => order.push('login-may-start'));
+    await tick();
+    expect(order).toEqual([]); // the login is held back
+    answer.resolve();
+    await settled;
+    expect(order).toEqual(['logout-answered', 'login-may-start']);
+  });
+
+  it('a logout that never answers is aborted at its deadline and releases the sign-in form', async () => {
+    const r = rig();
+    r.setQueue([]);
+    let seen: AbortSignal | undefined;
+    r.hooks.logout = (signal) => {
+      seen = signal;
+      return new Promise(() => undefined);
+    };
+    vi.useFakeTimers();
+    void r.session.signOut();
+    await vi.advanceTimersByTimeAsync(10);
+    let released = false;
+    void r.session.logoutsSettled().then(() => void (released = true));
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(released).toBe(false);
+    expect(seen?.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(1_100);
+    expect(seen?.aborted).toBe(true);
+    expect(released).toBe(true);
   });
 });

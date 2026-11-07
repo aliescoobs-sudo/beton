@@ -35,6 +35,8 @@ const DEVICE_KEY = 'bb_field_device';
 const SESSION_READ_TIMEOUT_MS = 10_000;
 /** R14-06: the whole last send of a sign-out may take this long; the screen is never held longer by a stuck network or storage. */
 const SIGN_OUT_DEADLINE_MS = 8_000;
+// R15A-01: the logout request is aborted after this; a new sign-in waits for it (at most this long) so an old answer cannot clear a new cookie.
+const LOGOUT_DEADLINE_MS = 6_000;
 
 /**
  * F07: the site address is shown as text with a copy button; nothing is sent to a third party. The external map link only
@@ -245,8 +247,9 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
         },
       },
       confirmPending: (count) => window.confirm(t('signOutPending', { count })),
-      logoutRequest: () => fetch('/api/field/logout', { method: 'POST' }),
+      logoutRequest: (signal) => fetch('/api/field/logout', { method: 'POST', signal }),
       drainDeadlineMs: SIGN_OUT_DEADLINE_MS,
+      logoutDeadlineMs: LOGOUT_DEADLINE_MS,
     });
     return sessionRef.current;
   }, [getController, saveQueue, t]);
@@ -391,6 +394,8 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     setMessage(null);
+    // R15A-01: no sign-in is sent while an older logout request is still on its way (bounded by its own deadline, then aborted).
+    await getSession().logoutsSettled();
     const res = await fetch('/api/field/login', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

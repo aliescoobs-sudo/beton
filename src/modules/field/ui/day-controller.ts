@@ -191,6 +191,7 @@ export function createDayController<D extends { userId: string }>(ports: DayPort
     unfence,
     signedIn,
     isFenced: () => fenced,
+    generation: () => generation,
     epoch: () => epoch,
   };
 }
