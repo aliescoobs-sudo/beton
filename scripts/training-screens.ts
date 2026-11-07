@@ -4,11 +4,15 @@
 // training mode, signs in as each account with the credentials the seed just issued (read in memory from a private temporary file that is
 // deleted afterwards, never written to an image or printed), and saves PNGs at 390x844, device scale factor 2. Only pages AFTER sign-in are
 // photographed, so no password or PIN is ever on screen. Fictitious data only.
+// R14-14: every page is asserted to have LOADED (a status below 400, the address asked for, not a 404 or a redirect to the sign-in) before it is
+// photographed, and the script fails otherwise; every image carries a visible "fictif" label; the seed's realistic first names for drivers are
+// replaced, in the picture only, by unambiguous invented labels ("Chauffeur fictif A") so that no image reads as a named worker's record.
 import { spawn } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { chromium } from '@playwright/test';
+import { chromium, type Page } from '@playwright/test';
+import pg from 'pg';
 import { TRAINING_TEST_DATABASE, ensureRoles, recreateDatabase } from './db-bootstrap';
 import { runMigrations } from './db-migrate';
 import { seedTraining } from './seed-training';
@@ -49,17 +53,19 @@ const SHOTS: { key: string; label: RegExp; pages: [string, string][] }[] = [
   {
     key: 'ventes',
     label: /^Bureau ventes/,
+    // The sales office reads orders without money (the chain) and writes quotes; the money lists are the owner's.
     pages: [
-      ['orders', '/fr/orders'],
-      ['quotes', '/fr/quotes'],
+      ['orders-chain', '/fr/orders/chain'],
+      ['quotes-new', '/fr/quotes/new'],
     ],
   },
   {
     key: 'achats',
     label: /^Bureau achats/,
+    // The purchasing office writes purchases and sees the plant's receipts; the money list and the stock board are not its pages.
     pages: [
-      ['purchases', '/fr/purchases'],
-      ['stock', '/fr/stock'],
+      ['purchases-new', '/fr/purchases/new'],
+      ['receipts', '/fr/receipts'],
     ],
   },
   {
@@ -94,8 +100,54 @@ const SHOTS: { key: string; label: RegExp; pages: [string, string][] }[] = [
       ['approvals', '/fr/approvals'],
     ],
   },
-  { key: 'admin', label: /^Administrateur/, pages: [['admin', '/fr/admin']] },
+  { key: 'admin', label: /^Administrateur/, pages: [['users', '/fr/admin/users']] },
 ];
+
+/** The label every image carries, in French and in Arabic. */
+const FICTION_LABEL = 'FICTIF · données inventées pour la formation / بيانات وهمية للتدريب';
+
+/**
+ * Makes the page ready to be photographed: replaces the seed's driver first names by invented labels (in the picture only; the database
+ * keeps its data) and adds the visible fiction label. `into` = a selector: the label is put at the top of that element (a crop); without
+ * it, as a fixed bar at the top of the page.
+ */
+async function prepareShot(page: Page, driverNames: string[], into?: string): Promise<void> {
+  await page.evaluate(
+    ({ names, label, into: target }) => {
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      const nodes: Text[] = [];
+      for (let n = walker.nextNode(); n; n = walker.nextNode()) nodes.push(n as Text);
+      names.forEach((name, i) => {
+        const fake = `Chauffeur fictif ${String.fromCharCode(65 + (i % 26))}`;
+        for (const node of nodes) if (node.data.includes(name)) node.data = node.data.split(name).join(fake);
+      });
+      const bar = document.createElement('div');
+      bar.setAttribute('data-testid', 'fiction-label');
+      bar.textContent = label;
+      bar.style.cssText =
+        'background:#b00020;color:#fff;font:700 11px/22px sans-serif;text-align:center;direction:ltr;' +
+        (target ? '' : 'position:fixed;top:0;left:0;right:0;z-index:2147483647;');
+      const host = target ? document.querySelector(target) : null;
+      if (host) host.prepend(bar);
+      else document.body.append(bar);
+    },
+    { names: driverNames, label: FICTION_LABEL, into },
+  );
+}
+
+/** Goes to a page and fails unless it really loaded: a status below 400, and the address asked for (not a 404, not a redirect to sign-in). */
+async function openPage(page: Page, url: string): Promise<void> {
+  const response = await page.goto(url);
+  if (!response || response.status() >= 400)
+    throw new Error(`screenshot page ${url} answered ${response?.status() ?? 'nothing'}`);
+  await page.waitForLoadState('networkidle').catch(() => undefined);
+  const landed = new URL(page.url());
+  if (landed.pathname !== new URL(url).pathname)
+    throw new Error(`screenshot page ${url} landed on ${landed.pathname}`);
+  // Next.js serves its not-found page with the layout around it: look for it as well.
+  if (await page.locator('text=/^404$|This page could not be found/').count())
+    throw new Error(`screenshot page ${url} is a 404 page`);
+}
 
 async function main() {
   process.env.E2E_TEST_RUNNER ??= 'training-screens'; // R14-13: the positive runner signal the throwaway-database seed escape needs
@@ -116,6 +168,14 @@ async function main() {
       credentialsFile,
     });
     const creds = parseCredentials(readFileSync(credentialsFile, 'utf8'));
+    // The drivers' names as the seed made them, longest first so that no name hides inside another.
+    const namesPool = new pg.Pool({ connectionString: env.DATABASE_URL_MIGRATOR, max: 1 });
+    const driverNames = (
+      await namesPool.query<{ name: string }>(`select name from driver order by code`)
+    ).rows
+      .map((r) => r.name)
+      .sort((a, b) => b.length - a.length);
+    await namesPool.end();
 
     server = spawn(
       process.execPath,
@@ -174,11 +234,15 @@ async function main() {
         await page.click('button[type=submit]');
         await page.waitForURL(`${BASE}/fr`, { timeout: 30_000 });
         for (const [name, url] of shot.pages) {
-          await page.goto(`${BASE}${url}`);
-          await page.waitForLoadState('networkidle').catch(() => undefined);
+          await openPage(page, `${BASE}${url}`);
+          await prepareShot(page, driverNames);
           await page.screenshot({ path: `${OUT}/${shot.key}-${name}.png` });
-          if (name === 'dispatch' && (await page.getByTestId('timing-board').count()))
+          if (name === 'dispatch' && (await page.getByTestId('timing-board').count())) {
+            // the crop has its own label, inside the element (the page's fixed bar is not part of an element screenshot)
+            await page.getByTestId('fiction-label').evaluate((el) => el.remove());
+            await prepareShot(page, [], '[data-testid=timing-board]');
             await page.getByTestId('timing-board').screenshot({ path: `${OUT}/${shot.key}-timing.png` });
+          }
         }
         await ctx.close();
       }
@@ -198,6 +262,7 @@ async function main() {
         await page.getByTestId('field-signin').click();
         await page.getByTestId('field-day').waitFor({ timeout: 30_000 });
         await page.waitForLoadState('networkidle').catch(() => undefined);
+        await prepareShot(page, driverNames);
         await page.screenshot({ path: `${OUT}/${key}-day.png` });
         await ctx.close();
       }
