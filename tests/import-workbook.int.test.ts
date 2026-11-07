@@ -25,6 +25,7 @@ let owner: SessionUser;
 let stepped: SessionUser;
 const tag = randomUUID().replace(/-/g, '').slice(0, 6).toUpperCase();
 const fakeIce = () => String(Math.floor(Math.random() * 9e14) + 1e14);
+const CLIENT_ICE = fakeIce(); // one ICE for the run's client: a repeat of the row must say the same thing (R14-08)
 const map = (sheet: string, kind: SheetMapping['kind']): SheetMapping => ({
   version: 1,
   sheet,
@@ -74,7 +75,7 @@ const sheets = (over: Partial<Record<string, (string | number)[][]>> = {}) =>
       name: 'Clients',
       rows: [
         ['Nom', 'Type', 'ICE', 'Téléphone'],
-        [CLIENT, 'company', fakeIce(), '0600000000'],
+        [CLIENT, 'company', CLIENT_ICE, '0600000000'],
       ],
     },
     {
@@ -266,7 +267,7 @@ describe('the real run', () => {
       file({
         Clients: [
           ['Nom', 'Type', 'ICE'],
-          [CLIENT, 'person', ''],
+          [CLIENT, 'company', CLIENT_ICE],
           [extra, 'person', ''],
         ],
       }),

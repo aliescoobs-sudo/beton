@@ -11,6 +11,7 @@ import {
   createTruck,
   listClients,
   listComponents,
+  listPurchaseUnits,
   listConcreteTypes,
   listPlants,
   listRecetteVersions,
@@ -256,14 +257,20 @@ async function plan(
 
   if (kind === 'concrete_types') {
     const records = rawRecords.map((r) => ({ row: r.row, values: full('concrete_types', r.values) }));
-    const have = new Set((await listConcreteTypes(appPool, actor)).map((t) => t.code));
+    const have = new Map((await listConcreteTypes(appPool, actor)).map((t) => [t.code, t]));
     const seen = new Set<string>();
     for (const { row, values: v } of records) {
       const input = { code: v.code, label: v.label };
       const parsed = parseConcreteTypeInput(input);
       if (!parsed.ok) planned.push({ row, label: v.code, error: 'invalid code or label' });
-      else if (have.has(parsed.value.code)) planned.push({ row, label: parsed.value.code, exists: true });
-      else if (seen.has(parsed.value.code))
+      else if (have.has(parsed.value.code)) {
+        const d = differences([['label', parsed.value.label, have.get(parsed.value.code)?.label]]);
+        planned.push(
+          d.length
+            ? { row, label: parsed.value.code, error: conflictMessage(d) }
+            : { row, label: parsed.value.code, exists: true },
+        );
+      } else if (seen.has(parsed.value.code))
         planned.push({ row, label: parsed.value.code, error: 'twice in the file' });
       else {
         seen.add(parsed.value.code);
@@ -280,7 +287,7 @@ async function plan(
   } else if (kind === 'clients') {
     const records = rawRecords.map((r) => ({ row: r.row, values: full('clients', r.values) }));
     const existing = await listClients(appPool, actor);
-    const names = new Set(existing.map((c) => c.name.trim().toLowerCase()));
+    const names = new Map(existing.map((c) => [c.name.trim().toLowerCase(), c]));
     const ices = new Set(existing.flatMap((c) => (c.ice ? [c.ice] : [])));
     const seenN = new Set<string>();
     const seenI = new Set<string>();
@@ -302,8 +309,20 @@ async function plan(
           label: v.name,
           error: 'invalid row (name, type company/person, ICE 15 digits for a company, terms in days)',
         });
-      else if (names.has(key)) planned.push({ row, label: v.name, exists: true });
-      else if (seenN.has(key)) planned.push({ row, label: v.name, error: 'twice in the file' });
+      else if (names.has(key)) {
+        const e = names.get(key)!;
+        const d = differences([
+          ['type', parsed.value.kind, e.kind],
+          ['ICE', parsed.value.ice, e.ice],
+          ['phone', parsed.value.phone, e.phone],
+          ['contact', parsed.value.contactName, e.contactName],
+          ['payment terms', v.terms === '' ? null : parsed.value.paymentTermsDays, e.paymentTermsDays],
+          ['notes', parsed.value.notes, e.notes],
+        ]);
+        planned.push(
+          d.length ? { row, label: v.name, error: conflictMessage(d) } : { row, label: v.name, exists: true },
+        );
+      } else if (seenN.has(key)) planned.push({ row, label: v.name, error: 'twice in the file' });
       else if (parsed.value.ice && (ices.has(parsed.value.ice) || seenI.has(parsed.value.ice)))
         planned.push({ row, label: v.name, error: 'this ICE belongs to another client' });
       else {
@@ -322,7 +341,7 @@ async function plan(
   } else if (kind === 'suppliers') {
     const records = rawRecords.map((r) => ({ row: r.row, values: full('suppliers', r.values) }));
     const existing = await listSuppliers(appPool, actor);
-    const names = new Set(existing.map((s) => s.name.trim().toLowerCase()));
+    const names = new Map(existing.map((s) => [s.name.trim().toLowerCase(), s]));
     const seen = new Set<string>();
     for (const { row, values: v } of records) {
       const category = v.category.trim().toLowerCase();
@@ -341,8 +360,19 @@ async function plan(
           label: v.name,
           error: `category must be one of ${SUPPLIER_CATEGORIES.join(', ')}`,
         });
-      } else if (names.has(key)) planned.push({ row, label: v.name, exists: true });
-      else if (seen.has(key)) planned.push({ row, label: v.name, error: 'twice in the file' });
+      } else if (names.has(key)) {
+        const e = names.get(key)!;
+        const d = differences([
+          ['category', category, e.category],
+          ['ICE', input.ice, e.ice],
+          ['phone', input.phone, e.phone],
+          ['payment terms', input.paymentTermsDays, e.paymentTermsDays],
+          ['lead time', input.leadTimeDays, e.leadTimeDays],
+        ]);
+        planned.push(
+          d.length ? { row, label: v.name, error: conflictMessage(d) } : { row, label: v.name, exists: true },
+        );
+      } else if (seen.has(key)) planned.push({ row, label: v.name, error: 'twice in the file' });
       else {
         seen.add(key);
         planned.push({
@@ -357,7 +387,12 @@ async function plan(
     }
   } else if (kind === 'trucks' || kind === 'pumps') {
     const records = rawRecords.map((r) => ({ row: r.row, values: full(kind, r.values) }));
-    const have = new Set((await listTrucks(appPool, actor)).flatMap((t) => [t.code, t.plate.toUpperCase()]));
+    const haveByKey = new Map<string, Awaited<ReturnType<typeof listTrucks>>[number]>();
+    for (const t of await listTrucks(appPool, actor)) {
+      haveByKey.set(t.code, t);
+      haveByKey.set(t.plate.toUpperCase(), t);
+    }
+    const have = { has: (k: string) => haveByKey.has(k) };
     const plants = new Map(
       (await listPlants(appPool, actor)).filter((p) => p.status === 'active').map((p) => [p.code, p.id]),
     );
@@ -384,9 +419,19 @@ async function plan(
         planned.push({ row, label: v.code, error: 'capacity in m³ between 1 and 30' });
       else if (!parsed.ok)
         planned.push({ row, label: v.code, error: 'invalid code (T1, P1, X1 by kind), plate or kind' });
-      else if (have.has(parsed.value.code) || have.has(plate))
-        planned.push({ row, label: v.code, exists: true });
-      else if (seen.has(parsed.value.code) || seen.has(plate))
+      else if (have.has(parsed.value.code) || have.has(plate)) {
+        const e = haveByKey.get(parsed.value.code) ?? haveByKey.get(plate)!;
+        const d = differences([
+          ['code', parsed.value.code, e.code],
+          ['plate', plate, e.plate.toUpperCase().replace(/\s+/g, ' ')],
+          ['kind', parsed.value.kind, e.kind],
+          ['capacity', cap && cap.ok ? cap.value : null, e.capacityL],
+          ['plant', plantId, e.plantId],
+        ]);
+        planned.push(
+          d.length ? { row, label: v.code, error: conflictMessage(d) } : { row, label: v.code, exists: true },
+        );
+      } else if (seen.has(parsed.value.code) || seen.has(plate))
         planned.push({ row, label: v.code, error: 'twice in the file' });
       else {
         seen.add(parsed.value.code);
@@ -433,9 +478,13 @@ async function plan(
         });
       else if (
         existing.some((p) => p.concreteTypeId === typeId && p.plantId === plantId && p.effectiveFrom === from)
-      )
-        planned.push({ row, label, exists: true });
-      else if (seen.has(key)) planned.push({ row, label, error: 'twice in the file' });
+      ) {
+        const e = existing.find(
+          (p) => p.concreteTypeId === typeId && p.plantId === plantId && p.effectiveFrom === from,
+        )!;
+        const d = differences([['price', amount.value, e.priceHtPerM3Centimes]]);
+        planned.push(d.length ? { row, label, error: conflictMessage(d) } : { row, label, exists: true });
+      } else if (seen.has(key)) planned.push({ row, label, error: 'twice in the file' });
       else {
         seen.add(key);
         planned.push({
@@ -456,7 +505,8 @@ async function plan(
   } else if (kind === 'components') {
     const records = rawRecords.map((r) => ({ row: r.row, values: full('components', r.values) }));
     const existing = await listComponents(appPool, actor);
-    const names = new Set(existing.map((c) => c.nameFr.trim().toLowerCase()));
+    const names = new Map(existing.map((c) => [c.nameFr.trim().toLowerCase(), c]));
+    const purchaseUnits = await listPurchaseUnits(appPool, actor);
     const seen = new Set<string>();
     for (const { row, values: v } of records) {
       const unit = BASE_UNITS.find((u) => u.toLowerCase() === v.unit.trim().toLowerCase());
@@ -473,8 +523,29 @@ async function plan(
           label: v.nameFr,
           error: `content of the purchase unit: a whole number of ${unit}`,
         });
-      else if (names.has(key)) planned.push({ row, label: v.nameFr, exists: true });
-      else if (seen.has(key)) planned.push({ row, label: v.nameFr, error: 'twice in the file' });
+      else if (names.has(key)) {
+        const e = names.get(key)!;
+        const mine = purchaseUnits.filter((u) => u.componentId === e.id && u.status === 'active');
+        const d = differences([
+          ['Arabic name', nul(v.nameAr), e.nameAr],
+          ['base unit', unit, e.baseUnit],
+          [
+            'purchase unit',
+            v.purchaseUnit,
+            mine.length === 1 ? mine[0]!.label : mine.length === 0 ? '' : '(several)',
+          ],
+          [
+            'purchase unit content',
+            v.factor === '' ? null : factor,
+            mine.length === 1 ? mine[0]!.factorToBase : null,
+          ],
+        ]);
+        planned.push(
+          d.length
+            ? { row, label: v.nameFr, error: conflictMessage(d) }
+            : { row, label: v.nameFr, exists: true },
+        );
+      } else if (seen.has(key)) planned.push({ row, label: v.nameFr, error: 'twice in the file' });
       else {
         seen.add(key);
         planned.push({
@@ -578,8 +649,17 @@ async function plan(
       const versions = (await listRecetteVersions(appPool, actor, g.typeId)).filter(
         (x) => (x.plantId ?? null) === g.plantId,
       );
-      if (versions.some((x) => x.effectiveFrom === g.from)) planned.push({ row: g.row, label, exists: true });
-      else if (versions.some((x) => x.effectiveFrom > g.from))
+      const same = versions.find((x) => x.effectiveFrom === g.from);
+      if (same) {
+        const mine = new Map(g.lines.map((l) => [l.componentId, l.qtyPerM3]));
+        const theirs = new Map(same.lines.map((l) => [l.componentId, l.qtyPerM3]));
+        const identical = mine.size === theirs.size && [...mine].every(([id, q]) => theirs.get(id) === q);
+        planned.push(
+          identical
+            ? { row: g.row, label, exists: true }
+            : { row: g.row, label, error: conflictMessage(['the lines of the recipe']) },
+        );
+      } else if (versions.some((x) => x.effectiveFrom > g.from))
         planned.push({
           row: g.row,
           label,
@@ -607,11 +687,10 @@ async function plan(
       clients.set(c.code.toLowerCase(), c.id);
       clients.set(c.name.trim().toLowerCase(), c.id);
     }
-    const have = new Set(
-      (await listInstruments(appPool, actor))
-        .filter((i) => i.direction === 'in')
-        .map((i) => `${i.partyId}|${(i.number ?? '').toLowerCase()}|${(i.bank ?? '').toLowerCase()}`),
-    );
+    const haveByKey = new Map<string, Awaited<ReturnType<typeof listInstruments>>[number]>();
+    for (const i of (await listInstruments(appPool, actor)).filter((x) => x.direction === 'in'))
+      haveByKey.set(`${i.partyId}|${(i.number ?? '').toLowerCase()}|${(i.bank ?? '').toLowerCase()}`, i);
+    const have = { has: (k: string) => haveByKey.has(k) };
     const seen = new Set<string>();
     for (const { row, values: v } of records) {
       const clientId = clients.get(v.client.trim().toLowerCase());
@@ -639,8 +718,15 @@ async function plan(
           label,
           error: `date not understood or ambiguous (expected ${ctx.dateFormat ?? 'dmy'})`,
         });
-      else if (have.has(key)) planned.push({ row, label, exists: true });
-      else if (seen.has(key)) planned.push({ row, label, error: 'twice in the file' });
+      else if (have.has(key)) {
+        const e = haveByKey.get(key)!;
+        const d = differences([
+          ['amount', amount.value, e.amountCentimes],
+          ['type', method, e.method],
+          ['written date', written, e.writtenDate],
+        ]);
+        planned.push(d.length ? { row, label, error: conflictMessage(d) } : { row, label, exists: true });
+      } else if (seen.has(key)) planned.push({ row, label, error: 'twice in the file' });
       else {
         seen.add(key);
         planned.push({
@@ -711,7 +797,8 @@ async function plan(
       suppliers.set(x.code.toLowerCase(), x.id);
       suppliers.set(x.name.trim().toLowerCase(), x.id);
     }
-    const has = new Set(state.parties.map((p) => `${p.kind}:${p.partyId}`));
+    const has = new Map(state.parties.map((p) => [`${p.kind}:${p.partyId}`, p]));
+    const seenInFile = new Set<string>();
     if (!date) {
       return {
         planned: records.map((r) => ({
@@ -739,9 +826,21 @@ async function plan(
           label: v.code,
           error: `amount in MAD: ${amount.ok ? 'must be above zero' : amount.reason}`,
         });
-      else if (has.has(`${party}:${id}`)) planned.push({ row, label: v.code, exists: true });
-      else {
-        has.add(`${party}:${id}`);
+      else if (seenInFile.has(`${party}:${id}`))
+        // R14-08: a second row for the same party in one workbook is a conflict, never an "already there"
+        planned.push({ row, label: v.code, error: 'this party has two opening-balance rows in the file' });
+      else if (has.has(`${party}:${id}`)) {
+        seenInFile.add(`${party}:${id}`);
+        const e = has.get(`${party}:${id}`)!;
+        const d = differences([
+          ['amount', amount.value, e.amountCentimes],
+          ['reference', nul(v.reference), e.reference],
+        ]);
+        planned.push(
+          d.length ? { row, label: v.code, error: conflictMessage(d) } : { row, label: v.code, exists: true },
+        );
+      } else {
+        seenInFile.add(`${party}:${id}`);
         const first = !dateDone;
         dateDone = true;
         planned.push({
@@ -765,6 +864,18 @@ async function plan(
   }
   return { planned, missing: [] };
 }
+
+/**
+ * R14-08: "already there" means the SAME payload, not just the same key. These are the names of the fields in which what the file says
+ * differs from the record that exists. Only what the row actually says is compared (a blank cell is "not said", not "empty"), and
+ * only field NAMES are returned, never a value.
+ */
+function differences(pairs: [name: string, fromFile: unknown, existing: unknown][]): string[] {
+  const norm = (v: unknown) => (v === null || v === undefined ? '' : String(v).trim().toLowerCase());
+  return pairs.filter(([, a, b]) => norm(a) !== '' && norm(a) !== norm(b)).map(([n]) => n);
+}
+const conflictMessage = (fields: string[]) =>
+  `conflicts with the record already there (it differs in: ${fields.join(', ')}): the file is blocked, nothing is skipped silently`;
 
 function tally(rows: ImportRow[]): ImportReport['counts'] {
   const counts = { new: 0, exists: 0, error: 0, created: 0, failed: 0 };

@@ -12,6 +12,11 @@ export interface SyntheticOptions {
   prefix?: string;
   /** Two existing plant codes (2 to 8 letters). */
   plants?: [string, string];
+  /**
+   * The number of the first truck code (T<n>, T<n+1>, P<n>; default 1). A database that already has trucks with these codes and other
+   * plates answers a CONFLICT (R14-08: it no longer skips them as "already there"), so a rehearsal into such a database picks free numbers.
+   */
+  truckNo?: number;
 }
 
 // 15 digits starting 999 (no real company has one); the next three digits come from the prefix, so two prefixes never share an ICE
@@ -59,12 +64,12 @@ function sheets(o: Required<SyntheticOptions>): Record<string, Rows> {
     ],
     Camions: [
       ['Code', 'Immatriculation', 'Capacité', 'Type', 'Centrale'],
-      ['T1', `FICTIF-${o.prefix}-1`, '8', 'malaxeur', pa],
-      ['T2', `FICTIF-${o.prefix}-2`, '8', 'malaxeur', pb],
+      [`T${o.truckNo}`, `FICTIF-${o.prefix}-1`, '8', 'malaxeur', pa],
+      [`T${o.truckNo + 1}`, `FICTIF-${o.prefix}-2`, '8', 'malaxeur', pb],
     ],
     Pompes: [
       ['Code', 'Immatriculation'],
-      ['P1', `FICTIF-${o.prefix}-P1`],
+      [`P${o.truckNo}`, `FICTIF-${o.prefix}-P1`],
     ],
     Prix: [
       ['Type', 'Prix HT', 'À partir du', 'Centrale'],
@@ -131,7 +136,7 @@ function problemSheets(o: Required<SyntheticOptions>): Record<string, Rows> {
     ],
     Camions: [
       ['Code', 'Immatriculation', 'Capacité', 'Type'],
-      ['T1', `FICTIF-${o.prefix}-1`, '99', 'malaxeur'],
+      [`T${o.truckNo}`, `FICTIF-${o.prefix}-1`, '99', 'malaxeur'],
     ],
     Prix: [
       ['Type', 'Prix HT', 'À partir du'],
@@ -167,6 +172,7 @@ const book = (s: Record<string, Rows>) =>
 const withDefaults = (o: SyntheticOptions): Required<SyntheticOptions> => ({
   prefix: o.prefix ?? 'FK',
   plants: o.plants ?? ['FAKEONE', 'FAKETWO'],
+  truckNo: o.truckNo ?? 1,
 });
 
 /** A complete, valid book with every sheet. */

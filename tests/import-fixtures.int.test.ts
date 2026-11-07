@@ -35,6 +35,8 @@ const letters = (n: number, from = 0) =>
 const prefix = `F${letters(2)}`;
 const plants: [string, string] = [`QA${letters(4)}`, `QB${letters(4, 1)}`];
 let stepped: SessionUser;
+// free truck numbers (T<n>, T<n+1>, P<n>): the shared test database already has trucks, and an existing code with another plate is a conflict now
+let truckNo = 500;
 const count = async (table: string, where = 'true') =>
   Number(
     (await migrator.query<{ n: string }>(`select count(*)::text as n from ${table} where ${where}`)).rows[0]
@@ -55,13 +57,22 @@ const go = (file: Buffer, mode: 'dry-run' | 'apply') =>
 beforeAll(async () => {
   stepped = { ...(await realSessionUser(env.DATABASE_URL_MIGRATOR, 'owner')), stepUpVerified: true };
   for (const code of plants) await createPlant(app, stepped, { code, name: `Centrale fictive ${code}` });
+  for (; truckNo < 990; truckNo += 3)
+    if (
+      (
+        await migrator.query('select 1 from truck where code = any($1)', [
+          [`T${truckNo}`, `T${truckNo + 1}`, `P${truckNo}`],
+        ])
+      ).rowCount === 0
+    )
+      break;
 });
 
 describe('the synthetic books', () => {
   it('say FICTIF everywhere: no real-looking name, ICE or phone', () => {
     for (const buf of [
-      syntheticValidWorkbook({ prefix, plants }),
-      syntheticProblemWorkbook({ prefix, plants }),
+      syntheticValidWorkbook({ prefix, plants, truckNo }),
+      syntheticProblemWorkbook({ prefix, plants, truckNo }),
     ]) {
       const cells = readWorkbook(buf).flatMap((s) => s.rows.flat());
       expect(cells.filter((c) => /^\d{15}$/.test(c)).every((c) => c.startsWith('999'))).toBe(true);
@@ -72,7 +83,7 @@ describe('the synthetic books', () => {
 });
 
 describe('the valid book', () => {
-  const valid = syntheticValidWorkbook({ prefix, plants });
+  const valid = syntheticValidWorkbook({ prefix, plants, truckNo });
   it('passes the dry run, writes everything on the real run, and does nothing the second time', async () => {
     const dry = await go(valid, 'dry-run');
     expect(formatWorkbookReport(dry)).toContain('errors 0');

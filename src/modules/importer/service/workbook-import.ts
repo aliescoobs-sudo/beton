@@ -67,6 +67,13 @@ export interface WorkbookOptions {
   today?: string;
 }
 
+/**
+ * R14-08: ONE import (or rollback) at a time. A transaction-level advisory lock, taken right after BEGIN and released by the COMMIT or
+ * ROLLBACK, so that the "was this file already imported" check and everything planned from the records that exist are read AFTER any
+ * earlier run has committed. Two simultaneous runs of the same file therefore cannot both create the same new client.
+ */
+const IMPORT_LOCK_SQL = `select pg_advisory_xact_lock(hashtextextended('belgobeton:excel-import', 0))`;
+
 const IMPORT_ROLES: readonly string[] = ['owner', 'app_admin'];
 const sha256 = (buf: Buffer) => createHash('sha256').update(buf).digest('hex');
 
@@ -156,6 +163,7 @@ export async function importWorkbook(opts: WorkbookOptions): Promise<WorkbookRep
   let ended = false;
   try {
     await client.query('BEGIN');
+    await client.query(IMPORT_LOCK_SQL);
     const pool = singleTransactionPool(client, runId);
 
     // idempotency: the same bytes, already imported and not rolled back
@@ -312,6 +320,7 @@ export async function rollbackImport(opts: {
   let ended = false;
   try {
     await client.query('BEGIN');
+    await client.query(IMPORT_LOCK_SQL);
     const pool = singleTransactionPool(client, rollbackId);
     await withRlsContext(pool, auditContext(opts.actor), async (tx) => {
       const ran = await tx.query(
