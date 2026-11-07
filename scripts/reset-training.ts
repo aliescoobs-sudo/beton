@@ -6,7 +6,7 @@ import pg from 'pg';
 import { ensureDatabase, superuserUrl } from './db-bootstrap.ts';
 import { runMigrations } from './db-migrate.ts';
 import { seedTraining } from './seed-training.ts';
-import { databaseNameOf, hasBirthRow, isTestRunnerDatabase, mintBirthToken } from './training-birth.ts';
+import { databaseNameOf, hasBoundBirthRow, isTestRunnerDatabase, mintBirthToken } from './training-birth.ts';
 
 export async function wipeTrainingDatabase(
   env: Parameters<typeof superuserUrl>[0] & {
@@ -21,11 +21,12 @@ export async function wipeTrainingDatabase(
     throw new Error(
       'Refusing to wipe: this needs TRAINING_MODE=true, APP_ENV not production and REAL_DATA off.',
     );
-  // ...and a birth row of THIS database on this cluster (spent or not): a marked database restored on a cluster that never had one
-  // cannot be reset here. A throwaway test database of a test runner is the only exception.
-  if (!isTestRunnerDatabase(env.DATABASE_URL_MIGRATOR) && !(await hasBirthRow(env, database)))
+  // ...and a birth row BOUND to this database on this cluster (spent or not): a marked database restored on a cluster that never had one,
+  // or a row of an earlier version that names no database (R15A-07), cannot be reset here. A throwaway test database of a test runner is the
+  // only exception. The operator can bind a legacy row by hand once they have verified the volume is dedicated (CP-TRAINING.md).
+  if (!isTestRunnerDatabase(env.DATABASE_URL_MIGRATOR) && !(await hasBoundBirthRow(env, database)))
     throw new Error(
-      `Refusing to wipe "${database}": this cluster has no birth row for it (it was not born through the stock training path). Remove the volume and start again.`,
+      `Refusing to wipe "${database}": this cluster has no birth row bound to it (no row, or a row that names no database or another one: it was not born through the stock training path, or by an earlier version). Remove the volume and start again. If you have verified that this volume is dedicated to this one database, you may bind the row yourself (see CP-TRAINING.md, step 7).`,
     );
   const migrator = new pg.Pool({ connectionString: env.DATABASE_URL_MIGRATOR, max: 1 });
   try {

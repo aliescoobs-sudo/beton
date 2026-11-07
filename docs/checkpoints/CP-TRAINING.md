@@ -78,8 +78,11 @@ Nothing here is done for you, and no token or password is ever pasted anywhere b
    every table of `public` and `finance` must have an empty heap file, or be read exactly with the maintenance login not subject to row-level security; a table that has been
    written to and whose rows row-level security may hide from that login **fails closed**. An OLD training volume cannot be seeded again: remove it
    (`./scripts/training/dc.sh down -v`, which also erases the accounts file and the file store) and run `training-up.sh` again. `reset:training` is the operator's own reset of a
-   database that carries the training marker; the helper itself checks the mode (training on, not production, real data off) and that the cluster has a birth row for that
-   database, and then mints a new marker bound to it. The only skip of the marker is for the throwaway test databases and needs a positive test-runner signal as well as the
+   database that carries the training marker; the helper itself checks the mode (training on, not production, real data off) and that the cluster has a birth row **bound to that
+   very database name** (R15A-07: a spent row with no name, made by an earlier version, is refused, because it never identified any database), and then mints a new marker bound to it.
+   Prefer a fresh volume. If you have verified yourself that a legacy volume is dedicated to this one database and want to keep it, you may bind its row deliberately, as the
+   database superuser in the maintenance database `postgres`: `update public.volume_birth set database_name = 'belgobeton_training' where database_name is null;` (add the column first with
+   `alter table public.volume_birth add column if not exists database_name text;` on a very old volume). This is an operator decision, not something any script does for you. The only skip of the marker is for the throwaway test databases and needs a positive test-runner signal as well as the
    database name; no deployed command offers it. Migrations: all of them through 0118, plus the finance ones.
 8. **Local only: nothing is published (R15A-06).** The instance is used on THIS Mac, in its browsers, at `http://localhost:3000`. The app accepts writes only from the exact address in
    `APP_BASE_URL`, and `init-env.sh` writes `http://127.0.0.1:3000` by default: run `./scripts/training/set-url.sh http://localhost:3000` once so that the address you type is the

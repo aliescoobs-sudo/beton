@@ -60,7 +60,7 @@ sur le volume tout neuf : il écrit un *marqueur de naissance*. Le seed de forma
 erreurs courantes (base restaurée ou montée à la main sur une machine sans marqueur, second seed sur le même volume, autre nom de base). **Ce n'est pas une preuve** : c'est un
 marqueur consommable, pas un jeton signé ; une restauration de la base de maintenance, du cluster entier ou d'un instantané disque peut emporter un marqueur *non utilisé* ailleurs.
 **Un seed réussi ne prouve donc pas que le volume est neuf** : vérifie toi-même, hors du code, que le volume est neuf et dédié. Un ancien volume doit être supprimé
-(`./scripts/training/dc.sh down -v`) puis `training-up.sh` relancé ; `reset:training` vérifie lui-même le mode et l'existence d'une ligne de naissance pour cette base. Migrations : toutes, jusqu'à 0118, et celles de la finance.
+(`./scripts/training/dc.sh down -v`) puis `training-up.sh` relancé ; `reset:training` vérifie lui-même le mode et l'existence d'une ligne de naissance **liée au nom exact de cette base** (R15A-07 : une ligne déjà utilisée et sans nom, d'une ancienne version, est refusée). Préfère un volume neuf ; si tu as vérifié toi-même qu'un ancien volume est dédié à cette seule base, tu peux lier la ligne à la main (voir CP-TRAINING.md, étape 7). Migrations : toutes, jusqu'à 0118, et celles de la finance.
 
 **8. Donner à chacun SON compte (jamais la liste entière)**
 `./scripts/training/show-accounts.sh` affiche seulement les **noms** des comptes, sans secret.

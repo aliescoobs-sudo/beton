@@ -55,11 +55,15 @@ export async function hasBirthToken(env: MaintenanceEnv, database: string): Prom
   });
 }
 
-/** True when the cluster has a birth row at all, spent or not, free or bound to this database (nothing is changed). */
-export async function hasBirthRow(env: MaintenanceEnv, database: string): Promise<boolean> {
+/**
+ * True only when the cluster's birth row is BOUND to exactly this database (spent or not; nothing is changed). This is what `reset:training`
+ * asks (R15A-07): a row with no name (made by an earlier version, or never claimed) never identified any database, so it is no evidence about
+ * this one and is refused. The first CLAIM of an unused unbound marker is a different, intentional step (`claimBirthToken`) and is unchanged.
+ */
+export async function hasBoundBirthRow(env: MaintenanceEnv, database: string): Promise<boolean> {
   return withSuperuser(env, async (c) => {
     const row = await readBirth(c);
-    return !!row && (row.database === null || row.database === database);
+    return !!row && row.database === database;
   });
 }
 

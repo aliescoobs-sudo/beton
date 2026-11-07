@@ -8,6 +8,7 @@ import { runMigrations } from '../scripts/db-migrate';
 import { wipeTrainingDatabase } from '../scripts/reset-training';
 import { seedTraining } from '../scripts/seed-training';
 import { armTrainingDay } from '../scripts/training-day';
+import { hasBirthToken, hasBoundBirthRow } from '../scripts/training-birth';
 import { businessDateOf, realClock } from '../src/modules/clock';
 import { getTimingBoard } from '../src/modules/operations';
 import { testEnv } from './db-env';
@@ -193,11 +194,61 @@ describe('reset:training (T1)', () => {
     }
     vi.stubEnv('VITEST', '');
     try {
-      await expect(wipeTrainingDatabase(training)).rejects.toThrow(/no birth row for it/);
+      await expect(wipeTrainingDatabase(training)).rejects.toThrow(/no birth row bound to it/);
     } finally {
       vi.unstubAllEnvs();
     }
     expect(await count(`select count(*) n from training_marker`)).toBe(1);
+  });
+  it('R15A-07: a legacy spent row with no name is refused for reset; only a row bound to this very database passes the birth check', async () => {
+    const sup = new pg.Client({ connectionString: superuserUrl(training, 'postgres') });
+    await sup.connect();
+    try {
+      // the table as an earlier version made it: no name column, spent
+      await sup.query('drop table if exists public.volume_birth');
+      await sup.query(
+        `create table public.volume_birth (only_row boolean primary key default true check (only_row), token uuid not null default gen_random_uuid(), born_at timestamptz not null default now(), consumed_at timestamptz)`,
+      );
+      await sup.query('insert into public.volume_birth (consumed_at) values (now())');
+      vi.stubEnv('VITEST', '');
+      try {
+        await expect(wipeTrainingDatabase(training)).rejects.toThrow(/no birth row bound to it/);
+      } finally {
+        vi.unstubAllEnvs();
+      }
+      expect(await count(`select count(*) n from training_marker`)).toBe(1); // nothing was dropped
+      const row = async (sql: string) => {
+        await sup.query('drop table if exists public.volume_birth');
+        await sup.query(
+          `create table public.volume_birth (only_row boolean primary key default true check (only_row), token uuid not null default gen_random_uuid(), born_at timestamptz not null default now(), consumed_at timestamptz, database_name text)`,
+        );
+        await sup.query(sql);
+        return {
+          mine: await hasBoundBirthRow(training, TRAINING_TEST_DATABASE),
+          unusedFree: await hasBirthToken(training, TRAINING_TEST_DATABASE),
+        };
+      };
+      expect(await row(`insert into public.volume_birth (consumed_at) values (now())`)).toMatchObject({
+        mine: false,
+      }); // spent, no name
+      expect(await row(`insert into public.volume_birth default values`)).toMatchObject({
+        mine: false,
+        unusedFree: true,
+      }); // unused, unbound: still claimable
+      expect(
+        await row(
+          `insert into public.volume_birth (database_name, consumed_at) values ('somewhere_else', now())`,
+        ),
+      ).toMatchObject({ mine: false });
+      expect(
+        await row(
+          `insert into public.volume_birth (database_name, consumed_at) values ('${TRAINING_TEST_DATABASE}', now())`,
+        ),
+      ).toMatchObject({ mine: true });
+    } finally {
+      await sup.query('drop table if exists public.volume_birth');
+      await sup.end();
+    }
   });
   it('refuses to wipe a database that does not carry the training marker', async () => {
     // belgobeton_test is a plain test database: no marker, so it is never dropped
