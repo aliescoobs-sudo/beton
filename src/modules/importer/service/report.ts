@@ -24,6 +24,10 @@ export function formatWorkbookReport(r: WorkbookReport): string {
     lines.push(
       `[${s.sheet}] ${s.kind}: rows ${s.report.rows.length} · new ${c.new + c.created} · already there ${c.exists} · errors ${c.error} · failed ${c.failed}`,
     );
+    if (s.formulaCellsRead > 0)
+      lines.push(
+        `  CACHED FORMULA VALUES USED: ${s.formulaCellsRead} cell(s) were read from the value Excel last stored, not calculated`,
+      );
     if (s.report.missingColumns.length)
       lines.push(`  missing columns: ${s.report.missingColumns.join(', ')}`);
     for (const row of s.report.rows)

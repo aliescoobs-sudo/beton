@@ -91,6 +91,12 @@ const colIndex = (ref: string): number => {
 export interface NamedSheet {
   name: string;
   rows: Sheet;
+  /**
+   * R14-04: how many cells of the sheet hold a FORMULA. The reader never evaluates one; it can only read the value Excel last stored
+   * with it (the "cached" value), which may be stale or wrong. The importer refuses such a sheet unless its mapping says to use the
+   * cached values, and then lists the count in the report.
+   */
+  formulaCells: number;
 }
 
 /** The sheet names in workbook order with the part that holds each, from workbook.xml and its relationships. */
@@ -123,6 +129,15 @@ function sheetParts(buf: Buffer, zip: Map<string, ZipEntry>): { name: string; pa
 /** Every sheet of a workbook with its name, in workbook order. Empty cells are ''. A date cell comes as its serial number. */
 export function readXlsxSheets(buf: Buffer): NamedSheet[] {
   const zip = zipEntries(buf);
+  // R14-04: the workbook's date system. A date cell is a number of days from an origin that depends on it (1899-12-30, or 1904-01-01,
+  // 1462 days later). This reader only knows the first, so a 1904 workbook is refused, never read with the wrong origin.
+  const wbXml = zip.get('xl/workbook.xml') ? readEntry(buf, zip.get('xl/workbook.xml') as ZipEntry) : '';
+  const pr = /<workbookPr\b([^>]*?)\/?>/.exec(wbXml)?.[1] ?? '';
+  const d1904 = /\bdate1904\s*=\s*"([^"]*)"/.exec(pr)?.[1]?.toLowerCase();
+  if (d1904 === '1' || d1904 === 'true')
+    throw new SheetError(
+      'this workbook uses the 1904 date system, which is not supported: in Excel, untick "Use 1904 date system" (File > Options > Advanced) and save it again',
+    );
   const shared = zip.get('xl/sharedStrings.xml');
   const strings = shared
     ? [...readEntry(buf, shared).matchAll(/<si>([\s\S]*?)<\/si>/g)].map((m) => textOf(m[1] ?? ''))
@@ -131,6 +146,7 @@ export function readXlsxSheets(buf: Buffer): NamedSheet[] {
   return sheetParts(buf, zip).map(({ name, part }) => {
     const xml = readEntry(buf, zip.get(part) as ZipEntry);
     const rows: Sheet = [];
+    let formulaCells = 0;
     for (const row of xml.matchAll(/<row\b[^>]*?(?:\/>|>([\s\S]*?)<\/row>)/g)) {
       const line: string[] = [];
       for (const c of (row[1] ?? '').matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
@@ -139,6 +155,7 @@ export function readXlsxSheets(buf: Buffer): NamedSheet[] {
         const ref = /\br="([A-Z]+)\d+"/.exec(attrs)?.[1];
         const type = /\bt="(\w+)"/.exec(attrs)?.[1];
         const body = c[2] ?? '';
+        if (/<f\b/.test(body)) formulaCells++;
         let value = '';
         if (type === 's') value = strings[Number(/<v>(\d+)<\/v>/.exec(body)?.[1])] ?? '';
         else if (type === 'inlineStr') value = textOf(body);
@@ -150,7 +167,7 @@ export function readXlsxSheets(buf: Buffer): NamedSheet[] {
       rows.push(line);
     }
     while (rows.length && rows[rows.length - 1]!.every((v) => v === '')) rows.pop();
-    return { name, rows };
+    return { name, rows, formulaCells };
   });
 }
 
@@ -192,6 +209,8 @@ export function readCsv(text: string): Sheet {
       cell = '';
     } else cell += ch;
   }
+  // R14-04: an opening quote that is never closed swallows the rest of the file into one cell; that is a damaged file, not a value.
+  if (quoted) throw new SheetError('the CSV file has a quote that is never closed');
   if (cell !== '' || row.length) {
     row.push(cell.trim());
     rows.push(row);
@@ -205,7 +224,7 @@ export function readCsv(text: string): Sheet {
 export function readWorkbook(buf: Buffer): NamedSheet[] {
   return buf.subarray(0, 2).toString('latin1') === 'PK'
     ? readXlsxSheets(buf)
-    : [{ name: 'csv', rows: readCsv(buf.toString('utf8')) }];
+    : [{ name: 'csv', rows: readCsv(buf.toString('utf8')), formulaCells: 0 }];
 }
 
 /** The rows of a file by its first bytes ("PK" is a zip, so an .xlsx), not by its name. */
@@ -258,14 +277,22 @@ export function toRecords(
   columns: Record<string, readonly string[]>,
   /** 1-based row that holds the headers (default 1); the rows above it (a title, a date) are ignored. */
   headerRow = 1,
-): { records: { row: number; values: Record<string, string> }[]; missing: string[] } {
+): {
+  records: { row: number; values: Record<string, string> }[];
+  missing: string[];
+  /** Fields for which TWO columns carry an accepted header (R14-04): which one is meant is not guessed, the sheet is refused. */
+  ambiguous: string[];
+} {
   const header = (sheet[headerRow - 1] ?? []).map(fold);
   const index: Record<string, number> = {};
   const missing: string[] = [];
+  const ambiguous: string[] = [];
   for (const [field, names] of Object.entries(columns)) {
-    const i = header.findIndex((h) => names.map(fold).includes(h));
-    if (i < 0) missing.push(field);
-    else index[field] = i;
+    const accepted = names.map(fold);
+    const hits = header.flatMap((h, k) => (accepted.includes(h) ? [k] : []));
+    if (hits.length === 0) missing.push(field);
+    else if (hits.length > 1) ambiguous.push(field);
+    else index[field] = hits[0] as number;
   }
   const records = sheet.slice(headerRow).flatMap((cells, k) => {
     if (cells.every((c) => c === '')) return [];
@@ -273,5 +300,5 @@ export function toRecords(
     for (const [field, i] of Object.entries(index)) values[field] = (cells[i] ?? '').trim();
     return [{ row: headerRow + k + 1, values }];
   });
-  return { records, missing };
+  return { records, missing, ambiguous };
 }

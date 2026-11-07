@@ -54,6 +54,11 @@ export const sheetMappingSchema = z
     dateFormat: z.enum(['dmy', 'mdy', 'iso']).default('dmy'),
     /** Field -> the header(s) that mean it in this sheet; replaces the default names of that field. */
     columns: z.record(z.string(), headerNames).default({}),
+    /**
+     * R14-04: a sheet with formula cells is REFUSED unless this is true. The reader never evaluates a formula; with this flag it takes
+     * the value Excel last stored with it (it can be stale or wrong) and the report says how many cells were read that way.
+     */
+    allowCachedFormulaValues: z.boolean().optional(),
     /** The plant code to use when a row has no plant of its own (prices, recipes, trucks). */
     defaultPlant: z
       .string()

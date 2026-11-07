@@ -29,6 +29,8 @@ export interface SheetReport {
   sheet: string;
   kind: MappingKind;
   report: ImportReport;
+  /** R14-04: formula cells whose last stored (cached) value was read because the mapping allows it. 0 for a sheet with none. */
+  formulaCellsRead: number;
 }
 export interface WorkbookReport {
   sha256: string;
@@ -124,10 +126,16 @@ export async function importWorkbook(opts: WorkbookOptions): Promise<WorkbookRep
   // which sheet goes with which mapping (a mapped sheet missing from the file, or two mappings on one sheet, are file problems)
   const work: { sheet: NamedSheet; mapping: SheetMapping }[] = [];
   const used = new Set<string>();
-  for (const sheet of sheets) {
+  for (const [index, sheet] of sheets.entries()) {
     const mapping = mappingForSheet(opts.mappings, sheet.name, sheets.length);
     if (!mapping) report.unmappedSheets.push(sheet.name);
     else {
+      // R14-04: the reader never evaluates a formula. A sheet with formula cells is refused unless its mapping explicitly accepts the
+      // cached values (which can be stale), and then the report says how many cells were read that way.
+      if (sheet.formulaCells > 0 && !mapping.allowCachedFormulaValues)
+        report.fileProblems.push(
+          `Sheet ${index + 1} has ${sheet.formulaCells} formula cell(s). Formulas are not evaluated and their stored values may be stale: paste the values (Paste Special > Values) and save again, or set "allowCachedFormulaValues": true in this sheet's mapping.`,
+        );
       work.push({ sheet, mapping });
       used.add(mapping.sheet);
     }
@@ -174,7 +182,12 @@ export async function importWorkbook(opts: WorkbookOptions): Promise<WorkbookRep
         openingDate: opts.openingDate,
         today: opts.today,
       });
-      report.sheets.push({ sheet: sheet.name, kind: mapping.kind, report: r });
+      report.sheets.push({
+        sheet: sheet.name,
+        kind: mapping.kind,
+        report: r,
+        formulaCellsRead: mapping.allowCachedFormulaValues ? sheet.formulaCells : 0,
+      });
     }
 
     for (const s of report.sheets) {

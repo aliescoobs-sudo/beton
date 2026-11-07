@@ -240,7 +240,14 @@ async function plan(
   sheet: Sheet,
   ctx: Ctx,
 ): Promise<{ planned: Planned[]; missing: string[] }> {
-  const { records: rawRecords, missing } = toRecords(sheet, ctx.columns ?? COLUMNS[kind], ctx.headerRow ?? 1);
+  const {
+    records: rawRecords,
+    missing,
+    ambiguous,
+  } = toRecords(sheet, ctx.columns ?? COLUMNS[kind], ctx.headerRow ?? 1);
+  // R14-04: two columns with an accepted header for one field: nothing is read (which one is meant is never guessed)
+  if (ambiguous.length)
+    return { planned: [], missing: ambiguous.map((f) => `${f} (two columns have this header)`) };
   // the optional columns do not make a file unusable
   const realMissing = missing.filter((m) => REQUIRED_FIELDS[kind].includes(m));
   if (realMissing.length) return { planned: [], missing: realMissing };

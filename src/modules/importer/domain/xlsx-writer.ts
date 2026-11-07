@@ -82,12 +82,14 @@ const colName = (i: number) => String.fromCharCode(65 + i);
  * Nothing in it comes from a real file.
  */
 export function buildWorkbook(
-  sheets: { name: string; rows: (string | number)[][] }[],
+  sheets: { name: string; rows: (string | number | { f: string; v: string | number })[][] }[],
   deflate = false,
+  /** `date1904`: write the 1904 date system into the workbook (a fixture for the refusal). */
+  opts: { date1904?: boolean } = {},
 ): Buffer {
   const files: Record<string, string> = {
     '[Content_Types].xml': '<?xml version="1.0"?><Types/>',
-    'xl/workbook.xml': `<?xml version="1.0"?><workbook xmlns:r="r"><sheets>${sheets
+    'xl/workbook.xml': `<?xml version="1.0"?><workbook xmlns:r="r">${opts.date1904 ? '<workbookPr date1904="1"/>' : ''}<sheets>${sheets
       .map((s, i) => `<sheet name="${escXml(s.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`)
       .join('')}</sheets></workbook>`,
     'xl/_rels/workbook.xml.rels': `<?xml version="1.0"?><Relationships>${sheets
@@ -101,6 +103,10 @@ export function buildWorkbook(
           `<row r="${ri + 1}">${r
             .map((v, ci) => {
               const ref = `${colName(ci)}${ri + 1}`;
+              if (typeof v === 'object')
+                return typeof v.v === 'number'
+                  ? `<c r="${ref}"><f>${escXml(v.f)}</f><v>${v.v}</v></c>`
+                  : `<c r="${ref}" t="str"><f>${escXml(v.f)}</f><v>${escXml(v.v)}</v></c>`;
               return typeof v === 'number'
                 ? `<c r="${ref}"><v>${v}</v></c>`
                 : `<c r="${ref}" t="inlineStr"><is><t>${escXml(v)}</t></is></c>`;
