@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { TRAINING_TEST_DATABASE, ensureRoles, recreateDatabase } from '../scripts/db-bootstrap';
+import { TRAINING_TEST_DATABASE, ensureRoles, recreateDatabase, superuserUrl } from '../scripts/db-bootstrap';
 import { runMigrations } from '../scripts/db-migrate';
 import { wipeTrainingDatabase } from '../scripts/reset-training';
 import { seedTraining } from '../scripts/seed-training';
@@ -176,6 +176,13 @@ describe('reset:training (T1)', () => {
     expect(await count(`select count(*) n from training_marker`)).toBe(1); // nothing was dropped
   });
   it('R14-13: without a runner signal, a marked database on a cluster with no birth row for it is not reset', async () => {
+    const sup = new pg.Client({ connectionString: superuserUrl(training, 'postgres') });
+    await sup.connect();
+    try {
+      await sup.query('drop table if exists public.volume_birth'); // a cluster that never had a birth row
+    } finally {
+      await sup.end();
+    }
     vi.stubEnv('VITEST', '');
     try {
       await expect(wipeTrainingDatabase(training)).rejects.toThrow(/no birth row for it/);
