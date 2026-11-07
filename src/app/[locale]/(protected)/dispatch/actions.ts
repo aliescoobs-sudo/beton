@@ -81,12 +81,7 @@ export async function reassignTripAction(input: {
 }): Promise<{ ok: true; conflicts: string[]; overlapOverride: boolean } | Failure> {
   return guarded('dispatch.write', async (user) => {
     const today = (await getRequestClock()).today();
-    const result = await reassignTrip(
-      getPool('app'),
-      user,
-      { ...input, overrideReason: input.reason },
-      { today },
-    );
+    const result = await reassignTrip(getPool('app'), user, input, { today });
     return result.ok
       ? {
           ok: true as const,

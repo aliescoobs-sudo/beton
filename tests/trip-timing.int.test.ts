@@ -12,6 +12,7 @@ import {
   postponeTrip,
   reassignTrip,
   setTripEstimate,
+  setTruckDefaultDriver,
 } from '../src/modules/operations';
 import type { SessionUser } from '../src/modules/platform-security/auth/session-gate';
 import { superuserUrl, TEST_DATABASE } from '../scripts/db-bootstrap';
@@ -328,7 +329,7 @@ describe('who can read the delays (enforced by row-level security)', () => {
         (
           await asRole(u, (tx) =>
             tx.query<{ n: string }>(
-              `select count(*)::text as n from audit_event where table_name in ('trip_delay', 'trip_dispatch_change')`,
+              `select count(*)::text as n from audit_event where table_name in ('trip_delay', 'trip_dispatch_change', 'trip_estimate_override')`,
             ),
           )
         ).rows[0]!.n,
@@ -593,5 +594,150 @@ describe('the plant manager can reassign or postpone a rotation that has not sta
     expect(await n(owner)).toBeGreaterThanOrEqual(2);
     expect(await n(pmA)).toBeGreaterThanOrEqual(2);
     for (const u of [pmB, accountant, sales, purchases, driver1]) expect(await n(u), u.role).toBe(0);
+  });
+});
+
+describe('the explanation never leaves the restricted tables (R14-02)', () => {
+  const TEXT = `chauffeur en retard, panne ${marker}`;
+  const needle = `%${TEXT}%`;
+  const outsiders = () => [partner, support, accountant, sales, purchases, pmB, driver1];
+  const count = async (u: SessionUser, sql: string) =>
+    Number((await asRole(u, (tx) => tx.query<{ n: string }>(sql, [needle]))).rows[0]!.n);
+
+  it('a reassignment and a postponement write codes in the plan and the cancellation, the text only in the change log', async () => {
+    // a truck with a default driver, so that moving another driver onto it writes the plan's override reason
+    expect((await setTruckDefaultDriver(app, owner, { truckId: truck2, driverId: driverRow1 })).ok).toBe(
+      true,
+    );
+    const moved = await asOwner(plantA, async (tx) => {
+      const o = await insertOrder(tx, owner.id, { ...master, clientId: scene.clientId }, DAY);
+      return o.id;
+    });
+    const t1 = await newTrip(plantA, scene.truckId, driverRow1, 700, 1, moved);
+    const r = await reassignTrip(
+      app,
+      pmA,
+      { tripId: t1, truckId: truck2, driverId: driverRow2, reason: TEXT },
+      { today: DAY },
+    );
+    expect(r.ok, JSON.stringify(r)).toBe(true);
+    if (!r.ok) return;
+    const plan = await migrator.query<{ driver_override_reason: string | null }>(
+      `select driver_override_reason from trip_plan where id = $1`,
+      [r.value.newTripId],
+    );
+    expect(plan.rows[0]!.driver_override_reason).toBe('reassigned');
+    const o2 = await asOwner(plantA, (tx) =>
+      insertOrder(tx, owner.id, { ...master, clientId: scene.clientId }, DAY),
+    );
+    const t2 = await newTrip(plantA, scene.truckId, driverRow2, 900, 1, o2.id);
+    expect((await postponeTrip(app, pmA, { tripId: t2, reason: TEXT })).ok).toBe(true);
+    const canc = await migrator.query<{ reason: string }>(
+      `select reason from trip_plan_cancellation where trip_id = $1`,
+      [t2],
+    );
+    expect(canc.rows[0]!.reason).toBe('postponed');
+    // the text is in the change log, and nowhere else in the operational tables
+    expect(
+      (await migrator.query(`select 1 from trip_dispatch_change where reason = $1`, [TEXT])).rowCount,
+    ).toBe(2);
+    expect(
+      (await migrator.query(`select 1 from trip_plan where driver_override_reason like $1`, [needle]))
+        .rowCount,
+    ).toBe(0);
+    expect(
+      (await migrator.query(`select 1 from trip_plan_cancellation where reason like $1`, [needle])).rowCount,
+    ).toBe(0);
+    // in the audit trail, only the audit copy of the change log holds it
+    const where = await migrator.query<{ table_name: string }>(
+      `select distinct table_name from audit_event where before::text like $1 or after::text like $1`,
+      [needle],
+    );
+    expect(where.rows.map((x) => x.table_name)).toEqual(['trip_dispatch_change']);
+  });
+
+  it('partner, support and the others cannot reconstruct it from the plan, the cancellations or the audit', async () => {
+    for (const u of outsiders()) {
+      expect(
+        await count(u, `select count(*)::text as n from trip_plan where driver_override_reason like $1`),
+        u.role,
+      ).toBe(0);
+      expect(
+        await count(u, `select count(*)::text as n from trip_plan_cancellation where reason like $1`),
+        u.role,
+      ).toBe(0);
+      expect(
+        await count(
+          u,
+          `select count(*)::text as n from audit_event where before::text like $1 or after::text like $1`,
+        ),
+        u.role,
+      ).toBe(0);
+    }
+    // the owner and app_admin can: the explanation exists, in the restricted place
+    for (const u of [owner, appAdmin])
+      expect(
+        await count(
+          u,
+          `select count(*)::text as n from audit_event where before::text like $1 or after::text like $1`,
+        ),
+        u.role,
+      ).toBeGreaterThan(0);
+    expect(
+      await count(pmA, `select count(*)::text as n from trip_dispatch_change where reason like $1`),
+    ).toBeGreaterThan(0);
+  });
+
+  it('rows written before this change, with the free text in the broader tables, are not readable through the audit either', async () => {
+    // what the old code did: the explanation copied into the cancellation reason (the table is insert-only, so such rows cannot be rewritten)
+    const o = await asOwner(plantA, (tx) =>
+      insertOrder(tx, owner.id, { ...master, clientId: scene.clientId }, DAY),
+    );
+    const legacy = await newTrip(plantA, scene.truckId, driverRow2, 1100, 1, o.id);
+    await asOwner(plantA, (tx) =>
+      tx.query(
+        `insert into trip_plan_cancellation (id, trip_id, reason, created_by) values (gen_random_uuid(), $1, $2, $3)`,
+        [legacy, `Reporté : ${TEXT}`, owner.id],
+      ),
+    );
+    for (const u of [partner, support, accountant, pmA, pmB, driver1, sales, purchases])
+      expect(
+        await count(
+          u,
+          `select count(*)::text as n from audit_event where table_name in ('trip_plan', 'trip_plan_cancellation', 'trip_event', 'trip_driver_report') and ($1::text is not null)`,
+        ),
+        u.role,
+      ).toBe(0);
+    expect(
+      await count(
+        owner,
+        `select count(*)::text as n from audit_event where table_name = 'trip_plan_cancellation' and ($1::text is not null)`,
+      ),
+    ).toBeGreaterThan(0);
+  });
+
+  it("an estimate override's reason is read in its own table by the manager and the owner, in the audit by the owner only", async () => {
+    const r = await setTripEstimate(app, pmA, {
+      plantId: plantA,
+      zoneId: null,
+      stage: 'loading',
+      minutes: 33,
+      reason: TEXT,
+    });
+    expect(r.ok, JSON.stringify(r)).toBe(true);
+    for (const u of [partner, support, accountant, pmB, driver1])
+      expect(
+        await count(
+          u,
+          `select count(*)::text as n from audit_event where table_name = 'trip_estimate_override' and after::text like $1`,
+        ),
+        u.role,
+      ).toBe(0);
+    expect(
+      await count(
+        owner,
+        `select count(*)::text as n from audit_event where table_name = 'trip_estimate_override' and after::text like $1`,
+      ),
+    ).toBeGreaterThan(0);
   });
 });

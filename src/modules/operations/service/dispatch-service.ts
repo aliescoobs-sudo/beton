@@ -26,6 +26,14 @@ import {
 import { parseDispatchInput, parseDriverInput } from '../domain/load-input';
 import { opsParameter } from './ops-parameters';
 
+/**
+ * What the broader records (the plan's driver override, the cancellation) hold for a change made by the plant manager (R14-02): a code,
+ * never the explanation. The explanation goes only to `log_dispatch_change`, whose table and audit copies only the owner, app_admin and the
+ * plant manager of the plant read.
+ */
+export const REASSIGNED_REF = 'reassigned';
+export const POSTPONED_REF = 'postponed';
+
 export type DispatchError =
   | 'INVALID'
   | 'NOT_FOUND'
@@ -477,8 +485,8 @@ export async function reassignTrip(
     tripId: string;
     truckId: string;
     driverId: string | null;
+    /** Why: recorded in the restricted change log only. */
     reason: string;
-    overrideReason?: string;
     overlapReason?: string;
   },
   deps: { today?: string } = {},
@@ -505,7 +513,7 @@ export async function reassignTrip(
               truckId: input.truckId,
               driverId: input.driverId,
               volumeL: r.volumeL,
-              overrideReason: input.overrideReason ?? reason,
+              overrideReason: REASSIGNED_REF,
             }
           : {
               orderId: r.orderId,
@@ -577,7 +585,7 @@ export async function postponeTrip(
       if (trip.started) return err('STARTED');
       await tx.query(
         `insert into trip_plan_cancellation (id, trip_id, reason, created_by) values ($1, $2, $3, $4)`,
-        [randomUUID(), input.tripId, `Reporté : ${reason}`.slice(0, 500), actor.id],
+        [randomUUID(), input.tripId, POSTPONED_REF, actor.id],
       );
       await tx.query('select public.log_dispatch_change($1, $2, $3, $4, $5, $6, $7, $8)', [
         'postpone',
