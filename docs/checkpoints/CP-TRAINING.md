@@ -87,8 +87,11 @@ Nothing here is done for you, and no token or password is ever pasted anywhere b
    c. Tell the app its public address **first** (it only accepts writes coming from it): `./scripts/training/set-url.sh https://<machine>.<tailnet>.ts.net`.
    d. `./scripts/training/go-public.sh https://<machine>.<tailnet>.ts.net` — the only step that opens the Funnel. **It first runs `tailscale funnel reset` and reads the status back: if the reset fails or the status is not clearly closed, it stops with `CLOSURE UNCONFIRMED — check Tailscale manually` and a non-zero status (close it through Tailscale yourself, then check from outside). After opening it validates the COMPLETE status (the structured one when the CLI offers it): exactly one HTTPS proxy to the app's loopback endpoint, any other entry refuses and closes. It never prints "closed" without having read the closed state back (R13-04).** It refuses unless the app was told this very address,
       runs in training mode and answers its readiness check (database and migrations), then runs `tailscale funnel --bg <the app's real port>`. If Tailscale says Funnel is
-      not allowed it prints a link to enable it for this machine: open it, accept, run `go-public.sh` again. (`funnel-check.sh`, run by `training-up.sh`, only warns if a
-      Funnel points at another port or machine; it never authorises anything.)
+      not allowed it prints a link to enable it for this machine: open it, accept, run `go-public.sh` again. **R14-07: every decision, "closed" as much as "open correctly",
+      is taken on the COMPLETE structured status (`tailscale funnel status --json`, validated by `python3`).** `python3` is required; a Tailscale CLI that does not know `--json`
+      (upgrade it) and a daemon or control-socket error are each a refusal, told apart on the screen; the plain-text status is never a fallback, and no "off" phrase is accepted.
+      (`funnel-check.sh`, run by `training-up.sh`, never authorises anything, but a failed check now stops `training-up.sh` with its status and the "local only" message is only
+      printed after a pass.)
    e. Test from a phone on mobile data (not the home Wi-Fi) the **whole** path over the real HTTPS address: the login page with the red banner, sign in with a training
       account, make one change, sign out. Then `tailscale funnel reset` and check that the address no longer answers. Open it again with `go-public.sh` when the training starts.
 9. **Nightly dump** (outside the repository, 14 kept): `crontab -e` and add
