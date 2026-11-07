@@ -10,6 +10,7 @@ import { type ImportEnvironment, importEnvironmentProblem } from '../domain/guar
 import { type NamedSheet, readWorkbook, SheetError } from '../domain/sheet';
 import { defaultColumnsOf, type ImportKind, type ImportReport, runImport } from './importers';
 import { RUN_TAG_PREFIX, singleTransactionPool } from './tx-pool';
+import { abandon, commitAndRelease, rollbackAndRelease } from './tx-end';
 
 // One workbook, one transaction (T2). The dry run and the real run do exactly the same work, in the same order, through the same
 // services as the screens (same rules, row-level security and audit); the dry run ends in a ROLLBACK, so a sheet that refers to a
@@ -144,7 +145,7 @@ export async function importWorkbook(opts: WorkbookOptions): Promise<WorkbookRep
   const runId = uuidv7(realClock.now());
   report.runId = runId;
   const client = await opts.appPool.connect();
-  let commit = false;
+  let ended = false;
   try {
     await client.query('BEGIN');
     const pool = singleTransactionPool(client, runId);
@@ -153,6 +154,8 @@ export async function importWorkbook(opts: WorkbookOptions): Promise<WorkbookRep
     const previous = await findAppliedRun(pool, opts.actor, hash);
     if (previous) {
       report.alreadyImportedRunId = previous;
+      ended = true;
+      await rollbackAndRelease(client);
       return report;
     }
 
@@ -206,14 +209,19 @@ export async function importWorkbook(opts: WorkbookOptions): Promise<WorkbookRep
           reason: 'excel import',
         }),
       );
-      commit = true;
+      // The only COMMIT of the file: a real run with no problem. `applied` is set only AFTER the server confirmed it (R14-03).
+      ended = true;
+      await commitAndRelease(client);
       report.applied = true;
+      return report;
     }
+    // Everything else (a dry run, a problem) rolls back, and says so only if the database confirmed it.
+    ended = true;
+    await rollbackAndRelease(client);
     return report;
-  } finally {
-    // The only COMMIT of the file: a real run with no problem. Everything else (a dry run, a problem, an exception) rolls back.
-    await client.query(commit ? 'COMMIT' : 'ROLLBACK').catch(() => undefined);
-    client.release();
+  } catch (error) {
+    if (!ended) await abandon(client); // an exception: roll back, or destroy the connection; the error itself goes on
+    throw error;
   }
 }
 
@@ -288,7 +296,7 @@ export async function rollbackImport(opts: {
   };
   const rollbackId = uuidv7(realClock.now());
   const client = await opts.appPool.connect();
-  let commit = false;
+  let ended = false;
   try {
     await client.query('BEGIN');
     const pool = singleTransactionPool(client, rollbackId);
@@ -356,11 +364,15 @@ export async function rollbackImport(opts: {
           reason: 'excel import rollback',
         }),
       );
-      commit = true;
+      ended = true;
+      await commitAndRelease(client);
+      return report;
     }
+    ended = true;
+    await rollbackAndRelease(client);
     return report;
-  } finally {
-    await client.query(commit ? 'COMMIT' : 'ROLLBACK').catch(() => undefined);
-    client.release();
+  } catch (error) {
+    if (!ended) await abandon(client);
+    throw error;
   }
 }

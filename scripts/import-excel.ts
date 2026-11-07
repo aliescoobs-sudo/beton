@@ -22,6 +22,7 @@ import {
   formatWorkbookReport,
   ImportRefused,
   importEnvironmentProblem,
+  ImportTransactionError,
   importWorkbook,
   loadMappingFiles,
   rollbackImport,
@@ -203,6 +204,10 @@ try {
   if (error instanceof ImportRefused) {
     console.error(error.message);
     process.exitCode = 1;
+  } else if (error instanceof ImportTransactionError) {
+    // R14-03: a failed or unknown end of the transaction is never "done". 4 = outcome unknown (check before running again), 1 = failed.
+    console.error(`${error.code}: ${error.message}`);
+    process.exitCode = error.code === 'COMMIT_OUTCOME_UNKNOWN' ? 4 : 1;
   } else throw error;
 } finally {
   prompt.close();

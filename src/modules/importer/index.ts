@@ -41,6 +41,7 @@ export {
   type WorkbookOptions,
   type WorkbookReport,
 } from './service/workbook-import';
+export { ImportTransactionError, type ImportTransactionCode } from './service/tx-end';
 export { type ImportEnvironment, importEnvironmentProblem } from './domain/guard';
 export { formatRollbackReport, formatWorkbookReport } from './service/report';
 export {
