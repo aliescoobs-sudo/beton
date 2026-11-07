@@ -1,92 +1,159 @@
-# BELGOBETON — Lead handoff (for a new lead conversation)
+# BELGOBETON — the project brain (lead handoff)
 
-Last update: 7 Nov 2026 (state at commit `f3cb07d`, review R14 included). This file is kept up to date by the lead conversation at every milestone. A new lead conversation (for example on Ali's second Claude account) starts by reading this file, then the files it points to.
+**Version:** 2026-11-07 03:30 (Africa/Casablanca). **Master copy:** the claude.ai Project "BELGOBETON", doc `claude/LEAD-HANDOFF.md`, maintained by the lead conversation. **Mirror:** `docs/LEAD-HANDOFF.md` in the repo (committed by Claude Code, so it is backed up in git/GitHub). If the two differ: this file wins for plans, rules and decisions; the repo docs (`docs/DECISIONS.md`, `docs/checkpoints/*`, `docs/reviews/*`) win for facts about code. A new lead conversation starts by reading this file, then `CLAUDE.md`, `docs/REQUIREMENTS-V1.md`, `docs/checkpoints/CP-PROD-PLAN.md`, `docs/DECISIONS.md` and the latest `docs/reviews/CODEX-REVIEW-R*.md`.
 
-## Who and how
-- **Ali** owns the project and decides everything. He speaks Moroccan Darija. Answer him in Darija with technical terms in English.
-- Prompts for Claude Code and Codex are written in English. Codex can also be addressed in Darija.
-- Ali's wife may relay messages and screenshots. Decisions, 2FA codes and passwords stay with Ali.
-- **Claude Code** runs on Ali's Mac in `~/BELGOBETON` with `claude --model sonnet`. Never `sonnet.` with a dot.
-  - Keep the Mac awake with `caffeinate -dims` in its own Terminal tab.
-  - Slash commands are typed after `❯` inside Claude Code, never in zsh.
-- **Codex** (GPT) is the second builder and the independent reviewer. It works in a git worktree on branch `codex/finance`, with migrations 0200 and above, and never merges into main.
-- **The lead** (this conversation) splits the work, writes the prompts, reviews the checkpoints and guards security. It never asks for passwords, TOTP secrets or keys.
+No secrets in this file, ever: no passwords, PINs, TOTP secrets, tokens, real company data.
 
-## Read first, in this order
-1. `CLAUDE.md`: security rules that override everything.
-2. `docs/REQUIREMENTS-V1.md`: production scope, written 2 Nov from Ali's interview after his meetings with the owner and the office. This is the source of truth.
-3. `docs/checkpoints/CP-PROD-PLAN.md`: the task plan R1–R10 and its checklist, once Claude Code has written it.
-4. `docs/DECISIONS.md`: numbered decisions; 114–120 cover the assistant.
-5. `docs/HANDOFF-CODEX.md`: architecture, history, rules and rejected ideas (version 2).
-6. `docs/checkpoints/CP-ASSIST-1.md` and `CP-INTEGRATION-2.md`: the latest completed waves.
+## 0. How this file is kept alive
+- The lead updates it at EVERY milestone: a push, a review verdict, a decision by Ali or the owner, a new idea or service, a changed plan, a lesson learned. Update the "Current state" (§8), "Roadmap" (§9), "Open decisions" (§12) and add one line to the change log (§16).
+- Ali may say "update the brain". The lead also updates it unprompted when something above changes.
+- After each update the lead asks Claude Code (one short prompt) to mirror the new text into `docs/LEAD-HANDOFF.md` and push, so a copy lives in git.
+- If this conversation gets long, slow or lost: open a new conversation inside the Project, say "read claude/LEAD-HANDOFF.md and continue as the lead". Nothing else is needed to restart.
 
-## State on 7 Nov (commits through `f3cb07d`)
-`main` is on GitHub (private remote `origin`), CI builds the image on every push. Everything is fictitious data. Migrations run through 0118. Details: `docs/checkpoints/CP-PROD-PLAN.md` (one section per batch), `docs/DECISIONS.md` (160 to 180), `docs/reviews/`.
+## 1. The project in one paragraph
+BELGOBETON is a management application for a friend's ready-mix concrete company in Tétouan (two plants: Tétouan and Chefchaouen, one office in Tétouan). It replaces Odoo, which the owner removed. It tracks money and materials together: clients and suppliers (cement, sand and other components), transport, fuel, what came in, what went out, what was cancelled, what was paid cash or by cheque or in instalments, which cheques are still due and when, advances, and stock. The plant's own software reports what was loaded (e.g. B20) and the app deducts the components from stock by recipe. The owner has a private interface (he has little time and many problems at once); two office employees enter transactions; the plants and drivers use phones. The owner wants APIs, one or more agents and automation of routine work. Ali (the builder) is the owner's contact and decides everything on the build side.
 
-### What was built since 2 Nov
-- **Batches A to C, C+ and D (final-review fixes F01 to F12):** plants, roles, prices and approvals, driver and pump PWA, production readiness, finance merged from Codex, recipes per plant, receipt variance, day-close fuel and cash, key-rotation registry, document approvals tied to the download, PIN attempt serialised. Decisions 160 to 175.
-- **T1 training instance:** `TRAINING_MODE` with a boot guard and a marker table, one account per role (password only, reserved address domain `formation.beton.invalid`), banner, imports, maps, push and LLM off, generated credentials in an ignored file, `docker-compose.training.yml` bound to 127.0.0.1, scripts under `scripts/training/`. Guides: `CP-TRAINING.md` and `CP-TRAINING-IMAC-FR.md` (simple French).
-- **T2 Excel importer** for go-live (`docs/IMPORT-EXCEL.md`, decision 176): dry run, apply with step-up and a confirmation phrase, soft rollback. Synthetic files only.
-- **T3 / T4 / T6:** fixes of reviews R11, R12, R13 (decisions 177 and 180).
-- **T5 training made usable (decisions 178, 179, migration 0118):** the seed ends with today's work, `rearm:training` brings a fresh day; stage timing, delay alerts, plant-manager reassign and postpone, estimates per plant/zone/stage; exercise cards per role in FR and AR.
+## 2. People and the working protocol
+- **Ali**: Moroccan, speaks Darija (answer him in Darija, technical terms in English; prompts for the tools in English). OBSIL MEDIA auto-entrepreneur. Decides. Never share passwords, 2FA codes or secrets with any AI. His wife may relay messages. Ali is often awake late at night; he works with a Mac (Apple silicon), an Intel 2019 27" iMac (i7) is planned as the training server.
+- **The lead (this Project's conversation)**: plans, splits the work, writes prompts, reads the review reports, guards security, keeps this file. It reads the Mac through the device bridge (mounted folder `~/mnt/BELGOBETON`, read-only habits: never edit the repo through the bridge except documentation files, and tell Ali).
+- **Claude Code**: the builder. Runs on Ali's Mac in `~/BELGOBETON` as `cd ~/BELGOBETON && caffeinate -dims claude --model sonnet`. Ali pastes the lead's English prompts into it. It commits per finding, runs tests, pushes, watches CI. Restart a heavy session with `/exit` then relaunch (typed by hand; pasting `/clear` is treated as plain text).
+- **Codex (GPT)**: second builder in the early phase, now the INDEPENDENT REVIEWER, in the separate clone `~/BELGOBETON-finance` (it cannot see `~/BELGOBETON`). It always starts with `git fetch origin`, reviews an exact commit, read-only, and never opens `.env*`, `backups/`, accounts files or keys. Ali copies each report: `cp ~/BELGOBETON-finance/docs/reviews/CODEX-REVIEW-Rxx.md ~/BELGOBETON/docs/reviews/`, then tells the lead "نسخت". For a new review use `/new` and choose "Use current Git worktree".
+- **Gemini**: non-code research only (e.g. drafting the CNDP declaration), never with real data.
+- **Prompt patterns that work.** Fix prompt for Claude Code: "read docs/reviews/…Rxx.md fully (it is the spec); one commit per finding with tests; never weaken RBAC, 2FA, replay protection, audit, encryption, RLS, rate limiting or the origin check; no secrets in output; run lint, typecheck, unit, integration and touched e2e; ONE full e2e on AC power under `caffeinate -dimsu`; push and confirm the CI image build; report hashes, totals and what could not be done; nothing public." Review prompt for Codex: "fetch first; review commit <hash> exactly; baseline <previous reviewed hash>; read-only, run nothing; never open secrets; scopes; deliver `docs/reviews/CODEX-REVIEW-Rxx.md` with a disposition table, new findings ranked blocker/high/medium/low with failure scenarios, the training verdict for this exact commit, what must be verified on the iMac, the real-data decision; separate 'verified in source' from 'inference'."
+- **Claude plan facts:** Ali is on Claude Pro; the weekly limit resets Thursday 03:00; Max is not possible before December; a second Pro account is the fallback.
 
-### Independent reviews (Codex, read-only, `docs/reviews/`)
-| Review | Object | Outcome |
-|---|---|---|
-| R11 | `52c2858` | Do not expose through Funnel as configured. Public PIN endpoint, credential-file handling and training-database admission had to be fixed. Fixed in T3. |
-| R12 | `b672a6b` | Conditional GO for supervised fictitious-data training with the restricted profile and seven pre-opening conditions. Fixed in T4 (decision 177). |
-| R13 | `99072c0` | Conditional GO, same conditions. Four medium findings and two small items (empty-database proof, per-IP release, offline epoch, Funnel reset). Fixed in T6 (decision 180). |
-| R14 | `f3cb07d` | **Training: conditional GO** (supervised, wholly fictitious data) until the on-iMac conditions are recorded. **T5: exercise only, production NO-GO. Importer: real-data NO-GO. Overall real data: NO-GO.** 14 findings, none a blocker for training. Not yet fixed. |
+## 3. Non-negotiable rules
+1. Ali's foundation rule: privacy and security are the base of every phase; the system is designed around highly sensitive information and a high security level. (Principle #0 of `CLAUDE.md`.)
+2. `CLAUDE.md`: never weaken RBAC, 2FA, audit log or encryption; money is integer centimes computed only by deterministic code; AI never computes amounts; no hard deletes of financial records (corrections are reversing entries); no AI action without human confirmation; pseudonymize before any AI call; never commit secrets; business vocabulary per `docs/DOMAIN.md`.
+3. Never ask for or repeat passwords, TOTP secrets, recovery codes or tokens, including ones visible in pasted terminal output or screenshots. Remind Ali to close sensitive windows (e.g. Apple Notes with credentials) before screenshots. Training credentials live only in `~/BELGOBETON/training-accounts.local.txt` (0600, gitignored); Ali reads them locally with `open -e`, never in chat.
+4. Codex and Gemini never read or send `.env*`, `backups/`, generated accounts files, keys or anything under `~/BELGOBETON-training-private`. No real company data goes to Gemini, Codex or any chat.
+5. Permanent refusals by the lead: no "black"/undeclared/no-VAT sales mode; no disguised names in documents for the accountant or tax administration (legally exempt operations only with their legal reference from the accountant); the steel loss is named honestly "تكلفة التمويل بالحديد".
+6. Real data only after ALL of: independent Codex GO with no open high findings, a rehearsed production runbook, and the CNDP declaration filed. No external LLM on real data until the CNDP authorizes the transfer (the assistant stays deterministic). Client and supplier portals are switched on last, after an independent review. Every module ships behind its own flag.
+7. Always use `http://localhost:<port>` (never 127.0.0.1): Better Auth rejects other origins. The origin check and rate limits are protections, never bugs; never widen them (no second allowed origin, no localhost exception).
 
-Regression evidence is in CP-PROD-PLAN. T5: full e2e 174 passed, 2 skipped, 0 failed. T6: one full run had 6 failures on a slow machine (all sign-in/TOTP timeouts in specs T6 did not touch; all pass alone). **A second green full run on AC power is still owed**, and R14 asks for it explicitly.
+## 4. Product scope (from `docs/REQUIREMENTS-V1.md`; read it for detail)
+- **Company/fleet:** two plants, one office; 9 active truck mixers (Tétouan 4×16 m³, Chefchaouen 4×11 m³, one old 10 m³); 4–5 old trucks stopped (status "stopped – breakdown" + decision field); 3 pump trucks not tied to a plant; one driver per machine; external hired trucks (payment basis unknown, configurable); fuel from a plant tank, rarely a station paid by voucher. Transport is included in the m³ price; pumping is a surcharge per m³.
+- **Roles:** owner, app_admin (Ali, owner-equivalent but audited), office_sales, office_purchases, plant_manager (one plant), driver, pump_operator, accountant (Excel exports, HT/VAT/TTC), client_portal and supplier_portal (defined, OFF until the end), partner (unused), support. Money visibility is a matrix (§16.1): entering, seeing inside a document, seeing balances/aggregates, exporting are separate rights; only owner and app_admin see balances, cash, bank, P&L, financing.
+- **Prices:** not fixed; a reference average per concrete type per plant gives a PROVISIONAL price; no invoice while any line is provisional; owner/app_admin confirms from the phone (single or bulk), audited. Waiting time on site is recorded, not billed. Excess load billed on the m³ actually unloaded.
+- **Clients/credit:** per-client terms (advance, instalments), credit limit; an order over the limit or from a client with overdue invoices stays pending until owner/app_admin approves on the phone; the office sees "pending approval", never the figure.
+- **Plants/stock/purchases:** stock per plant, consumption by recipe (recipes per plant), reorder thresholds from lead time and average daily consumption (cement from a single supplier needs more than 2 days ahead), two-step receipt (plant manager confirms, office_purchases enters details, then stock rises) with a variance rule (2 %), inter-plant transfers of materials and fuel, day close with fuel variance and cash per holder.
+- **Driver/pump phone flow (PWA):** stages `loading_started` (driver report) then `loaded`, `departed`, `arrived`, `unloading_started`, `unloading_finished`, `back`; BL photo; seven cancellation cases (redirect carries the destination address; BL kept and marked "annulé"); offline day with an 18-hour hard limit; device binding per driver; PIN 6–8 digits.
+- **Documents:** devis, BL (no price, one per load), relevé de situation (not fiscal), facture d'acompte, facture définitive (timing is a parameter chosen by the accountant; numbering continues from the company's last 2026 invoice number, still to be supplied), avoir (owner/app_admin only). Any number-bearing document a client requests passes the approval gate.
+- **Finance (owner/app_admin only; accountant export-only):** built by Codex, schema `finance`, migrations 0200–0207, flag `FINANCE_ENABLED` off; real TOTP is always required, even in training.
+- **Assistant:** deterministic (scripted provider, anomaly report with fixed thresholds, field surveys); non-money roles get answers without figures; it never answers a user-chosen amount; figure disclosure is a scoped, single-view approval (15 min expiry, audited). External LLM locked.
+- **Approvals inbox** (owner/app_admin on the phone), **notifications**, **languages** fr, ar and Darija (flag `DARIJA_ENABLED`, wording must be read by a Darija speaker).
+- **Dispatch and trip timing (T5, decision 179):** per-plant/zone/stage estimates (median of the last 10 completed rotations, at least 5; else audited override; else plan defaults); every phone tap records planned time, phone time, server time, stage delay and cumulative delay (append-only, audited, optional reason); alerts none/watch/critical (in-app); the plant manager can reassign or postpone an unstarted rotation with a reason; privacy: delay data readable only by that driver, his plant manager, owner and app_admin.
+- **Hosting/legal:** Infomaniak, Switzerland (decided 3 Nov; Switzerland is on the CNDP adequate list; the transfer must be DECLARED). HTTPS, firewall, DB not exposed, SSH by key, one encrypted daily backup of DB + documents pulled by an office machine in Morocco, restore tested, keys escrowed off the server. CNDP declaration (employees, clients, suppliers, drivers, transfer to Switzerland, provider terms) before any real personal data.
+- **Future scope (grows over time; Ali adds items here):** APIs and agents, automation of routine chores, client and supplier portals, WhatsApp/SMS channels, an external LLM after CNDP authorization, further services Ali agrees with the owner. Record each new idea here with its date, status and the owner's decision.
 
-### R14 findings, grouped as the pending T7 work
-- **Group A, training / iMac:** R14-06 (phone logout and sync/photo continuations share no session epoch), R14-07 (Funnel check falls back to text when JSON is unusable, startup ignores a failed check), R14-12 (stale sweep can delete another seed's staged credentials), R14-13 (birth-token documentation promises more than it proves), R14-14 (17 screenshots: five show 404 pages, one shows named drivers' delays without the banner). Plus the on-iMac rehearsal itself.
-- **Group B, T5 dispatch:** R14-01 (started-state checks and dispatch writes are not one serialized decision; `loading_started` is ignored), R14-02 (performance reasons leak into plan, cancellation and audit rows outside the restricted tables), R14-05 (`trip_stage_estimate` is SECURITY DEFINER with no plant or assignment scope).
-- **Group C, importer:** R14-03 (COMMIT/ROLLBACK failures swallowed, success reported early), R14-04 (1904 date system ignored; duplicate headers, unclosed CSV quote and cached formula values accepted silently), R14-08 (idempotency race, conflicting rows treated as already imported), R14-09 (report can echo a cell; row audits are value-bearing), R14-10 (soft rollback names the wrong opening tables), R14-11 (CLI TOTP bypasses the one-time-step claim).
-- Still deferred from earlier: none of F01 to F12 remains; the missing audit action was added (decision 175).
+## 5. Architecture and conventions
+- Next.js 16 (Turbopack), TypeScript, PostgreSQL 17 in Docker via Colima, RLS (FORCE) and SECURITY DEFINER doors, hash-chained audit log, Better Auth (TOTP, step-up, origin check, rate limit), pg-boss, Vitest, Playwright, locales fr/ar/ary. Build in the Mac's Colima needs 4 GB (a 2 GB VM was killed); the real build runs in GitHub Actions.
+- Migrations: main app uses 0078–0199 (latest applied: 0118, T5 dispatch/timing; 0117 importer; 0112–0115 Batch D), finance uses 0200–0207. One task per commit; every money and visibility rule enforced in the database (RLS, column grants, definer functions) with exposure tests for each role and screen.
+- Module flags (`MODULE_*`/`*_ENABLED`): plants, roles_v1, approvals (on); FIELD_APP, NOTIFICATIONS, CANCELLATIONS, DOCUMENTS_V1, DARIJA, ASSISTANT_DET, TRANSFERS, FINANCE (off by default, on in e2e); client_portal/supplier_portal off, last.
+- Deployment: image built by GitHub Actions for linux/amd64, pushed to private GHCR (package `belgobeton`), pulled by digest tied to a commit; Caddy under the `public` compose profile; Tailscale Funnel for public training access; Docker Keychain helper; FileVault on, automatic login off.
+- Training mode: `TRAINING_MODE=true`; fictitious data only; red banner "Version de formation — données fictives"; imports, maps, push, WhatsApp/SMS and external LLM disabled; birth token + completed-seed marker (marker written last); reserved `@formation.beton.invalid` accounts; optional TOTP except finance; scripts `training-up/down`, `go-public`, `funnel-check`, `pick-image`, `show-accounts`, `set-url`, `reset:training`, `rearm:training`.
+- Excel importer (T2): dry run = the same work in a rolled-back transaction on a production-mode database; `--apply` needs owner/app_admin, a typed phrase and a fresh authenticator code; `--rollback` is soft; per-sheet mapping files; strict parsing (integer centimes, ambiguous dates/amounts rejected); refuses training/simulation/non-REAL_DATA; docs in `docs/IMPORT-EXCEL.md`, decision 176. Real sheet headers are still unknown.
 
-### On-iMac conditions (all required before Funnel is opened; none done yet)
-Full list: R14 section 6 and the numbered checklist in both training guides. In short:
-1. Run exactly the image of `f3cb07d` (or its fix commit), same artifact for app and ops, on a brand-new Docker volume (birth token created by initdb, claimed once, marker last). The R13 digest does not count.
-2. Loopback-only socket, no host database port, accounts volume only in the ops container (uid 10001, 0700 folder, 0600 file), FileVault on, locked host, auto-login off.
-3. Real Tailscale shape: complete structured status (including Foreground and Services) before and after opening, exactly one HTTPS proxy to the loopback app, closure verified at the end of every session. A failed JSON read is a refusal.
-4. Phone: forwarded-IP trust, per-driver and per-IP locking, foreign or revoked device, logout with a sync in flight, handover. Use locked dedicated phones until R14-06 is fixed.
-5. T5 only with invented records, one supervisor editing dispatch at a time, never to steer real work.
-6. Finance roles enrol a real authenticator; HTTPS login over mobile data.
-7. Regression evidence: second green full e2e.
+## 6. Build history (for orientation; details in `docs/checkpoints/CP-PROD-PLAN.md`)
+- Pilot (fake data): `44b5732`, 3 442 tests, 140 e2e. 2 Nov: production phase starts (REQUIREMENTS-V1). Batch A (R1 plants, R2 roles, R3 prices/approvals, R4 driver PWA, R9 production readiness), Batch B (visibility matrix, notifications, cancellations, documents, Darija, assistant, transfers), Batch C (finance merged from Codex, server hardening, importers, recipes per plant, receipt variance, day close), Batch D (Codex "final" review F01–F12 closed 5 Nov).
+- T1 training instance (`52c2858`), T3 fixes of R11 (`b672a6b`), T2 importer + T4 fixes of R12 (`99072c0`, image digest `sha256:32e795616a12461f6d05d976049bb29c3650dd4215c39e36f1e34742174f0652`), T5 usable training and dispatch/timing (`5abea8d`, migration 0118), T6 fixes of R13 (`f3cb07d`). Decisions numbered up to 180.
+- Test totals at `f3cb07d`: unit 2191, integration 2458; full e2e ≈ 172 passed / 2–3 skipped.
 
-### Hosting plan
-- **Now:** training runs on a dedicated Intel iMac (linux/amd64, Colima, GHCR image pulled by digest), app bound to 127.0.0.1, published only through Tailscale. Funnel (public) is opened for a supervised session and closed after; for a private phone test use Tailscale Serve (tailnet only), which needs Serve and HTTPS certificates enabled once in the Tailscale admin console.
-- **December:** the same compose on a VPS in a Moroccan data centre (decision 134, stability, security, cost). Training starts there with a fresh seed, not a restored dump. Transfers abroad (for example a provider outside Morocco) need CNDP authorization (decision 153 and `RUNBOOK.md`).
-- **Real data:** blocked by the overall NO-GO of R14, the CNDP declaration, and a re-review of the corrective commits.
-- Go-live date from the 2 Nov plan (1 Dec) is at risk and is Ali's call.
+## 7. Independent reviews (Codex)
+| Review | Commit | Verdict | Led to |
+|---|---|---|---|
+| R9, FINAL | pilot, Batch C | findings F01–F12, server hardening | Batch D (closed 5 Nov) |
+| R11 | 52c2858 | NO-GO for the unchanged training install | T3 |
+| R12 | b672a6b | conditional GO (2 high, 4 medium, 1 low) | T4 |
+| R13 | 99072c0 | conditional GO (4 medium) | T6 |
+| **R14** | **f3cb07d** | **training with fictitious data: conditional GO. T5: exercise-only, production NO-GO. Importer: NO-GO as a real-data gate. Real data: NO-GO.** 4 high, 8 medium, 2 low | **T7** |
 
-### Lessons learned (do not repeat)
-- **Use `http://localhost:PORT`, never `127.0.0.1`.** The origin check compares the exact origin to `APP_BASE_URL`; 127.0.0.1 gives `INVALID_ORIGIN` and the generic "Connexion impossible" message. The check stays strict; do not add a second origin. Over Tailscale the origin must be the exact HTTPS tailnet URL.
-- **`OTHER_DEVICE` on the driver phone** means the account is bound to another phone. It is audited and refused with a 403 until the owner or app_admin releases the device in *Chauffeurs (téléphones)*; the next sign-in then binds the new phone. This is also the release path for a lost phone (RUNBOOK section 4). Do not clear it in the database by hand.
-- **Run the full e2e on AC power under `caffeinate`, one worker, nothing else running.** On battery or a slow machine the sign-in/TOTP steps time out (the T6 run took 1.6 h instead of about 30 min and showed 6 false failures). Build first with `NEXT_DIST_DIR=.next-e2e`, restore `tsconfig.json` afterwards (`git checkout tsconfig.json`), logs in `./.logs/`.
-- **To end a Claude Code session type `/exit`.** Do not paste `/clear` or other slash commands from a prompt document: they are typed after the prompt marker, one at a time, never in zsh.
-- zsh is not bash (`${!name}` indirection fails); run helper scripts under `bash`. A slip once ran a migration against the dev database instead of the training one; scripts now stop unless the target database name matches.
-- Shared test database: use random truck codes and far dates so specs do not collide; each e2e spec that enrols a user needs its own user.
-- Nobody pastes passwords, PINs or tokens into a chat, a commit or a log. Credentials live only in the ignored `training-accounts.local.txt` or the private Docker volume.
+R14 findings (spec: `docs/reviews/CODEX-REVIEW-R14.md`): HIGH — R14-01 dispatch checks not serialized (cancel vs start race, `loading_started` ignored, driver/truck double booking silently accepted); R14-02 performance reasons copied into ordinary audited tables, escaping the delay-privacy policy; R14-03 importer swallows COMMIT/ROLLBACK failures and reports success; R14-04 XLSX reader ignores `date1904`, accepts duplicate headers, malformed CSV, cached formula values. MEDIUM — R14-05 `trip_stage_estimate` lacks plant/assignment scope and has a nullable role check; R14-06 logout/sync lifecycle epoch gaps in the phone app; R14-07 Funnel scripts can fall back to incomplete text status, `training-up.sh` ignores a failed check; R14-08 importer idempotency race and key-only "exists" (conflicting rows skipped); R14-09 reports and logs can contain cells/sheet names; R14-10 soft rollback ignores `ledger_opening` and `opening_party_balance`; R14-11 CLI TOTP bypasses the used-step claim and the cross-process failure budget; R14-12 the stale-staging sweep can delete a live seed's file. LOW — R14-13 birth-token docs overclaim (a cluster restore can carry an unused token; external fresh-volume provenance stays mandatory); R14-14 five screenshots are 404 pages and one image shows named workers without a fictitious label.
 
-## Hard rules decided with Ali
-- **No external LLM on real data** until the CNDP authorizes it. The assistant stays deterministic until then.
-- **Client and supplier portals** are switched on last, after the independent review.
-- **No "black" or no-VAT sales mode, and no disguised names** in accountant or tax documents. The lead refused both. Legally exempt operations are allowed only with their legal reference.
-- **Module flags:** a module is switched on only when its tests pass on the server.
-- **The CNDP declaration** is filed before any real personal data is entered.
+## 8. Current state (7 Nov 2026, 03:30)
+- Code = `f3cb07d` (reviewed by R14). `main` head = `c971230` (docs only: Claude Code's first refresh of this handoff plus `docs/reviews/CODEX-REVIEW-R14.md`; no tests/CI run). This brain version replaces that repo text (Claude Code's version wrongly said "VPS in Morocco"; the decision is Infomaniak, Switzerland).
+- Uncommitted on the Mac (seen 7 Nov 03:20, origin not yet explained to the lead): edits to field-UI files and an untracked `field-session.ts`, plus `.next-training/`. Ask Claude Code what they are before T7 (they may be the start of R14-06 work). Nothing from them is in `main`.
+- **Training instance on the Mac:** `http://localhost:3300/fr/login` (database `belgobeton_training`, runs from `.next-training`, started by `.logs/_training-start.sh`, currently on `f3cb07d`; the `:3000` pilot dev server is stopped). Funnel is CLOSED. Tailscale on Ali's iPhone is blocked by an App Store payment issue; BlueStacks (Android emulator) exists on the Mac and becomes useful once a public HTTPS URL exists.
+- **Training logins** (labels only): `proprietaire@`, `admin@`, `ventes@`, `achats@`, `centrale-tetouan@`, `centrale-chefchaouen@`, `comptable@` all at `formation.beton.invalid`; drivers `CH-01`, `CH-02`, `CH-03`, pump operator `CH-06` with PINs. Passwords/PINs only in `training-accounts.local.txt`. Phone login: generic 404 "Code ou PIN incorrect" is intentional; `403 OTHER_DEVICE` means the PIN is right but the driver is bound to another device. Owner/app_admin releases it at `/fr/admin/field` ("Chauffeurs (téléphones)", button "Libérer", may ask a fresh TOTP). Five wrong PINs lock a driver; failed logins also hit a per-IP limit (wait ~15 min). `CH-01`–`CH-03` are currently bound to Ali's earlier test devices.
+- **Excel files from the office:** expected; not yet received. Store only in `~/BELGOBETON-data` (chmod 700, outside the repo, FileVault on); only first-row headers go to the tools; never real data to an AI.
+- **Tailscale Serve (private, tailnet-only; NEVER Funnel) in progress:** Claude Code reset Funnel (nothing public) and prepared `tailscale serve --bg 3300`. Blocked on Ali enabling Serve (and HTTPS certificates if asked) in the Tailscale admin console, then telling Claude Code. After that the app's origin becomes the `*.ts.net` URL set in `.logs/_training-start.sh` (no localhost second origin; `http://localhost:3300` will then be rejected on purpose). Off switch: `tailscale serve reset`. Caveat: a phone needs the Tailscale app to reach a Serve URL, and Ali's iPhone cannot install it (App Store payment issue), so Serve helps only devices already in the tailnet (the Mac, other computers); phones still need the later public Funnel URL (after the iMac conditions) or Chrome device mode / BlueStacks meanwhile.
+- Not yet done: T7, Codex R15, the on-iMac rehearsal, the CNDP declaration, the VPS.
+- Open training limits (T5): pilot rotations also show "critical" when the day is armed late; the plant board does not refresh live; delay reason is chosen before the tap; Chefchaouen has no driver accounts; role cards not yet walked through by a person; repeated rearm accumulates client credit.
 
-## Artifacts in Ali's first account (private unless he shares them)
-- "BELGOBETON — Vision 2", the integrated mockup: https://claude.ai/artifact/Ewwqsb3fGfBewgA51fe5V4
-- "BELGOBETON — Vision pilote", shared by link: https://claude.ai/artifact/JPfGeyxrQLj5mTmH8jtNuf
-- Owner meeting document (Docs): XucYc8cKzoY46X2Pu8mtYa
+## 9. Roadmap (in order; update as things move)
+1. **T7** (Claude Code; full prompt in Appendix A): fix R14 in three groups, push after each, one clean full e2e at the end. A: training/iMac path (R14-06, 07, 12, 13). B: T5 dispatch (R14-01, 02, 05, 14). C: importer (R14-03, 04, 08, 09, 10, 11 + typed phrase over the full hash, guard `runImport`).
+2. **R15** (Codex): re-review the corrective commit including importer and T5 (Appendix B), with a runtime-evidence list.
+3. **On-iMac rehearsal** of the seven R14 §6 conditions (exact artifact and digest, genuinely new volume, isolation, Keychain/GHCR token, real Funnel with forged X-Forwarded-For, mobile-data tests, closure verification, reset afterwards). Guide: `docs/checkpoints/CP-TRAINING-IMAC-FR.md`. Then SUPERVISED training sessions only (Funnel open only during a session; `tailscale funnel reset` afterwards). Phones use the public URL in their browser (no app needed).
+4. **Importer rehearsal** with synthetic workbooks on a production-mode rehearsal database; then the office's real headers and mapping; real import only after R15 + CNDP.
+5. **CNDP declaration**: draft via Gemini without real data; start soon (filing takes time). Include the transfer to Switzerland and, for named drivers' delay statistics, the purpose, who accesses, retention, correction/dispute process and notice to workers (never for disciplinary use).
+6. Pre-production items: plant manager's technical confirmation for §16.10, `ops.sh reset-owner-*`, e2e specs for client-copy and copy-address, driver and finance flag review, reset of legacy 4–6 digit PINs, Darija wording review before `DARIJA_ENABLED`, plant/driver interview outcomes (verify what REQUIREMENTS §6/§7 and DECISIONS already record from the 3 Nov interviews), final Codex review.
+7. **December (when Ali receives an advance):** order the Infomaniak VPS Lite (2 vCPU/4 GB, 86.40 €/year, annual only, Ubuntu; SSH key already created), DNS A record `beton` in OrangeHost cPanel (Ali logs in himself), set `APP_DOMAIN`, fresh install (the VPS starts from a fresh seed, earlier training work is discarded), restore and rollback tests, firewall/SSH checks, office backup pull.
+8. Timeline (owner's): semi-trial 16–30 Nov, go-live target 1 Dec. It is at risk: real data needs items 1–6 first. Decide with Ali whether go-live slides or starts with a reduced scope; record the decision in §12.
 
-Mockups are illustrative only, not requirements.
+## 10. Where everything is
+- Repo `~/BELGOBETON` (GitHub private repo). Key docs: `CLAUDE.md`; `docs/REQUIREMENTS-V1.md` (source of truth); `docs/DECISIONS.md` (numbered decisions; 169–180 are recent); `docs/checkpoints/CP-PROD-PLAN.md` (plan, batches, T1–T6); `CP-TRAINING.md` and `CP-TRAINING-IMAC-FR.md` (training and iMac steps); `docs/RUNBOOK.md` (production); `docs/IMPORT-EXCEL.md`; `docs/training/` (role cards FR/AR, `screens/`); `docs/reviews/CODEX-REVIEW-*.md`; `docs/DOMAIN.md`, `BRIEF.md`, `HANDOFF-CODEX.md`, `AI-COLLABORATION.md`, `VISION-V3.md`, `NEXT-STEPS.md` (early, partly historical).
+- Logs and backups: `~/BELGOBETON/.logs/` (e2e logs, `training-before-5abea8d.dump`), gitignored.
+- Mockups (Ali's first account, illustrative only): "BELGOBETON — Vision 2" https://claude.ai/artifact/Ewwqsb3fGfBewgA51fe5V4; "BELGOBETON — Vision pilote" https://claude.ai/artifact/JPfGeyxrQLj5mTmH8jtNuf; owner meeting doc (Docs) XucYc8cKzoY46X2Pu8mtYa.
 
-## Next actions, in order
-1. Group A to C of R14 as T7, one commit per finding, then ask Codex to re-review the corrective commit.
-2. Second green full e2e on AC power; record it in CP-PROD-PLAN.
-3. On-iMac rehearsal against the conditions above; record only non-secret results.
-4. Ali decides the go-live date given the real-data NO-GO; CNDP declaration and VPS provider choice.
+## 11. Lessons and gotchas
+- `pnpm` missing in a new terminal: `corepack pnpm …`. Never `claude --model sonnet.` (no dot).
+- e2e: run one full pass on AC power under `caffeinate -dimsu`; a pass takes ~35–45 min. The repeated "TOTP/login timeouts" were the Mac SLEEPING on battery (system log shows Clamshell/Maintenance Sleep), not replay protection and not code. The test helper already waits for the next TOTP step. Do not run other heavy things (Chrome DevTools, dev servers) during it. Stop the `:3000`/`:3300` servers first.
+- Claude Code resumes after a network loss with "continue". Approve harmless permission prompts; stop on `push --force` or deletions. Ignore "Update installed · Restart to update".
+- Rate limiting is a protection: after failed logins wait ~15 min; never retry blindly (5 wrong PINs lock a driver).
+- The lead must not guess: verify in the repo through the bridge; when a plan changes, update this file.
+- The birth token is a consumable marker, not proof a volume is new; always confirm a genuinely new dedicated volume independently.
+- Ali's screenshots may expose other people's credentials (Apple Notes); never use or repeat them.
+
+## 12. Open decisions (Ali / owner / accountant)
+- Go-live date versus the real-data gates (see §9 item 8).
+- Named-driver delay statistics: purpose, retention, correction process, notice to workers.
+- Owner: external truck pricing basis, cancellation fee policy, reference price per plant (built per plant; confirm), accountant read scope.
+- Accountant: final invoice timing, legal exemptions with references, export format; last 2026 invoice number.
+- Dispatch assumptions of T5 (decision 179): 5-minute tolerance, 10-rotation median window, default waiting/turnaround 0. Confirm against reality in training.
+- Real Excel headers/sheet names and which purchase price lists, stock counts and months of history exist.
+- Who will operate the iMac/VPS day to day, and the backup holder in Morocco.
+
+## 13. Idea backlog (add dated entries)
+- (empty so far beyond the future-scope list in §4; add Ali's and the owner's agreed extra services here.)
+
+## 14. Appendix A — T7 prompt (pending; paste into Claude Code if not already done)
+```
+T7 — fix the findings of docs/reviews/CODEX-REVIEW-R14.md (read it fully first; it is the spec). Never weaken RBAC, 2FA, replay protection, audit, encryption, RLS, rate limiting or the origin check. No secrets in commits or output. One commit per finding with tests (a failing-before proof where practical). Three groups, in this order; after each group run lint, typecheck, unit, integration and the touched e2e specs, then push and confirm the CI image build is green. After group C run ONE full e2e with the Mac on AC power and wrapped in `caffeinate -dimsu` (the Mac sleeping on battery caused the previous e2e timeouts). Do not open anything public.
+
+GROUP A — training/iMac path: R14-06, R14-07, R14-12, R14-13.
+- R14-06: one session generation shared by sync, photo flush, day reads and wipes in field-app. Logout must fence new work first (no new reads/uploads after it starts), have an overall deadline, and a stale wipe must check its epoch BEFORE touching the queue (clearWaiting). Whole-component tests: logout with a sync/photo flush in flight, stalled network, re-login, delayed IndexedDB/Cache Storage.
+- R14-07: go-public.sh and funnel-check.sh require a SUCCESSFUL complete JSON inspection for publication and for any "closed" claim. python3 is required. Positively distinguish "CLI version does not support --json" (refuse) from a control/daemon error (refuse); never fall back to text as authorization. Remove the loose "off" phrase acceptance in funnel-check.sh. training-up.sh must propagate a failed check, never print a local-only reassurance on failure. Tests for each path.
+- R14-12: lock the whole seed/output lifecycle (lock file) before sweeping, and sweep only provably abandoned staging files (older than a threshold and not under a held lock).
+- R14-13: harden and document the birth token honestly: bind the token to the business database name; make the reset helper itself check the mode flags and an existing birth row instead of relying only on the CLI; require a real test-runner signal for the allowlisted-name escape. Rewrite the claims in scripts/training-birth.ts, 10-birth-token.sql and decision 180 to the true boundary (a maintenance/cluster restore can carry an unused token; external fresh-volume provenance stays mandatory).
+
+GROUP B — T5 (dispatch/timing): R14-01, R14-02, R14-05, R14-14.
+- R14-01: serialize cancellation, start and replacement under one lock discipline (day/resource/trip), including the event writer's lock inside the cancellation trigger. "Started" must include the driver's loading_started report. Re-read state after locking. Unique plan identity per work item (not only per random batch). Decide the overlap policy for driver/truck: block double-booking unless an explicit audited override with reason exists, and surface any accepted conflict in the reassign action instead of discarding it. Concurrency tests (cancel vs start, two simultaneous reassignments, two saves creating batches for the same work).
+- R14-02: the explanation text stays only in the restricted delay/change tables. Broader records (driver_override_reason, trip_plan_cancellation.reason) get a neutral reference/code, never the free text. Extend the restrictive audit policy to every secondary audit row that could carry performance information, and test that partner/support cannot reconstruct it via plan, cancellation or audit reads.
+- R14-05: trip_stage_estimate must positively authorize the role (no nullable NOT IN fall-through when role context is absent), enforce plant/assignment scope inside the function, and for driver callers require a minimum number of distinct drivers behind any median. Tests as foreign plant manager, foreign driver, no role context.
+- R14-14: regenerate the 17 screenshots with a page-success assertion (replace the five 404 captures), label every standalone image fictitious, and use unambiguous invented driver labels in the timing image.
+- Correct decision 179 (driver access to trip_dispatch_change) and document in the rearm docs: run it before trainees sign in; it is not all-or-nothing.
+
+GROUP C — importer (real-data gate): R14-03, R14-04, R14-08, R14-09, R14-10, R14-11, plus two extras.
+- R14-03: await a SUCCESSFUL COMMIT before setting or reporting applied; a failed or unknown commit outcome exits non-zero with a safe error code, distinguishing "failed" from "outcome unknown". If transaction cleanup fails, destroy the connection instead of returning it to the pool. Same for soft rollback and dry-run rollback. Tests with an injected commit-time constraint failure and a connection loss.
+- R14-04: honor workbookPr.date1904 or refuse that workbook; refuse duplicate accepted headers; refuse malformed CSV (unclosed quote); define and enforce a strict policy for formula cells (refuse unless the mapping explicitly allows cached values, and then flag them in the report).
+- R14-08: serialize imports (advisory lock) and make idempotency compare payloads, not just keys. A conflicting existing row, or two same-party opening-balance rows in one workbook, must block the file instead of being skipped as "exists". Concurrency test for two simultaneous imports of the same file.
+- R14-09: reports and CLI output use fixed error codes and safe sheet aliases (Sheet 1…n), never cell values or raw sheet names; normalize PostgreSQL errors at the CLI boundary; log files created 0600 in a 0700 directory. Treat WorkbookReport labels as sensitive. Correct docs/IMPORT-EXCEL.md: row audit rows DO contain values under their existing RLS, only the summary import audit row is hash/counts.
+- R14-10: fix the SEALED/residual inventory to the real tables (ledger_opening, opening_party_balance); test a rollback after importing balances, including the opening-date singleton, and document the correction procedure.
+- R14-11: the CLI must use the same atomic used-step claim as the application (totp_used_step) and a persisted cross-process failure budget, revalidate account eligibility at use, and bind the verified code to this operation.
+- Extra 1: the typed phrase must cover the FULL file hash (or at least the full hash plus mapping and opening-date choices), not a 48-bit prefix.
+- Extra 2: the exported runImport helper must not be usable as an alternative import path: remove it from the public index or give it the same mode/marker/step-up checks.
+- Use only synthetic workbooks; never bypass the training refusal to rehearse. Add a fixture with date1904, duplicate headers and a formula cell.
+
+Docs: update CP-PROD-PLAN.md and the decision log, and the iMac/training guides where behavior changed. Report each finding's commit hash, the final commit hash, test totals, the full e2e result with duration and sleep status, and anything you could not fix.
+```
+
+## 15. Appendix B — R15 prompt skeleton (Codex, after T7)
+Start with `/new` (current worktree). "Review commit <T7 final hash> exactly; baseline f3cb07db878d124029b6aa4a4533dfac482fb964 (your R14). Read-only; run nothing; never open .env*, backups/, accounts files, keys, or ~/BELGOBETON-training-private. Scope A: dispositions for R14-01…R14-14 with file:line evidence at the exact commit and bypass hunting against each fix. Scope B: new code introduced by T7. Scope C: importer as a real-data gate, with the list of runtime evidence still required on synthetic production-mode data. Deliver docs/reviews/CODEX-REVIEW-R15.md: disposition table; new findings ranked; training verdict for this exact commit; importer verdict; what must be verified on the iMac; the real-data decision. Distinguish 'verified in source' from 'inference'. Change no application code."
+
+## 16. Change log
+- 2026-11-07 03:45 — Claude Code pushed `c971230` (docs-only handoff refresh + R14 report). Lead found two inaccuracies in it (hosting said Morocco; T7 grouping differed) and replaced it with this brain. Tailscale Serve (tailnet-only) setup pending Ali's console step. Uncommitted field-UI edits noted in §8.
+- 2026-11-07 03:30 — Brain rewritten from scratch (replaces the 2 Nov repo version): roles/protocol, rules, scope, architecture, history, reviews R11–R14, state, roadmap, open decisions, appendices.
+- 2026-11-07 — R14 received (conditional GO for fictitious training; T5 exercise-only; importer NO-GO; real data NO-GO); T7 prompt written. Lessons: e2e timeouts were Mac sleep; Tailscale on iPhone blocked by App Store payment; driver binding release path found.
+- 2026-11-06 — T2, T4, T5, T6 pushed (`99072c0`, `5abea8d`, `f3cb07d`); R12 and R13 received.
+- 2026-11-05 — Batch D closed; T1 training instance; R11 NO-GO → T3.
+- 2026-11-02 — Production phase starts; REQUIREMENTS-V1; Batch A.
