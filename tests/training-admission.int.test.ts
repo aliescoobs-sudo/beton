@@ -339,7 +339,7 @@ describe('stale staged credentials are swept first', () => {
   const stale = () => {
     const d = mkdtempSync(path.join(tmpdir(), 'bb-sweep-'));
     chmodSync(d, 0o700);
-    const staged = path.join(d, 'training-accounts.staging-0123456789ab.local.txt');
+    const staged = path.join(d, 'training-accounts.staging-t0123456789ab.local.txt');
     writeFileSync(staged, 'password: leftover\n', { mode: 0o600 });
     const old = new Date(Date.now() - 3_600_000); // R14-12: only a provably abandoned file (older than the threshold) is swept
     utimesSync(staged, old, old);
@@ -391,7 +391,7 @@ describe('stale staged credentials are swept first', () => {
        insert into client (id, code, name, kind) values (gen_random_uuid(), 'CLT-7778', 'Reste', 'company')`,
     );
     const s = stale();
-    const young = path.join(s.dir, 'training-accounts.staging-aaaaaaaaaaaa.local.txt');
+    const young = path.join(s.dir, 'training-accounts.staging-taaaaaaaaaaaa.local.txt');
     writeFileSync(young, 'password: seed A, in progress\n', { mode: 0o600 });
     const lockA = acquireSeedLock(s.final); // seed A is running
     try {
@@ -409,6 +409,6 @@ describe('stale staged credentials are swept first', () => {
     ).rejects.toThrow(/not empty/);
     expect(existsSync(s.staged)).toBe(false);
     expect(existsSync(young)).toBe(true);
-    expect(existsSync(path.join(s.dir, 'training-accounts.seed.lock'))).toBe(false); // the lock is released on every way out
+    expect(readdirSync(s.dir).filter((n) => n.startsWith('training-accounts.seed.lock'))).toEqual([]); // the lock is released on every way out
   });
 });

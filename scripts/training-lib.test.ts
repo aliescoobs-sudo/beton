@@ -170,78 +170,196 @@ describe('R12-02: no secret under an unignored name, nothing left behind, no che
     expect(() => commitCredentialsFile(staged)).toThrow();
     expect(readdirSync(d).filter((n) => STAGING_NAME.test(n))).toEqual([]);
   });
-  it('the startup sweep removes staged files of an earlier crash, old and new names, and nothing else', () => {
+  it('the startup sweep removes only stages of a superseded attempt (and old enough), keeps unknown ones and reports them', () => {
     const d = dir();
     const final = path.join(d, 'training-accounts.local.txt');
     writeFileSync(final, 'keep', { mode: 0o600 });
-    writeFileSync(path.join(d, 'training-accounts.staging-0123456789ab.local.txt'), 'stale', { mode: 0o600 });
-    writeFileSync(path.join(d, '.training-accounts.local.txt.abcdef012345'), 'stale', { mode: 0o600 });
+    const other = path.join(d, 'training-accounts.staging-t0123456789ab.local.txt'); // an earlier attempt's own stage
+    const young = path.join(d, 'training-accounts.staging-tbbbbbbbbbbbb.local.txt');
+    const unknown = path.join(d, 'training-accounts.staging-0123456789ab.local.txt'); // bare name: creator unknown
+    const legacy = path.join(d, '.training-accounts.local.txt.abcdef012345');
+    writeFileSync(other, 'stale', { mode: 0o600 });
+    writeFileSync(young, 'young', { mode: 0o600 });
+    writeFileSync(unknown, 'who knows', { mode: 0o600 });
+    writeFileSync(legacy, 'who knows', { mode: 0o600 });
     writeFileSync(path.join(d, 'notes.txt'), 'mine');
-    symlinkSync('/etc/hosts', path.join(d, 'training-accounts.staging-aaaaaaaaaaaa.local.txt'));
+    symlinkSync('/etc/hosts', path.join(d, 'training-accounts.staging-taaaaaaaaaaaa.local.txt'));
     const old = new Date(realClock.now().getTime() - 3_600_000);
-    for (const n of [
-      'training-accounts.staging-0123456789ab.local.txt',
-      '.training-accounts.local.txt.abcdef012345',
-    ])
-      utimesSync(path.join(d, n), old, old);
+    for (const n of [other, unknown, legacy]) utimesSync(n, old, old);
     const lock = acquireSeedLock(final);
-    expect(sweepStaleStagedCredentials(final, lock)).toBe(2);
-    lock.release();
-    expect(readdirSync(d).sort()).toEqual(
-      ['notes.txt', 'training-accounts.local.txt', 'training-accounts.staging-aaaaaaaaaaaa.local.txt'].sort(),
+    const r = sweepStaleStagedCredentials(final, lock);
+    expect(r.removed).toBe(1);
+    expect(r.unknown.sort()).toEqual(
+      [
+        '.training-accounts.local.txt.abcdef012345',
+        'training-accounts.staging-0123456789ab.local.txt',
+      ].sort(),
     );
+    lock.release();
+    expect(existsSync(other)).toBe(false);
+    expect(existsSync(young)).toBe(true); // the age gate, on top of the attempt rule
+    expect(existsSync(unknown)).toBe(true); // creator unknown: never deleted
+    expect(existsSync(legacy)).toBe(true);
     expect(readFileSync(final, 'utf8')).toBe('keep');
   });
-  describe('R14-12: the seed lock and the abandoned-file rule', () => {
+  describe('R14-12, R15A-05: the seed lock, the takeover and the fence', () => {
     const mk = () => {
       const d = dir();
       return { d, final: path.join(d, 'training-accounts.local.txt') };
     };
+    const locks = (d: string) => readdirSync(d).filter((n) => n.startsWith(SEED_LOCK_NAME));
+    // a clock the test moves; heartbeats never run on their own (the interval is an hour)
+    const clockAt = (t0: number) => {
+      const c = { t: t0, now: () => c.t, heartbeatMs: 3_600_000 };
+      return c;
+    };
+    const age = (d: string, file: string, c: { t: number }) =>
+      utimesSync(path.join(d, file), new Date(c.t), new Date(c.t));
     it("a second seed is refused while the first one's lock is live, and the lock goes when it is released", () => {
       const { d, final } = mk();
       const a = acquireSeedLock(final);
       expect(() => acquireSeedLock(final)).toThrow(SeedLockError);
       expect(a.held()).toBe(true);
       a.release();
-      expect(existsSync(path.join(d, SEED_LOCK_NAME))).toBe(false);
+      expect(locks(d)).toEqual([]);
       acquireSeedLock(final).release();
     });
-    it('an abandoned lock (no heartbeat) is taken over once; a live one never is', () => {
+    it('an abandoned lock (no heartbeat) is taken over by the NEXT epoch; a live one never is', () => {
       const { d, final } = mk();
-      let t = 1_000_000;
-      const clock = { now: () => t, heartbeatMs: 3_600_000 };
-      const dead = acquireSeedLock(final, clock); // its heartbeat never runs in this test
-      const lockFile = path.join(d, SEED_LOCK_NAME);
-      utimesSync(lockFile, new Date(t), new Date(t));
-      t += 30_000;
-      expect(() => acquireSeedLock(final, clock)).toThrow(SeedLockError); // 30 s: still live
-      t += 60_000;
-      const taker = acquireSeedLock(final, clock); // 90 s without a beat: abandoned
+      const c = clockAt(1_000_000);
+      const dead = acquireSeedLock(final, c); // its heartbeat never runs in this test
+      const first = locks(d);
+      expect(first).toEqual([`${SEED_LOCK_NAME}.1`]);
+      age(d, first[0]!, c);
+      c.t += 30_000;
+      expect(() => acquireSeedLock(final, c)).toThrow(SeedLockError); // 30 s: still live
+      c.t += 60_000;
+      const taker = acquireSeedLock(final, c); // 90 s without a beat: abandoned
+      expect(locks(d)).toEqual([`${SEED_LOCK_NAME}.2`]);
       expect(taker.held()).toBe(true);
       expect(dead.held()).toBe(false); // the old holder no longer holds anything...
+      expect(() => dead.assertHeld('the marker')).toThrow(/no longer holds the seed lock/);
       dead.release();
-      expect(existsSync(lockFile)).toBe(true); // ...and its release does not remove the new holder's lock
+      expect(locks(d)).toEqual([`${SEED_LOCK_NAME}.2`]); // ...and its release does not remove the new holder's lock
       taker.release();
-      expect(existsSync(lockFile)).toBe(false);
+      expect(locks(d)).toEqual([]);
+    });
+    it("concurrent takers of one abandoned lock: exactly one wins, and the winner's NEW lock is never removed by the loser", () => {
+      const { d, final } = mk();
+      const c = clockAt(5_000_000);
+      const dead = acquireSeedLock(final, c);
+      age(d, locks(d)[0]!, c);
+      c.t += 120_000;
+      // B and C have both read "epoch 1 is abandoned". B takes epoch 2 first; C then acts on its stale reading: the epoch it wants exists.
+      const b = acquireSeedLock(final, c);
+      // C re-reads and finds B's fresh lock...
+      expect(() => acquireSeedLock(final, c)).toThrow(/live/);
+      // ...and even if C had read before B acted, its exclusive create of the same epoch fails. Simulate by planting C's target ourselves:
+      expect(b.held()).toBe(true);
+      expect(locks(d)).toEqual([`${SEED_LOCK_NAME}.2`]);
+      dead.release();
+      expect(b.held()).toBe(true); // nobody removed B's lock
+      b.release();
+    });
+    it('two processes racing for an abandoned lock: one wins, the other is refused, the winner keeps holding', () => {
+      const { d, final } = mk();
+      // plant an abandoned epoch-7 lock (mtime two hours ago)
+      const planted = path.join(d, `${SEED_LOCK_NAME}.7`);
+      writeFileSync(planted, JSON.stringify({ token: 'x', epoch: 7 }), { mode: 0o600 });
+      const old = new Date(realClock.now().getTime() - 7_200_000);
+      utimesSync(planted, old, old);
+      const script = `import('./scripts/training-lib.ts').then(async (m) => { try { const l = m.acquireSeedLock(${JSON.stringify(final)}); console.log('won'); await new Promise((r) => setTimeout(r, 400)); console.log(l.held() ? 'still-held' : 'LOST'); l.release(); process.exit(0); } catch (e) { console.log(e instanceof m.SeedLockError ? 'refused' : 'error'); process.exit(0); } })`;
+      // start 4 at once through the shell: they all read the same abandoned lock
+      const r = spawnSync(
+        'sh',
+        [
+          '-c',
+          `for i in 1 2 3 4; do (${JSON.stringify(process.execPath)} --import ./scripts/register-ts-paths.mjs -e ${JSON.stringify(script)} &) ; done; sleep 3`,
+        ],
+        { encoding: 'utf8' },
+      );
+      const out = r.stdout.split('\n').filter(Boolean);
+      expect(out.filter((x) => x === 'won').length).toBe(1);
+      expect(out.filter((x) => x === 'refused').length).toBe(3);
+      expect(out).toContain('still-held');
+      expect(out).not.toContain('LOST');
+      expect(out).not.toContain('error');
+    }, 20_000);
+    it('a suspended holder that resumes after a takeover is fenced at every commit', () => {
+      const { d, final } = mk();
+      const c = clockAt(9_000_000);
+      const a = acquireSeedLock(final, c);
+      const staged = stageCredentialsFile(final, 'password: A\n', a.attempt);
+      expect(a.held()).toBe(true);
+      // A is suspended: no beat for 90 s of the wall clock; B takes over
+      age(d, locks(d)[0]!, c);
+      c.t += 90_000;
+      const b = acquireSeedLock(final, c);
+      // A resumes and tries to commit: it is refused, at the rename and at the marker
+      expect(() => a.assertHeld('the placing of the credentials file')).toThrow(SeedLockError);
+      expect(existsSync(final)).toBe(false); // A placed nothing
+      expect(existsSync(staged.tmp)).toBe(true); // A's stage is still its own until the sweep of an old, superseded attempt
+      expect(b.held()).toBe(true);
+      b.release();
+    });
+    it('the holder fences ITSELF when it cannot prove its lease, even before anyone has taken over', () => {
+      const { final } = mk();
+      const c = clockAt(2_000_000);
+      const a = acquireSeedLock(final, c);
+      expect(a.held()).toBe(true);
+      c.t += 29_999;
+      expect(a.held()).toBe(true);
+      c.t += 2; // more than half of the stale time without a beat: it stops committing, a taker would still have to wait
+      expect(a.held()).toBe(false);
+      a.release();
+    });
+    it('a stage older than ten minutes owned by a resumable writer is not swept; once its writer is superseded it is', () => {
+      const { d, final } = mk();
+      const c = clockAt(realClock.now().getTime());
+      const a = acquireSeedLock(final, c);
+      const staged = stageCredentialsFile(final, 'password: A\n', a.attempt);
+      const hourAgo = new Date(c.t - 3_600_000);
+      utimesSync(staged.tmp, hourAgo, hourAgo); // the stage is an hour old, and A's heartbeat has not run
+      // a second seed cannot even start while A's lock is live: it cannot sweep
+      expect(() => acquireSeedLock(final, c)).toThrow(SeedLockError);
+      expect(existsSync(staged.tmp)).toBe(true);
+      // A is stalled past the stale time: B takes over. Only now is A's stage a candidate, and it is old enough
+      age(d, locks(d)[0]!, c);
+      c.t += 90_000;
+      const b = acquireSeedLock(final, c);
+      expect(a.held()).toBe(false);
+      expect(sweepStaleStagedCredentials(final, b, { now: c.now }).removed).toBe(1);
+      expect(existsSync(staged.tmp)).toBe(false);
+      b.release();
+    });
+    it('a stage of the attempt itself is never swept by it, and a younger superseded one is kept by the age gate', () => {
+      const { d, final } = mk();
+      const c = clockAt(realClock.now().getTime());
+      const a = acquireSeedLock(final, c);
+      const staged = stageCredentialsFile(final, 'x', a.attempt);
+      age(d, locks(d)[0]!, c);
+      c.t += 90_000;
+      const b = acquireSeedLock(final, c);
+      expect(sweepStaleStagedCredentials(final, b, { now: c.now }).removed).toBe(0); // A's stage is only ~1.5 minutes old
+      expect(existsSync(staged.tmp)).toBe(true);
+      b.release();
     });
     it('the sweep refuses to run without a held lock', () => {
       const { final } = mk();
       const lock = acquireSeedLock(final);
       lock.release();
-      expect(() => sweepStaleStagedCredentials(final, lock)).toThrow(/needs the seed lock/);
+      expect(() => sweepStaleStagedCredentials(final, lock)).toThrow(/no longer holds the seed lock/);
     });
-    it('the sweep spares a young staged file (another seed may be writing it) and removes an old one', () => {
+    it('a lock of the first version (no epoch) is read as epoch 0: live ones refuse, abandoned ones are taken over', () => {
       const { d, final } = mk();
-      const young = path.join(d, 'training-accounts.staging-111111111111.local.txt');
-      const old = path.join(d, 'training-accounts.staging-222222222222.local.txt');
-      writeFileSync(young, 'x', { mode: 0o600 });
-      writeFileSync(old, 'x', { mode: 0o600 });
-      const hourAgo = new Date(realClock.now().getTime() - 3_600_000);
-      utimesSync(old, hourAgo, hourAgo);
+      const legacy = path.join(d, SEED_LOCK_NAME);
+      writeFileSync(legacy, JSON.stringify({ token: 'old' }), { mode: 0o600 });
+      expect(() => acquireSeedLock(final)).toThrow(/live/);
+      const old = new Date(realClock.now().getTime() - 3_600_000);
+      utimesSync(legacy, old, old);
       const lock = acquireSeedLock(final);
-      expect(sweepStaleStagedCredentials(final, lock)).toBe(1);
-      expect(existsSync(young)).toBe(true);
-      expect(existsSync(old)).toBe(false);
+      expect(existsSync(legacy)).toBe(false);
+      expect(locks(d)).toEqual([`${SEED_LOCK_NAME}.1`]);
       lock.release();
     });
     it('the lock is exclusive between processes: a second process cannot take it', () => {

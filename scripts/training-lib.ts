@@ -176,7 +176,13 @@ function insideCheckoutOrBuildContext(dir: string): boolean {
 }
 
 /** The name of a staged file: covered by `training-accounts*.local.txt` in both .gitignore and .dockerignore, never a hidden name. */
-export const STAGING_NAME = /^training-accounts\.staging-[0-9a-f]{12}\.local\.txt$/;
+export const STAGING_NAME = /^training-accounts\.staging-t?[0-9a-f]{12}\.local\.txt$/;
+/**
+ * R15A-05: a stage written by the lock protocol of this version is named after the attempt that made it
+ * (`staging-t<first 12 hex of the lock token>`); the sweep can then tell WHOSE it is. A bare `staging-<12 hex>` name is from an earlier
+ * version or a caller with no lock: its creator is unknown.
+ */
+const ATTEMPT_STAGING_NAME = /^training-accounts\.staging-t([0-9a-f]{12})\.local\.txt$/;
 /** Staged names of the first version (hidden, uncovered by the ignore rules): still swept if an old crash left one. */
 const LEGACY_STAGING_NAME = /^\.training-accounts[A-Za-z0-9._-]*\.[0-9a-f]{12}$/;
 
@@ -219,11 +225,13 @@ export interface StagedCredentials {
 }
 
 /** Writes the content to a new file made exclusively (O_EXCL, no symlink following) with mode 0600, flushed to disk. Not yet in place. */
-export function stageCredentialsFile(file: string, content: string): StagedCredentials {
+export function stageCredentialsFile(file: string, content: string, attempt?: string): StagedCredentials {
   const final = validateCredentialsPath(file);
   const tmp = path.join(
     path.dirname(final),
-    `training-accounts.staging-${randomBytes(6).toString('hex')}.local.txt`,
+    attempt
+      ? `training-accounts.staging-t${attempt}.local.txt`
+      : `training-accounts.staging-${randomBytes(6).toString('hex')}.local.txt`,
   );
   const fd = openSync(
     tmp,
@@ -257,28 +265,58 @@ export function commitCredentialsFile(staged: StagedCredentials): void {
   }
 }
 
-// ---- R14-12: the whole seed/output lifecycle is under ONE lock; the sweep only removes provably abandoned staging files -------------------
-/** The lock file of the seed in the credentials folder (never a credentials name; no secret in it). */
+// ---- R14-12, R15A-05: the whole seed/output lifecycle is under ONE lock; a displaced holder is fenced; the sweep only removes stages whose
+// creating attempt provably cannot resume -------------------------------------------------------------------------------------------------
+/**
+ * The seed lock lives in the credentials folder as numbered EPOCH files `training-accounts.seed.lock.<n>` (no secret in them). The
+ * highest number is the current lock. A file without a number is the lock of the first version (epoch 0).
+ *   - A new lock is taken by creating the next number with O_EXCL. Creating a name that exists is refused by the file system, so of any
+ *     number of concurrent takers exactly ONE wins an epoch, and nobody ever unlinks a lock they have not themselves superseded: there is
+ *     no "stat, decide, unlink the pathname" step that could remove a living holder's NEW lock.
+ *   - A lock is taken over only when its heartbeat (mtime) is older than SEED_LOCK_STALE_MS. A missing heartbeat is NOT proof that the
+ *     holder is dead (a suspended or stalled process comes back), so the holder FENCES ITSELF: `held()` is true only while the holder's
+ *     own last successful beat is younger than half of SEED_LOCK_STALE_MS (by its own clock) AND its epoch is still the highest. A
+ *     taker waits the whole stale time; a holder stops committing at half of it. They cannot both be committing, except for the
+ *     instant between a `held()` check and the action right after it (the residual, stated in decision 191).
+ */
 export const SEED_LOCK_NAME = 'training-accounts.seed.lock';
-/** A lock whose last heartbeat is older than this is abandoned (its seed died). A live seed touches it every HEARTBEAT_MS. */
+/** A lock whose last heartbeat is older than this may be taken over. A live seed touches it every HEARTBEAT_MS. */
 export const SEED_LOCK_STALE_MS = 60_000;
 const SEED_LOCK_HEARTBEAT_MS = 10_000;
-/** A staged file younger than this is never swept, even under our own lock (a second line of defence for a lock taken over). */
+/** A staged file younger than this is never swept, even when its attempt is superseded (a second line of defence, not the proof). */
 export const STAGING_MIN_AGE_MS = 10 * 60_000;
 
 export class SeedLockError extends Error {}
 
+const LOCK_FILE = /^training-accounts\.seed\.lock(?:\.([0-9]+))?$/;
+const epochFile = (dir: string, epoch: number): string => path.join(dir, `${SEED_LOCK_NAME}.${epoch}`);
+
 export interface SeedLock {
+  /** The current epoch file. */
   readonly file: string;
-  /** True while this process still holds it (not released, and nobody took the file over). */
+  /** The first 12 hex characters of this attempt's token: stamped into the name of every file it stages. */
+  readonly attempt: string;
+  /** True only while this attempt may still commit: not released, lease fresh by its own clock, and nobody holds a higher epoch. */
   held(): boolean;
+  /** Throws SeedLockError (naming the step) unless held(). Call immediately before every commit. */
+  assertHeld(step: string): void;
   release(): void;
 }
 
+function lockEpochs(dir: string): number[] {
+  const found: number[] = [];
+  for (const name of readdirSync(dir)) {
+    const m = LOCK_FILE.exec(name);
+    if (m) found.push(m[1] === undefined ? 0 : Number(m[1]));
+  }
+  return found.sort((x, y) => x - y);
+}
+const lockPath = (dir: string, epoch: number): string =>
+  epoch === 0 ? path.join(dir, SEED_LOCK_NAME) : epochFile(dir, epoch);
+
 /**
- * Takes the seed lock of the credentials folder, exclusively (O_EXCL, no link followed), and keeps it alive with a heartbeat. Another seed
- * that finds it live (heartbeat within SEED_LOCK_STALE_MS) is refused: it must not sweep, seed or stage anything. A lock whose heartbeat
- * stopped is taken over once. Call BEFORE the sweep and hold it until the seed has finished (marker written or everything discarded).
+ * Takes the seed lock of the credentials folder (see above) and keeps it alive with a heartbeat. A seed that finds the lock live is
+ * refused: it must not sweep, seed or stage anything. Call BEFORE the sweep and hold it until the seed has finished.
  */
 export function acquireSeedLock(
   finalFile: string,
@@ -286,60 +324,81 @@ export function acquireSeedLock(
 ): SeedLock {
   const now = opts.now ?? Date.now;
   const staleMs = opts.staleMs ?? SEED_LOCK_STALE_MS;
-  const file = path.join(path.dirname(path.resolve(finalFile)), SEED_LOCK_NAME);
+  const dir = path.dirname(path.resolve(finalFile));
   const token = randomBytes(12).toString('hex');
-  const create = (): boolean => {
+  const attempt = token.slice(0, 12);
+  const refuse = (why: string): never => {
+    throw new SeedLockError(why);
+  };
+  const create = (epoch: number): boolean => {
     try {
       const fd = openSync(
-        file,
+        epochFile(dir, epoch),
         constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
         0o600,
       );
       try {
-        writeSync(fd, JSON.stringify({ token, pid: process.pid, at: now() }));
+        writeSync(fd, JSON.stringify({ token, epoch, pid: process.pid, at: now() }));
       } finally {
         closeSync(fd);
       }
       return true;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'EEXIST') return false;
-      throw new SeedLockError(
+      return refuse(
         `the credentials folder cannot take the seed lock (${(error as NodeJS.ErrnoException).code ?? 'error'}): nothing was seeded or claimed. Use a folder this user can write (mode 0700).`,
       );
     }
   };
-  if (!create()) {
-    const st = lstatSync(file, { throwIfNoEntry: false });
+  const epochs = lockEpochs(dir);
+  const top = epochs.at(-1);
+  if (top !== undefined) {
+    const st = lstatSync(lockPath(dir, top), { throwIfNoEntry: false });
     if (st && (!st.isFile() || now() - st.mtimeMs <= staleMs))
-      throw new SeedLockError(
+      refuse(
         'another training seed holds the credentials folder (its lock is live): wait for it to finish; nothing was swept, written or removed',
       );
-    // abandoned: its heartbeat stopped. Removed once; if another seed wins the race for the new lock, this one is refused too.
-    if (st) unlinkSync(file);
-    if (!create())
-      throw new SeedLockError(
-        'another training seed took the credentials folder at the same moment: nothing was done',
-      );
   }
+  // The next number is created exclusively. Two takers that judged the same lock abandoned both try the SAME name: one wins, the other
+  // is refused. The winner supersedes the older locks; it never removes anybody's current lock.
+  const epoch = (top ?? 0) + 1;
+  if (!create(epoch))
+    return refuse('another training seed took the credentials folder at the same moment: nothing was done');
+  const file = epochFile(dir, epoch);
+  for (const old of epochs) discardCredentialsFile(lockPath(dir, old)); // superseded (or released) locks, best effort
+
   let released = false;
+  let lastBeat = now();
   const mine = (): boolean => {
     try {
-      return (JSON.parse(readFileSync(file, 'utf8')) as { token?: string }).token === token;
+      if ((JSON.parse(readFileSync(file, 'utf8')) as { token?: string }).token !== token) return false;
+      return (lockEpochs(dir).at(-1) ?? -1) === epoch; // nobody holds a higher epoch
     } catch {
       return false;
     }
   };
+  const held = (): boolean => !released && now() - lastBeat < staleMs / 2 && mine();
   const beat = setInterval(() => {
     try {
-      if (mine()) utimesSync(file, new Date(now()), new Date(now()));
+      if (mine()) {
+        utimesSync(file, new Date(now()), new Date(now()));
+        lastBeat = now();
+      }
     } catch {
-      // the next beat tries again
+      // the next beat tries again; the lease runs out meanwhile and held() turns false
     }
   }, opts.heartbeatMs ?? SEED_LOCK_HEARTBEAT_MS);
   beat.unref();
   return {
     file,
-    held: () => !released && mine(),
+    attempt,
+    held,
+    assertHeld: (step) => {
+      if (!held())
+        throw new SeedLockError(
+          `training seed stopped before "${step}": this attempt no longer holds the seed lock (it was stalled, or another seed took over). Nothing further was written by it.`,
+        );
+    },
     release: () => {
       if (released) return;
       released = true;
@@ -350,34 +409,43 @@ export function acquireSeedLock(
 }
 
 /**
- * Deletes what an earlier crashed seed left in the credentials folder: staged files of ours (regular files, never links) that are
- * PROVABLY abandoned: the caller holds the seed lock (so no other seed is writing) AND the file is older than STAGING_MIN_AGE_MS.
- * Returns how many were removed. Never touches the final file, and refuses to run without a held lock.
+ * Deletes what an earlier seed attempt left in the credentials folder, only when that attempt provably cannot resume a commit:
+ *   - a stage named after an attempt (`staging-t<attempt>`) whose attempt is NOT this one. The caller holds the highest epoch, so the
+ *     creator either released its lock (finished or gave up) or was superseded; a superseded holder fences itself at half the stale
+ *     time (see above) and takes its credentials file out of the question by failing its own `assertHeld` before the rename;
+ *   - AND the file is at least STAGING_MIN_AGE_MS old: an extra, not the proof.
+ * A stage whose creator is unknown (a bare `staging-<hex>` name, or the hidden names of the first version) is NEVER deleted here: nothing
+ * proves that nobody can still rename it. Those are returned in `unknown` so the operator can remove them by hand once they know no seed
+ * is running. Refuses to run without a held lock. Never touches the final file.
  */
 export function sweepStaleStagedCredentials(
   finalFile: string,
   lock: SeedLock,
   opts: { now?: () => number; minAgeMs?: number } = {},
-): number {
-  if (!lock.held())
-    throw new SeedLockError(
-      'the stale staging sweep needs the seed lock: refusing to touch the credentials folder',
-    );
+): { removed: number; unknown: string[] } {
+  lock.assertHeld('sweep of abandoned staged files');
   const now = opts.now ?? Date.now;
   const minAge = opts.minAgeMs ?? STAGING_MIN_AGE_MS;
   const dir = path.dirname(path.resolve(finalFile));
   const me = process.getuid?.();
   let removed = 0;
+  const unknown: string[] = [];
   for (const name of readdirSync(dir)) {
-    if (!STAGING_NAME.test(name) && !LEGACY_STAGING_NAME.test(name)) continue;
+    const named = ATTEMPT_STAGING_NAME.exec(name);
+    if (!named && !STAGING_NAME.test(name) && !LEGACY_STAGING_NAME.test(name)) continue;
     const full = path.join(dir, name);
     const st = lstatSync(full, { throwIfNoEntry: false });
     if (!st || !st.isFile() || (me !== undefined && st.uid !== me)) continue;
-    if (now() - st.mtimeMs < minAge) continue; // maybe in use: not provably abandoned
+    if (!named) {
+      unknown.push(name); // creator unknown: not provably abandoned
+      continue;
+    }
+    if (named[1] === lock.attempt) continue; // ours
+    if (now() - st.mtimeMs < minAge) continue; // the age gate, on top of the proof
     unlinkSync(full);
     removed++;
   }
-  return removed;
+  return { removed, unknown };
 }
 
 /** Removes a staged or committed file, ignoring one that is not there. */

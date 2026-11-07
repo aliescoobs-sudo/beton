@@ -62,6 +62,7 @@ import {
   discardCredentialsFile,
   renderCredentialsFile,
   stageCredentialsFile,
+  SeedLockError,
   type SeedLock,
   sweepStaleStagedCredentials,
   type StagedCredentials,
@@ -209,9 +210,13 @@ export async function seedTraining(opts: SeedTrainingOptions): Promise<SeedTrain
     // (a half-seed that was interrupted, or a seeded database that is being asked again) is removed FIRST, whatever the checks below say.
     validateCredentialsPath(opts.credentialsFile);
     // R14-12: the whole seed/output lifecycle is under one lock, taken BEFORE the sweep and held to the end. A second seed that finds the
-    // lock live is refused before it sweeps, claims the token or writes anything; the sweep only removes provably abandoned files.
+    // lock live is refused before it sweeps, claims the token or writes anything; the sweep only removes stages of superseded attempts (R15A-05).
     lock = acquireSeedLock(opts.credentialsFile);
-    sweepStaleStagedCredentials(opts.credentialsFile, lock);
+    const swept = sweepStaleStagedCredentials(opts.credentialsFile, lock);
+    if (swept.unknown.length)
+      console.warn(
+        `training seed: ${swept.unknown.length} staged credentials file(s) of an unknown earlier attempt were left in place (${swept.unknown.join(', ')}). Nothing proves that no seed can still rename them: remove them by hand once you know no seed is running.`,
+      );
     if ((await migrator.query('select 1 from public.training_marker')).rowCount)
       return { applied: false, accounts: 0, credentialsFile: null };
     await assertSeedTargetEmpty(migrator);
@@ -219,6 +224,9 @@ export async function seedTraining(opts: SeedTrainingOptions): Promise<SeedTrain
     const database = databaseNameOf(env.DATABASE_URL_MIGRATOR);
     if (needToken && !(await hasBirthToken(env, database))) throw new SeedError(PROVENANCE_REFUSAL);
     // Claimed atomically: two seeds cannot both pass, and one seed cannot be run twice on the same volume.
+    // R15A-05: every commit below is preceded by a check that this attempt still holds the lock (a stalled seed that another one has
+    // taken over from stops here instead of finishing over the newer one).
+    lock.assertHeld('the claim of the birth token');
     if (needToken && !(await claimBirthToken(env, database))) throw new SeedError(PROVENANCE_REFUSAL);
 
     const issued: IssuedCredential[] = [];
@@ -590,6 +598,7 @@ export async function seedTraining(opts: SeedTrainingOptions): Promise<SeedTrain
 
     // 8c. T5: the working day of the training instance (rotations for the three drivers, orders to dispatch and to cancel, quotes,
     //     a delivery to receive, a low-stock alert), dated from today. `rearm:training` does the same on any later morning.
+    lock.assertHeld('the training day');
     await armTrainingDay(env, today, { requireMarker: false });
 
     // 9. Credentials first, marker last (R11-04, R11-02). The file is staged privately and exclusively; if it cannot be written the seed
@@ -597,23 +606,31 @@ export async function seedTraining(opts: SeedTrainingOptions): Promise<SeedTrain
     //    "completed seed, credentials in the hands of the operator". If the marker cannot be written the file is taken away again.
     let staged: StagedCredentials;
     try {
+      lock.assertHeld('the staging of the credentials file');
       staged = stageCredentialsFile(
         opts.credentialsFile,
         renderCredentialsFile(env.APP_BASE_URL, issued, realClock.now()),
+        lock.attempt,
       );
     } catch (error) {
+      if (error instanceof SeedLockError) throw error; // a displaced attempt: its own message says so
       throw new SeedError(
         `training seed NOT completed: the credentials file could not be written (${error instanceof Error ? error.message : String(error)}). ` +
           'The accounts exist but nobody knows their passwords and the database is not marked: remove the training volume and start again.',
       );
     }
+    let placed = false;
     try {
+      lock.assertHeld('the placing of the credentials file');
       commitCredentialsFile(staged);
+      placed = true;
+      lock.assertHeld('the training marker');
       await migrator.query('insert into public.training_marker default values');
     } catch (error) {
-      // the rename failed (commit already removed the staged file) or the marker could not be written: nothing secret stays behind
+      // the rename failed (commit already removed the staged file) or the marker could not be written: nothing secret stays behind.
+      // The final file is only ever removed if THIS attempt put it there: a displaced attempt never touches a file a newer seed placed.
       discardCredentialsFile(staged.tmp);
-      discardCredentialsFile(staged.final);
+      if (placed) discardCredentialsFile(staged.final);
       throw error;
     }
     return { applied: true, accounts: issued.length, credentialsFile: opts.credentialsFile };
