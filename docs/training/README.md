@@ -1,7 +1,7 @@
 # Fiches d'exercices de la formation / بطاقات التمارين
 
 Une fiche par rôle, en français et en arabe standard. Données fictives, aucun mot de passe.
-Chaque matin, avant la séance : `./scripts/training-rearm.sh` (moins d'une minute ; garde les comptes et mots de passe, remet des livraisons du jour à faire).
+Chaque matin, avant la séance : `./scripts/training-rearm.sh` (moins d'une minute ; garde les comptes et mots de passe, remet des livraisons du jour à faire). **À lancer AVANT que les stagiaires se connectent**, jamais pendant la séance : la remise à zéro annule toutes les commandes éligibles du jour à Tétouan (pas seulement celles qu'elle a créées) et n'est **pas tout-ou-rien** (plusieurs transactions : une exécution interrompue peut laisser une journée à moitié remise ; relancez-la).
 
 | Rôle | FR | AR |
 |---|---|---|

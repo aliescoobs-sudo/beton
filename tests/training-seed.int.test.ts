@@ -10,7 +10,6 @@ import { seedTraining } from '../scripts/seed-training';
 import { armTrainingDay } from '../scripts/training-day';
 import { businessDateOf, realClock } from '../src/modules/clock';
 import { getTimingBoard } from '../src/modules/operations';
-import { minuteOfDay } from '../src/modules/operations/domain/trip-times';
 import { testEnv } from './db-env';
 
 // T1: the training seed, run once on a scratch database. Fictitious data only; one account per role; credentials written once to a file
@@ -25,7 +24,13 @@ migrator.on('error', () => undefined);
 let first: Awaited<ReturnType<typeof seedTraining>>;
 const logs: string[] = [];
 
+// The arming of the training day reads the hour (the plan starts a quarter of an hour from now, a late rotation is set up around now), so
+// the file runs at a FIXED hour of the day, mid-morning in Casablanca, whatever the hour the suite is run at. Only Date is faked.
+const FIXED_NOW = new Date(`${new Date().toISOString().slice(0, 10)}T11:00:00Z`);
+
 beforeAll(async () => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(FIXED_NOW);
   await ensureRoles(training, env.DATABASE_URL_SEED);
   await recreateDatabase(training, TRAINING_TEST_DATABASE);
   await runMigrations(env.DATABASE_URL_MIGRATOR);
@@ -45,7 +50,10 @@ beforeAll(async () => {
     Object.assign(console, original);
   }
 }, 600_000);
-afterAll(() => migrator.end());
+afterAll(async () => {
+  vi.useRealTimers();
+  await migrator.end();
+});
 
 const count = async (sql: string) => Number((await migrator.query<{ n: string }>(sql)).rows[0]!.n);
 
@@ -327,7 +335,6 @@ describe('the training day carries timing: history, estimates and a rotation run
     ).toBeGreaterThanOrEqual(1);
   });
   it('one rotation is on the road and late: its truck is critical and names the next order', async () => {
-    if (minuteOfDay(realClock.now().toISOString()) < 85) return; // the rotation would have to start yesterday
     const board = await getTimingBoard(app, await ownerSession(), today, realClock.now().getTime());
     const critical = board.trucks.filter((t) => t.alert.level === 'critical');
     expect(critical.length).toBeGreaterThanOrEqual(1);
