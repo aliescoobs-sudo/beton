@@ -17,33 +17,71 @@ tr_host_port() {
 # An environment variable of the running app.
 tr_app_env() { $dc exec -T app printenv "$1" 2>/dev/null; }
 
-# The "proxy <url>" targets of a `tailscale funnel status` text, one per line.
-# No match is an empty answer, never a failing status (the callers run under `set -e`).
-tr_proxy_targets() { { printf '%s\n' "$1" | grep -Eo 'proxy +[^ ]+' | sed -E 's/^proxy +//'; } || true; }
-
-# ---- R13-04: closing and checking the Funnel, fail closed ------------------------------------------------------------------------------
-
-# True only when `tailscale funnel status` was READ and says, in so many words, that nothing is served: empty, or "No serve config" /
-# "Funnel off" / "not enabled|configured", and no "Funnel on", no proxy, no handler line, no address. A status that cannot be read, or
-# is not understood, is NOT closed.
-tr_funnel_closed() {
-  local s
-  s=$(tailscale funnel status 2>&1) || return 1
-  if printf '%s\n' "$s" | grep -Eqi 'funnel on|proxy|path|\|--|tcp://|https?://'; then return 1; fi
-  [ -z "$(printf '%s' "$s" | tr -d '[:space:]')" ] && return 0
-  printf '%s\n' "$s" | grep -Eqi 'no serve config|funnel off|not (enabled|configured)'
+# ---- R14-07: the Funnel is inspected through the COMPLETE structured status, and nothing else ------------------------------------------
+# The plain-text status cannot prove the absence of a foreground or service configuration (it does not list them), so it is NEVER used
+# to authorise publication or to claim "closed". `tailscale funnel status --json` must succeed and be validated by python3. A CLI that
+# does not know --json (too old) and a daemon/control error are BOTH refusals, told apart so the operator knows what to fix.
+#   tr_funnel_read   : sets TR_JSON to the structured status; returns 0, or
+#                        2 python3 is missing        3 this Tailscale CLI does not support --json (upgrade it)
+#                        4 the daemon or control socket failed or said nothing    5 the answer is not JSON
+tr_funnel_read() {
+  TR_JSON=
+  command -v python3 >/dev/null 2>&1 || return 2
+  local out err rc errfile
+  errfile=$(mktemp) || return 4
+  out=$(tailscale funnel status --json 2>"$errfile"); rc=$?
+  err=$(cat "$errfile"); rm -f "$errfile"
+  if [ "$rc" -ne 0 ]; then
+    if printf '%s\n%s\n' "$err" "$out" | grep -Eqi 'flag provided but not defined|unknown flag|unknown shorthand|unrecognized (option|flag|argument)|invalid (flag|option)|unknown option'; then return 3; fi
+    return 4
+  fi
+  [ -n "$(printf '%s' "$out" | tr -d '[:space:]')" ] || return 4
+  python3 -c 'import json,sys; json.loads(sys.argv[1])' "$out" >/dev/null 2>&1 || return 5
+  TR_JSON=$out
 }
 
-# Resets the Funnel and VERIFIES it is closed. Returns 0 only if the reset succeeded AND the status reads back closed.
+# Says, on stderr, why the structured status could not be used. $1 is the return code of tr_funnel_read.
+tr_funnel_read_explain() {
+  case "$1" in
+    2) echo "python3 is required to inspect the Tailscale configuration and is not available: refusing (nothing is assumed closed or safe)." >&2 ;;
+    3) echo "this Tailscale CLI does not support 'funnel status --json' (too old): upgrade Tailscale. The text status is NOT accepted instead: refusing." >&2 ;;
+    4) echo "the Tailscale daemon or control socket failed to answer 'funnel status --json': refusing (this is not an unsupported CLI)." >&2 ;;
+    5) echo "'funnel status --json' did not return valid JSON: refusing." >&2 ;;
+  esac
+}
+
+# 0 only when the structured status was READ and is COMPLETELY empty: nothing served, no TCP forward, no foreground, no service. Any
+# non-empty value of any key, or a non-object, is not closed.
+tr_funnel_json_empty() {
+  python3 - "$1" <<'PY'
+import json, sys
+try:
+    c = json.loads(sys.argv[1])
+except Exception:
+    sys.exit(1)
+if not isinstance(c, dict):
+    sys.exit(1)
+sys.exit(0 if all(v in (None, {}, [], "", False) for v in c.values()) else 1)
+PY
+}
+
+# True only when the structured status was read AND is empty. An unreadable or unvalidated status is NOT closed.
+tr_funnel_closed() {
+  tr_funnel_read; local rc=$?
+  if [ "$rc" -ne 0 ]; then tr_funnel_read_explain "$rc"; return 1; fi
+  tr_funnel_json_empty "$TR_JSON"
+}
+
+# Resets the Funnel and VERIFIES it is closed. Returns 0 only if the reset succeeded AND the structured status reads back empty.
 tr_close_funnel() {
   tailscale funnel reset >/dev/null 2>&1 || return 1
   tr_funnel_closed
 }
 
-tr_closure_unconfirmed() { echo "CLOSURE UNCONFIRMED — check Tailscale manually (tailscale funnel status; tailscale funnel reset)." >&2; }
+tr_closure_unconfirmed() { echo "CLOSURE UNCONFIRMED — check Tailscale manually (tailscale funnel status --json; tailscale funnel reset)." >&2; }
 
 # The COMPLETE configuration must be exactly one HTTPS proxy ("/" -> $2) with the Funnel allowed on it, and nothing else: no TCP forward,
-# no other host, port, mount point or path handler. $1 is the JSON of `tailscale funnel status --json`.
+# no other host, port, mount point or path handler, no foreground, no service. $1 is the JSON of `tailscale funnel status --json`.
 tr_funnel_json_ok() {
   command -v python3 >/dev/null 2>&1 || return 1
   python3 - "$1" "$2" <<'PY'
@@ -75,34 +113,10 @@ if allow != {hostport: True}:
 PY
 }
 
-# The same rule on the plain-text status, line by line: every line must be one this check knows. $1 is the text, $2 the target.
-tr_funnel_text_ok() {
-  local line proxies=0 headers=0
-  while IFS= read -r line; do
-    case "$line" in
-      "") ;;
-      "# Funnel on:") ;;
-      "#     - https://"*) ;;
-      "|-- / proxy $2") proxies=$((proxies + 1)) ;;
-      "https://"*" (Funnel on)")
-        case "${line%% *}" in *[!A-Za-z0-9./:_-]*) return 1 ;; esac
-        headers=$((headers + 1)) ;;
-      *) return 1 ;;
-    esac
-  done <<TEXT
-$1
-TEXT
-  [ "$proxies" = 1 ] && [ "$headers" = 1 ]
-}
-
-# Reads the whole status of the Funnel and accepts only "one HTTPS proxy to $1". Uses the structured status when the CLI offers it and
-# python3 can read it; otherwise the text, line by line. An unreadable status is a refusal.
+# Reads the whole structured status and accepts only "one HTTPS proxy to $1". Any failure to read or validate it is a refusal (the reason
+# is on stderr); the text status is never a fallback.
 tr_funnel_exactly_one_proxy() {
-  local json text
-  if json=$(tailscale funnel status --json 2>/dev/null) && [ -n "$(printf '%s' "$json" | tr -d '[:space:]')" ]; then
-    tr_funnel_json_ok "$json" "$1" && return 0
-    command -v python3 >/dev/null 2>&1 && return 1 # the structured status was read and it is not exactly that: refused
-  fi
-  text=$(tailscale funnel status 2>&1) || return 1
-  tr_funnel_text_ok "$text" "$1"
+  tr_funnel_read; local rc=$?
+  if [ "$rc" -ne 0 ]; then tr_funnel_read_explain "$rc"; return 1; fi
+  tr_funnel_json_ok "$TR_JSON" "$1"
 }

@@ -471,17 +471,24 @@ describe('the Funnel is opened last, to the real port, and only for the exact im
   });
 });
 
-// R12-05: the Funnel gate fails closed. Everything it asks of Docker, curl and tailscale is a stub driven by environment variables.
-describe('go-public.sh and funnel-check.sh fail closed (R12-05)', () => {
+// R12-05, R14-07: the Funnel gate fails closed, on the COMPLETE structured status only. Everything it asks of Docker, curl and tailscale
+// is a stub driven by environment variables.
+describe('go-public.sh and funnel-check.sh fail closed (R12-05, R14-07)', () => {
   const URL = 'https://imac.tail1.ts.net';
-  const UP = (target: string) => `${URL} (Funnel on)\n|-- / proxy ${target}`;
+  const GOOD_JSON = (target = 'http://127.0.0.1:3300') =>
+    JSON.stringify({
+      TCP: { '443': { HTTPS: true } },
+      Web: { 'imac.tail1.ts.net:443': { Handlers: { '/': { Proxy: target } } } },
+      AllowFunnel: { 'imac.tail1.ts.net:443': true },
+    });
+  const JSON_STATUS_CALL = 'funnel status --json';
   const setup = (envFile = `APP_BASE_URL=${URL}\nAPP_PORT=3300\n`) => {
     const root = mkdtempSync(path.join(tmpdir(), 'bb-r12gp-'));
     mkdirSync(path.join(root, 'scripts/training'), { recursive: true });
-    for (const f of ['go-public.sh', 'funnel-check.sh', 'lib.sh'])
+    for (const f of ['go-public.sh', 'funnel-check.sh', 'lib.sh']) {
       copyFileSync(`scripts/training/${f}`, path.join(root, 'scripts/training', f));
-    for (const f of ['go-public.sh', 'funnel-check.sh', 'lib.sh'])
       chmodSync(path.join(root, 'scripts/training', f), 0o755);
+    }
     writeFileSync(
       path.join(root, 'scripts/training/dc.sh'),
       `#!/usr/bin/env bash
@@ -503,9 +510,12 @@ esac
       writeFileSync(path.join(bin, name), `#!/usr/bin/env bash\n${body}\n`, { mode: 0o755 });
     stub('docker', `[ "$1" = port ] && printf '%s' "\${STUB_PORT_LINES-127.0.0.1:3300}" && echo`);
     stub('curl', `printf '%s' "\${STUB_READY-{\\"status\\":\\"ready\\",\\"mode\\":\\"training\\"}}"`);
-    // A small Tailscale: `funnel reset` clears the state unless STUB_RESET_FAIL (exit 1, state kept) or STUB_RESET_NOOP (exit 0, state kept)
-    // or STUB_RESET_FAIL_AFTER (fails from the second reset on); `funnel --bg` makes STUB_STATUS the state; `status` shows the state, or
-    // STUB_INITIAL (a Funnel that was already there; "No serve config" otherwise); `status --json` is STUB_JSON, or unsupported when unset.
+    // A small Tailscale. `funnel reset` clears the state unless STUB_RESET_FAIL (exit 1, state kept), STUB_RESET_NOOP (exit 0, state kept)
+    // or STUB_RESET_FAIL_AFTER (fails from the second reset on). `funnel --bg` makes STUB_JSON the state. `funnel status --json` shows the
+    // state, or STUB_INITIAL_JSON (a Funnel that was already there; "{}" otherwise) until a reset. Failure modes: STUB_JSON_UNSUPPORTED
+    // (an old CLI: "flag provided but not defined"), STUB_DAEMON_ERR (the daemon does not answer), STUB_JSON_EMPTY_OUT (exit 0, nothing),
+    // STUB_JSON_GARBAGE (exit 0, not JSON); STUB_UNSUPPORTED_AFTER=n makes every --json read after the n-th unsupported. The PLAIN-TEXT
+    // status says "Funnel off" and is logged: nothing may ever call it.
     stub(
       'tailscale',
       `echo "$*" >> "${root}/calls.log"
@@ -516,11 +526,16 @@ case "$1 $2" in
     if [ -n "\${STUB_RESET_FAIL_AFTER-}" ] && [ "$(grep -c '^funnel reset$' "${root}/calls.log")" -gt 1 ]; then exit 1; fi
     if [ -z "\${STUB_RESET_NOOP-}" ]; then rm -f "$state"; touch "${root}/ts.reset"; fi
     exit 0;;
-  "funnel --bg") printf '%s\\n' "\${STUB_STATUS-}" > "$state"; : > "${root}/ts.opened"; exit 0;;
+  "funnel --bg") printf '%s\\n' "\${STUB_JSON-}" > "$state"; : > "${root}/ts.opened"; exit 0;;
   "funnel status")
-    [ -n "\${STUB_STATUS_FAIL-}" ] && exit 1
-    if [ "\${3-}" = "--json" ]; then [ -n "\${STUB_JSON-}" ] && { printf '%s\\n' "$STUB_JSON"; exit 0; }; exit 1; fi
-    if [ -f "$state" ]; then cat "$state"; elif [ -f "${root}/ts.reset" ]; then printf 'No serve config\\n'; else printf '%s\\n' "\${STUB_INITIAL-No serve config}"; fi;;
+    if [ "\${3-}" != "--json" ]; then printf 'Funnel off\\n'; exit 0; fi
+    n=$(grep -c '^funnel status --json$' "${root}/calls.log")
+    if [ -n "\${STUB_JSON_UNSUPPORTED-}" ] || { [ -n "\${STUB_UNSUPPORTED_AFTER-}" ] && [ "$n" -gt "$STUB_UNSUPPORTED_AFTER" ]; }; then
+      echo "flag provided but not defined: -json" >&2; exit 1; fi
+    [ -n "\${STUB_DAEMON_ERR-}" ] && { echo "failed to connect to local tailscaled; it doesn't appear to be running" >&2; exit 1; }
+    [ -n "\${STUB_JSON_EMPTY_OUT-}" ] && exit 0
+    [ -n "\${STUB_JSON_GARBAGE-}" ] && { echo "oops"; exit 0; }
+    if [ -f "$state" ]; then cat "$state"; elif [ -f "${root}/ts.reset" ]; then echo '{}'; else init="\${STUB_INITIAL_JSON-}"; [ -n "$init" ] || init='{}'; printf '%s\\n' "$init"; fi;;
 esac`,
     );
     return { root, bin };
@@ -530,34 +545,64 @@ esac`,
     ctx: { root: string; bin: string },
     env: Record<string, string> = {},
     args: string[] = [],
+    pathOverride?: string,
   ) =>
     spawnSync('bash', [path.join(ctx.root, 'scripts/training', script), ...args], {
       encoding: 'utf8',
       env: {
         ...process.env,
-        PATH: `${ctx.bin}:${process.env.PATH}`,
+        PATH: pathOverride ?? `${ctx.bin}:${process.env.PATH}`,
         READY_TRIES: '1',
         READY_SLEEP: '0',
+        STUB_JSON: GOOD_JSON(),
         ...env,
       },
     });
+  /** A PATH with the tools the scripts need and NO python3. */
+  const noPython = (ctx: { root: string; bin: string }) => {
+    const dir = path.join(ctx.root, 'nopy');
+    mkdirSync(dir);
+    for (const t of [
+      'bash',
+      'env',
+      'mktemp',
+      'cat',
+      'grep',
+      'tr',
+      'rm',
+      'head',
+      'sed',
+      'cut',
+      'seq',
+      'sleep',
+      'dirname',
+      'touch',
+      'wc',
+    ]) {
+      const found = spawnSync('bash', ['-c', `command -v ${t}`], { encoding: 'utf8' }).stdout.trim();
+      if (found) symlinkSync(found, path.join(dir, t));
+    }
+    return `${ctx.bin}:${dir}`;
+  };
   const calls = (ctx: { root: string }) =>
     existsSync(path.join(ctx.root, 'calls.log'))
       ? readFileSync(path.join(ctx.root, 'calls.log'), 'utf8').trim().split('\n')
       : [];
   const opened = (ctx: { root: string }) => calls(ctx).some((c) => c.startsWith('funnel --bg'));
+  const textStatusCalled = (ctx: { root: string }) => calls(ctx).includes('funnel status');
+  const CLOSED_AND_READ = ['funnel reset', JSON_STATUS_CALL];
 
-  it('opens the Funnel on the port Docker really publishes, after resetting the old one, and reads the whole status back', () => {
+  it('opens the Funnel on the port Docker really publishes, after resetting the old one, and reads the whole structured status back', () => {
     const ctx = setup();
-    const r = run('go-public.sh', ctx, { STUB_STATUS: UP('http://127.0.0.1:3300') }, [URL]);
+    const r = run('go-public.sh', ctx, {}, [URL]);
     expect(r.status, r.stderr).toBe(0);
     expect(calls(ctx)).toEqual([
       'funnel reset',
-      'funnel status', // verified closed before anything else
+      JSON_STATUS_CALL, // verified closed before anything else
       'funnel --bg 3300',
-      'funnel status --json', // the structured status is tried first (this Tailscale has none)
-      'funnel status',
+      JSON_STATUS_CALL,
     ]);
+    expect(textStatusCalled(ctx)).toBe(false); // R14-07: the text status is never consulted
   });
   it.each([
     [
@@ -603,111 +648,114 @@ esac`,
     expect(r.status).toBe(1);
     expect(r.stderr).toMatch(msg as RegExp);
     expect(opened(ctx)).toBe(false);
-    expect(calls(ctx).slice(0, 2)).toEqual(['funnel reset', 'funnel status']); // closed first, and read back
-    expect(calls(ctx).slice(-2)).toEqual(['funnel reset', 'funnel status']); // closed again on the way out, and read back
+    expect(calls(ctx).slice(0, 2)).toEqual(CLOSED_AND_READ); // closed first, and read back
+    expect(calls(ctx).slice(-2)).toEqual(CLOSED_AND_READ); // closed again on the way out, and read back
     expect(r.stderr).toMatch(/Funnel is closed \(verified\)/);
+    expect(textStatusCalled(ctx)).toBe(false);
   });
-  it('after opening, an unreadable, extra, wrong or unrecognised status closes the Funnel again and fails', () => {
-    for (const status of [
-      'something I do not recognise',
-      `${URL} (Funnel on)`, // on, but no proxy target parsed
-      UP('http://127.0.0.1:3300') + '\n|-- /api proxy http://127.0.0.1:9999', // a second target
-      UP('http://127.0.0.1:9999'), // another port
-      UP('http://192.168.1.20:3300'), // another machine
-    ]) {
+
+  const base = JSON.parse(GOOD_JSON());
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const withExtra = (patch: (c: Record<string, any>) => void) => {
+    const c = structuredClone(base);
+    patch(c);
+    return JSON.stringify(c);
+  };
+  const BAD_CONFIGS: [string, string][] = [
+    ['another target', GOOD_JSON('http://127.0.0.1:9999')],
+    ['another machine', GOOD_JSON('http://192.168.1.20:3300')],
+    [
+      'a second path handler',
+      withExtra((c) => (c.Web['imac.tail1.ts.net:443'].Handlers['/api'] = { Path: '/tmp' })),
+    ],
+    [
+      'a handler that serves files',
+      withExtra((c) => (c.Web['imac.tail1.ts.net:443'].Handlers['/'] = { Path: '/Users' })),
+    ],
+    ['a TCP forward', withExtra((c) => (c.TCP['22'] = { TCPForward: '127.0.0.1:22' }))],
+    [
+      'a second host',
+      withExtra((c) => (c.Web['b.ts.net:8443'] = { Handlers: { '/': { Proxy: 'http://127.0.0.1:3300' } } })),
+    ],
+    ['the Funnel not allowed on the site', withExtra((c) => (c.AllowFunnel = {}))],
+    ['a service', withExtra((c) => (c.Services = { 'svc:x': { TCP: {} } }))],
+    ['a foreground configuration', withExtra((c) => (c.Foreground = { sess1: { TCP: { '443': {} } } }))],
+    ['an unknown non-empty key', withExtra((c) => (c.Mystery = { a: 1 }))],
+    [
+      'an empty object where a mapping is required',
+      '{"TCP":{"443":{"HTTPS":true}},"Web":{},"AllowFunnel":{}}',
+    ],
+  ];
+  it('after opening, any configuration other than exactly one HTTPS proxy to the app closes the Funnel again and fails', () => {
+    for (const [why, json] of BAD_CONFIGS) {
       const ctx = setup();
-      const r = run('go-public.sh', ctx, { STUB_STATUS: status }, [URL]);
-      expect(r.status, status).toBe(1);
-      expect(calls(ctx).slice(-2), status).toEqual(['funnel reset', 'funnel status']);
-      expect(r.stderr, status).toMatch(/Funnel is closed \(verified\)/);
-    }
-  });
-  const GOOD_JSON = (target = 'http://127.0.0.1:3300') =>
-    JSON.stringify({
-      TCP: { '443': { HTTPS: true } },
-      Web: { 'imac.tail1.ts.net:443': { Handlers: { '/': { Proxy: target } } } },
-      AllowFunnel: { 'imac.tail1.ts.net:443': true },
-    });
-  it('R13-04: the structured status is used when the CLI offers it; exactly one HTTPS proxy passes', () => {
-    const ctx = setup();
-    const r = run('go-public.sh', ctx, { STUB_STATUS: 'unused text', STUB_JSON: GOOD_JSON() }, [URL]);
-    expect(r.status, r.stderr).toBe(0);
-    expect(calls(ctx).at(-1)).toBe('funnel status --json');
-  });
-  it('R13-04: a status with any entry other than the single expected HTTPS proxy is refused, in the text form and in the structured form', () => {
-    const base = JSON.parse(GOOD_JSON());
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const withExtra = (patch: (c: Record<string, any>) => void) => {
-      const c = structuredClone(base);
-      patch(c);
-      return JSON.stringify(c);
-    };
-    const bad: [string, Record<string, string>][] = [
-      [
-        'text: an extra path handler',
-        { STUB_STATUS: UP('http://127.0.0.1:3300') + '\n|-- /files path /Users/x/Documents' },
-      ],
-      [
-        'text: a TCP forward',
-        { STUB_STATUS: UP('http://127.0.0.1:3300') + '\n|-- tcp://22 -> 127.0.0.1:22' },
-      ],
-      [
-        'text: a second site',
-        {
-          STUB_STATUS:
-            UP('http://127.0.0.1:3300') +
-            '\nhttps://other.ts.net:8443 (Funnel on)\n|-- / proxy http://127.0.0.1:3300',
-        },
-      ],
-      [
-        'text: a tailnet-only section',
-        {
-          STUB_STATUS:
-            UP('http://127.0.0.1:3300') +
-            '\n\nhttps://imac.tail1.ts.net:10000 (tailnet only)\n|-- / proxy http://127.0.0.1:8080',
-        },
-      ],
-      ['json: another target', { STUB_JSON: GOOD_JSON('http://127.0.0.1:9999') }],
-      [
-        'json: a second path handler',
-        { STUB_JSON: withExtra((c) => (c.Web['imac.tail1.ts.net:443'].Handlers['/api'] = { Path: '/tmp' })) },
-      ],
-      [
-        'json: a handler that serves files',
-        { STUB_JSON: withExtra((c) => (c.Web['imac.tail1.ts.net:443'].Handlers['/'] = { Path: '/Users' })) },
-      ],
-      [
-        'json: a TCP forward',
-        { STUB_JSON: withExtra((c) => (c.TCP['22'] = { TCPForward: '127.0.0.1:22' })) },
-      ],
-      [
-        'json: a second host',
-        {
-          STUB_JSON: withExtra(
-            (c) => (c.Web['b.ts.net:8443'] = { Handlers: { '/': { Proxy: 'http://127.0.0.1:3300' } } }),
-          ),
-        },
-      ],
-      ['json: the Funnel not allowed on the site', { STUB_JSON: withExtra((c) => (c.AllowFunnel = {})) }],
-      [
-        'json: a foreground service',
-        { STUB_JSON: withExtra((c) => (c.Services = { 'svc:x': { TCP: {} } })) },
-      ],
-      ['json: not JSON at all', { STUB_JSON: 'oops' }],
-    ];
-    for (const [why, env] of bad) {
-      const ctx = setup();
-      const r = run('go-public.sh', ctx, { STUB_STATUS: UP('http://127.0.0.1:3300'), ...env }, [URL]);
+      const r = run('go-public.sh', ctx, { STUB_JSON: json }, [URL]);
       expect(r.status, why).toBe(1);
-      expect(r.stderr, why).toMatch(/complete status/);
-      expect(calls(ctx).slice(-2), why).toEqual(['funnel reset', 'funnel status']);
+      expect(opened(ctx), why).toBe(true);
+      expect(calls(ctx).slice(-2), why).toEqual(CLOSED_AND_READ);
+      expect(r.stderr, why).toMatch(/Funnel is closed \(verified\)/);
+      expect(textStatusCalled(ctx), why).toBe(false);
     }
   }, 120_000);
+
+  describe('R14-07: the structured status is mandatory; nothing else authorises', () => {
+    it('an old CLI without --json is a refusal that says so, and the text status ("Funnel off") is never used as proof of closure', () => {
+      const ctx = setup();
+      const r = run('go-public.sh', ctx, { STUB_JSON_UNSUPPORTED: '1' }, [URL]);
+      expect(r.status).toBe(1);
+      expect(r.stderr).toMatch(/does not support 'funnel status --json'/);
+      expect(r.stderr).toMatch(/CLOSURE UNCONFIRMED/);
+      expect(r.stderr).not.toMatch(/closed \(verified\)/);
+      expect(opened(ctx)).toBe(false);
+      expect(textStatusCalled(ctx)).toBe(false);
+    });
+    it('a daemon or control error is a refusal told apart from an unsupported CLI', () => {
+      const ctx = setup();
+      const r = run('go-public.sh', ctx, { STUB_DAEMON_ERR: '1' }, [URL]);
+      expect(r.status).toBe(1);
+      expect(r.stderr).toMatch(/daemon or control socket failed/);
+      expect(r.stderr).not.toMatch(/does not support/);
+      expect(r.stderr).toMatch(/CLOSURE UNCONFIRMED/);
+      expect(opened(ctx)).toBe(false);
+    });
+    it.each([
+      ['empty output', { STUB_JSON_EMPTY_OUT: '1' }, /failed to answer/],
+      ['output that is not JSON', { STUB_JSON_GARBAGE: '1' }, /valid JSON/],
+    ])('%s is a refusal', (_why, env, msg) => {
+      const ctx = setup();
+      const r = run('go-public.sh', ctx, env, [URL]);
+      expect(r.status).toBe(1);
+      expect(r.stderr).toMatch(msg);
+      expect(r.stderr).toMatch(/CLOSURE UNCONFIRMED/);
+      expect(opened(ctx)).toBe(false);
+    });
+    it('a machine without python3 is a refusal: nothing is assumed closed or safe', () => {
+      const ctx = setup();
+      const r = run('go-public.sh', ctx, {}, [URL], noPython(ctx));
+      expect(r.status).toBe(1);
+      expect(r.stderr).toMatch(/python3 is required/);
+      expect(r.stderr).toMatch(/CLOSURE UNCONFIRMED/);
+      expect(opened(ctx)).toBe(false);
+    });
+    it('a status that stops being readable AFTER the Funnel was opened is a refusal and never "closed"', () => {
+      const ctx = setup();
+      const r = run('go-public.sh', ctx, { STUB_UNSUPPORTED_AFTER: '1' }, [URL]);
+      expect(r.status).toBe(1);
+      expect(opened(ctx)).toBe(true);
+      expect(r.stderr).toMatch(/does not support/);
+      expect(r.stderr).toMatch(/CLOSURE UNCONFIRMED/);
+      expect(r.stderr).not.toMatch(/closed \(verified\)/);
+    });
+  });
+
   it('R13-04: a reset that FAILS stops everything and never says closed', () => {
     const ctx = setup();
-    const r = run('go-public.sh', ctx, { STUB_RESET_FAIL: '1', STUB_INITIAL: UP('http://127.0.0.1:9999') }, [
-      URL,
-    ]);
+    const r = run(
+      'go-public.sh',
+      ctx,
+      { STUB_RESET_FAIL: '1', STUB_INITIAL_JSON: GOOD_JSON('http://127.0.0.1:9999') },
+      [URL],
+    );
     expect(r.status).toBe(1);
     expect(r.stderr).toMatch(/CLOSURE UNCONFIRMED — check Tailscale manually/);
     expect(r.stderr + r.stdout).not.toMatch(/closed \(verified\)|Funnel is closed/);
@@ -716,9 +764,9 @@ esac`,
   });
   it('R13-04: a reset that "succeeds" but leaves the Funnel on, or a status that cannot be read, is also unconfirmed', () => {
     for (const env of <Record<string, string>[]>[
-      { STUB_RESET_NOOP: '1', STUB_INITIAL: UP('http://127.0.0.1:9999') },
-      { STUB_STATUS_FAIL: '1' },
-      { STUB_RESET_NOOP: '1', STUB_INITIAL: 'something I do not recognise' },
+      { STUB_RESET_NOOP: '1', STUB_INITIAL_JSON: GOOD_JSON('http://127.0.0.1:9999') },
+      { STUB_DAEMON_ERR: '1' },
+      { STUB_RESET_NOOP: '1', STUB_INITIAL_JSON: '{"Mystery":{"a":1}}' },
     ]) {
       const ctx = setup();
       const r = run('go-public.sh', ctx, env, [URL]);
@@ -733,7 +781,7 @@ esac`,
     const r = run(
       'go-public.sh',
       ctx,
-      { STUB_RESET_FAIL_AFTER: '1', STUB_STATUS: UP('http://127.0.0.1:9999') }, // wrong port: refused after opening, then the reset fails
+      { STUB_RESET_FAIL_AFTER: '1', STUB_JSON: GOOD_JSON('http://127.0.0.1:9999') }, // wrong port: refused after opening, then the reset fails
       [URL],
     );
     expect(r.status).toBe(1);
@@ -745,43 +793,47 @@ esac`,
     const ctx = setup();
     const r = run('go-public.sh', ctx, { STUB_RESET_FAIL_AFTER: '1' }, ['http://not-https']);
     expect(r.status).toBe(2); // usage error: the Funnel had already been closed and verified first
-    expect(calls(ctx).slice(0, 2)).toEqual(['funnel reset', 'funnel status']);
+    expect(calls(ctx).slice(0, 2)).toEqual(CLOSED_AND_READ);
   });
   it('still requires a full https address', () => {
     const ctx = setup();
     expect(run('go-public.sh', ctx, {}, ['http://insecure.example']).status).toBe(2);
-    expect(calls(ctx).slice(0, 2)).toEqual(['funnel reset', 'funnel status']); // closed and verified before the arguments are judged
+    expect(calls(ctx).slice(0, 2)).toEqual(CLOSED_AND_READ); // closed and verified before the arguments are judged
     expect(run('go-public.sh', setup(), {}, []).status).toBe(2);
   });
 
-  const check = (status: string, env: Record<string, string> = {}) => {
+  const check = (initial: string, env: Record<string, string> = {}, pathOverride?: string) => {
     const ctx = setup();
-    return run('funnel-check.sh', ctx, { STUB_INITIAL: status, ...env });
+    return { ctx, ...run('funnel-check.sh', ctx, { STUB_INITIAL_JSON: initial, ...env }, [], pathOverride) };
   };
-  it('funnel-check.sh passes for a closed Funnel and for the one right target', () => {
-    expect(check('No serve config').status).toBe(0);
-    expect(check('').status).toBe(0);
-    expect(check(UP('http://127.0.0.1:3300')).status).toBe(0);
+  it('funnel-check.sh passes for a completely empty Funnel and for the one right target', () => {
+    expect(check('{}').status).toBe(0);
+    expect(check('{"TCP":{},"Web":{},"AllowFunnel":{},"Foreground":{}}').status).toBe(0);
+    expect(check(GOOD_JSON()).status).toBe(0);
   });
-  it('funnel-check.sh fails when the target is another port or machine, when none could be parsed, when there are two, or when the status is not understood', () => {
-    expect(check(UP('http://127.0.0.1:8080')).status).toBe(1);
-    expect(check(UP('http://192.168.1.20:3300')).stderr).toMatch(/not to this app/);
-    expect(check(`${URL} (Funnel on)`).status).toBe(1); // on, no target parsed: NOT a success
-    expect(check(UP('http://127.0.0.1:3300') + '\n|-- /x proxy http://127.0.0.1:3300').status).toBe(1);
-    expect(check('mystery output').status).toBe(1);
+  it('funnel-check.sh fails on every other configuration (R14-07 / R13-04)', () => {
+    for (const [why, json] of BAD_CONFIGS) expect(check(json).status, why).toBe(1);
+    expect(check('{"Mystery":{"a":1}}').status).toBe(1);
+    expect(check('[]').status).toBe(1);
+  }, 120_000);
+  it('funnel-check.sh fails when the structured status cannot be used, whatever the text says (no loose "off" phrase)', () => {
+    const old = check('{}', { STUB_JSON_UNSUPPORTED: '1' });
+    expect(old.status).toBe(1);
+    expect(old.stderr).toMatch(/does not support/);
+    expect(textStatusCalled(old.ctx)).toBe(false);
+    const daemon = check('{}', { STUB_DAEMON_ERR: '1' });
+    expect(daemon.status).toBe(1);
+    expect(daemon.stderr).toMatch(/daemon or control socket failed/);
+    expect(check('{}', { STUB_JSON_EMPTY_OUT: '1' }).status).toBe(1);
+    expect(check('{}', { STUB_JSON_GARBAGE: '1' }).status).toBe(1);
     const ctx = setup();
-    expect(run('funnel-check.sh', ctx, { STUB_STATUS_FAIL: '1' }).status).toBe(1);
-  });
-  it('funnel-check.sh also fails on any extra non-proxy entry in an otherwise right status (R13-04)', () => {
-    expect(check(UP('http://127.0.0.1:3300') + '\n|-- /files path /Users/x').status).toBe(1);
-    expect(check(UP('http://127.0.0.1:3300'), { STUB_JSON: GOOD_JSON() }).status).toBe(0);
-    const extra = JSON.parse(GOOD_JSON());
-    extra.TCP['22'] = { TCPForward: '127.0.0.1:22' };
-    expect(check(UP('http://127.0.0.1:3300'), { STUB_JSON: JSON.stringify(extra) }).status).toBe(1);
+    const noPy = run('funnel-check.sh', ctx, {}, [], noPython(ctx));
+    expect(noPy.status).toBe(1);
+    expect(noPy.stderr).toMatch(/python3 is required/);
   });
   it('funnel-check.sh fails when the Funnel is up and the app is not in training mode or not running', () => {
-    expect(check(UP('http://127.0.0.1:3300'), { STUB_TRAINING: 'false' }).status).toBe(1);
-    expect(check(UP('http://127.0.0.1:3300'), { STUB_CID: '' }).status).toBe(1);
+    expect(check(GOOD_JSON(), { STUB_TRAINING: 'false' }).status).toBe(1);
+    expect(check(GOOD_JSON(), { STUB_CID: '' }).status).toBe(1);
   });
   it('funnel-check.sh is silent on a machine without Tailscale', () => {
     const ctx = setup();
@@ -790,6 +842,44 @@ esac`,
       env: { PATH: '/usr/bin:/bin', NODE_ENV: 'test' },
     });
     expect(r.status).toBe(0);
+  });
+});
+
+// R14-07: training-up.sh stops on a failed Funnel check and never prints the reassurance then.
+describe('training-up.sh propagates a failed Funnel check (R14-07)', () => {
+  const setup = (checkExit: number) => {
+    const root = mkdtempSync(path.join(tmpdir(), 'bb-r14up-'));
+    mkdirSync(path.join(root, 'scripts/training'), { recursive: true });
+    copyFileSync('scripts/training-up.sh', path.join(root, 'scripts/training-up.sh'));
+    const stub = (name: string, body: string) =>
+      writeFileSync(path.join(root, 'scripts/training', name), `#!/usr/bin/env bash\n${body}\n`, {
+        mode: 0o755,
+      });
+    stub('dc.sh', `case "$*" in *"exec -T app wget"*) echo '{"status":"ready"}';; esac`);
+    stub('ops.sh', 'exit 0');
+    stub('funnel-check.sh', `echo "stub check" >&2; exit ${checkExit}`);
+    writeFileSync(path.join(root, '.env.training'), 'X=1\n', { mode: 0o600 });
+    writeFileSync(path.join(root, '.env.training.ops'), 'X=1\n', { mode: 0o600 });
+    const bin = path.join(root, 'bin');
+    mkdirSync(bin);
+    writeFileSync(path.join(bin, 'docker'), '#!/usr/bin/env bash\nexit 0\n', { mode: 0o755 });
+    return { root, bin };
+  };
+  const up = (ctx: { root: string; bin: string }) =>
+    spawnSync('bash', [path.join(ctx.root, 'scripts/training-up.sh')], {
+      encoding: 'utf8',
+      env: { ...process.env, PATH: `${ctx.bin}:${process.env.PATH}`, READY_TRIES: '1', READY_SLEEP: '0' },
+    });
+  it('a failing check makes the start-up fail, with no local-only reassurance and no "next steps"', () => {
+    const r = up(setup(1));
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/Funnel check FAILED/);
+    expect(r.stdout).not.toMatch(/running and ready|Next, by hand|go-public/);
+  });
+  it('a passing check prints the next steps', () => {
+    const r = up(setup(0));
+    expect(r.status, r.stderr).toBe(0);
+    expect(r.stdout).toMatch(/Funnel check passed/);
   });
 });
 

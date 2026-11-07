@@ -27,10 +27,14 @@ for _ in $(seq 1 "${READY_TRIES:-30}"); do
   sleep "${READY_SLEEP:-5}"
 done
 [ "$ready" = yes ] || { echo "training-up.sh: the app did not become ready: look at  ./scripts/training/dc.sh logs app" >&2; exit 1; }
-./scripts/training/funnel-check.sh || true
+# R14-07: a failed Funnel check stops the start-up with its status; the "local only" reassurance below is printed ONLY when the check passed.
+if ! ./scripts/training/funnel-check.sh; then
+  echo "training-up.sh: the Tailscale Funnel check FAILED, so this instance is NOT confirmed local-only. Fix or close the Funnel (tailscale funnel reset), then run this again." >&2
+  exit 1
+fi
 cat <<'NEXT'
 
-The training instance is running and ready on this machine only:  http://127.0.0.1:3000
+The training instance is running and ready, and the Funnel check passed (nothing is published, or exactly this app):  http://127.0.0.1:3000
 
 Next, by hand:
   1. Hand each trainee ONLY their own account (never the whole list):   ./scripts/training/show-accounts.sh <name>

@@ -7,8 +7,10 @@
 #   2. the port is the one Docker really publishes for the running app (loopback only) and the env file agrees,
 #   3. the running app is a training app (TRAINING_MODE=true, APP_ENV=training, not real data, the test escape off),
 #   4. the real loopback endpoint on that port answers the training readiness response of the app,
-#   5. only then:  tailscale funnel --bg <that port>, and the COMPLETE funnel status (the structured one when the CLI offers it) must be
-#      exactly one HTTPS proxy to that endpoint: any other entry of any kind is a refusal.
+#   5. only then:  tailscale funnel --bg <that port>, and the COMPLETE structured status (`funnel status --json`, validated by python3)
+#      must be exactly one HTTPS proxy to that endpoint: any other entry of any kind is a refusal.
+# R14-07: the structured status is MANDATORY, for "closed" as much as for "open correctly". python3 missing, a Tailscale CLI without
+# --json, a daemon/control error, an empty or non-JSON answer are each a refusal (told apart on stderr); the text is never a fallback.
 # Any way out that is not a success resets again and verifies again; if that cannot be verified: "CLOSURE UNCONFIRMED", non-zero.
 # Then test from a phone on mobile data: sign in, write something, sign out.
 #   ./scripts/training/go-public.sh https://<machine>.<tailnet>.ts.net
