@@ -43,6 +43,12 @@ const dispatchSchema = z.object({
     )
     .min(1)
     .max(200),
+  /** The reason of an explicit override when the plan double-books a driver or a truck (R14-01); absent: such a plan is refused. */
+  overlapReason: z
+    .string()
+    .transform((v) => v.trim().replace(/\s+/g, ' '))
+    .pipe(z.string().max(300))
+    .nullish(),
 });
 const driverSchema = z.object({
   name: z

@@ -373,6 +373,23 @@ export const TABLE_ACCESS = {
     exception:
       'T5 (DECISIONS 179): a reassignment or a postponement of a rotation with its reason (it names drivers). Written only by log_dispatch_change. Read by the owner, app_admin and the plant manager of the plant. Append-only. No price.',
   },
+  trip_overlap_override: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'none',
+      office: 'none',
+      plant: 'none',
+      system: 'none',
+      anonymous: 'none',
+      support: 'none',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    exception:
+      'R14-01 (DECISIONS 182): the audited override that lets a day plan double-book a driver or a truck, with its reason. Written only by record_dispatch_overlap (owner, app_admin, plant manager). Read by the owner, app_admin and the plant manager of the plant. Append-only (trigger). No price.',
+  },
   trip_driver_report: {
     kind: 'rls',
     read: {

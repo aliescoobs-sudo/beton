@@ -109,6 +109,8 @@ describe('functions the application role can execute', () => {
     'public.log_dispatch_change(p_kind text, p_old uuid, p_new uuid, p_from_truck uuid, p_to_truck uuid, p_from_driver uuid, p_to_driver uuid, p_reason text)', // T5: owner, app_admin, plant manager of the plant (checked inside)
     'public.set_trip_estimate(p_plant uuid, p_zone uuid, p_stage text, p_minutes integer, p_reason text)', // T5: owner, app_admin, plant manager of the plant (checked inside)
     'public.timing_parameter(p_key text)', // T5: four plan parameters, for the driver, plant manager, owner and app_admin (checked inside)
+    'public.record_dispatch_overlap(p_batch uuid, p_date date, p_kinds text[], p_reason text)', // R14-01: the audited override of a double-booking: owner, app_admin, plant manager (checked inside)
+    'public.trip_started(p_trip uuid)', // R14-01: whether a rotation has started (an event, or the driver's loading report); read by the dispatch service
     'public.trip_stage_estimate(p_plant uuid, p_zone uuid, p_stage text)', // T5: the estimate of a stage, same roles (checked inside)
     'public.trip_timing(p_date date)', // T5: the timing inputs of the rotations the caller may see (checked inside, scoped)
     'public.driver_trips(p_date date)',

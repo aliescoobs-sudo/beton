@@ -74,6 +74,9 @@ export function DispatchBoard({
   const [fromProposal, setFromProposal] = useState(!hasSaved);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  // R14-01: a driver or a truck on two rotations at once is refused unless the person gives the reason of an explicit, audited exception.
+  const [overlapAsked, setOverlapAsked] = useState(false);
+  const [overlapReason, setOverlapReason] = useState('');
 
   const ctx = useMemo(
     () => ({ orders: day.orders, trucks: day.trucks, drivers: day.drivers, params: day.params, fixed }),
@@ -140,8 +143,12 @@ export function DispatchBoard({
             ? (reasons[r.key] ?? '').trim()
             : null,
         })),
+        ...(overlapAsked && overlapReason.trim() ? { overlapReason: overlapReason.trim() } : {}),
       });
-      if (!result.ok) return setMessage(t(`errors.${result.error}` as never));
+      if (!result.ok) {
+        if (result.error === 'OVERLAP') setOverlapAsked(true);
+        return setMessage(t(`errors.${result.error}` as never));
+      }
       // The confirmation is shown by the page (the board is rebuilt from the saved plan): it travels in the address.
       router.replace(`${pathname}?date=${day.date}&saved=${result.rotations}`);
       router.refresh();
@@ -455,6 +462,18 @@ export function DispatchBoard({
             <span className="text-sm text-status-late">
               {missingReason ? t('overrideNeeded') : t('blockedHint')}
             </span>
+          )}
+          {overlapAsked && (
+            <label className="block">
+              <span className="field-label">{t('overlapReason')}</span>
+              <Input
+                value={overlapReason}
+                onChange={(e) => setOverlapReason(e.target.value)}
+                minLength={3}
+                maxLength={300}
+                data-testid="dispatch-overlap-reason"
+              />
+            </label>
           )}
           {message && (
             <span role="status" className="text-sm" data-testid="dispatch-message">

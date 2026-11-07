@@ -32,12 +32,21 @@ async function guarded<T>(
 // @permission dispatch.write (plant, owner, partner): a day's rotations, quantities and times only
 export async function saveDispatchAction(
   input: unknown,
-): Promise<{ ok: true; rotations: number; conflicts: number } | Failure> {
+): Promise<
+  | { ok: true; rotations: number; conflicts: number; conflictKinds: string[]; overlapOverride: boolean }
+  | Failure
+> {
   return guarded('dispatch.write', async (user) => {
     const today = (await getRequestClock()).today();
     const result = await saveDispatch(getPool('app'), user, input, { today });
     return result.ok
-      ? { ok: true as const, rotations: result.value.rotations, conflicts: result.value.conflicts.length }
+      ? {
+          ok: true as const,
+          rotations: result.value.rotations,
+          conflicts: result.value.conflicts.length,
+          conflictKinds: [...new Set(result.value.conflicts.map((c) => c.kind))],
+          overlapOverride: result.value.overlapOverride,
+        }
       : { ok: false as const, error: result.error };
   });
 }
@@ -67,7 +76,9 @@ export async function reassignTripAction(input: {
   truckId: string;
   driverId: string | null;
   reason: string;
-}): Promise<{ ok: true } | Failure> {
+  /** The reason of an explicit override, only when the new plan double-books a driver or a truck. */
+  overlapReason?: string;
+}): Promise<{ ok: true; conflicts: string[]; overlapOverride: boolean } | Failure> {
   return guarded('dispatch.write', async (user) => {
     const today = (await getRequestClock()).today();
     const result = await reassignTrip(
@@ -76,7 +87,14 @@ export async function reassignTripAction(input: {
       { ...input, overrideReason: input.reason },
       { today },
     );
-    return result.ok ? { ok: true as const } : { ok: false as const, error: result.error };
+    return result.ok
+      ? {
+          ok: true as const,
+          // What the new plan still has wrong is handed back to the screen, never dropped.
+          conflicts: [...new Set(result.value.conflicts)],
+          overlapOverride: result.value.overlapOverride,
+        }
+      : { ok: false as const, error: result.error };
   });
 }
 

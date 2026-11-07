@@ -349,6 +349,18 @@ const FIXTURES: Record<
       ),
     visible: `select split_part(reason, ':', 2) as owner from trip_dispatch_change where reason like $1 || ':%'`,
   },
+  trip_overlap_override: {
+    // Written by record_dispatch_overlap; the fixture writes the row as the definer would.
+    writers: ['owner'],
+    seed: (_tx, actor) =>
+      withRlsContext(migratorPool, { userId: actor, role: 'owner', requestId: marker }, (m) =>
+        m.query(
+          `insert into trip_overlap_override (id, batch_id, trip_date, kinds, reason, created_by) values (gen_random_uuid(), gen_random_uuid(), current_date, ARRAY['driver'], $1, $2)`,
+          [`${marker}:${actor}`, actor],
+        ),
+      ),
+    visible: `select split_part(reason, ':', 2) as owner from trip_overlap_override where reason like $1 || ':%'`,
+  },
   trip_driver_report: {
     // Written by driver_report (the driver of the rotation); the fixture writes the row as the definer would, on a rotation of its own.
     writers: ['owner'],
@@ -729,9 +741,10 @@ const FIXTURES: Record<
     seed: async (tx, actor) => {
       const scene = await deliveryScene(app, actors.owner, marker);
       return tx.query(
-        `insert into trip_plan (id, batch_id, trip_date, order_id, seq, truck_id, volume_l, load_min, depart_min, arrive_min,
+        `with s as (select coalesce(max(seq), 0) + 1 as n from trip_plan where trip_date = '2097-03-02' and order_id = $1)
+         insert into trip_plan (id, batch_id, trip_date, order_id, seq, truck_id, volume_l, load_min, depart_min, arrive_min,
                                 unload_end_min, back_min, created_by)
-         values (gen_random_uuid(), gen_random_uuid(), '2097-03-02', $1, 1, $2, 1000, 420, 430, 455, 485, 520, $3)`,
+         select gen_random_uuid(), gen_random_uuid(), '2097-03-02', $1, s.n, $2, 1000, 420 + 100 * s.n, 430 + 100 * s.n, 455 + 100 * s.n, 485 + 100 * s.n, 520 + 100 * s.n, $3 from s`,
         [scene.orderId, scene.truckId, actor],
       );
     },
@@ -742,9 +755,10 @@ const FIXTURES: Record<
     seed: async (tx, actor) => {
       const scene = await deliveryScene(app, actors.owner, marker);
       const plan = await tx.query<{ id: string }>(
-        `insert into trip_plan (id, batch_id, trip_date, order_id, seq, truck_id, volume_l, load_min, depart_min, arrive_min,
+        `with s as (select coalesce(max(seq), 0) + 1 as n from trip_plan where trip_date = '2096-03-02' and order_id = $1)
+         insert into trip_plan (id, batch_id, trip_date, order_id, seq, truck_id, volume_l, load_min, depart_min, arrive_min,
                                 unload_end_min, back_min, created_by)
-         values (gen_random_uuid(), gen_random_uuid(), '2096-03-02', $1, 1, $2, 1000, 420, 430, 455, 485, 520, $3) returning id`,
+         select gen_random_uuid(), gen_random_uuid(), '2096-03-02', $1, s.n, $2, 1000, 420 + 100 * s.n, 430 + 100 * s.n, 455 + 100 * s.n, 485 + 100 * s.n, 520 + 100 * s.n, $3 from s returning id`,
         [scene.orderId, scene.truckId, actor],
       );
       return tx.query(
@@ -761,9 +775,10 @@ const FIXTURES: Record<
     seed: async (tx, actor) => {
       const scene = await deliveryScene(app, actors.owner, marker);
       const plan = await tx.query<{ id: string }>(
-        `insert into trip_plan (id, batch_id, trip_date, order_id, seq, truck_id, volume_l, load_min, depart_min, arrive_min,
+        `with s as (select coalesce(max(seq), 0) + 1 as n from trip_plan where trip_date = '2095-03-02' and order_id = $1)
+         insert into trip_plan (id, batch_id, trip_date, order_id, seq, truck_id, volume_l, load_min, depart_min, arrive_min,
                                 unload_end_min, back_min, created_by)
-         values (gen_random_uuid(), gen_random_uuid(), '2095-03-02', $1, 1, $2, 1000, 420, 430, 455, 485, 520, $3) returning id`,
+         select gen_random_uuid(), gen_random_uuid(), '2095-03-02', $1, s.n, $2, 1000, 420 + 100 * s.n, 430 + 100 * s.n, 455 + 100 * s.n, 485 + 100 * s.n, 520 + 100 * s.n, $3 from s returning id`,
         [scene.orderId, scene.truckId, actor],
       );
       const delivery = await insertDelivery(tx, actor, scene, 100, 2095);

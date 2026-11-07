@@ -196,7 +196,7 @@ describe('overriding it on a rotation (AC-INT-20)', () => {
         tx.query(
           `insert into trip_plan (id, batch_id, trip_date, order_id, seq, truck_id, driver_id, volume_l, load_min,
                                   depart_min, arrive_min, unload_end_min, back_min, created_by, driver_override_reason)
-           values (gen_random_uuid(), gen_random_uuid(), $1, $2, 1, $3, $4, 1000, 420, 430, 455, 485, 520, $5, $6)`,
+           values (gen_random_uuid(), gen_random_uuid(), $1, $2, 99, $3, $4, 1000, 1000, 1010, 1035, 1065, 1100, $5, $6)`,
           [DAY, scene.orderId, truck, driver, users.plant.id, reason],
         ),
       );

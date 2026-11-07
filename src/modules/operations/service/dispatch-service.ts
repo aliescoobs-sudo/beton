@@ -18,6 +18,7 @@ import {
   type DispatchParams,
   type DispatchTruck,
   isBlocking,
+  isOverlap,
   retime,
   isDriverOverride,
   type Rotation,
@@ -33,7 +34,12 @@ export type DispatchError =
   | 'PUMP_NOT_SCHEDULED'
   | 'OVER_CAPACITY'
   | 'CONFLICT'
-  | 'OVERRIDE_REASON';
+  | 'OVERRIDE_REASON'
+  /** The rotation has started (an event, or the driver's report that loading began): it can no longer be moved or cancelled. */
+  | 'STARTED'
+  /** A driver or a truck would be on two rotations at once and no audited override reason was given (R14-01). */
+  | 'OVERLAP'
+  | 'FORBIDDEN';
 
 export function dispatchFailure(error: unknown): DispatchError {
   const e = error as { code?: string; message?: string };
@@ -43,9 +49,12 @@ export function dispatchFailure(error: unknown): DispatchError {
     if (/no pump is scheduled on site/.test(m)) return 'PUMP_NOT_SCHEDULED';
     if (/more than the truck/.test(m)) return 'OVER_CAPACITY';
     if (/needs a reason/.test(m)) return 'OVERRIDE_REASON';
+    if (/has started/.test(m)) return 'STARTED';
+    if (/already on another rotation/.test(m)) return 'OVERLAP';
     if (/not a live order|driver is not active/.test(m)) return 'NOT_FOUND';
     return 'INVALID';
   }
+  if (e.code === '42501') return 'FORBIDDEN';
   if (e.code === '23503' || isMalformedId(error)) return 'NOT_FOUND';
   if (isUniqueViolation(error) || e.code === '40001' || e.code === '40P01') return 'CONFLICT';
   throw error;
@@ -196,6 +205,32 @@ async function activeDrivers(tx: pg.PoolClient): Promise<DispatchDriver[]> {
   return rows;
 }
 
+/**
+ * The lock discipline of the plan (R14-01): the DAY first, then every live rotation of the day by id (the key the event writer and the
+ * cancellation guard take), before any audited write, which would hold the audit chain's lock until commit. Whoever changes the plan of a
+ * day takes these first and READS THE STATE AFTER, so a start that was waiting is already visible. A lock held by this transaction costs nothing.
+ */
+export async function lockDispatchDay(tx: pg.PoolClient, date: string): Promise<void> {
+  await tx.query(`select pg_advisory_xact_lock(hashtextextended('trip_plan_day:' || $1::text, 0))`, [date]);
+  const { rows } = await tx.query<{ id: string }>(
+    `select p.id from trip_plan p
+      where p.trip_date = $1 and not exists (select 1 from trip_plan_cancellation c where c.trip_id = p.id)
+      order by p.id`,
+    [date],
+  );
+  for (const r of rows)
+    await tx.query(`select pg_advisory_xact_lock(hashtextextended('trip_event:' || $1::text, 0))`, [r.id]);
+}
+
+/** The day of a rotation (a plan row never changes, so reading it before the lock is safe); null when there is none. */
+async function tripDate(tx: pg.PoolClient, tripId: string): Promise<string | null> {
+  const { rows } = await tx.query<{ d: string }>(
+    `select to_char(trip_date, 'YYYY-MM-DD') as d from trip_plan where id = $1`,
+    [tripId],
+  );
+  return rows[0]?.d ?? null;
+}
+
 async function liveRotations(tx: pg.PoolClient, date: string): Promise<SavedRotation[]> {
   const { rows } = await tx.query<{
     id: string;
@@ -218,7 +253,7 @@ async function liveRotations(tx: pg.PoolClient, date: string): Promise<SavedRota
   }>(
     `select p.id, p.order_id, p.seq, p.truck_id, p.driver_id, p.volume_l, p.load_min, p.depart_min, p.arrive_min,
             p.unload_end_min, p.back_min, o.code as order_code, o.client_code, t.code as truck_code, d.name as driver_name, p.driver_override_reason as override_reason,
-            exists (select 1 from trip_event e where e.trip_id = p.id) as started
+            public.trip_started(p.id) as started
        from trip_plan p
        join sales_order_ops o on o.id = p.order_id
        join truck t on t.id = p.truck_id
@@ -275,6 +310,8 @@ export interface SavedDispatch {
   rotations: number;
   /** What the plan still has wrong that the database does not refuse (shown, never silent). */
   conflicts: Conflict[];
+  /** The plan double-books a driver or a truck and was saved under an audited override (the conflicts above say which). */
+  overlapOverride: boolean;
 }
 
 /**
@@ -292,12 +329,17 @@ export async function saveDispatch(
   await require(appPool, actor, 'dispatch.write');
   const parsed = parseDispatchInput(input);
   if (!parsed.ok) return err('INVALID');
-  const { date, rotations: wanted } = parsed.value;
+  const { date, rotations: wanted, overlapReason } = parsed.value;
   try {
     return await inRequest(appPool, actor, async (tx) => {
-      const r = await saveDispatchIn(tx, actor, date, wanted, deps);
+      const r = await saveDispatchIn(tx, actor, date, wanted, { ...deps, overlapReason });
       return r.ok
-        ? ok({ batchId: r.value.batchId, rotations: r.value.rotations, conflicts: r.value.conflicts })
+        ? ok({
+            batchId: r.value.batchId,
+            rotations: r.value.rotations,
+            conflicts: r.value.conflicts,
+            overlapOverride: r.value.overlapOverride,
+          })
         : r;
     });
   } catch (error) {
@@ -319,8 +361,9 @@ export async function saveDispatchIn(
   actor: SessionUser,
   date: string,
   wanted: readonly WantedRotation[],
-  deps: { today?: string } = {},
+  deps: { today?: string; overlapReason?: string | null } = {},
 ): Promise<Result<SavedDispatch & { tripIds: string[] }, DispatchError>> {
+  await lockDispatchDay(tx, date);
   const params = await readDispatchParams(tx);
   const orders = await dayOrders(tx, date, deps.today !== undefined && date >= deps.today);
   const trucks = await dayTrucks(tx, date);
@@ -332,7 +375,9 @@ export async function saveDispatchIn(
   // Orders already fully loaded drop out of `orders`; a plan for one of them is for an order with nothing left.
   const known = new Set(orders.map((o) => o.orderId));
   if (wanted.some((w) => !known.has(w.orderId))) return err('NOT_FOUND');
+  // A work item is (day, order, number): the new rotations of an order are numbered after the ones that stay, never from 1 again.
   const seq = new Map<string, number>();
+  for (const f of fixed) seq.set(f.orderId, Math.max(seq.get(f.orderId) ?? 0, f.seq));
   const draft: Rotation[] = wanted.map((w, i) => {
     const n = (seq.get(w.orderId) ?? 0) + 1;
     seq.set(w.orderId, n);
@@ -354,6 +399,11 @@ export async function saveDispatchIn(
   const timed = retime(draft, orders, params, fixed);
   const conflicts = checkDispatch(timed, { orders, trucks, drivers, params, fixed });
   if (conflicts.some(isBlocking)) return err('BLOCKED');
+  // A double-booked driver or truck is refused unless the caller gives the reason of an explicit override, which is recorded and audited.
+  const overlaps = conflicts.filter(isOverlap);
+  const overlapReason = deps.overlapReason?.trim() ?? '';
+  if (overlaps.length > 0 && overlapReason.length < 3) return err('OVERLAP');
+  if (overlapReason.length > 300) return err('INVALID');
 
   // A driver other than the truck's default needs a reason (the database refuses it too); a rotation on the default has none.
   const truckOf = new Map(trucks.map((k) => [k.id, k]));
@@ -371,6 +421,15 @@ export async function saveDispatchIn(
       `insert into trip_plan_cancellation (id, trip_id, reason, created_by) values ($1, $2, 'replanned', $3)`,
       [randomUUID(), p.key, actor.id],
     );
+  }
+  if (overlaps.length > 0) {
+    const kinds = [...new Set(overlaps.map((c) => (c.kind === 'DRIVER_OVERLAP' ? 'driver' : 'truck')))];
+    await tx.query('select public.record_dispatch_overlap($1, $2, $3, $4)', [
+      batchId,
+      date,
+      kinds,
+      overlapReason,
+    ]);
   }
   const tripIds: string[] = [];
   for (const [i, r] of timed.entries()) {
@@ -399,13 +458,17 @@ export async function saveDispatchIn(
       ],
     );
   }
-  return ok({ batchId, rotations: timed.length, conflicts, tripIds });
+  return ok({ batchId, rotations: timed.length, conflicts, overlapOverride: overlaps.length > 0, tripIds });
 }
 
 /**
  * The plant manager moves a rotation that will start late to another truck and driver (T5). Everything that has not started is planned
  * again by the same rules as a saved plan (a driver other than the truck's default needs a reason); the change is recorded with its reason,
- * in the same step. A rotation that has started cannot be moved.
+ * in the same step. A rotation that has started (an event, or the driver's report that loading began) cannot be moved.
+ *
+ * R14-01: the day and its rotations are locked first and the state is read after, so a start, a cancellation or another change that was in
+ * flight is seen. The conflicts the new plan still has are RETURNED, never dropped; a double-booked driver or truck is refused unless
+ * `overlapReason` gives the reason of an explicit, audited override.
  */
 export async function reassignTrip(
   appPool: pg.Pool,
@@ -416,90 +479,101 @@ export async function reassignTrip(
     driverId: string | null;
     reason: string;
     overrideReason?: string;
+    overlapReason?: string;
   },
   deps: { today?: string } = {},
-): Promise<Result<{ newTripId: string }, DispatchError | 'STARTED'>> {
+): Promise<Result<ReassignedTrip, DispatchError>> {
   await require(appPool, actor, 'dispatch.write');
   const reason = input.reason?.trim() ?? '';
   if (reason.length < 3 || reason.length > 500) return err('INVALID');
   try {
-    return await inRequest(
-      appPool,
-      actor,
-      async (tx): Promise<Result<{ newTripId: string }, DispatchError | 'STARTED'>> => {
-        const row = await tx.query<{ trip_date: string; truck_id: string; driver_id: string | null }>(
-          `select to_char(trip_date, 'YYYY-MM-DD') as trip_date, truck_id, driver_id from trip_plan p
-          where id = $1 and not exists (select 1 from trip_plan_cancellation c where c.trip_id = p.id)`,
-          [input.tripId],
-        );
-        const trip = row.rows[0];
-        if (!trip) return err('NOT_FOUND');
-        const live = await liveRotations(tx, trip.trip_date);
-        const target = live.find((r) => r.key === input.tripId);
-        if (!target) return err('NOT_FOUND');
-        if (target.started) return err('STARTED');
-        const wanted: WantedRotation[] = live
-          .filter((r) => !r.started)
-          .map((r) =>
-            r.key === input.tripId
-              ? {
-                  orderId: r.orderId,
-                  truckId: input.truckId,
-                  driverId: input.driverId,
-                  volumeL: r.volumeL,
-                  overrideReason: input.overrideReason ?? reason,
-                }
-              : {
-                  orderId: r.orderId,
-                  truckId: r.truckId,
-                  driverId: r.driverId,
-                  volumeL: r.volumeL,
-                  overrideReason: r.overrideReason,
-                },
-          );
-        const saved = await saveDispatchIn(tx, actor, trip.trip_date, wanted, deps);
-        if (!saved.ok) return saved;
-        const newTripId =
-          saved.value.tripIds[live.filter((r) => !r.started).findIndex((r) => r.key === input.tripId)]!;
-        await tx.query('select public.log_dispatch_change($1, $2, $3, $4, $5, $6, $7, $8)', [
-          'reassign',
-          input.tripId,
-          newTripId,
-          trip.truck_id,
-          input.truckId,
-          trip.driver_id,
-          input.driverId,
-          reason,
-        ]);
-        return ok({ newTripId });
-      },
-    );
+    return await inRequest(appPool, actor, async (tx): Promise<Result<ReassignedTrip, DispatchError>> => {
+      const date = await tripDate(tx, input.tripId);
+      if (!date) return err('NOT_FOUND');
+      await lockDispatchDay(tx, date);
+      // The state is read after the locks.
+      const live = await liveRotations(tx, date);
+      const target = live.find((r) => r.key === input.tripId);
+      // Gone after the locks: cancelled, postponed or replaced by another change of the day while this one waited.
+      if (!target) return err('CONFLICT');
+      if (target.started) return err('STARTED');
+      const movable = live.filter((r) => !r.started);
+      const wanted: WantedRotation[] = movable.map((r) =>
+        r.key === input.tripId
+          ? {
+              orderId: r.orderId,
+              truckId: input.truckId,
+              driverId: input.driverId,
+              volumeL: r.volumeL,
+              overrideReason: input.overrideReason ?? reason,
+            }
+          : {
+              orderId: r.orderId,
+              truckId: r.truckId,
+              driverId: r.driverId,
+              volumeL: r.volumeL,
+              overrideReason: r.overrideReason,
+            },
+      );
+      const saved = await saveDispatchIn(tx, actor, date, wanted, {
+        ...deps,
+        overlapReason: input.overlapReason,
+      });
+      if (!saved.ok) return saved;
+      const newTripId = saved.value.tripIds[movable.findIndex((r) => r.key === input.tripId)]!;
+      await tx.query('select public.log_dispatch_change($1, $2, $3, $4, $5, $6, $7, $8)', [
+        'reassign',
+        input.tripId,
+        newTripId,
+        target.truckId,
+        input.truckId,
+        target.driverId,
+        input.driverId,
+        reason,
+      ]);
+      return ok({
+        newTripId,
+        conflicts: saved.value.conflicts.map((c) => c.kind),
+        overlapOverride: saved.value.overlapOverride,
+      });
+    });
   } catch (error) {
     return err(dispatchFailure(error));
   }
 }
 
+export interface ReassignedTrip {
+  newTripId: string;
+  /** What the new plan of the day still has wrong that the database does not refuse (shown, never silent). */
+  conflicts: Conflict['kind'][];
+  overlapOverride: boolean;
+}
+
 /**
  * The plant manager postpones a rotation that has not started, with a reason: it leaves the plan (a cancellation of the rotation, as
  * `replanned` does) and its litres go back to the orders still to plan, to be placed again or taken the next day. Recorded with the reason.
+ * Same lock discipline as the reassignment (R14-01).
  */
 export async function postponeTrip(
   appPool: pg.Pool,
   actor: SessionUser,
   input: { tripId: string; reason: string },
-): Promise<Result<true, DispatchError | 'STARTED'>> {
+): Promise<Result<true, DispatchError>> {
   await require(appPool, actor, 'dispatch.write');
   const reason = input.reason?.trim() ?? '';
   if (reason.length < 3 || reason.length > 500) return err('INVALID');
   try {
-    return await inRequest(appPool, actor, async (tx): Promise<Result<true, DispatchError | 'STARTED'>> => {
+    return await inRequest(appPool, actor, async (tx): Promise<Result<true, DispatchError>> => {
+      const date = await tripDate(tx, input.tripId);
+      if (!date) return err('NOT_FOUND');
+      await lockDispatchDay(tx, date);
       const row = await tx.query<{ truck_id: string; driver_id: string | null; started: boolean }>(
-        `select p.truck_id, p.driver_id, exists (select 1 from trip_event e where e.trip_id = p.id) as started
+        `select p.truck_id, p.driver_id, public.trip_started(p.id) as started
            from trip_plan p where p.id = $1 and not exists (select 1 from trip_plan_cancellation c where c.trip_id = p.id)`,
         [input.tripId],
       );
       const trip = row.rows[0];
-      if (!trip) return err('NOT_FOUND');
+      if (!trip) return err('CONFLICT'); // cancelled or replaced while this one waited for the day
       if (trip.started) return err('STARTED');
       await tx.query(
         `insert into trip_plan_cancellation (id, trip_id, reason, created_by) values ($1, $2, $3, $4)`,

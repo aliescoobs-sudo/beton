@@ -263,6 +263,15 @@ async function seedPlannedAhead(
       fixed,
     );
     const batch = randomUUID();
+    // A work item is (day, order, number): the rotations already written for the day (the seeded history) keep their numbers.
+    const taken = new Map(
+      (
+        await tx.query<{ order_id: string; n: number }>(
+          `select p.order_id, max(p.seq) as n from trip_plan p where p.trip_date = $1 group by p.order_id`,
+          [date],
+        )
+      ).rows.map((r) => [r.order_id, r.n]),
+    );
     for (const r of plan.rotations) {
       await tx.query(
         `insert into trip_plan (id, batch_id, trip_date, order_id, seq, truck_id, driver_id, volume_l, load_min, depart_min,
@@ -273,7 +282,7 @@ async function seedPlannedAhead(
           batch,
           date,
           r.orderId,
-          r.seq,
+          r.seq + (taken.get(r.orderId) ?? 0),
           r.truckId,
           r.driverId,
           r.volumeL,

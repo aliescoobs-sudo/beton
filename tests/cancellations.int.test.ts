@@ -99,7 +99,7 @@ async function newTrip(
     const t = await tx.query<{ id: string }>(
       `insert into trip_plan (id, batch_id, trip_date, order_id, seq, truck_id, driver_id, volume_l, load_min, depart_min, arrive_min,
                               unload_end_min, back_min, created_by, plant_id)
-       values (gen_random_uuid(), gen_random_uuid(), $4, $1, 1, $2, $5, 8000, 420, 430, 455, 485, 520, $3, $6) returning id`,
+       values (gen_random_uuid(), gen_random_uuid(), $4, $1, (select coalesce(max(seq), 0) + 1 from trip_plan where trip_date = $4 and order_id = $1), $2, $5, 8000, 420, 430, 455, 485, 520, $3, $6) returning id`,
       [orderId, truckId, u.owner!.id, tripDate, driverId, plantId],
     );
     const tripId = t.rows[0]!.id;

@@ -7,7 +7,7 @@ import { Button, Input, Select, StatusPill } from '@/ui';
 import { ESTIMATE_STAGES, type BoardTruck, type EstimateStage } from '../domain/trip-timing';
 import type { DelayStats, EstimateView } from '../service/timing-service';
 
-type Done = { ok: true } | { ok: false; error: string };
+type Done = { ok: true; conflicts?: string[] } | { ok: false; error: string };
 
 export interface TimingBoardProps {
   trucks: BoardTruck[];
@@ -23,6 +23,7 @@ export interface TimingBoardProps {
     truckId: string;
     driverId: string | null;
     reason: string;
+    overlapReason?: string;
   }) => Promise<Done>;
   postpone: (input: { tripId: string; reason: string }) => Promise<Done>;
   setEstimate: (input: {
@@ -44,7 +45,9 @@ const minuteClock = (min: number) => clock(0, min * 60_000);
 /** The board of the day by truck: status, planned and projected times, delays and the state, with reassign and postpone for the next rotation. */
 export function TimingBoardPanel(props: TimingBoardProps) {
   const t = useTranslations('operations.dispatch.timing');
+  const tc = useTranslations('operations.dispatch.conflict');
   const router = useRouter();
+  const [overlapAsked, setOverlapAsked] = useState(false);
   const [acting, setActing] = useState<{ tripId: string; kind: 'reassign' | 'postpone' } | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -52,9 +55,16 @@ export function TimingBoardPanel(props: TimingBoardProps) {
   async function run(job: Promise<Done>) {
     setError(null);
     const r = await job;
-    if (!r.ok) return setError(t(`errors.${r.error}` as never));
+    if (!r.ok) {
+      // A driver or a truck on two rotations at once: the form then asks for the reason of an explicit, audited exception.
+      if (r.error === 'OVERLAP') setOverlapAsked(true);
+      return setError(t(`errors.${r.error}` as never));
+    }
     setActing(null);
-    setMessage(t('done'));
+    setOverlapAsked(false);
+    // What the new plan still has wrong is shown, never dropped.
+    const left = (r.conflicts ?? []).map((c) => tc(c as never)).join(', ');
+    setMessage(left ? `${t('done')} ${t('conflictsLeft', { list: left })}` : t('done'));
     router.refresh();
   }
 
@@ -164,7 +174,11 @@ export function TimingBoardPanel(props: TimingBoardProps) {
                       kind={acting.kind}
                       orderCode={tr.orderCode}
                       movable={props.movable}
-                      onCancel={() => setActing(null)}
+                      askOverlap={overlapAsked}
+                      onCancel={() => {
+                        setActing(null);
+                        setOverlapAsked(false);
+                      }}
                       onSubmit={(v) =>
                         run(
                           acting.kind === 'reassign'
@@ -173,6 +187,7 @@ export function TimingBoardPanel(props: TimingBoardProps) {
                                 truckId: v.truckId,
                                 driverId: v.driverId,
                                 reason: v.reason,
+                                ...(v.overlapReason ? { overlapReason: v.overlapReason } : {}),
                               })
                             : props.postpone({ tripId: tr.tripId, reason: v.reason }),
                         )
@@ -196,26 +211,29 @@ function ActForm({
   kind,
   orderCode,
   movable,
+  askOverlap,
   onCancel,
   onSubmit,
 }: {
   kind: 'reassign' | 'postpone';
   orderCode: string;
   movable: TimingBoardProps['movable'];
+  askOverlap: boolean;
   onCancel: () => void;
-  onSubmit: (v: { truckId: string; driverId: string | null; reason: string }) => void;
+  onSubmit: (v: { truckId: string; driverId: string | null; reason: string; overlapReason: string }) => void;
 }) {
   const t = useTranslations('operations.dispatch.timing');
   const [truckId, setTruckId] = useState(movable.trucks[0]?.id ?? '');
   const [driverId, setDriverId] = useState('');
   const [reason, setReason] = useState('');
+  const [overlapReason, setOverlapReason] = useState('');
   return (
     <form
       className="mt-2 flex flex-wrap items-end gap-2"
       data-testid={`act-form-${orderCode}`}
       onSubmit={(e) => {
         e.preventDefault();
-        onSubmit({ truckId, driverId: driverId || null, reason });
+        onSubmit({ truckId, driverId: driverId || null, reason, overlapReason: overlapReason.trim() });
       }}
     >
       {kind === 'reassign' && (
@@ -262,6 +280,19 @@ function ActForm({
           data-testid={`act-reason-${orderCode}`}
         />
       </label>
+      {kind === 'reassign' && askOverlap && (
+        <label className="block">
+          <span className="field-label">{t('overlapReason')}</span>
+          <Input
+            value={overlapReason}
+            onChange={(e) => setOverlapReason(e.target.value)}
+            required
+            minLength={3}
+            maxLength={300}
+            data-testid={`act-overlap-${orderCode}`}
+          />
+        </label>
+      )}
       <Button type="submit" data-testid={`act-confirm-${orderCode}`}>
         {t('confirm')}
       </Button>

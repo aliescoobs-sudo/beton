@@ -94,6 +94,14 @@ export const BLOCKING_CONFLICTS: readonly ConflictKind[] = ['TRUCK_BROKEN', 'OVE
 
 export const isBlocking = (c: Conflict): boolean => BLOCKING_CONFLICTS.includes(c.kind);
 
+/**
+ * A driver or a truck on two rotations that overlap (R14-01). The database refuses it too, unless the batch carries an explicit audited
+ * override with a reason (`record_dispatch_overlap`): the service asks for that reason and reports the accepted conflict back.
+ */
+export const OVERLAP_CONFLICTS: readonly ConflictKind[] = ['TRUCK_OVERLAP', 'DRIVER_OVERLAP'];
+
+export const isOverlap = (c: Conflict): boolean => OVERLAP_CONFLICTS.includes(c.kind);
+
 /** The milestones of a rotation that starts loading at `startMin` (AC-OPS-13). */
 export function rotationTimes(
   startMin: number,
