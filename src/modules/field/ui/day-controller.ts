@@ -25,6 +25,16 @@ export interface WorkGuard {
   done(): void;
 }
 
+/** One sign-out operation (R15A-02): the only source of guards for the sign-out's own stages. */
+export interface SignOutOp {
+  alive(): boolean;
+  /** Terminal: the operation opens no more guards and the ones it opened are aborted. Does not unfence. */
+  end(): void;
+  /** The driver stays: the operation ends and the fence is lifted (unless a newer session has begun). */
+  cancel(): void;
+  openDrain(): WorkGuard | null;
+}
+
 export interface DayPorts<D extends { userId: string }> {
   /** The session read; aborted by the signal. */
   fetchSession(signal: AbortSignal): Promise<{ status: number; ok: boolean; json(): Promise<unknown> }>;
@@ -57,30 +67,53 @@ export function createDayController<D extends { userId: string }>(ports: DayPort
   // until the next sign-in (or until the driver declines to sign out).
   let generation = 0;
   let fenced = false;
-  const guards = new Set<{ kind: 'background' | 'drain'; gen: number; ctl: AbortController }>();
-  const abortWhere = (pred: (g: { kind: 'background' | 'drain'; gen: number }) => boolean) => {
+  type GuardEntry = { kind: 'background' | 'drain'; gen: number; ctl: AbortController; op?: SignOutOp };
+  const guards = new Set<GuardEntry>();
+  const abortWhere = (pred: (g: GuardEntry) => boolean) => {
     for (const g of guards) if (pred(g)) g.ctl.abort();
   };
 
-  /** Starts a piece of work under the current generation. Background work is refused (null) while fenced; a drain is the sign-out's own. */
-  function openWork(kind: 'background' | 'drain'): WorkGuard | null {
-    if (fenced && kind === 'background') return null;
-    const entry = { kind, gen: generation, ctl: new AbortController() };
+  const guardOf = (entry: GuardEntry): WorkGuard => {
     guards.add(entry);
     return {
       alive: () =>
-        entry.gen === generation && !entry.ctl.signal.aborted && !(fenced && entry.kind === 'background'),
+        entry.gen === generation && !entry.ctl.signal.aborted && (entry.op ? entry.op.alive() : !fenced),
       signal: entry.ctl.signal,
       done: () => void guards.delete(entry),
     };
+  };
+
+  /** Starts a piece of background work under the current generation. Refused (null) while fenced. */
+  function openWork(): WorkGuard | null {
+    if (fenced) return null;
+    return guardOf({ kind: 'background', gen: generation, ctl: new AbortController() });
   }
-  /** The first thing a sign-out does: nothing new starts, and what is on its way is aborted. Reversible until `signedOut`. */
-  function fence(): void {
+
+  /**
+   * R15A-02: the sign-out is ONE operation, captured before its first await. Every stage of it (the sync, the photo send) takes its
+   * guard from THIS operation (`openDrain`) and from nowhere else; a guard is never minted from "the current generation". The
+   * operation ends for good when its deadline passes, the driver declines, the session is refused or a new sign-in opens a new
+   * generation: after that it opens no guard and its guards are dead, so a continuation that wakes up late does nothing.
+   * It also FENCES: nothing new starts from now until the next sign-in (or until the operation is cancelled).
+   */
+  function beginSignOut(): SignOutOp {
     fenced = true;
     abortWhere((g) => g.kind === 'background');
-  }
-  function unfence(): void {
-    fenced = false;
+    const gen = generation;
+    let ended = false;
+    const op: SignOutOp = {
+      alive: () => !ended && gen === generation,
+      end: () => {
+        ended = true;
+        abortWhere((g) => g.op === op);
+      },
+      cancel: () => {
+        op.end();
+        if (gen === generation) fenced = false; // the driver stays: background work resumes (only if no newer session began)
+      },
+      openDrain: () => (op.alive() ? guardOf({ kind: 'drain', gen, ctl: new AbortController(), op }) : null),
+    };
+    return op;
   }
   /** A new sign-in: a new generation; nothing started before it can commit into it. */
   function signedIn(): void {
@@ -187,8 +220,7 @@ export function createDayController<D extends { userId: string }>(ports: DayPort
     refused,
     signedOut,
     openWork,
-    fence,
-    unfence,
+    beginSignOut,
     signedIn,
     isFenced: () => fenced,
     generation: () => generation,

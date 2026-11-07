@@ -4,18 +4,18 @@
 //   - a sign-out FENCES first: no new read, sync or upload starts from then on, and work already on its way is aborted;
 //   - the sign-out's own last send (the "drain") has an overall deadline: a stuck network never keeps the day on the screen;
 //   - a sign-in opens a new generation: nothing started before it can commit into it.
-import type { WorkGuard } from './day-controller';
+import type { SignOutOp, WorkGuard } from './day-controller';
 
 export interface SessionDay {
   loadDay(guard?: WorkGuard | null): Promise<void>;
   refused(): void;
   signedOut(): void;
   signedIn(): void;
-  openWork(kind: 'background' | 'drain'): WorkGuard | null;
+  openWork(): WorkGuard | null;
   /** The session generation now (a sign-out operation belongs to the one it started in). */
   generation(): number;
-  fence(): void;
-  unfence(): void;
+  /** Captures one sign-out operation and fences (R15A-02). */
+  beginSignOut(): SignOutOp;
 }
 
 export interface QueuedPhotoRef {
@@ -81,23 +81,24 @@ export function createFieldSession<P extends QueuedPhotoRef>(ports: SessionPorts
     }
   }
 
-  /** `kind`: a background sync is skipped while one runs; the sign-out's drain waits for it, then sends itself. */
-  async function sync(kind: 'background' | 'drain' = 'background'): Promise<void> {
-    if (kind === 'background') {
-      if (syncRunning) return;
-      const guard = day.openWork('background');
-      if (!guard) return;
-      const run = runSync(guard).finally(() => {
-        if (syncRunning === run) syncRunning = null;
-      });
-      syncRunning = run;
-      return run;
-    }
-    // The guard is taken BEFORE waiting: a drain that outlives its sign-out (deadline) belongs to a finished generation and sends nothing.
-    const guard = day.openWork('drain');
+  /** A background sync is skipped while one runs or while a sign-out has fenced. */
+  async function sync(): Promise<void> {
+    if (syncRunning) return;
+    const guard = day.openWork();
+    if (!guard) return;
+    return startSync(guard);
+  }
+
+  /** The sign-out's own send: the guard comes from the sign-out operation, taken before waiting. It waits for a running sync, then sends. */
+  async function syncDrain(op: SignOutOp): Promise<void> {
+    const guard = op.openDrain();
     if (!guard) return;
     await syncRunning?.catch(() => undefined);
     if (!guard.alive()) return guard.done();
+    return startSync(guard);
+  }
+
+  function startSync(guard: WorkGuard): Promise<void> {
     const run = runSync(guard).finally(() => {
       if (syncRunning === run) syncRunning = null;
     });
@@ -130,21 +131,32 @@ export function createFieldSession<P extends QueuedPhotoRef>(ports: SessionPorts
     }
   }
 
-  async function flushPhotos(kind: 'background' | 'drain' = 'background'): Promise<void> {
-    if (kind === 'background') {
-      if (flushRunning) return;
-      const guard = day.openWork('background');
-      if (!guard) return;
-      const run = runFlush(guard).finally(() => {
-        if (flushRunning === run) flushRunning = null;
-      });
-      flushRunning = run;
-      return run;
-    }
-    const guard = day.openWork('drain');
+  async function flushPhotos(): Promise<void> {
+    if (flushRunning) return;
+    const guard = day.openWork();
+    if (!guard) return;
+    return startFlush(guard);
+  }
+
+  /** Same for the photos: under the sign-out operation's guard, never a fresh one minted from the current generation. */
+  async function flushDrain(op: SignOutOp): Promise<void> {
+    const guard = op.openDrain();
     if (!guard) return;
     await flushRunning?.catch(() => undefined);
     if (!guard.alive()) return guard.done();
+    return startFlush(guard);
+  }
+
+  /** A photo flush under a guard taken by the caller, who keeps its generation through the whole flush (R15A-04). */
+  function flushUnder(guard: WorkGuard): Promise<void> {
+    if (flushRunning) {
+      guard.done();
+      return flushRunning;
+    }
+    return startFlush(guard);
+  }
+
+  function startFlush(guard: WorkGuard): Promise<void> {
     const run = runFlush(guard).finally(() => {
       if (flushRunning === run) flushRunning = null;
     });
@@ -168,29 +180,36 @@ export function createFieldSession<P extends QueuedPhotoRef>(ports: SessionPorts
   }
 
   async function runSignOut(): Promise<void> {
-    day.fence();
+    const op = day.beginSignOut(); // captured BEFORE the first await; every stage below takes its guard from it
     let timer: ReturnType<typeof setTimeout> | undefined;
     const expired = new Promise<'expired'>((resolve) => {
       timer = setTimeout(() => resolve('expired'), ports.drainDeadlineMs);
     });
     const drain = (async () => {
-      await sync('drain');
-      await flushPhotos('drain');
+      await syncDrain(op);
+      if (!op.alive()) return null; // expired, cancelled or overtaken: the next stage does not start
+      await flushDrain(op);
+      if (!op.alive()) return null;
       return ports.listPhotos().catch(() => [] as P[]);
     })();
     const result = await Promise.race([drain, expired]);
     clearTimeout(timer);
     let photos: P[];
     if (result === 'expired') {
-      // The deadline: whatever is still on its way is aborted; the sign-out goes on with what is known.
+      // The deadline ends the operation FOR GOOD: what is on its way is aborted and no stage of it can start again, whatever the
+      // driver answers below and whoever signs in later. The sign-out goes on with what is known.
+      op.end();
       drain.catch(() => undefined);
       photos = [];
+    } else if (result === null) {
+      return void op.end(); // the session was refused or replaced while the drain ran: nothing is left to sign out of
     } else photos = result.filter((x) => x.userId === ports.owner());
     const waiting = ports.queueLength() + photos.length + (result === 'expired' ? 1 : 0);
     if (waiting > 0 && !ports.confirmPending(waiting)) {
-      day.unfence();
+      op.cancel();
       return;
     }
+    op.end();
     day.signedOut();
     ports.ui.clearWaiting();
     await sendLogout();
@@ -231,5 +250,13 @@ export function createFieldSession<P extends QueuedPhotoRef>(ports: SessionPorts
     await sync();
   }
 
-  return { sync, flushPhotos, signOut, signedIn, logoutsSettled, isSigningOut: () => activeSignOut !== null };
+  return {
+    sync,
+    flushPhotos,
+    flushUnder,
+    signOut,
+    signedIn,
+    logoutsSettled,
+    isSigningOut: () => activeSignOut !== null,
+  };
 }

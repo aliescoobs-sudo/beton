@@ -429,3 +429,102 @@ describe('an unresolved old logout never blocks a later one (R15A-01)', () => {
     expect(released).toBe(true);
   });
 });
+
+describe('one sign-out operation guards every stage (R15A-02)', () => {
+  const okPost = async () => ({ status: 200, ok: true, json: async () => ({ outcomes: [] }) });
+
+  it('drain times out, the driver confirms leaving, another user signs in, the old chain is released: it does nothing in the new generation', async () => {
+    const r = rig({ confirm: true });
+    const stuck = deferred<{ status: number; ok: boolean; json(): Promise<unknown> }>();
+    r.hooks.post = () => stuck.promise; // an abort-insensitive background sync
+    const background = r.session.sync();
+    await tick();
+    vi.useFakeTimers();
+    const out = r.session.signOut(); // its drain waits for that sync
+    await vi.advanceTimersByTimeAsync(8_001);
+    await out;
+    vi.useRealTimers();
+    // u2 signs in and queues a photo
+    r.setOwner('u2');
+    r.setQueue([]);
+    r.setPhotos([{ key: 'u2-photo', tripId: 't9', userId: 'u2' }]);
+    r.hooks.session = async () => ({ userId: 'u2', label: 'day-2' });
+    r.hooks.post = okPost;
+    await r.session.signedIn();
+    const reads = r.log.sessionReads;
+    const uploads = [...r.log.uploads];
+    const posts = r.log.syncPosts;
+    // the old wait is released: the old sign-out chain must not flush, upload, read or send
+    stuck.resolve({ status: 200, ok: true, json: async () => ({ outcomes: ['old'] }) });
+    await background;
+    await tick();
+    await tick();
+    expect(r.log.uploads).toEqual(uploads);
+    expect(r.log.sessionReads).toBe(reads);
+    expect(r.log.syncPosts).toBe(posts);
+    expect(r.getPhotos().map((p) => p.key)).toEqual(['u2-photo']); // u2's photo is still there
+    expect(r.ui.day).toEqual({ userId: 'u2', label: 'day-2' });
+  });
+
+  it('expiry is terminal even when the driver cancels leaving: the released chain opens no new drain guard', async () => {
+    const r = rig({ confirm: false });
+    const stuck = deferred<{ status: number; ok: boolean; json(): Promise<unknown> }>();
+    r.hooks.post = () => stuck.promise;
+    r.setPhotos([{ key: 'p1', tripId: 't1', userId: 'u1' }]);
+    const background = r.session.sync();
+    await tick();
+    vi.useFakeTimers();
+    const out = r.session.signOut();
+    await vi.advanceTimersByTimeAsync(8_001);
+    await out;
+    vi.useRealTimers();
+    expect(r.log.confirms.length).toBe(1);
+    expect(r.controller.isFenced()).toBe(false); // the driver stayed
+    stuck.resolve({ status: 200, ok: true, json: async () => ({ outcomes: [] }) });
+    await background;
+    await tick();
+    await tick();
+    expect(r.log.uploads).toEqual([]); // the dead operation's photo stage never started
+    // and the driver can sign out again with a fresh operation that works
+    r.hooks.post = okPost;
+    r.setQueue([]);
+    r.setPhotos([]);
+    await r.session.signOut();
+    expect(r.ui.session).toBe('out');
+  });
+
+  it('A to A: the old chain released after the same account signed in again does nothing', async () => {
+    const r = rig({ confirm: true });
+    const stuck = deferred<{ status: number; ok: boolean; json(): Promise<unknown> }>();
+    r.hooks.post = () => stuck.promise;
+    const background = r.session.sync();
+    await tick();
+    vi.useFakeTimers();
+    const out = r.session.signOut();
+    await vi.advanceTimersByTimeAsync(8_001);
+    await out;
+    vi.useRealTimers();
+    r.setPhotos([{ key: 'new-a', tripId: 't1', userId: 'u1' }]);
+    r.setQueue([]);
+    r.hooks.post = okPost;
+    await r.session.signedIn();
+    const uploads = r.log.uploads.length;
+    stuck.resolve({ status: 200, ok: true, json: async () => ({ outcomes: [] }) });
+    await background;
+    await tick();
+    await tick();
+    expect(r.log.uploads.length).toBe(uploads);
+    expect(r.getPhotos().map((p) => p.key)).toEqual(['new-a']);
+  });
+
+  it('a drain stage that wakes up after the operation ended opens no guard from the current generation', async () => {
+    const r = rig();
+    const op = r.controller.beginSignOut();
+    expect(op.openDrain()).not.toBeNull();
+    op.end();
+    expect(op.openDrain()).toBeNull();
+    r.controller.signedIn();
+    expect(op.openDrain()).toBeNull();
+    expect(r.controller.isFenced()).toBe(false);
+  });
+});
