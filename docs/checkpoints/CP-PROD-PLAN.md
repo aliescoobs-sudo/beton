@@ -298,11 +298,23 @@ Spec: the review (four medium findings, two small items). One commit per finding
 ## T7: fixes of the R14 review (`docs/reviews/CODEX-REVIEW-R14.md`), 2026-11-07
 Spec: the review. Three groups, one commit per finding; decision 181 (group A). Reference: the reviewed code is `f3cb07d`.
 ### Group A — training / iMac path
+**Reading the boxes (R15a):** a checked box below records that the work was IMPLEMENTED and tested at the level named. It is NOT a security closure: `docs/reviews/CODEX-REVIEW-R15A.md` found Group A only partly closed, and the follow-up is section "Group A2" below. The phone logout/handover boundary stays unaccepted until the lifecycle findings are evidenced on a real browser.
 - [x] **R14-06** `c23254b`: one session generation for sync, photo flush, day reads and wipes; a sign-out fences first and has an overall deadline; a stale wipe checks its epoch before `clearWaiting`; wipes are owner-scoped. Whole-lifecycle tests (`field-session.test.ts`): stalled network, sync/photo in flight at logout, re-login, delayed IndexedDB/Cache Storage.
 - [x] **R14-07** `738cc97`: Funnel decisions on the complete structured status only; python3 required; unsupported CLI vs daemon error told apart; no text fallback, no loose "off"; `training-up.sh` propagates a failed check.
 - [x] **R14-12** `75e5872`: seed/output lock with heartbeat before the sweep; the sweep needs the lock and only removes files older than 10 minutes.
 - [x] **R14-13** `75cbe48`: marker bound to the database name; `wipeTrainingDatabase` checks mode flags and a birth row; test escape needs a runner signal; claims rewritten to the true boundary.
 **Docs:** CP-TRAINING.md, CP-TRAINING-IMAC-FR.md, decisions 180 (corrected) and 181.
+
+### Group A2 — the R15a findings (`docs/reviews/CODEX-REVIEW-R15A.md`), decisions 187 to 193
+Implemented and tested with unit, fake-port or scratch-database evidence; none of it is a real-browser or on-the-Mac acceptance, and the R15a "runtime evidence still missing" list stands.
+- [x] **R15A-01** `941d647`: a logout belongs to the generation that started it; its request is abortable with a 6 s deadline; the sign-in waits for it; the server logout is idempotent (decision 187).
+- [x] **R15A-02** `0b732eb`: one sign-out operation guards every stage; expiry is terminal, also when the driver cancels leaving (188).
+- [x] **R15A-03** `1986756`: a wipe captures a creation cutoff when it starts and never erases photos queued after it; storage-level tests over a fake IndexedDB (189).
+- [x] **R15A-04** `57391a1`: photo capture captures owner and generation at its start, refuses stale work before the enqueue, makes the write generation-aware and keeps its guard through the flush (190).
+- [x] **R15A-05** `bf89ffe`: seed lock by exclusive epoch files with a lease fence; the sweep deletes only stages of superseded attempts (191). Residual: the instant between a `held()` check and the action after it.
+- [x] **R15A-06** `bb780af`: public helpers retired; local only, operator responsible for no publisher (192).
+- [x] **R15A-07** `96fe258`: reset refuses legacy spent or unbound birth rows (193).
+**Not proven here:** a real browser (aborted logout headers, logout then reload), real storage timing on a phone, the Mac having no publisher, a fresh Docker volume through the image.
 **Cannot be proven here:** the real Tailscale `--json` output (assumed `{}` when empty) and a really fresh Docker volume; a pre-existing time-of-day dependent failure in `tests/training-seed.int.test.ts` ("one rotation is on the road and late") that also fails on f3cb07d when run in the early morning (Group B territory).
 
 
