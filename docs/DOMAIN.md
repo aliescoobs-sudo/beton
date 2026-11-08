@@ -1,4 +1,4 @@
-# DOMAIN.md — BELGOBETON
+# DOMAIN.md — KAYAS
 
 ## Glossary
 | Term (FR / Darija) | Meaning |

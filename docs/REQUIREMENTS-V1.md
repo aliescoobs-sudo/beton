@@ -1,4 +1,4 @@
-# BELGOBETON — Requirements V1 (production build)
+# KAYAS — Requirements V1 (production build)
 
 Status: captured by the lead conversation from Ali's interview after his meetings with the owner and the office (2 Nov 2026). The plant (centrales) and the drivers will be interviewed on Tue 3 Nov; their answers will amend §6 and §7. Everything here is **"Ali, confirmed with owner"** unless marked *(provisional)*.
 

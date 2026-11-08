@@ -1,6 +1,6 @@
 # Fiche d'exercices — Bureau ventes
 
-Données **fictives**. Compte à utiliser : « Bureau ventes » (e-mail ventes@formation.beton.invalid ; mot de passe : voir la fiche remise en main propre). Les mots de passe ne figurent dans aucune fiche : ils sont remis en main propre.
+Données **fictives**. Compte à utiliser : « Bureau ventes » (e-mail ventes@formation.kayas.invalid ; mot de passe : voir la fiche remise en main propre). Les mots de passe ne figurent dans aucune fiche : ils sont remis en main propre.
 
 ## À essayer
 Ton menu (profil bureau ventes, sans montants) : *Ventes* → Nouveau devis, Chaîne des commandes, Nouvelle commande, À facturer, Facturer une commande, Saisir un paiement ; *Production* → Annulations, Où est mon camion, Chargements, Pompes. Tu n'as **pas** les écrans *Devis* ni *Commandes* (listes avec montants) : ils sont réservés au propriétaire et à l'administrateur.

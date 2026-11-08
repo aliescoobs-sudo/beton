@@ -1,6 +1,6 @@
 # Fiche d'exercices — Administrateur
 
-Données **fictives**. Compte à utiliser : « Administrateur » (admin@formation.beton.invalid). Les mots de passe ne figurent dans aucune fiche : ils sont remis en main propre.
+Données **fictives**. Compte à utiliser : « Administrateur » (admin@formation.kayas.invalid). Les mots de passe ne figurent dans aucune fiche : ils sont remis en main propre.
 
 ## À essayer
 1. **Comptes** : *Administration → Gérer les utilisateurs* : la liste des comptes de formation, sans mot de passe.

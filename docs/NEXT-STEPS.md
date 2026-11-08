@@ -1,4 +1,4 @@
-# NEXT-STEPS.md — BELGOBETON
+# NEXT-STEPS.md — KAYAS
 
 ## 0. Prepare the folder
 ```bash
@@ -11,7 +11,7 @@ git init
 ## 1. Create CLAUDE.md (project rules Claude Code reads every session)
 Create `~/belgobeton/CLAUDE.md` with:
 ```markdown
-# BELGOBETON — project rules
+# KAYAS — project rules
 - Read docs/BRIEF.md, docs/DECISIONS.md and docs/DOMAIN.md before any work.
 - Principle #0: security and privacy first. Never weaken RBAC, 2FA, audit log or encryption.
 - Money is computed by deterministic code only, stored as integer centimes. AI never computes amounts.
@@ -29,7 +29,7 @@ claude
 
 ## 3. Write the spec
 ```
-/agent-skills:spec Build the spec for BELGOBETON from docs/BRIEF.md, docs/DECISIONS.md, docs/DOMAIN.md and docs/RESEARCH.md. Scope = MVP pilot only (section 8 of BRIEF). Include: data model, roles and permissions (RBAC), rules engine (cash forecast, risk detection, reconciliation), AI layer with pseudonymization and confirmation flow, Telegram minimal alerts, simulation dataset and simulation clock for the "black day" scenario, security requirements, and acceptance criteria for each feature. Flag every 🟡 assumption you rely on.
+/agent-skills:spec Build the spec for KAYAS from docs/BRIEF.md, docs/DECISIONS.md, docs/DOMAIN.md and docs/RESEARCH.md. Scope = MVP pilot only (section 8 of BRIEF). Include: data model, roles and permissions (RBAC), rules engine (cash forecast, risk detection, reconciliation), AI layer with pseudonymization and confirmation flow, Telegram minimal alerts, simulation dataset and simulation clock for the "black day" scenario, security requirements, and acceptance criteria for each feature. Flag every 🟡 assumption you rely on.
 ```
 Review the spec. Correct anything wrong before continuing.
 

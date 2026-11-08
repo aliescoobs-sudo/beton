@@ -1,4 +1,6 @@
-# BELGOBETON
+# KAYAS
+
+> Formerly BELGOBETON (renamed 8 Nov 2026, decision 204; brand rules in [docs/BRAND-KAYAS.md](docs/BRAND-KAYAS.md)).
 
 Secure operations brain for a ready-mix concrete company (pilot, **fake data only**).
 Start with [docs/BRIEF.md](docs/BRIEF.md), the spec index [CAPABILITY-MAP.md](CAPABILITY-MAP.md) and the plan [tasks/plan.md](tasks/plan.md).

@@ -1,6 +1,6 @@
 # Fiche d'exercices — Chef de centrale Tétouan
 
-Données **fictives**. Compte à utiliser : « Chef de centrale Tétouan » (centrale-tetouan@formation.beton.invalid). Les mots de passe ne figurent dans aucune fiche : ils sont remis en main propre.
+Données **fictives**. Compte à utiliser : « Chef de centrale Tétouan » (centrale-tetouan@formation.kayas.invalid). Les mots de passe ne figurent dans aucune fiche : ils sont remis en main propre.
 
 ## À essayer
 1. **Commandes du jour à répartir** : ouvre *Planning du jour*. Trois commandes ont déjà leurs rotations en séquence sur trois camions et trois chauffeurs ; une commande (16 m³) n'est pas planifiée : ajoute-la à un camion et enregistre. Résultat : le chauffeur voit une rotation de plus sur son téléphone.

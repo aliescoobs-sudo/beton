@@ -1,4 +1,4 @@
-# RESEARCH.md — BELGOBETON
+# RESEARCH.md — KAYAS
 
 Research date: 2026-10-18. Facts below are paraphrased from the listed sources. Items marked (assumption) are our own estimates, not sourced facts.
 

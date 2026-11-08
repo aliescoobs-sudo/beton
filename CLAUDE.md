@@ -1,4 +1,4 @@
-# BELGOBETON — project rules
+# KAYAS — project rules (formerly BELGOBETON)
 - Read docs/BRIEF.md, docs/DECISIONS.md and docs/DOMAIN.md before any work.
 - Principle #0: security and privacy first. Never weaken RBAC, 2FA, audit log or encryption.
 - Money is computed by deterministic code only, stored as integer centimes. AI never computes amounts.

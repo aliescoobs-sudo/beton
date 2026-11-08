@@ -1,6 +1,6 @@
 # Fiche d'exercices — Propriétaire
 
-Données **fictives**. Compte à utiliser : « Propriétaire » (proprietaire@formation.beton.invalid). Les mots de passe ne figurent dans aucune fiche : ils sont remis en main propre.
+Données **fictives**. Compte à utiliser : « Propriétaire » (proprietaire@formation.kayas.invalid). Les mots de passe ne figurent dans aucune fiche : ils sont remis en main propre.
 
 ## À essayer
 1. **Tableau de bord** : l'accueil montre l'activité du jour (commandes, rotations, alertes de stock, encaissements).

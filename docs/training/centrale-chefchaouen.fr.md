@@ -1,6 +1,6 @@
 # Fiche d'exercices — Chef de centrale Chefchaouen
 
-Données **fictives**. Compte à utiliser : « Chef de centrale Chefchaouen » (centrale-chefchaouen@formation.beton.invalid). Les mots de passe ne figurent dans aucune fiche : ils sont remis en main propre.
+Données **fictives**. Compte à utiliser : « Chef de centrale Chefchaouen » (centrale-chefchaouen@formation.kayas.invalid). Les mots de passe ne figurent dans aucune fiche : ils sont remis en main propre.
 
 ## À essayer
 1. **Commandes du jour** : *Planning du jour* montre la commande B30 avec pompe et la commande B25 de 22 m³ : planifie-les sur les camions T5 à T9. Résultat : les rotations apparaissent avec leurs heures prévues.

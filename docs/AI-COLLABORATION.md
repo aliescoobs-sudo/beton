@@ -1,4 +1,4 @@
-# BELGOBETON — AI collaboration
+# KAYAS — AI collaboration
 
 Updated: 2026-11-04 (end of Batch C). No secrets in this file.
 

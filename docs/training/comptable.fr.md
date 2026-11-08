@@ -1,6 +1,6 @@
 # Fiche d'exercices — Comptable
 
-Données **fictives**. Compte à utiliser : « Comptable » (comptable@formation.beton.invalid). Les mots de passe ne figurent dans aucune fiche : ils sont remis en main propre.
+Données **fictives**. Compte à utiliser : « Comptable » (comptable@formation.kayas.invalid). Les mots de passe ne figurent dans aucune fiche : ils sont remis en main propre.
 
 ## À essayer
 1. **Documents à revoir** : *Trésorerie → Factures* : les factures du scénario avec montants HT/TVA/TTC ; ouvre-en une.

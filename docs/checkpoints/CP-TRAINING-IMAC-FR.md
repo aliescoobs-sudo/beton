@@ -65,7 +65,7 @@ marqueur consommable, pas un jeton signé ; une restauration de la base de maint
 **8. Donner à chacun SON compte (jamais la liste entière)**
 `./scripts/training/show-accounts.sh` affiche seulement les **noms** des comptes, sans secret.
 ✅ Une liste : propriétaire, administrateur, bureau ventes/achats, deux chefs de centrale, comptable, trois chauffeurs et un pompiste.
-Pour un stagiaire : `./scripts/training/show-accounts.sh CH-02` (le **code exact** du chauffeur ; pour un compte e-mail, son **identifiant exact**, par exemple `comptable`) affiche **son bloc seulement**. Un mot générique (`chauffeur`, le domaine `formation.beton.invalid`) est **refusé sans rien afficher** : il désignerait plusieurs personnes. Vérifie qu'un seul bloc s'affiche. Donne-le **en main propre**, puis efface l'écran
+Pour un stagiaire : `./scripts/training/show-accounts.sh CH-02` (le **code exact** du chauffeur ; pour un compte e-mail, son **identifiant exact**, par exemple `comptable`) affiche **son bloc seulement**. Un mot générique (`chauffeur`, le domaine `formation.kayas.invalid`) est **refusé sans rien afficher** : il désignerait plusieurs personnes. Vérifie qu'un seul bloc s'affiche. Donne-le **en main propre**, puis efface l'écran
 **et son historique** (touches ⌘K). Pas de capture d'écran, pas de message, pas d'enregistrement du Terminal (`script`), pas de redirection vers un fichier. Les comptes e-mail n'ont **pas**
 de code d'authentification : le mot de passe suffit (seulement dans cette version). **Exception : la finance.** Le propriétaire, l'administrateur et le comptable qui veulent essayer la finance
 activent une vraie application d'authentification (lien dans la bannière rouge) : la finance n'accepte jamais le mot de passe seul.
@@ -84,8 +84,8 @@ d'une personne à l'autre en te déconnectant puis en te reconnectant dans la m�
 bloqué (une déconnexion qui ne finit pas, une photo qui reste en attente, une journée qui ne s'efface pas), **ARRÊTE l'exercice de ce profil** au lieu de continuer par-dessus une session bloquée. Images synthétiques seulement.
 
 **10. Sauvegarde de nuit** (dans un dossier hors du projet)
-`crontab -e` puis ajoute la ligne : `30 2 * * * cd $HOME/belgobeton && ./scripts/training-backup.sh >> $HOME/belgobeton-training-backup.log 2>&1`
-✅ Pour tester tout de suite : `./scripts/training-backup.sh` écrit « wrote …/belgobeton-training-backups/training-….dump ».
+`crontab -e` puis ajoute la ligne : `30 2 * * * cd $HOME/belgobeton && ./scripts/training-backup.sh >> $HOME/kayas-training-backup.log 2>&1`
+✅ Pour tester tout de suite : `./scripts/training-backup.sh` écrit « wrote …/kayas-training-backups/training-….dump ».
 
 **Au quotidien**
 - Rien n'est public (étape 9) : il n'y a pas d'adresse à fermer. Quand personne ne s'entraîne, `./scripts/training-down.sh` arrête l'instance.

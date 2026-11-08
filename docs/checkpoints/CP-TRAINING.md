@@ -1,6 +1,6 @@
 # CP-TRAINING — the training instance (T1)
 
-Written 2026-11-04. A copy of BELGOBETON for hands-on training of the office staff, the drivers and the owner, with **fictitious data only**.
+Written 2026-11-04. A copy of KAYAS for hands-on training of the office staff, the drivers and the owner, with **fictitious data only**.
 **Current policy (R15A-06): the training instance runs LOCAL ONLY, on one Mac, at `http://localhost:3000`. Nothing is public and there is no tunnel**
 (no Tailscale Funnel or Serve, no reverse proxy, no port forwarding, no public profile of the compose file). The public helpers of the earlier
 plan (`go-public.sh`, the Funnel check) are removed. The operator is responsible for the machine having no publisher: the startup scripts do not
@@ -17,7 +17,7 @@ the final review (`docs/reviews/CODEX-REVIEW-FINAL.md`) still stands for real da
 - **Accounts.** One per role (owner, app_admin, office_sales, office_purchases, two plant managers, accountant, three drivers, one pump operator). Random
   passwords and 6-digit PINs are written **once** to `/app/out/training-accounts.local.txt` inside a Docker volume (`accounts`, folder mode 0700 owned by the container user, no folder of the checkout; file mode 0600, created exclusively then renamed, name covered by the ignore rules of git and of the image; the seed stops without marking the database if it cannot be written) and never printed or logged.
   Read them one trainee at a time with `./scripts/training/show-accounts.sh <exact login or code>` (no argument lists the names only; zero or several matches are refused).
-- **Sign-in.** The accounts on the reserved address `…@formation.beton.invalid` work with their **password alone** (no authenticator), only while training
+- **Sign-in.** The accounts on the reserved address `…@formation.kayas.invalid` work with their **password alone** (no authenticator), only while training
   mode is on. Everything else is unchanged: roles and permissions, row-level security, the audit log, money visibility, the **rate limiting and the login
   lockout stay on** (they are not relaxed for training). Drivers and the pump operator sign in on the phone with their code and PIN (five wrong PINs lock them 15 minutes, attempts are serialised per driver, and the sign-in endpoint has a per-IP limit).
 - **Banner.** A red banner on every page, in the user's language: « Version de formation — données fictives » / « نسخة تدريب — معطيات وهمية ».
@@ -97,10 +97,10 @@ Nothing here is done for you, and no token or password is ever pasted anywhere b
    out and signing in again in the same live page; close the old page or profile before another person starts; and if anything is stuck (a sign-out that does not finish,
    a photo that stays waiting, a day that does not clear), STOP that profile's exercise instead of carrying on over a stuck session. Use synthetic images only.
 9. **Nightly dump** (outside the repository, 14 kept): `crontab -e` and add
-   `30 2 * * * cd $HOME/belgobeton && ./scripts/training-backup.sh >> $HOME/belgobeton-training-backup.log 2>&1`
+   `30 2 * * * cd $HOME/belgobeton && ./scripts/training-backup.sh >> $HOME/kayas-training-backup.log 2>&1`
    The dump is the **database only** (no attachments, no keys): it brings back the database on THIS host, with the same `.env.training` files and the same
    `filestore` volume, and nowhere else. Restore one (stop the app first): `./scripts/training/dc.sh stop app`, then
-   `./scripts/training/dc.sh exec -T db pg_restore -U postgres -d belgobeton --clean --if-exists < ~/belgobeton-training-backups/training-<stamp>.dump`, then `./scripts/training/dc.sh up -d app`.
+   `./scripts/training/dc.sh exec -T db pg_restore -U postgres -d belgobeton --clean --if-exists < ~/kayas-training-backups/training-<stamp>.dump`, then `./scripts/training/dc.sh up -d app`.
 
 ## Day to day
 - Stop: `./scripts/training-down.sh` (data kept). Start: `./scripts/training-up.sh`.

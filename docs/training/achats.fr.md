@@ -1,6 +1,6 @@
 # Fiche d'exercices — Bureau achats
 
-Données **fictives**. Compte à utiliser : « Bureau achats » (achats@formation.beton.invalid). Les mots de passe ne figurent dans aucune fiche : ils sont remis en main propre.
+Données **fictives**. Compte à utiliser : « Bureau achats » (achats@formation.kayas.invalid). Les mots de passe ne figurent dans aucune fiche : ils sont remis en main propre.
 
 ## À essayer
 Ton menu (profil bureau achats, sans montants) : *Achats* → Nouvel achat, Facture fournisseur à saisir, Fournisseurs ; *Production* → Réceptions, Chargements, Annulations. Tu n'as **pas** les écrans *Achats* (liste), *Factures fournisseurs* (liste) ni *Stock* : ils sont réservés au propriétaire, à l'administrateur et aux chefs de centrale.

@@ -1,4 +1,4 @@
-# Capability Map — BELGOBETON MVP pilot
+# Capability Map — KAYAS MVP pilot
 
 Status: **APPROVED (spec phase) — 2026-10-18**, review answers applied · Date: 2026-10-18 · Scope: BRIEF.md §8 only (out-of-scope list in §8 stays out).
 

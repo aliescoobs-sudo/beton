@@ -1,7 +1,7 @@
-# BRIEF.md — BELGOBETON
+# BRIEF.md — KAYAS
 
 ## 1. One-line summary
-BELGOBETON is a secure, AI-assisted "operations brain" for a mid-sized ready-mix concrete company in Tetouan, Morocco. It tracks every financial and material movement (orders, deliveries, stock, payments, cheques, installments, purchases, trucks), forecasts cash and stock problems **before** they happen, and talks with the owner until each problem is resolved.
+KAYAS is a secure, AI-assisted "operations brain" for a mid-sized ready-mix concrete company in Tetouan, Morocco. It tracks every financial and material movement (orders, deliveries, stock, payments, cheques, installments, purchases, trucks), forecasts cash and stock problems **before** they happen, and talks with the owner until each problem is resolved.
 
 ## 2. Context
 - Client: one concrete (béton prêt à l'emploi) company in Tetouan. Not a SaaS product (for now).

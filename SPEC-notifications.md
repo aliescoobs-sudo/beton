@@ -21,8 +21,8 @@ Default subscriptions (🟡): owner — all rules ≥ 🔵 in-app, ≥ 🟠 push
 ## 3. Behaviour
 - Triggered when an alert is created, worsens in severity, or loses its override (not on unchanged recomputes — AC-RE-07).
 - **Telegram message templates (fixed, no variables except counts and severity emoji):**
-  - fr: `BELGOBETON — 1 nouvelle alerte 🔴. Détails dans l'application : https://<host>/alertes`
-  - ar: `BELGOBETON — تنبيه جديد 🔴. التفاصيل في التطبيق: https://<host>/alertes`
+  - fr: `KAYAS — 1 nouvelle alerte 🔴. Détails dans l'application : https://<host>/alertes`
+  - ar: `KAYAS — تنبيه جديد 🔴. التفاصيل في التطبيق: https://<host>/alertes`
   No names, codes, amounts, dates, alert ids, or counterparties. Link is generic; the app requires login + 2FA.
 - No inline actions in Telegram in MVP; replies to the bot get a fixed "Répondez dans l'application" message. Incoming bot text is discarded (not stored, not sent to AI).
 - Linking: in-app (session with 2FA) "Lier Telegram" shows a one-time code; user sends `/start <code>` to the bot; webhook validates the `X-Telegram-Bot-Api-Secret-Token` header, the code hash and expiry, stores chat id encrypted. Unlink in-app or `/stop`.

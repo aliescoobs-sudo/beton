@@ -1,4 +1,4 @@
-# BELGOBETON — تسليم من محادثة القيادة (Claude) إلى GPT/Codex
+# KAYAS — تسليم من محادثة القيادة (Claude) إلى GPT/Codex
 
 النسخة 2. التاريخ: 31/10/2026، 22:20 (Casablanca). تم التحقق مباشرة من المجلد المحلي `/Users/macplanet/BELGOBETON` وحالة Git فهاد الساعة.
 
