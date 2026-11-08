@@ -62,7 +62,7 @@ export function RecoveryCodesPanel() {
             />
           </label>
           {problem && (
-            <p role="alert" className="text-sm text-signal">
+            <p role="alert" className="text-sm text-danger">
               {t(problem)}
             </p>
           )}

@@ -1,10 +1,10 @@
 import { renderSVG } from 'uqr';
 
-export const TOTP_ISSUER = 'BELGOBETON';
+export const TOTP_ISSUER = 'KAYAS';
 
 /**
  * QR code (SVG data URL) for the caller's own TOTP enrolment URI, rendered locally (DECISIONS 73): the secret never
- * leaves our server/browser. Anything that is not a BELGOBETON TOTP URI for `email` is refused (null).
+ * leaves our server/browser. Anything that is not a KAYAS TOTP URI for `email` is refused (null).
  */
 export function totpQrDataUrl(uri: string, email: string): string | null {
   let url: URL;

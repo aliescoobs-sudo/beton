@@ -120,7 +120,7 @@ export function AssistantPanel({ role }: { role: string }) {
           aria-modal="false"
           aria-label={t('title')}
           data-testid="assistant-panel"
-          className="fixed inset-y-0 end-0 z-50 flex w-full flex-col border-s border-rule bg-white text-ink shadow-xl sm:w-[26rem]"
+          className="fixed inset-y-0 end-0 z-50 flex w-full flex-col border-s border-rule bg-surface text-ink shadow-xl sm:w-[26rem]"
         >
           <header className="flex items-center justify-between gap-2 border-b border-rule px-4 py-3">
             <h2 className="text-lg font-semibold">{t('title')}</h2>
@@ -171,7 +171,7 @@ export function AssistantPanel({ role }: { role: string }) {
               e.kind === 'user' ? (
                 <div
                   key={i}
-                  className="ms-8 bg-ink px-3 py-2 text-sm text-white"
+                  className="ms-8 bg-forest px-3 py-2 text-sm text-white"
                   data-testid="assistant-question"
                 >
                   <p dir="auto">{e.text}</p>

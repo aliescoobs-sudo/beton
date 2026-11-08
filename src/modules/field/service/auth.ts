@@ -48,7 +48,7 @@ export async function createFieldAccount(
   if (d.user_id) return err('ALREADY');
   const created = await createUser(deps.auth, deps.authPool, {
     actor: actorOf(admin),
-    email: `${d.code.toLowerCase()}@field.belgobeton.invalid`,
+    email: `${d.code.toLowerCase()}@field.kayas.invalid`,
     name: d.name,
     // Nobody knows this password: the phone signs in with its PIN, never through the password form.
     password: randomBytes(24).toString('base64url'),

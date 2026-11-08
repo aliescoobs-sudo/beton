@@ -118,7 +118,7 @@ export function LossButton({
         </Button>
       </div>
       {message && (
-        <span role="alert" className="text-sm text-signal" data-testid={`loss-error-${blNo}`}>
+        <span role="alert" className="text-sm text-danger" data-testid={`loss-error-${blNo}`}>
           {message}
         </span>
       )}

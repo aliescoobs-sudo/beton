@@ -53,7 +53,7 @@ export function PlantsManager({ plants, editable }: { plants: PlantRow[]; editab
       {message && (
         <p
           role="status"
-          className={message.ok ? 'text-sm' : 'text-sm text-signal'}
+          className={message.ok ? 'text-sm' : 'text-sm text-danger'}
           data-testid="plant-message"
         >
           {message.text}

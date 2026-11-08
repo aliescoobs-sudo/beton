@@ -1,34 +1,81 @@
 @import 'tailwindcss';
 
 /*
- * Design tokens: a ready-mix concrete plant. Flat, ruled, no shadows: sections are separated by a 3px ink rule and
- * spacing, key areas are full-width bands. Status colours (D21/D22) are unchanged and appear only as a 10px square
- * next to an ink label. Components use logical properties only (inline/block start/end), so Arabic mirrors itself.
+ * Design tokens, KAYAS identity (docs/BRAND-KAYAS.md). Four brand colours: Forêt (structure, primary buttons, headings), Citron
+ * (accent only: never body text, never under white text), Graphite (text), Craie (backgrounds); about 60 neutral / 30 structure /
+ * 10 accent. Status colours (D21/D22: late, due, ok, error) are NOT brand colours and are unchanged: they appear as a 10px square
+ * next to a text label, so colour is never the only signal. Flat, ruled, no shadows. Components use logical properties only, so
+ * Arabic mirrors itself. src/ui/brand-contrast.test.ts checks the contrast of every text/background pair in light and dark.
+ * Utilities read the variables at run time (plain @theme, not "inline"), so the dark block below can override them.
  */
-@theme inline {
-  --color-canvas: #e6e7e3;
-  --color-surface: #f4f4f1;
-  --color-band: #d5d7d2;
-  --color-ink: #1b1d1c;
-  --color-muted: #5e6360;
-  --color-rule: #bfc2bd;
-  --color-field: #8d918c;
+@font-face {
+  font-family: 'KAYAS Inter';
+  src: url('/fonts/kayas-font-latin-variable.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'KAYAS Naskh';
+  src: url('/fonts/kayas-font-arabic-variable.ttf') format('truetype');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@theme {
+  --color-forest: #01592b;
+  --color-citron: #9ada02;
+  --color-graphite: #292929;
+  --color-craie: #f5f5f5;
+  --color-canvas: #f5f5f5;
+  --color-surface: #ffffff;
+  --color-band: #e2e9e5;
+  --color-ink: #292929;
+  --color-heading: #01592b;
+  --color-structure: #01592b;
+  --color-muted: #5a5f5c;
+  --color-rule: #bfc4c0;
+  --color-field: #7d827e;
+  --color-focus: #01592b;
   --color-signal: #d23a1e;
+  --color-danger: #b3301a;
   --color-ok: #2f6b4f;
   --color-amber: #c08a12;
   --color-sim: #5b45a8;
-  --color-sim-past: #b9bcb7;
+  --color-sim-past: #c9ccc8;
   --color-status-paid: #2e7d4f;
   --color-status-ontrack: #2f6db5;
   --color-status-due: #c9a227;
   --color-status-late: #c0392b;
   --color-status-cancelled: #8a8f98;
-  --font-sans: var(--font-readex-latin), var(--font-readex-arabic), ui-sans-serif, system-ui, sans-serif;
-  --font-display:
-    var(--font-alexandria-latin), var(--font-alexandria-arabic), var(--font-readex-latin), ui-sans-serif,
-    system-ui, sans-serif;
+  /* KAYAS fonts, self-hosted from /fonts (SIL OFL, licence texts shipped beside them; no external request, CSP unchanged). Inter comes
+     first: it owns every Latin letter, digit and unit (including m³, which Noto lacks), and has no Arabic, so Arabic falls through to
+     Noto Naskh Arabic. Deliberate substitution of the guide's Apple fonts (Helvetica Neue, Geeza Pro): same look on Android and Apple. */
+  --font-sans: 'KAYAS Inter', 'KAYAS Naskh', system-ui, sans-serif;
+  --font-display: var(--font-sans);
   --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-  --radius-control: 2px;
+  --radius-control: 6px;
+}
+
+/* Dark mode, derived from the same tokens: Graphite is the surface, Craie the text, Citron stays the accent, Forêt keeps the
+   header band (white on Forêt 8.5:1). Forêt text on a dark surface would fail, so headings and focus switch to Craie and Citron. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-canvas: #1c1c1c;
+    --color-surface: #292929;
+    --color-band: #343434;
+    --color-ink: #f5f5f5;
+    --color-heading: #f5f5f5;
+    --color-structure: #9ada02;
+    --color-muted: #b8bcb9;
+    --color-rule: #4a4d4b;
+    --color-field: #8e938f;
+    --color-focus: #9ada02;
+    --color-danger: #ff7a5c;
+    --color-ok: #6fcf97;
+    --color-sim-past: #444746;
+  }
 }
 
 @layer base {
@@ -36,8 +83,8 @@
     background: var(--color-canvas);
     color: var(--color-ink);
     font-family: var(--font-sans);
-    font-size: 15px;
-    line-height: 1.55;
+    font-size: 16px;
+    line-height: 1.5;
     font-variant-numeric: tabular-nums;
     -webkit-text-size-adjust: 100%;
   }
@@ -47,18 +94,22 @@
     min-height: 100dvh;
   }
   :focus-visible {
-    outline: 3px solid var(--color-signal);
+    outline: 3px solid var(--color-focus);
     outline-offset: 2px;
+  }
+  /* On a Forêt band (header, drawer) the focus ring is Citron: Forêt on Forêt would not show. */
+  .on-forest :focus-visible {
+    outline-color: var(--color-citron);
   }
   h1,
   h2 {
     font-family: var(--font-display);
     font-weight: 700;
-    color: var(--color-ink);
+    color: var(--color-heading);
     line-height: 1.2;
   }
   h1 {
-    font-weight: 800;
+    font-weight: 700;
   }
   h3 {
     font-weight: 600;
@@ -84,7 +135,7 @@
   }
   /* A section is a ruled block: 3px ink rule on top, then spacing. Form bands and nested sections opt out. */
   main section:not(.band, .form-band) {
-    border-block-start: 3px solid var(--color-ink);
+    border-block-start: 3px solid var(--color-structure);
     padding-block-start: 1rem;
     margin-block-start: 2rem;
   }
@@ -104,13 +155,13 @@
     font-feature-settings: 'tnum';
   }
 
-  /* Buttons: primary = solid ink; everything else is an underlined text button. */
+  /* Buttons: primary = Forêt fill + white text; secondary = light fill + Forêt text (bordered); ghost/danger stay underlined text. */
   .btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    min-block-size: 2.25rem;
+    min-block-size: 2.75rem;
     padding-inline: 1rem;
     padding-block: 0.25rem;
     border: 2px solid transparent;
@@ -125,14 +176,21 @@
     cursor: not-allowed;
   }
   .btn-primary {
-    background: var(--color-ink);
+    background: var(--color-forest);
     color: #fff;
-    border-color: var(--color-ink);
+    border-color: var(--color-forest);
   }
   .btn-primary:hover:not(:disabled) {
-    background: #000;
+    background: #014522;
+    border-color: #014522;
   }
-  .btn-secondary,
+  /* In dark mode the light fill is the dark surface and the text is Craie (Forêt would not pass 4.5:1 there). */
+  .btn-secondary {
+    background: var(--color-surface);
+    color: var(--color-heading);
+    border-color: var(--color-heading);
+    padding-inline: 0.875rem;
+  }
   .btn-ghost,
   .btn-danger {
     background: transparent;
@@ -141,7 +199,6 @@
     text-decoration-thickness: 2px;
     text-underline-offset: 0.25em;
   }
-  .btn-secondary,
   .btn-ghost {
     color: var(--color-ink);
   }
@@ -150,14 +207,20 @@
     background: var(--color-band);
   }
   .btn-danger {
-    color: var(--color-signal);
+    color: var(--color-danger);
   }
   .btn-danger:hover:not(:disabled) {
     background: var(--color-band);
   }
   .btn-sm {
-    min-block-size: 1.875rem;
+    min-block-size: 2rem;
     font-size: 0.82rem;
+  }
+  /* A finger needs 44px: on touch screens the small button grows to the touch target. */
+  @media (pointer: coarse) {
+    .btn-sm {
+      min-block-size: 2.75rem;
+    }
   }
   .btn-primary.btn-sm {
     padding-inline: 0.75rem;
@@ -166,7 +229,7 @@
   .input {
     display: block;
     inline-size: 100%;
-    min-block-size: 2.25rem;
+    min-block-size: 2.75rem;
     padding-inline: 0.625rem;
     padding-block: 0.375rem;
     background: var(--color-surface);
@@ -183,7 +246,7 @@
     color: var(--color-muted);
   }
   .input[aria-invalid='true'] {
-    border-color: var(--color-signal);
+    border-color: var(--color-danger);
     border-width: 2px;
   }
   select.input {
@@ -206,13 +269,13 @@
     margin-block-start: 0.25rem;
     font-size: 0.85rem;
     font-weight: 500;
-    color: var(--color-signal);
+    color: var(--color-danger);
   }
 
   /* Surfaces: no shadows. A panel is a ruled block; a band spans the full width; a row separates list items. */
   .panel {
     background: var(--color-surface);
-    border-block-start: 3px solid var(--color-ink);
+    border-block-start: 3px solid var(--color-structure);
     padding: 1rem;
   }
   .band {
@@ -322,7 +385,7 @@
     padding: 1.5rem;
     background: var(--color-surface);
     color: var(--color-ink);
-    border-block-start: 6px solid var(--color-ink);
+    border-block-start: 6px solid var(--color-structure);
   }
 
   .toast-region {
@@ -340,9 +403,9 @@
     align-items: center;
     gap: 0.75rem;
     padding: 0.625rem 0.875rem;
-    background: var(--color-ink);
+    background: var(--color-graphite);
     color: #fff;
-    border-inline-start: 4px solid var(--color-ok);
+    border-inline-start: 4px solid var(--color-citron);
     font-size: 0.88rem;
   }
   .toast-error {
@@ -375,7 +438,7 @@
     color: var(--color-ink);
   }
   .sim-day-today {
-    background: var(--color-ink);
+    background: var(--color-forest);
     color: #fff;
   }
   .sim-day-future {

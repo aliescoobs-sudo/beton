@@ -3,7 +3,7 @@ import { cn } from '@/ui';
 
 const STYLE: Record<Severity, { icon: string; className: string }> = {
   risk: { icon: '▲', className: 'text-status-late' },
-  urgent: { icon: '◆', className: 'text-signal' },
+  urgent: { icon: '◆', className: 'text-danger' },
   important: { icon: '■', className: 'text-amber' },
   probable: { icon: '●', className: 'text-status-ontrack' },
 };

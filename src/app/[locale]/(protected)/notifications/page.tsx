@@ -59,7 +59,7 @@ export default async function NotificationsPage({ params }: { params: Promise<{ 
               <span
                 className={
                   n.severity === 'urgent'
-                    ? 'font-semibold text-signal'
+                    ? 'font-semibold text-danger'
                     : n.read
                       ? 'text-muted'
                       : 'font-medium'

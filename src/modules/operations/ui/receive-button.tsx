@@ -147,7 +147,7 @@ export function ReceiveButton({
         </form>
       )}
       {message && (
-        <span role="alert" className="text-sm text-signal" data-testid={`receive-error-${code}`}>
+        <span role="alert" className="text-sm text-danger" data-testid={`receive-error-${code}`}>
           {message}
         </span>
       )}

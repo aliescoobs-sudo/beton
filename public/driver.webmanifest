@@ -1,11 +1,36 @@
 {
-  "name": "BELGOBETON – Chauffeur",
+  "name": "KAYAS – Chauffeur",
   "short_name": "Chauffeur",
   "start_url": "/ar/driver",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0e1116",
-  "theme_color": "#0e1116",
-  "icons": [{ "src": "/driver-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+  "background_color": "#01592b",
+  "theme_color": "#01592b",
+  "icons": [
+    {
+      "src": "/icons/192/kayas-pwa-any-white-on-forest.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/512/kayas-pwa-any-white-on-forest.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/192/kayas-pwa-maskable-white-on-forest.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/512/kayas-pwa-maskable-white-on-forest.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
 }

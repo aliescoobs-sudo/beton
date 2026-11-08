@@ -3,8 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
-import { cn } from '@/ui';
-import { SiloMark } from './brand';
+import { Brand, cn } from '@/ui';
 import type { NavGroup } from './nav-model';
 
 interface ShellLabels {
@@ -67,11 +66,10 @@ export function AppShell({
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <header className="bg-ink text-white">
+      <header className="on-forest bg-forest text-white">
         <div className="mx-auto flex w-full max-w-[1240px] items-stretch gap-1 px-3 md:gap-4 md:px-8">
-          <Link href={homeHref} className="flex items-center gap-2.5 py-3" aria-label={labels.brand}>
-            <SiloMark />
-            <span className="font-display text-lg font-extrabold tracking-wide">{labels.brand}</span>
+          <Link href={homeHref} className="flex items-center" aria-label={labels.brand}>
+            <Brand tone="white" width={160} />
           </Link>
           <nav aria-label={labels.mainNav} className="hidden flex-1 items-stretch gap-1 md:flex">
             {groups.map((group) => {
@@ -85,7 +83,7 @@ export function AppShell({
                   className={cn(
                     'flex items-center border-b-4 px-3.5 text-sm font-medium',
                     isCurrent
-                      ? 'border-signal text-white'
+                      ? 'border-citron text-white'
                       : 'border-transparent text-white/70 hover:text-white',
                   )}
                 >
@@ -145,7 +143,7 @@ export function AppShell({
                   aria-current={isCurrent ? 'page' : undefined}
                   className={cn(
                     'whitespace-nowrap border-b-[3px] px-3 py-2.5 text-sm',
-                    isCurrent ? 'border-ink font-semibold' : 'border-transparent hover:border-field',
+                    isCurrent ? 'border-forest font-semibold' : 'border-transparent hover:border-field',
                   )}
                 >
                   {link.label}
@@ -167,16 +165,13 @@ export function AppShell({
         >
           <button
             type="button"
-            className="absolute inset-0 bg-ink/60"
+            className="absolute inset-0 bg-graphite/60"
             onClick={() => setOpenAt(null)}
             aria-label={labels.close}
           />
-          <div className="absolute inset-y-0 start-0 flex w-80 max-w-[88vw] flex-col overflow-y-auto bg-ink text-white">
+          <div className="on-forest absolute inset-y-0 start-0 flex w-80 max-w-[88vw] flex-col overflow-y-auto bg-forest text-white">
             <div className="flex items-center justify-between px-5 py-4">
-              <span className="flex items-center gap-2.5">
-                <SiloMark />
-                <span className="font-display text-lg font-extrabold">{labels.brand}</span>
-              </span>
+              <Brand tone="white" width={160} />
               <button
                 type="button"
                 onClick={() => setOpenAt(null)}
@@ -214,7 +209,7 @@ export function AppShell({
                           className={cn(
                             'block border-s-4 py-2 ps-3 text-sm',
                             current?.link.href === link.href
-                              ? 'border-signal font-semibold'
+                              ? 'border-citron font-semibold'
                               : 'border-transparent text-white/85',
                           )}
                         >

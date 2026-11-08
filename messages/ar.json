@@ -4,7 +4,8 @@
     "enrolForFinance": "تفعيل المصادقة الثنائية (ضرورية للمالية)"
   },
   "shell": {
-    "title": "BELGOBETON",
+    "title": "KAYAS",
+    "descriptor": "الخرسانة الجاهزة",
     "tagline": "نسخة تجريبية — بيانات وهمية فقط",
     "userMenu": "قائمة المستخدم",
     "dismiss": "إغلاق",

@@ -25,8 +25,24 @@ export function nextPhotoSeq(): number {
   return lastSeq;
 }
 
-const DB = 'belgobeton-field';
+const DB = 'kayas-field';
+/** The database of the application's former name (BELGOBETON). Never read or written any more; every wipe deletes it (delete-only). */
+export const LEGACY_DB = 'belgobeton-field';
 const STORE = 'photos';
+
+/** Deletes the former-named database so no photo from a phone that used the old name survives a sign-out. Never throws. */
+export function deleteLegacyPhotoStore(): Promise<void> {
+  return new Promise((resolve) => {
+    try {
+      const req = indexedDB.deleteDatabase(LEGACY_DB);
+      req.onsuccess = () => resolve();
+      req.onerror = () => resolve();
+      req.onblocked = () => resolve();
+    } catch {
+      resolve();
+    }
+  });
+}
 
 function open(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -74,6 +90,7 @@ export async function wipePhotos(
   scope: WipeScope = 'everything',
   cutoff: number = nextPhotoSeq(),
 ): Promise<void> {
+  await deleteLegacyPhotoStore();
   const db = await open();
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE, 'readwrite');

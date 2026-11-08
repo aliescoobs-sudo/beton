@@ -42,7 +42,7 @@ export function DriverForm({
         {t('driverAdd')}
       </Button>
       {message && (
-        <span role="alert" className="text-sm text-signal">
+        <span role="alert" className="text-sm text-danger">
           {message}
         </span>
       )}

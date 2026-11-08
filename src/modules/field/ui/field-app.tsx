@@ -444,11 +444,11 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
             />
           </label>
           {message && (
-            <p role="alert" className="text-2xl text-signal" data-testid="field-error">
+            <p role="alert" className="text-2xl text-danger" data-testid="field-error">
               {message}
             </p>
           )}
-          <button type="submit" className={`${big} bg-ink text-white`} data-testid="field-signin">
+          <button type="submit" className={`${big} bg-forest text-white`} data-testid="field-signin">
             {t('signIn')}
           </button>
         </form>
@@ -521,7 +521,7 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
                 )}
                 <button
                   type="button"
-                  className={`${big} bg-ink text-white`}
+                  className={`${big} bg-forest text-white`}
                   onClick={() =>
                     push({ kind: 'ack', key: newKey(), instructionId: i.id, at: new Date().toISOString() })
                   }
@@ -839,13 +839,13 @@ function UnloadedForm({
         data-testid="field-m3"
       />
       {error && (
-        <p role="alert" className="text-2xl text-signal">
+        <p role="alert" className="text-2xl text-danger">
           {invalid}
         </p>
       )}
       <button
         type="submit"
-        className="w-full rounded-2xl bg-ink px-4 py-5 text-3xl font-extrabold text-white"
+        className="w-full rounded-2xl bg-forest px-4 py-5 text-3xl font-extrabold text-white"
         data-testid="field-m3-ok"
       >
         {ok}
@@ -900,7 +900,7 @@ function PumpEnd({
       </label>
       <button
         type="submit"
-        className="w-full rounded-2xl bg-ink px-4 py-5 text-3xl font-extrabold text-white"
+        className="w-full rounded-2xl bg-forest px-4 py-5 text-3xl font-extrabold text-white"
         data-testid="pump-m3-ok"
       >
         {ok}

@@ -1,5 +1,6 @@
 // Shared UI kit (design tokens live in src/app/globals.css). Leaf layer: imports nothing from modules or routes.
 export { Button, buttonClass, type ButtonProps, type ButtonVariant } from './button';
+export { Brand } from './brand';
 export { Card } from './card';
 export { cn } from './cn';
 export { Dialog } from './dialog';

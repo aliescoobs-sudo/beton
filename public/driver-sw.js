@@ -48,7 +48,7 @@ self.addEventListener('fetch', (event) => {
 // R5: a push is a bare wake-up (no content); tapping it opens the driver app.
 self.addEventListener('push', (event) => {
   event.waitUntil(
-    self.registration.showNotification('BELGOBETON', {
+    self.registration.showNotification('KAYAS', {
       body: 'لديك تنبيه جديد',
       tag: 'bb-driver-alert',
       renotify: true,

@@ -44,8 +44,8 @@ export interface WalkResult {
 }
 
 const DEMO_USERS = {
-  office: { email: 'demo-assistant-office@belgobeton.test', name: 'Bureau (démo assistant)' },
-  plant: { email: 'demo-assistant-plant@belgobeton.test', name: 'Centrale (démo assistant)' },
+  office: { email: 'demo-assistant-office@kayas.test', name: 'Bureau (démo assistant)' },
+  plant: { email: 'demo-assistant-plant@kayas.test', name: 'Centrale (démo assistant)' },
 } as const;
 
 async function userOf(deps: WalkDeps, role: 'owner' | 'office' | 'plant'): Promise<SessionUser | null> {

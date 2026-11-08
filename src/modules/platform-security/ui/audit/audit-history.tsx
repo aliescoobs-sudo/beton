@@ -64,7 +64,7 @@ export function AuditHistory({
                   {changes.map((c) => (
                     <tr key={c.field} data-testid={`diff-${c.field}`}>
                       <td className="font-mono">{c.field}</td>
-                      <td className="font-mono text-signal">{show(c.before)}</td>
+                      <td className="font-mono text-danger">{show(c.before)}</td>
                       <td className="font-mono text-ok">{show(c.after)}</td>
                     </tr>
                   ))}

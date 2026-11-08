@@ -6,7 +6,7 @@ import { realClock } from '@/modules/clock';
 import { SYSTEM_ACTOR_ID } from '../auth/actors';
 
 // R5: web push to the installed PWA (iPhone included), without any content. A push with an empty body is a wake-up: the service
-// worker shows a generic line ("BELGOBETON: you have an alert") and the person opens the app to read it. Nothing the notification
+// worker shows a generic line ("KAYAS: you have an alert") and the person opens the app to read it. Nothing the notification
 // says, no name and no figure, ever travels through the push service. The request is authenticated by VAPID (RFC 8292).
 
 export interface VapidKeys {
@@ -54,7 +54,7 @@ export function vapidFromEnv(env: {
   return {
     publicKey: env.VAPID_PUBLIC_KEY,
     privateKey: env.VAPID_PRIVATE_KEY,
-    subject: env.VAPID_SUBJECT || 'mailto:admin@belgobeton.invalid',
+    subject: env.VAPID_SUBJECT || 'mailto:admin@kayas.invalid',
   };
 }
 

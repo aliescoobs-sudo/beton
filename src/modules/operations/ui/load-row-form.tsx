@@ -115,7 +115,7 @@ export function LoadRowForm({
         {t('create')}
       </Button>
       {message && (
-        <p role="alert" className="w-full text-sm text-signal">
+        <p role="alert" className="w-full text-sm text-danger">
           {message}
         </p>
       )}

@@ -89,7 +89,7 @@ export function PumpBoard({
   return (
     <div className="space-y-8">
       {message && (
-        <p role="alert" className="text-signal" data-testid="pump-message">
+        <p role="alert" className="text-danger" data-testid="pump-message">
           {message}
         </p>
       )}
@@ -105,7 +105,7 @@ export function PumpBoard({
             {conflicts.map((c) => (
               <li
                 key={c.id}
-                className={c.resolvedAt ? 'text-muted' : 'font-semibold text-signal'}
+                className={c.resolvedAt ? 'text-muted' : 'font-semibold text-danger'}
                 data-testid={`pump-conflict-${c.kind}`}
                 data-resolved={c.resolvedAt ? 'yes' : 'no'}
               >
@@ -177,7 +177,7 @@ export function PumpBoard({
               <li key={w.orderId} data-testid={`pump-waiting-${w.orderCode}`}>
                 <bdi dir="ltr">{w.orderCode}</bdi> · {w.clientName} ·{' '}
                 <bdi dir="ltr">{(w.volumeL / 1000).toLocaleString('fr-FR')} m³</bdi>{' '}
-                <span className="text-signal">{t('noTruckBeforePump')}</span>
+                <span className="text-danger">{t('noTruckBeforePump')}</span>
                 {editable && (
                   <Button
                     type="button"
@@ -224,7 +224,7 @@ export function PumpBoard({
                       · {t('firstTruck')} <bdi dir="ltr">{hhmm(j.firstTruckArriveMin)}</bdi>
                     </>
                   )}
-                  {j.openConflicts > 0 && <span className="text-signal"> · ⚠ {j.openConflicts}</span>}
+                  {j.openConflicts > 0 && <span className="text-danger"> · ⚠ {j.openConflicts}</span>}
                 </span>
                 {editable && (
                   <form

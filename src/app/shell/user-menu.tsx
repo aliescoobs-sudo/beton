@@ -50,7 +50,7 @@ export function UserMenu({
           <span className="block text-sm font-medium">{name}</span>
           <span className="block text-xs text-white/70">{roleLabel}</span>
         </span>
-        <span className="grid size-8 place-items-center bg-white text-sm font-bold text-ink">
+        <span className="grid size-8 place-items-center bg-craie text-sm font-bold text-graphite">
           {[...name.trim()][0] ?? '?'}
         </span>
       </button>

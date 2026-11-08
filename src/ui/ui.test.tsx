@@ -6,41 +6,51 @@ import { Button, EmptyState, Money, PageHeader, StatusPill, Table, Td, Th } from
 describe('design tokens', () => {
   const css = readFileSync('src/app/globals.css', 'utf8');
   it.each([
-    ['canvas', '#e6e7e3'],
-    ['surface', '#f4f4f1'],
-    ['band', '#d5d7d2'],
-    ['ink', '#1b1d1c'],
-    ['muted', '#5e6360'],
-    ['rule', '#bfc2bd'],
-    ['field', '#8d918c'],
+    ['forest', '#01592b'],
+    ['citron', '#9ada02'],
+    ['graphite', '#292929'],
+    ['craie', '#f5f5f5'],
+    ['canvas', '#f5f5f5'],
+    ['ink', '#292929'],
+    ['heading', '#01592b'],
+  ])('--color-%s is the KAYAS brand value %s', (name, hex) => {
+    expect(css).toContain(`--color-${name}: ${hex};`);
+  });
+
+  it.each([
     ['signal', '#d23a1e'],
     ['ok', '#2f6b4f'],
     ['amber', '#c08a12'],
     ['sim', '#5b45a8'],
-    ['sim-past', '#b9bcb7'],
     ['status-paid', '#2e7d4f'],
     ['status-ontrack', '#2f6db5'],
     ['status-due', '#c9a227'],
     ['status-late', '#c0392b'],
     ['status-cancelled', '#8a8f98'],
-  ])('--color-%s is %s (D21/D22 status colours unchanged)', (name, hex) => {
+  ])('--color-%s is %s (D21/D22 status colours unchanged by the rebrand)', (name, hex) => {
     expect(css).toContain(`--color-${name}: ${hex};`);
   });
 
-  it('is flat: no shadow, control radius 2px, no tinted status background, tabular numerals on the page', () => {
+  it('is flat: no shadow, control radius 6px, no tinted status background, tabular numerals on the page', () => {
     expect(css).not.toMatch(/box-shadow|--shadow/);
-    expect(css).toContain('--radius-control: 2px;');
+    expect(css).toContain('--radius-control: 6px;');
     expect(css).toMatch(/html \{[^}]*font-variant-numeric: tabular-nums/);
     const pill = css.slice(css.indexOf('.pill {'), css.indexOf('.pill::before'));
     expect(pill).not.toMatch(/background|border:/);
     expect(css.slice(css.indexOf('.pill::before'), css.indexOf('.pill-paid'))).toContain('inline-size: 10px');
   });
 
-  it('loads Alexandria for titles and Readex Pro for text, from committed files', () => {
-    expect(css).toMatch(/--font-display:\s*var\(--font-alexandria-latin\)/);
-    expect(css).toMatch(/--font-sans:\s*var\(--font-readex-latin\)/);
-    for (const f of ['Alexandria-latin', 'Alexandria-arabic', 'ReadexPro-latin', 'ReadexPro-arabic']) {
-      expect(readFileSync(`src/fonts/${f}-variable.woff2`).length).toBeGreaterThan(10_000);
+  it('uses the bundled KAYAS fonts, self-hosted: Inter for Latin and numbers first, Noto Naskh Arabic for Arabic, no external font', () => {
+    expect(css).toMatch(/--font-sans:\s*'KAYAS Inter', 'KAYAS Naskh', system-ui/);
+    expect(css).toContain("url('/fonts/kayas-font-latin-variable.ttf')");
+    expect(css).toContain("url('/fonts/kayas-font-arabic-variable.ttf')");
+    const code = css.replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(code).not.toMatch(/https?:\/\/|@import url|fonts\.googleapis|Helvetica Neue|Geeza/);
+    for (const f of ['latin', 'arabic']) {
+      expect(readFileSync(`public/fonts/kayas-font-${f}-variable.ttf`).length).toBeGreaterThan(100_000);
+      expect(readFileSync(`public/fonts/kayas-font-${f}-license.txt`, 'utf8')).toMatch(
+        /SIL OPEN FONT LICENSE/i,
+      );
     }
   });
 

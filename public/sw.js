@@ -5,7 +5,7 @@ self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim(
 
 self.addEventListener('push', (event) => {
   event.waitUntil(
-    self.registration.showNotification('BELGOBETON', {
+    self.registration.showNotification('KAYAS', {
       body: 'لديك تنبيه · Vous avez une alerte',
       tag: 'bb-alert',
       renotify: true,

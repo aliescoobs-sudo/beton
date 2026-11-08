@@ -7,7 +7,7 @@ import { FieldApp } from '@/modules/field/ui/field-app';
 // The module flag is read per request, never baked into the build.
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = { manifest: '/driver.webmanifest', title: 'BELGOBETON' };
+export const metadata: Metadata = { manifest: '/driver.webmanifest', title: 'KAYAS – Chauffeur' };
 
 /** The driver and pump operator phone app (R4). Its own sign-in (code and PIN), outside the office navigation. */
 export default async function DriverPage({ params }: { params: Promise<{ locale: string }> }) {

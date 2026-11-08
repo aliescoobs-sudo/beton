@@ -53,7 +53,7 @@ export function TruckDefaults({
         ))}
       </ul>
       {message && (
-        <p role="alert" className="text-sm text-signal">
+        <p role="alert" className="text-sm text-danger">
           {message}
         </p>
       )}

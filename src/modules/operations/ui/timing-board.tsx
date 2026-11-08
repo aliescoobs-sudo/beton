@@ -88,7 +88,7 @@ export function TimingBoardPanel(props: TimingBoardProps) {
         </p>
       )}
       {error && (
-        <p role="alert" className="text-sm font-semibold text-signal" data-testid="timing-error">
+        <p role="alert" className="text-sm font-semibold text-danger" data-testid="timing-error">
           {error}
         </p>
       )}
@@ -114,7 +114,7 @@ export function TimingBoardPanel(props: TimingBoardProps) {
           {truck.alert.level === 'critical' && (
             <p
               role="alert"
-              className="mt-2 font-semibold text-signal"
+              className="mt-2 font-semibold text-danger"
               data-testid={`timing-alert-${truck.truckCode}`}
             >
               {t('affected', { order: truck.alert.nextOrderCode ?? '', min: truck.alert.slipMin })}

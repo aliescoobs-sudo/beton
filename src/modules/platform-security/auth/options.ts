@@ -67,7 +67,7 @@ export function baseAuthOptions({ authPool, env }: AuthDeps) {
     },
     plugins: [
       twoFactor({
-        issuer: 'BELGOBETON',
+        issuer: 'KAYAS',
         accountLockout: { enabled: true, maxFailedAttempts: 5, durationSeconds: 15 * 60 },
         backupCodeOptions: {
           amount: 10,

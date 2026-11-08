@@ -195,7 +195,7 @@ export function ConfirmArrivalButton({
         </form>
       )}
       {message && (
-        <span role="alert" className="text-sm text-signal" data-testid={`arrival-error-${code}`}>
+        <span role="alert" className="text-sm text-danger" data-testid={`arrival-error-${code}`}>
           {message}
         </span>
       )}

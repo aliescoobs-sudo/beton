@@ -4,7 +4,8 @@
     "enrolForFinance": "Activer l’authentification à deux facteurs (nécessaire pour la finance)"
   },
   "shell": {
-    "title": "BELGOBETON",
+    "title": "KAYAS",
+    "descriptor": "Béton prêt à l’emploi",
     "tagline": "Pilote — données fictives uniquement",
     "userMenu": "Menu utilisateur",
     "dismiss": "Fermer",
