@@ -5,7 +5,7 @@ const key = Buffer.alloc(32, 1).toString('base64');
 
 describe('keyedHash', () => {
   it('is deterministic for the same key and value', () => {
-    expect(keyedHash(key, 'owner@belgobeton.test')).toEqual(keyedHash(key, 'owner@belgobeton.test'));
+    expect(keyedHash(key, 'owner@kayas.test')).toEqual(keyedHash(key, 'owner@kayas.test'));
   });
 
   it('depends on the key, so it cannot be recomputed without it', () => {
@@ -13,7 +13,7 @@ describe('keyedHash', () => {
   });
 
   it('returns 32 bytes that do not contain the value', () => {
-    const digest = keyedHash(key, 'owner@belgobeton.test');
+    const digest = keyedHash(key, 'owner@kayas.test');
     expect(digest).toHaveLength(32);
     expect(digest.toString('utf8')).not.toContain('owner');
   });

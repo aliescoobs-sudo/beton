@@ -491,12 +491,12 @@ describe('R2 roles and R3 confirmed price', () => {
     await migrator.query(
       `insert into "user" (id, name, email, "emailVerified", role, locale, status, "twoFactorEnabled", "provisionedAt", "plantId")
        values ($1, $2, $3, true, 'plant_manager', 'fr', 'active', true, now(), $4)`,
-      [id, 'Finance plant manager', `${marker}-pm-${id}@belgobeton.test`, A.id],
+      [id, 'Finance plant manager', `${marker}-pm-${id}@kayas.test`, A.id],
     );
     return {
       id,
       name: 'Finance plant manager',
-      email: `${marker}-pm@belgobeton.test`,
+      email: `${marker}-pm@kayas.test`,
       role: 'plant_manager' as never,
       locale: 'fr' as const,
       twoFactorEnabled: true,

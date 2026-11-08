@@ -1,11 +1,11 @@
-# BELGOBETON production stack (R9, C2). The database is on an INTERNAL network: no host port, no route to or from the internet.
+# KAYAS production stack (R9, C2). The database is on an INTERNAL network: no host port, no route to or from the internet.
 # Only the reverse proxy publishes ports (80 and 443). The image is pulled BY DIGEST from the private registry (APP_IMAGE).
 # Secrets are on the server only, chmod 600, never in git, one file per purpose:
 #   .env.prod         the app (no migrator, no backup, no superuser)
 #   .env.ops.prod     maintenance and compose interpolation: POSTGRES_SUPERUSER_PASSWORD, DATABASE_URL_MIGRATOR, APP_DOMAIN, APP_IMAGE, FIRST_BOOT
 #   .env.backup.prod  the backup job only: DATABASE_URL_BACKUP, BACKUP_AGE_RECIPIENT
 # EVERY command goes through ./scripts/ops/dc.sh, which passes --env-file .env.ops.prod (a bare `docker compose` cannot read this file).
-name: belgobeton
+name: kayas
 
 services:
   db:
@@ -26,7 +26,7 @@ services:
     networks: [internal]
 
   app:
-    image: ${APP_IMAGE:?set APP_IMAGE in .env.ops.prod to ghcr.io/<owner>/belgobeton@sha256:<digest>}
+    image: ${APP_IMAGE:?set APP_IMAGE in .env.ops.prod to ghcr.io/<owner>/kayas@sha256:<digest>}
     restart: unless-stopped
     env_file: .env.prod
     environment:

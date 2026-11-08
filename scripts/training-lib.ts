@@ -106,7 +106,7 @@ export function renderCredentialsFile(
   at: Date,
 ): string {
   const lines = [
-    'BELGOBETON — comptes de formation / حسابات التدريب',
+    'KAYAS — comptes de formation / حسابات التدريب',
     `Généré le ${at.toISOString()} — données fictives uniquement.`,
     `Adresse : ${baseUrl}`,
     '',

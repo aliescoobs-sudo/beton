@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Deploys an image BY DIGEST (C2): the digest printed by the "Build and publish image" GitHub Actions workflow, never a moving tag.
-#   ./scripts/ops/deploy.sh ghcr.io/<owner>/belgobeton@sha256:<digest>
+#   ./scripts/ops/deploy.sh ghcr.io/<owner>/kayas@sha256:<digest>
 # Needs `docker login ghcr.io` once on the server with a read-only token (read:packages) of the private registry. Steps: pull, fresh
 # backup, migrate with the new image, start it, wait for readiness (which counts the migrations). ANY failure after the image has been
 # switched (migration, start, readiness) puts the previous image back (D5, F05: before, only a readiness timeout did, and the script
@@ -11,7 +11,7 @@ set -euo pipefail
 # R11-03: the env file holds the database and encryption secrets: everything created here is private from its first byte.
 umask 077
 cd "$(dirname "$0")/../.."
-image="${1:?usage: deploy.sh ghcr.io/<owner>/belgobeton@sha256:<digest>}"
+image="${1:?usage: deploy.sh ghcr.io/<owner>/kayas@sha256:<digest>}"
 case "$image" in *@sha256:????????????????????????????????????????????????????????????????) ;; *) echo "deploy.sh: give an image reference with @sha256:<64 hex>" >&2; exit 2;; esac
 env_file=.env.ops.prod
 [ -r "$env_file" ] || { echo "deploy.sh: $env_file not found in $(pwd)" >&2; exit 1; }

@@ -1,5 +1,5 @@
 # Builds the production image for the server (linux/amd64), pushes it to the PRIVATE GitHub Container Registry and prints the DIGEST.
-# The server deploys that digest, never a moving tag:   ./scripts/ops/deploy.sh ghcr.io/<owner>/belgobeton@sha256:<digest>
+# The server deploys that digest, never a moving tag:   ./scripts/ops/deploy.sh ghcr.io/<owner>/kayas@sha256:<digest>
 # Nothing here holds a secret: the push uses the job's own GITHUB_TOKEN. The package must stay PRIVATE (Packages settings), and the
 # server logs in once with a read-only token (read:packages). The build needs a runner with enough memory (a standard GitHub-hosted
 # runner has 16 GB; the 2 GB local VM could not finish `next build`).
@@ -49,7 +49,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - id: meta
-        run: echo "name=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/belgobeton" >> "$GITHUB_OUTPUT"
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/kayas" >> "$GITHUB_OUTPUT"
       - id: build
         uses: docker/build-push-action@v6
         with:

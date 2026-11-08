@@ -37,7 +37,7 @@ import { realActor } from './helpers/actors';
 const env = testEnv();
 const identityFile = process.env.BACKUP_AGE_IDENTITY_FILE ?? '';
 const app = new pg.Pool({ connectionString: env.DATABASE_URL_APP, max: 1 });
-const work = mkdtempSync(join(tmpdir(), 'belgobeton-backup-'));
+const work = mkdtempSync(join(tmpdir(), 'kayas-backup-'));
 const dir = join(work, 'backups');
 const fileStore = join(work, 'file-store');
 const keys = generateSigningKeys(join(work, 'keys'));

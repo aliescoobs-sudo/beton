@@ -34,7 +34,7 @@ test.beforeAll(async () => {
   await migrator.query(
     `insert into "user" (id, name, email, "emailVerified", role, locale, status, "twoFactorEnabled", "provisionedAt")
      values ($1, $2, $3, true, 'driver', 'ar', 'active', false, now())`,
-    [userId, `Chauffeur ${marker}`, `${marker}@field.belgobeton.invalid`],
+    [userId, `Chauffeur ${marker}`, `${marker}@field.kayas.invalid`],
   );
   const scene = await deliveryScene(app, owner.id, marker);
   const driverId = await withRlsContext(
@@ -253,9 +253,9 @@ const localState = (page: Page) =>
   page.evaluate(async () => {
     const dbs = (await indexedDB.databases?.()) ?? [];
     let photos = 0;
-    if (dbs.some((d) => d.name === 'belgobeton-field')) {
+    if (dbs.some((d) => d.name === 'kayas-field')) {
       photos = await new Promise<number>((resolve) => {
-        const req = indexedDB.open('belgobeton-field');
+        const req = indexedDB.open('kayas-field');
         req.onsuccess = () => {
           const db = req.result;
           if (!db.objectStoreNames.contains('photos')) return resolve(0);

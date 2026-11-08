@@ -66,12 +66,12 @@ beforeAll(async () => {
   await migrator.query(
     `insert into "user" (id, name, email, "emailVerified", role, locale, status, "twoFactorEnabled", "provisionedAt", "plantId")
      values ($1, $2, $3, true, 'plant_manager', 'fr', 'active', true, now(), $4)`,
-    [id, `${marker} pmB`, `${marker}-pmb-${id}@belgobeton.test`, plantB],
+    [id, `${marker} pmB`, `${marker}-pmb-${id}@kayas.test`, plantB],
   );
   pmB = {
     id,
     name: `${marker} pmB`,
-    email: `${id}@belgobeton.test`,
+    email: `${id}@kayas.test`,
     role: 'plant_manager',
     locale: 'fr',
     twoFactorEnabled: true,

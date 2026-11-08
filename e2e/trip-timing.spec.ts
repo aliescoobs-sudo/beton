@@ -46,7 +46,7 @@ test.beforeAll(async () => {
   await migrator.query(
     `insert into "user" (id, name, email, "emailVerified", role, locale, status, "twoFactorEnabled", "provisionedAt")
      values ($1, $2, $3, true, 'driver', 'fr', 'active', false, now())`,
-    [userId, `Chauffeur ${marker}`, `${marker}@field.belgobeton.invalid`],
+    [userId, `Chauffeur ${marker}`, `${marker}@field.kayas.invalid`],
   );
   // the scene first (one plant at most while it is made), then the plant of the spec
   const scene = await deliveryScene(app, owner.id, marker, today);

@@ -1,4 +1,4 @@
-# BELGOBETON TRAINING instance (T1): fictitious data only, a production build. NOT a production stack. Runs on the training Mac
+# KAYAS TRAINING instance (T1): fictitious data only, a production build. NOT a production stack. Runs on the training Mac
 # (linux/amd64 under Colima), LOCAL ONLY (R15A-06; see CP-TRAINING.md): the app is published on 127.0.0.1:${APP_PORT:-3000} only, nothing is
 # public and no tunnel is used. The `public` profile below is NOT part of the current policy; it is kept only for a later, separately reviewed
 # VPS step (it would need its own review before anything is published):
@@ -10,7 +10,7 @@
 # The database is on an INTERNAL network (no host port). Rate limiting and the login lockout stay on: the instance is reachable from the internet.
 # Two secret files on the server (chmod 600, never in git): .env.training (the app and compose) and .env.training.ops (superuser, migrator,
 # backup and seed logins, used by the maintenance container only). Every command goes through ./scripts/training/dc.sh.
-name: belgobeton-training
+name: kayas-training
 
 services:
   db:
@@ -33,7 +33,7 @@ services:
     networks: [internal]
 
   app:
-    image: ${APP_IMAGE:?set APP_IMAGE in .env.training to ghcr.io/<owner>/belgobeton@sha256:<digest>}
+    image: ${APP_IMAGE:?set APP_IMAGE in .env.training to ghcr.io/<owner>/kayas@sha256:<digest>}
     restart: unless-stopped
     env_file: .env.training
     environment:

@@ -22,7 +22,7 @@ test('the owner enters the legal identity, invoices a delivered order, prints it
 
   // Our legal identity: ICE, IF, RC, patente, address, RIB.
   await goNav(page, 'company-link');
-  await page.getByTestId('company-legalName').fill('BELGOBETON E2E (fictif)');
+  await page.getByTestId('company-legalName').fill('KAYAS E2E (fictif)');
   await page.getByTestId('company-legalForm').fill('SARL');
   await page.getByTestId('company-ice').fill('001234567000089');
   await page.getByTestId('company-ifNumber').fill('12345678');
@@ -72,7 +72,7 @@ test('the owner enters the legal identity, invoices a delivered order, prints it
   await goNav(page, 'invoices-link');
   await page.getByTestId(`invoice-open-${number}`).click();
   const doc = page.getByTestId('invoice-document');
-  await expect(doc).toContainText('BELGOBETON E2E (fictif) (SARL)');
+  await expect(doc).toContainText('KAYAS E2E (fictif) (SARL)');
   await expect(doc).toContainText('ICE 001234567000089');
   await expect(doc).toContainText('RIB 181 780 0000123456789012 34');
   await expect(doc).toContainText(number);

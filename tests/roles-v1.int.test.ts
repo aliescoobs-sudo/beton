@@ -52,7 +52,7 @@ async function makeUser(role: Role, plantId: string | null = null): Promise<stri
   await migrator.query(
     `insert into "user" (id, name, email, "emailVerified", role, locale, status, "twoFactorEnabled", "provisionedAt", "plantId")
      values ($1, $2, $3, true, $4, 'fr', 'active', true, now(), $5)`,
-    [id, `${marker} ${role}`, `${marker}-${role}-${id}@belgobeton.test`, role, plantId],
+    [id, `${marker} ${role}`, `${marker}-${role}-${id}@kayas.test`, role, plantId],
   );
   return id;
 }
@@ -65,7 +65,7 @@ const as = <T>(role: Role, fn: (tx: pg.PoolClient) => Promise<T>, userId?: strin
 const session = (id: string, role: Role): SessionUser => ({
   id,
   name: marker,
-  email: `${id}@belgobeton.test`,
+  email: `${id}@kayas.test`,
   role,
   locale: 'fr',
   twoFactorEnabled: true,

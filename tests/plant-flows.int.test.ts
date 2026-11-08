@@ -93,9 +93,9 @@ beforeAll(async () => {
   await migrator.query(
     `insert into "user" (id, name, email, "emailVerified", role, locale, status, "twoFactorEnabled", "provisionedAt", "plantId")
      values ($1, $2, $3, true, 'plant_manager', 'fr', 'active', true, now(), $4)`,
-    [id, `${marker} pm2`, `${marker}-pm2-${id}@belgobeton.test`, plant2],
+    [id, `${marker} pm2`, `${marker}-pm2-${id}@kayas.test`, plant2],
   );
-  u.pm2 = { ...v.session('plant_manager'), id, name: `${marker} pm2`, email: `${id}@belgobeton.test` };
+  u.pm2 = { ...v.session('plant_manager'), id, name: `${marker} pm2`, email: `${id}@kayas.test` };
   componentId = (await migrator.query<{ id: string }>(`select id from component order by code limit 1`))
     .rows[0]!.id;
 });

@@ -506,7 +506,7 @@ export async function restoreCheck(options: {
   await admin.connect();
   const scratchUrl = new URL(options.adminUrl);
   scratchUrl.pathname = `/${RESTORE_TEST_DATABASE}`;
-  const scratchDir = mkdtempSync(join(tmpdir(), 'belgobeton-restore-'));
+  const scratchDir = mkdtempSync(join(tmpdir(), 'kayas-restore-'));
   try {
     await admin.query(`drop database if exists "${RESTORE_TEST_DATABASE}" with (force)`);
     await admin.query(`create database "${RESTORE_TEST_DATABASE}" owner belgobeton_migrator`);

@@ -400,7 +400,7 @@ describe('support is read-only everywhere (DECISIONS 81)', () => {
     await migrator.query(
       `insert into "user" (id, name, email, "emailVerified", role, locale, status, "twoFactorEnabled", "provisionedAt")
        values ($1, 'Support off', $2, true, 'support', 'fr', 'active', true, now())`,
-      [fresh, `off-${marker}@belgobeton.test`],
+      [fresh, `off-${marker}@kayas.test`],
     );
     await expect(
       inCtx('support', fresh, (tx) => tx.query('select 1 from purchase_price limit 1')),

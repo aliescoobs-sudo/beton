@@ -18,7 +18,7 @@ test('the owner creates, disables, re-enables a user and resets another user’s
   await expect(page).toHaveURL('/fr/admin/users');
 
   // Create (sensitive, but the second factor is fresh right after login: no dialog).
-  const email = `e2e-office-${Date.now()}@belgobeton.test`;
+  const email = `e2e-office-${Date.now()}@kayas.test`;
   const form = page.getByTestId('create-user');
   await form.locator('input[name=name]').fill('Bureau E2E');
   await form.locator('input[name=email]').fill(email);

@@ -1,7 +1,7 @@
 // The training instance (T1): the rules that keep fictitious data and production apart. A leaf with no import.
 
 /** The only email domain of training accounts: a password alone opens them, and only while TRAINING_MODE is on. */
-export const TRAINING_EMAIL_DOMAIN = 'formation.beton.invalid';
+export const TRAINING_EMAIL_DOMAIN = 'formation.kayas.invalid';
 
 export const isTrainingEmail = (email: string): boolean =>
   email.toLowerCase().endsWith(`@${TRAINING_EMAIL_DOMAIN}`);

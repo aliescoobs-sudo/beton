@@ -114,7 +114,7 @@ describe('the image and the host (items 10, 12)', () => {
     expect(runtime).toMatch(/-u 10001/);
     expect(runtime).toMatch(/chown -R 10001:10001 \/data/);
     expect(readFileSync('scripts/ops/init-host.sh', 'utf8')).toMatch(
-      /install -d -o 10001 -g belgobeton-backup -m 2750/,
+      /install -d -o 10001 -g kayas-backup -m 2750/,
     );
   });
   it('keeps the Excel imports out of git and out of the image', () => {
@@ -232,8 +232,8 @@ describe('scripts/ops/bootstrap.sh (F04)', () => {
 });
 
 describe('scripts/ops/deploy.sh (F05 of the final review)', () => {
-  const OLD = `ghcr.io/o/belgobeton@sha256:${'a'.repeat(64)}`;
-  const NEW = `ghcr.io/o/belgobeton@sha256:${'b'.repeat(64)}`;
+  const OLD = `ghcr.io/o/kayas@sha256:${'a'.repeat(64)}`;
+  const NEW = `ghcr.io/o/kayas@sha256:${'b'.repeat(64)}`;
   /** Runs deploy.sh from a directory that is NOT the repository root, against stubs; `fail` names the step that fails. */
   const deploy = (
     fail: 'none' | 'pull' | 'backup' | 'migrate' | 'up' | 'ready',

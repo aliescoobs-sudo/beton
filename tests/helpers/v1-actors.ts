@@ -31,7 +31,7 @@ export async function v1Actors(app: pg.Pool, migratorUrl: string, marker: string
       [
         id,
         `${marker} ${role}`,
-        `${marker}-${role}-${id}@belgobeton.test`,
+        `${marker}-${role}-${id}@kayas.test`,
         role,
         role === 'plant_manager' ? plantId : null,
       ],
@@ -41,7 +41,7 @@ export async function v1Actors(app: pg.Pool, migratorUrl: string, marker: string
   const session = (role: Role) => ({
     id: ids[role],
     name: `${marker} ${role}`,
-    email: `${ids[role]}@belgobeton.test`,
+    email: `${ids[role]}@kayas.test`,
     role,
     locale: 'fr' as const,
     twoFactorEnabled: true,

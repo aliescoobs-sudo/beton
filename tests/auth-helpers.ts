@@ -57,7 +57,7 @@ export function authTestKit(overrides: Partial<Env> = {}) {
   const password = 'correct-horse-battery-staple';
 
   async function newUser(role: UserRole = 'partner') {
-    const email = `user-${Math.random().toString(36).slice(2)}@belgobeton.test`;
+    const email = `user-${Math.random().toString(36).slice(2)}@kayas.test`;
     const { id } = await createUser(auth, authPool, {
       actor: { userId: BOOTSTRAP_ACTOR_ID, role: 'system' },
       email,

@@ -7,7 +7,7 @@ cd "$(dirname "$0")/.."
 dc=./scripts/training/dc.sh
 ops=./scripts/training/ops.sh
 for f in .env.training .env.training.ops; do
-  [ -r "$f" ] || { echo "training-up.sh: $f is missing. First run:  APP_IMAGE=ghcr.io/<owner>/belgobeton@sha256:<digest> ./scripts/training/init-env.sh" >&2; exit 1; }
+  [ -r "$f" ] || { echo "training-up.sh: $f is missing. First run:  APP_IMAGE=ghcr.io/<owner>/kayas@sha256:<digest> ./scripts/training/init-env.sh" >&2; exit 1; }
 done
 docker info >/dev/null 2>&1 || { echo "training-up.sh: Docker does not answer. On the iMac start it first:  colima start --arch x86_64 --cpu 2 --memory 4 --disk 40" >&2; exit 1; }
 $dc pull

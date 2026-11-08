@@ -14,7 +14,7 @@ let n = 0;
 /** A fresh office user per test, so lockout counters never interfere. */
 async function freshUser() {
   n += 1;
-  const email = `office${n}-${Date.now()}@belgobeton.test`;
+  const email = `office${n}-${Date.now()}@kayas.test`;
   const user = await createUser(kit.auth, kit.authPool, {
     actor: { userId: BOOTSTRAP_ACTOR_ID, role: 'system' },
     email,
@@ -33,7 +33,7 @@ describe('password login (T9, AC-SEC-02 password part)', () => {
     if (rowCount) return;
     await createUser(kit.auth, kit.authPool, {
       actor: { userId: BOOTSTRAP_ACTOR_ID, role: 'system' },
-      email: 'owner@belgobeton.test',
+      email: 'owner@kayas.test',
       name: 'Owner',
       password,
       role: 'owner',
@@ -51,7 +51,7 @@ describe('password login (T9, AC-SEC-02 password part)', () => {
   it('gives the same status and message for an unknown email and a wrong password', async () => {
     const { email } = await freshUser();
     const unknown = await kit.call('/sign-in/email', {
-      email: `nobody-${Date.now()}@belgobeton.test`,
+      email: `nobody-${Date.now()}@kayas.test`,
       password,
     });
     const wrong = await kit.call('/sign-in/email', { email, password: 'wrong-password-123' });
@@ -68,7 +68,7 @@ describe('password login (T9, AC-SEC-02 password part)', () => {
     const locked = await kit.call('/sign-in/email', { email, password });
     expect(locked.status).toBe(429);
 
-    const ghost = `ghost-${Date.now()}@belgobeton.test`;
+    const ghost = `ghost-${Date.now()}@kayas.test`;
     for (let i = 0; i < 5; i++)
       await kit.call('/sign-in/email', { email: ghost, password: `wrong-password-${i}xx` });
     const ghostLocked = await kit.call('/sign-in/email', { email: ghost, password });
@@ -105,11 +105,7 @@ describe('password login (T9, AC-SEC-02 password part)', () => {
   it('blocks an IP after 20 failures in 15 minutes, across accounts', async () => {
     const ip = '203.0.113.77';
     for (let i = 0; i < 20; i++) {
-      await kit.call(
-        '/sign-in/email',
-        { email: `spray${i}-${Date.now()}@belgobeton.test`, password },
-        { ip },
-      );
+      await kit.call('/sign-in/email', { email: `spray${i}-${Date.now()}@kayas.test`, password }, { ip });
     }
     const { email } = await freshUser();
     expect((await kit.call('/sign-in/email', { email, password }, { ip })).status).toBe(429);
@@ -121,7 +117,7 @@ describe('password login (T9, AC-SEC-02 password part)', () => {
     for (let i = 0; i < 20; i++) {
       await kit.call(
         '/sign-in/email',
-        { email: `spoof${i}-${Date.now()}@belgobeton.test`, password },
+        { email: `spoof${i}-${Date.now()}@kayas.test`, password },
         { ip: `198.51.100.${i + 1}, ${real}` },
       );
     }
@@ -139,7 +135,7 @@ describe('password login (T9, AC-SEC-02 password part)', () => {
     for (let i = 0; i < 21; i++) {
       await noProxyKit.call(
         '/sign-in/email',
-        { email: `noproxy${i}-${Date.now()}@belgobeton.test`, password },
+        { email: `noproxy${i}-${Date.now()}@kayas.test`, password },
         { ip },
       );
     }
@@ -148,7 +144,7 @@ describe('password login (T9, AC-SEC-02 password part)', () => {
   });
 
   it('audits a failed login for an unknown email with the anonymous actor and only a keyed hash of the identifier', async () => {
-    const ghost = `unknown-${Date.now()}@belgobeton.test`;
+    const ghost = `unknown-${Date.now()}@kayas.test`;
     await kit.call('/sign-in/email', { email: ghost, password: 'some-password-xyz' });
     const hmac = keyedHash(kit.env.LOOKUP_HMAC_KEY, ghost).toString('hex');
     const [event] = await kit.auditEvents(`action = 'login_failed' and after->>'identifier_hmac' = $1`, [
@@ -175,7 +171,7 @@ describe('password login (T9, AC-SEC-02 password part)', () => {
   });
 
   it('never writes attempted passwords or identifiers to the logs', async () => {
-    const ghost = `logscan-${Date.now()}@belgobeton.test`;
+    const ghost = `logscan-${Date.now()}@kayas.test`;
     const attempted = 'attempted-secret-password-42';
     await kit.call('/sign-in/email', { email: ghost, password: attempted });
     await kit.call('/sign-in/email', { email: 'not-an-email', password: attempted });
@@ -190,7 +186,7 @@ describe('password login (T9, AC-SEC-02 password part)', () => {
     const stdout = vi.spyOn(process.stdout, 'write');
     try {
       await kit.call('/sign-in/email', {
-        email: `quiet-${Date.now()}@belgobeton.test`,
+        email: `quiet-${Date.now()}@kayas.test`,
         password: 'nope-nope-nope-1',
       });
       await kit.call('/sign-up/email', {});
@@ -218,7 +214,7 @@ describe('createUser (owner bootstrap and user admin)', () => {
   const bootstrap = { userId: BOOTSTRAP_ACTOR_ID, role: 'system' as const };
 
   it('if writing the credentials fails, the user stays disabled, the failure is audited, and a retry completes it', async () => {
-    const email = `retry-${Date.now()}@belgobeton.test`;
+    const email = `retry-${Date.now()}@kayas.test`;
     const input = {
       actor: bootstrap,
       email,
@@ -261,7 +257,7 @@ describe('createUser (owner bootstrap and user admin)', () => {
   });
 
   it('refuses to create a user whose email already belongs to a completed account', async () => {
-    const email = `dup-${Date.now()}@belgobeton.test`;
+    const email = `dup-${Date.now()}@kayas.test`;
     const input = {
       actor: bootstrap,
       email,
@@ -278,7 +274,7 @@ describe('createUser (owner bootstrap and user admin)', () => {
     await expect(
       createUser(kit.auth, kit.authPool, {
         actor: bootstrap,
-        email: `owner2-${Date.now()}@belgobeton.test`,
+        email: `owner2-${Date.now()}@kayas.test`,
         name: 'Owner 2',
         password,
         role: 'owner',
@@ -294,7 +290,7 @@ describe('createUser (owner bootstrap and user admin)', () => {
     await expect(
       createUser(kit.auth, kit.authPool, {
         actor: bootstrap,
-        email: `weak-${Date.now()}@belgobeton.test`,
+        email: `weak-${Date.now()}@kayas.test`,
         name: 'Weak',
         password: weak,
         role: 'office',
@@ -304,7 +300,7 @@ describe('createUser (owner bootstrap and user admin)', () => {
   });
 
   it('stores an argon2id hash and a lowercase email, and audits the creation without the password', async () => {
-    const email = `Mixed.Case-${Date.now()}@BelgoBeton.test`;
+    const email = `Mixed.Case-${Date.now()}@kayas.test`;
     const user = await createUser(kit.auth, kit.authPool, {
       actor: bootstrap,
       email,

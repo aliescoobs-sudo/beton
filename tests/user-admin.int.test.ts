@@ -70,7 +70,7 @@ describe('user admin (T13): owner only', () => {
 
   it('creates partner, office and plant users, never a second owner', async () => {
     const created = await createManagedUser(deps(), owner, {
-      email: `new-office-${Date.now()}@belgobeton.test`,
+      email: `new-office-${Date.now()}@kayas.test`,
       name: 'New Office',
       role: 'office',
       locale: 'ar',
@@ -80,7 +80,7 @@ describe('user admin (T13): owner only', () => {
     expect(event.actor_user_id).toBe(owner.id);
     await expect(
       createManagedUser(deps(), owner, {
-        email: `owner2-${Date.now()}@belgobeton.test`,
+        email: `owner2-${Date.now()}@kayas.test`,
         name: 'Owner 2',
         role: 'owner' as never,
         locale: 'fr',
@@ -181,7 +181,7 @@ describe('authorize (route and action guard)', () => {
 });
 
 describe('user admin V1 (R2, DECISIONS 126 to 128)', () => {
-  const email = (r: string) => `v1-${r}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@belgobeton.test`;
+  const email = (r: string) => `v1-${r}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@kayas.test`;
   const pw = 'correct-horse-battery-staple';
 
   it('the owner creates an app_admin and an office_sales; the portals are refused', async () => {
@@ -226,7 +226,7 @@ describe('user admin V1 (R2, DECISIONS 126 to 128)', () => {
     const admin: SessionUser = {
       id: adminId,
       name: 'Admin Two',
-      email: 'x@belgobeton.test',
+      email: 'x@kayas.test',
       role: 'app_admin',
       locale: 'fr',
       twoFactorEnabled: true,

@@ -17,7 +17,7 @@ const password = 'correct-horse-battery-staple';
 const nextStep = () => vi.setSystemTime(Date.now() + 30_000);
 
 async function newUser() {
-  const email = `twofa-${Math.random().toString(36).slice(2)}@belgobeton.test`;
+  const email = `twofa-${Math.random().toString(36).slice(2)}@kayas.test`;
   const { id } = await createUser(kit.auth, kit.authPool, {
     actor: { userId: BOOTSTRAP_ACTOR_ID, role: 'system' },
     email,
@@ -104,7 +104,7 @@ describe('enrolment QR code (DECISIONS 73)', () => {
       totpURI: string;
     };
     expect(totpQrDataUrl(totpURI, user.email)).toMatch(/^data:image\/svg\+xml;base64,/);
-    expect(totpQrDataUrl(totpURI, 'someone-else@belgobeton.test')).toBeNull();
+    expect(totpQrDataUrl(totpURI, 'someone-else@kayas.test')).toBeNull();
   });
 });
 

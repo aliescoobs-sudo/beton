@@ -9,14 +9,14 @@
 #   - each new set gets a receipt signed with SIGNING_KEY_FILE, which every restore checks;
 #   - any problem sends an alert (scripts/ops/alert.sh) and exits non-zero. Nothing is "ignored if present": a damaged local copy is
 #     replaced by a good one from the server.
-#   SERVER=backup@server.example SIGNING_KEY_FILE=~/belgobeton-keys/backup-signing.key BACKUP_DIR=~/belgobeton-backups ./backup-pull.sh
+#   SERVER=backup@server.example SIGNING_KEY_FILE=~/kayas-keys/backup-signing.key BACKUP_DIR=~/kayas-backups ./backup-pull.sh
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 repo="$(cd "$here/../.." && pwd)"
 : "${SERVER:?set SERVER, e.g. backup@server.example}"
 : "${SIGNING_KEY_FILE:?set SIGNING_KEY_FILE to the office ed25519 private key (node scripts/backup-verify.ts keygen <dir>)}"
-BACKUP_DIR="${BACKUP_DIR:-$HOME/belgobeton-backups}"
-REMOTE_DIR="${REMOTE_DIR:-/srv/belgobeton/backups}"
+BACKUP_DIR="${BACKUP_DIR:-$HOME/kayas-backups}"
+REMOTE_DIR="${REMOTE_DIR:-/srv/kayas/backups}"
 MAX_AGE_HOURS="${MAX_AGE_HOURS:-30}"
 mkdir -p "$BACKUP_DIR"
 umask 077

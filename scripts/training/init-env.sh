@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Writes .env.training and .env.training.ops with fresh random secrets (once; refuses to overwrite). Needs openssl.
-#   APP_IMAGE=ghcr.io/<owner>/belgobeton@sha256:<digest> ./scripts/training/init-env.sh
+#   APP_IMAGE=ghcr.io/<owner>/kayas@sha256:<digest> ./scripts/training/init-env.sh
 #   APP_BASE_URL (optional) is the address people type: local only, http://127.0.0.1:3000 by default (`set-url.sh http://localhost:3000`
 #   changes it later). The app only accepts writes that come from that address.
 # The secrets are written to the two files only (chmod 600) and are not printed.
@@ -8,7 +8,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 base="${APP_BASE_URL:-http://127.0.0.1:3000}"
 domain="${APP_DOMAIN:-}"
-image="${APP_IMAGE:?set APP_IMAGE (ghcr.io/<owner>/belgobeton@sha256:<digest>)}"
+image="${APP_IMAGE:?set APP_IMAGE (ghcr.io/<owner>/kayas@sha256:<digest>)}"
 for f in .env.training .env.training.ops; do
   { [ -e "$f" ] || [ -L "$f" ]; } && { echo "init-env.sh: $f already exists (or is a link): not overwritten" >&2; exit 1; }
 done

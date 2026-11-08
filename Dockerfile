@@ -1,5 +1,5 @@
-# BELGOBETON production image (R9). Provider-neutral: any host that runs containers. Multi-stage, non-root, no secret inside.
-# Build:  docker build -t belgobeton:$(git rev-parse --short HEAD) .
+# KAYAS production image (R9). Provider-neutral: any host that runs containers. Multi-stage, non-root, no secret inside.
+# Build:  docker build -t kayas:$(git rev-parse --short HEAD) .
 # The Node and Alpine base is pinned by tag here; pin it by digest in your registry before a release (docker buildx imagetools inspect).
 FROM node:24-alpine AS build
 WORKDIR /app

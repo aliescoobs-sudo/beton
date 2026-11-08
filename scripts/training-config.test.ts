@@ -111,7 +111,7 @@ describe('init-env.sh really produces a working training environment', () => {
       env: {
         ...process.env,
         APP_BASE_URL: 'http://localhost:3000',
-        APP_IMAGE: `ghcr.io/o/belgobeton@sha256:${'a'.repeat(64)}`,
+        APP_IMAGE: `ghcr.io/o/kayas@sha256:${'a'.repeat(64)}`,
       },
     });
   const parse = (file: string) =>
@@ -353,13 +353,13 @@ describe('the training guides do not promise what was not rehearsed (R11-09, R11
 
 describe('scripts/training/show-accounts.sh (R11-10)', () => {
   const FILE = [
-    'BELGOBETON — comptes de formation',
+    'KAYAS — comptes de formation',
     'Adresse : http://127.0.0.1:3000',
     '',
     'Ce fichier est lu une seule fois.',
     '',
     'Propriétaire (owner)',
-    '  e-mail : proprietaire@formation.beton.invalid',
+    '  e-mail : proprietaire@formation.kayas.invalid',
     '  mot de passe : PWD-OWNER-AAAA',
     '',
     'Chauffeur 1 (driver)',
@@ -401,12 +401,12 @@ describe('scripts/training/show-accounts.sh (R11-10)', () => {
     expect(run('proprietaire').stdout).toContain('PWD-OWNER-AAAA');
     expect(run('proprietaire').stdout).not.toContain('333444');
     expect(run('Chauffeur 2').stdout).toContain('333444'); // the whole name is exact too
-    expect(run('proprietaire@formation.beton.invalid').stdout).toContain('PWD-OWNER-AAAA');
+    expect(run('proprietaire@formation.kayas.invalid').stdout).toContain('PWD-OWNER-AAAA');
   });
   it('R12-06: a generic word, the shared domain or a part of a code prints NO secret and says why', () => {
     for (const generic of [
       'chauffeur',
-      'formation.beton.invalid',
+      'formation.kayas.invalid',
       'beton',
       'driver',
       'ch',
@@ -455,7 +455,7 @@ describe('pick-image.sh and the stub sandbox (R11)', () => {
   };
 
   describe('pick-image.sh', () => {
-    const SHA_LINE = (sha: string) => `IMAGE_REF=ghcr.io/o/belgobeton@sha256:${'c'.repeat(64)} COMMIT=${sha}`;
+    const SHA_LINE = (sha: string) => `IMAGE_REF=ghcr.io/o/kayas@sha256:${'c'.repeat(64)} COMMIT=${sha}`;
     const pick = (runList: string, log: (sha: string) => string) => {
       const root = sbx(['pick-image.sh'], '');
       const git = (...a: string[]) => spawnSync('git', a, { cwd: root, encoding: 'utf8' });
@@ -476,7 +476,7 @@ describe('pick-image.sh and the stub sandbox (R11)', () => {
     it('prints the digest of the green run of this very commit', () => {
       const { r, sha } = pick('777', SHA_LINE);
       expect(r.status, r.stderr).toBe(0);
-      expect(r.stdout.trim()).toBe(`ghcr.io/o/belgobeton@sha256:${'c'.repeat(64)}`);
+      expect(r.stdout.trim()).toBe(`ghcr.io/o/kayas@sha256:${'c'.repeat(64)}`);
       expect(r.stderr).toContain(sha);
     });
     it('refuses when no green run exists for the commit, when the run built another commit, and when the log has no reference', () => {
@@ -557,7 +557,7 @@ describe('init-env.sh creates its files exclusively, never through a link (R12)'
       env: {
         ...process.env,
         PATH: `${extraPath}${process.env.PATH}`,
-        APP_IMAGE: `ghcr.io/o/belgobeton@sha256:${'a'.repeat(64)}`,
+        APP_IMAGE: `ghcr.io/o/kayas@sha256:${'a'.repeat(64)}`,
       },
     });
   it('refuses an existing file and an existing link (dangling or not), and writes nothing', () => {

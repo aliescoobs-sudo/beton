@@ -47,7 +47,7 @@ describe('password-only training accounts (T1)', () => {
   });
 
   it('are not granted to any other address: a real-looking account still has to enrol, even in training mode', async () => {
-    const cookie = await signedIn(`ventes-${unique()}@belgobeton.test`);
+    const cookie = await signedIn(`ventes-${unique()}@kayas.test`);
     expect((await stateOf(cookie, true)).kind).toBe('needs_enrolment');
     const spoof = await signedIn(`x-${unique()}@${TRAINING_EMAIL_DOMAIN}.evil.test`);
     expect((await stateOf(spoof, true)).kind).toBe('needs_enrolment');

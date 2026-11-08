@@ -25,7 +25,7 @@ export async function realActor(migratorUrl: string, role: Role): Promise<TestAc
       if (rows[0]) return rows[0];
     }
     const id = uuidv7(realClock.now());
-    const email = `actor-${role}-${id}@belgobeton.test`;
+    const email = `actor-${role}-${id}@kayas.test`;
     await pool.query(
       `insert into "user" (id, name, email, "emailVerified", role, locale, status, "twoFactorEnabled", "provisionedAt")
        values ($1, $2, $3, true, $4, 'fr', 'active', true, now())`,

@@ -63,7 +63,7 @@ describe('training credentials (T1)', () => {
       'TET',
       'CHF',
     ]);
-    for (const a of PASSWORD_ACCOUNTS) expect(emailOf(a.login)).toMatch(/@formation\.beton\.invalid$/);
+    for (const a of PASSWORD_ACCOUNTS) expect(emailOf(a.login)).toMatch(/@formation\.kayas\.invalid$/);
   });
   it('the file lists every credential once and says the data are fictitious', () => {
     const text = renderCredentialsFile(
@@ -72,7 +72,7 @@ describe('training credentials (T1)', () => {
         {
           label: 'Propriétaire',
           role: 'owner',
-          login: 'a@formation.beton.invalid',
+          login: 'a@formation.kayas.invalid',
           secret: 'S3cretS3cretS3cr',
           secretKind: 'password',
         },

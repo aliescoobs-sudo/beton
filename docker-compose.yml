@@ -1,6 +1,9 @@
 # Local development database. The superuser password lives in .env.ops (never .env.local: Next.js loads that one),
 # so every compose command needs it passed explicitly. Use the package scripts:
 #   corepack pnpm db:up | db:ps | db:down      (or: docker compose --env-file .env.ops <command>)
+# Project name KAYAS (formerly BELGOBETON): container kayas-db-1, volume kayas_kayas-pg. The former volume belgobeton_belgobeton-pg is left untouched.
+name: kayas
+
 services:
   db:
     image: postgres:17.11-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
@@ -12,7 +15,7 @@ services:
     ports:
       - '127.0.0.1:5432:5432' # loopback only, never exposed on the LAN
     volumes:
-      - belgobeton-pg:/var/lib/postgresql/data
+      - kayas-pg:/var/lib/postgresql/data
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U postgres']
       interval: 2s
@@ -20,4 +23,4 @@ services:
       retries: 30
 
 volumes:
-  belgobeton-pg:
+  kayas-pg:

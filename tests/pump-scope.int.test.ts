@@ -87,9 +87,9 @@ beforeAll(async () => {
   await migrator.query(
     `insert into "user" (id, name, email, "emailVerified", role, locale, status, "twoFactorEnabled", "provisionedAt", "plantId")
      values ($1, $2, $3, true, 'plant_manager', 'fr', 'active', true, now(), $4)`,
-    [id, `${marker} pmB`, `${marker}-pmb-${id}@belgobeton.test`, plantB],
+    [id, `${marker} pmB`, `${marker}-pmb-${id}@kayas.test`, plantB],
   );
-  pmB = { ...v.session('plant_manager'), id, name: `${marker} pmB`, email: `${id}@belgobeton.test` };
+  pmB = { ...v.session('plant_manager'), id, name: `${marker} pmB`, email: `${id}@kayas.test` };
   operator = (
     await asOwner(plantA, (tx) =>
       tx.query<{ id: string }>(

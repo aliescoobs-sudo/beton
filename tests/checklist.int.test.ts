@@ -103,7 +103,7 @@ describe('security checklist (T21)', () => {
     const before = (await getChecklist(deps())).items.find((i) => i.key === 'no_seed_accounts')!;
     await createUser(kit.auth, kit.authPool, {
       actor: { userId: BOOTSTRAP_ACTOR_ID, role: 'system' },
-      email: `seed-${randomUUID()}@belgobeton.test`,
+      email: `seed-${randomUUID()}@kayas.test`,
       name: 'Seed',
       password: kit.password,
       role: 'office',

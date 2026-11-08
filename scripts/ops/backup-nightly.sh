@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Nightly encrypted backup on the SERVER (cron: 30 2 * * *  /srv/belgobeton/scripts/ops/backup-nightly.sh). ONE set per night: the
+# Nightly encrypted backup on the SERVER (cron: 30 2 * * *  /srv/kayas/scripts/ops/backup-nightly.sh). ONE set per night: the
 # database and the stored documents, both sealed with the age PUBLIC key, then the manifest (written last). The private key is not on
 # this host, so this host cannot read its own backups. Keeps the last 14 sets. The copy to the office machine is PULLED from there by
 # scripts/ops/backup-pull.sh. A failure sends an alert (scripts/ops/alert.sh) and exits non-zero.

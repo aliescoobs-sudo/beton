@@ -76,12 +76,12 @@ async function userRow(role: string, plant: string | null): Promise<SessionUser>
   await migrator.query(
     `insert into "user" (id, name, email, "emailVerified", role, locale, status, "twoFactorEnabled", "provisionedAt", "plantId")
      values ($1, $2, $3, true, $4, 'fr', 'active', true, now(), $5)`,
-    [id, `${marker} ${role}`, `${marker}-${role}-${id}@belgobeton.test`, role, plant],
+    [id, `${marker} ${role}`, `${marker}-${role}-${id}@kayas.test`, role, plant],
   );
   return {
     id,
     name: `${marker} ${role}`,
-    email: `${id}@belgobeton.test`,
+    email: `${id}@kayas.test`,
     role,
     locale: 'fr',
     twoFactorEnabled: true,

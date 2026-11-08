@@ -44,7 +44,7 @@ for (const locale of ['fr', 'ar'] as const) {
   test(`${locale}: no CSP violation on the login page`, async ({ page }) => {
     const violations = collectCspViolations(page);
     await page.goto(`/${locale}/login`);
-    await page.locator('input[name=email]').fill('someone@belgobeton.test'); // hydrated and interactive
+    await page.locator('input[name=email]').fill('someone@kayas.test'); // hydrated and interactive
     await page.waitForLoadState('networkidle');
     expect(violations).toEqual([]);
     await expect(page.getByTestId('fake-data-banner')).toBeVisible(); // T21: on every page until the checklist is done

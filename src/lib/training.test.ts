@@ -126,10 +126,10 @@ describe('the boot rule (T1)', () => {
 
 describe('training accounts', () => {
   it('are recognised by their reserved domain only', () => {
-    expect(isTrainingEmail('owner@formation.beton.invalid')).toBe(true);
-    expect(isTrainingEmail('Owner@Formation.Beton.Invalid')).toBe(true);
-    expect(isTrainingEmail('owner@belgobeton.test')).toBe(false);
-    expect(isTrainingEmail('x@evil.com?formation.beton.invalid')).toBe(false);
+    expect(isTrainingEmail('owner@formation.kayas.invalid')).toBe(true);
+    expect(isTrainingEmail('Owner@Formation.Kayas.Invalid')).toBe(true);
+    expect(isTrainingEmail('owner@kayas.test')).toBe(false);
+    expect(isTrainingEmail('x@evil.com?formation.kayas.invalid')).toBe(false);
   });
 });
 
@@ -164,12 +164,12 @@ describe('the Funnel warning (T1)', () => {
 describe('the optional authenticator for finance (R11-08)', () => {
   const u = (email: string, role: string, twoFactorEnabled = false) => ({ email, role, twoFactorEnabled });
   it('is offered to a training account of a finance role that has none, and to nobody else', () => {
-    const t = 'x@formation.beton.invalid';
+    const t = 'x@formation.kayas.invalid';
     for (const role of ['owner', 'app_admin', 'accountant'])
       expect(offersFinanceEnrolment(u(t, role))).toBe(true);
     for (const role of ['office_sales', 'office_purchases', 'plant_manager', 'driver', 'support'])
       expect(offersFinanceEnrolment(u(t, role))).toBe(false);
     expect(offersFinanceEnrolment(u(t, 'owner', true))).toBe(false);
-    expect(offersFinanceEnrolment(u('boss@belgobeton.test', 'owner'))).toBe(false);
+    expect(offersFinanceEnrolment(u('boss@kayas.test', 'owner'))).toBe(false);
   });
 });
