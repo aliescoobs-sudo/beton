@@ -100,7 +100,7 @@ describe('the invoice PDF (AC-INT-19)', () => {
     const invoice = (await listInvoices(app, users.owner)).find((i) => i.number === sold.number);
     const doc = await getInvoiceDocument(app, users.owner, invoice?.id as string);
     expect(all(invoicePdf(doc as NonNullable<typeof doc>, { company: null, specimen: false }))).toContain(
-      'non renseignées',
+      'à renseigner',
     );
   });
 });

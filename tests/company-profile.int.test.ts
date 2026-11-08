@@ -38,7 +38,7 @@ beforeAll(async () => {
 });
 
 const profile = (extra: Record<string, unknown> = {}) => ({
-  legalName: `BELGOBETON ${marker} (fictif)`,
+  legalName: `KAYAS ${marker} (fictif)`,
   legalForm: 'SARL',
   ice: '001234567000089',
   ifNumber: '12345678',
@@ -79,7 +79,7 @@ describe('company profile (L29)', () => {
       ).ok,
     ).toBe(true);
     expect((await getCompanyProfile(app, users.owner, { today: '2026-02-01' }))?.legalName).toBe(
-      `BELGOBETON ${marker} (fictif)`,
+      `KAYAS ${marker} (fictif)`,
     );
     expect((await getCompanyProfile(app, users.owner, { today: '2026-06-01' }))?.legalName).toBe(
       `Nouveau nom ${marker}`,

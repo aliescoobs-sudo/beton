@@ -1,10 +1,21 @@
 import { deflateSync } from 'node:zlib';
+import { KAYAS_SIGNATURE_PDF } from './brand-logo-data';
 
 // A small PDF writer: A4 pages, the standard fonts (Helvetica, Courier, bold of each) in WinAnsi, text, lines, rectangles and a
 // diagonal watermark. No dependency, nothing written to disk: `build()` returns the bytes, the route streams them. Characters
 // outside WinAnsi (Arabic, for instance) are replaced by "?": the documents are French legal documents (DECISIONS 111).
 
 export const A4 = { width: 595.28, height: 841.89 } as const;
+
+/** KAYAS brand colours as PDF RGB (0 to 1). Forêt #01592B, Citron #9ADA02, Graphite #292929. */
+export type Rgb = readonly [number, number, number];
+const rgb255 = (r: number, g: number, b: number): Rgb => [r / 255, g / 255, b / 255];
+export const BRAND = {
+  forest: rgb255(1, 89, 43),
+  citron: rgb255(154, 218, 2),
+  graphite: rgb255(41, 41, 41),
+  white: [1, 1, 1] as Rgb,
+} as const;
 
 export type Font = 'regular' | 'bold' | 'mono' | 'monoBold';
 const FONT_NAME: Record<Font, string> = {
@@ -107,10 +118,14 @@ export interface TextOptions {
   align?: 'left' | 'right' | 'center';
   /** Gray level, 0 black to 1 white. */
   gray?: number;
+  /** A brand colour; wins over `gray`. */
+  color?: Rgb;
 }
 
 const hex = (bytes: Uint8Array) => Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 const num = (n: number) => (Math.round(n * 100) / 100).toString();
+// Five decimals: the brand colours must be exact (Forêt #01592B is 0.00392 0.34902 0.16863), not rounded to hundredths.
+const rgbOps = (c: Rgb) => c.map((v) => v.toFixed(5)).join(' ');
 
 /** Breaks a text into lines that fit `maxWidth` points, on spaces; a word longer than a line is cut. */
 export function wrapText(text: string, maxWidth: number, size: number, font: Font = 'regular'): string[] {
@@ -141,6 +156,7 @@ export function wrapText(text: string, maxWidth: number, size: number, font: Fon
 export class PdfDocument {
   private readonly pages: string[][] = [];
   private watermarkText: string | null = null;
+  private footerLines: string[] = [];
   private readonly title: string;
 
   constructor(options: { title: string }) {
@@ -166,14 +182,16 @@ export class PdfDocument {
     const font = options.font ?? 'regular';
     const width = textWidth(text, size, font);
     const at = options.align === 'right' ? x - width : options.align === 'center' ? x - width / 2 : x;
-    const gray = options.gray ?? 0;
+    const fill = options.color ? `${rgbOps(options.color)} rg` : `${num(options.gray ?? 0)} g`;
     this.ops().push(
-      `${num(gray)} g BT /${FONT_KEY[font]} ${num(size)} Tf ${num(at)} ${num(y)} Td <${hex(winAnsi(text))}> Tj ET`,
+      `${fill} BT /${FONT_KEY[font]} ${num(size)} Tf ${num(at)} ${num(y)} Td <${hex(winAnsi(text))}> Tj ET`,
     );
   }
 
-  line(x1: number, y1: number, x2: number, y2: number, width = 0.5): void {
-    this.ops().push(`0 G ${num(width)} w ${num(x1)} ${num(y1)} m ${num(x2)} ${num(y2)} l S`);
+  line(x1: number, y1: number, x2: number, y2: number, width = 0.5, color?: Rgb): void {
+    this.ops().push(
+      `${color ? `${rgbOps(color)} RG` : '0 G'} ${num(width)} w ${num(x1)} ${num(y1)} m ${num(x2)} ${num(y2)} l S`,
+    );
   }
 
   rect(
@@ -181,14 +199,35 @@ export class PdfDocument {
     y: number,
     w: number,
     h: number,
-    options: { fillGray?: number; stroke?: boolean } = {},
+    options: { fillGray?: number; fillRgb?: Rgb; stroke?: boolean } = {},
   ): void {
-    const fill = options.fillGray !== undefined;
+    const fill = options.fillGray !== undefined || options.fillRgb !== undefined;
     this.ops().push(
-      `${fill ? `${num(options.fillGray as number)} g ` : ''}${options.stroke ? '0 G 0.5 w ' : ''}${num(x)} ${num(y)} ${num(w)} ${num(h)} re ${
+      `${options.fillRgb ? `${rgbOps(options.fillRgb)} rg ` : options.fillGray !== undefined ? `${num(options.fillGray)} g ` : ''}${options.stroke ? '0 G 0.5 w ' : ''}${num(x)} ${num(y)} ${num(w)} ${num(h)} re ${
         fill && options.stroke ? 'B' : fill ? 'f' : 'S'
       }`,
     );
+  }
+
+  /**
+   * The KAYAS colour signature as VECTOR paths (the SVG's own contours, flat Forêt and Citron fills), never stretched: `width` is given and
+   * the height follows the file's ratio, so the header is sharp at any resolution. (x, y) is the bottom-left corner. Returns the height in points.
+   */
+  logo(x: number, y: number, width: number): number {
+    const { width: w, height: h, paths } = KAYAS_SIGNATURE_PDF;
+    const k = width / w;
+    const height = h * k;
+    // The SVG is y-down: a flipping matrix puts its origin at the top-left corner of the box.
+    const ops = [`q ${num(k)} 0 0 ${num(-k)} ${num(x)} ${num(y + height)} cm`];
+    for (const p of paths) ops.push(`${rgbOps(p.fill)} rg ${p.ops} ${p.evenOdd ? 'f*' : 'f'}`);
+    ops.push('Q');
+    this.ops().push(ops.join('\n'));
+    return height;
+  }
+
+  /** Legal lines printed at the foot of every page (above the page number), from the owner-filled company profile. */
+  footer(lines: readonly string[]): void {
+    this.footerLines = [...lines];
   }
 
   /** A pale diagonal text across every page (drawn under the page's own content), for the pilot's documents. */
@@ -209,7 +248,7 @@ export class PdfDocument {
     add('');
     for (const font of ['regular', 'bold', 'mono', 'monoBold'] as const)
       add(`<< /Type /Font /Subtype /Type1 /BaseFont /${FONT_NAME[font]} /Encoding /WinAnsiEncoding >>`);
-    add(`<< /Title <${hex(winAnsi(this.title))}> /Producer (BELGOBETON) >>`);
+    add(`<< /Title <${hex(winAnsi(this.title))}> /Producer (KAYAS) >>`);
     const kids: number[] = [];
     for (const [n, ops] of this.pages.entries()) {
       const content = [
@@ -219,6 +258,10 @@ export class PdfDocument {
             ]
           : []),
         ...ops,
+        ...this.footerLines.map(
+          (line, k) =>
+            `0.35 g BT /F1 7 Tf ${num(A4.width / 2 - textWidth(line, 7) / 2)} ${num(46 - 9 * k)} Td <${hex(winAnsi(line))}> Tj ET`,
+        ),
         // Page number, last line of every page
         `0.4 g BT /F1 8 Tf ${num(A4.width / 2 - 20)} 24 Td <${hex(winAnsi(`Page ${n + 1} / ${total}`))}> Tj ET`,
       ].join('\n');

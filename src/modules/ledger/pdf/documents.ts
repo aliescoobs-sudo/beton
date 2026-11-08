@@ -1,6 +1,6 @@
 import { formatCentimes } from '@/lib/money';
 import { PdfLayout } from '@/lib/pdf/layout';
-import { type CompanyProfile, legalMentions } from '../domain/company';
+import { type CompanyProfile, legalFooter } from '../domain/company';
 import { type Statement, type StatementRow } from '../domain/statement';
 import type { AvoirView } from '../service/avoir-service';
 import type { InvoiceDocument } from '../service/invoice-service';
@@ -21,11 +21,10 @@ const mad = (c: number) => `${formatCentimes(c)} MAD`;
 const percent = (bp: number) => `${(bp / 100).toLocaleString('fr-FR')} %`;
 
 function head(title: string, ctx: PdfContext): PdfLayout {
-  const page = new PdfLayout(title, { watermark: ctx.specimen ? SPECIMEN : null });
-  if (ctx.company) for (const line of legalMentions(ctx.company)) page.paragraph(line, { size: 9 });
-  else page.paragraph('Coordonnées de la société non renseignées', { size: 9, gray: 0.4 });
-  page.gap(10);
-  return page;
+  return new PdfLayout(title, {
+    watermark: ctx.specimen ? SPECIMEN : null,
+    footer: legalFooter(ctx.company),
+  });
 }
 
 /** The invoice or credit note: the stored figures only, lines grouped by product with their BL numbers, advance and net to pay. */

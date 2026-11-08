@@ -1,11 +1,12 @@
-import { A4, type Font, PdfDocument, textWidth, wrapText } from './pdf';
+import { A4, BRAND, type Font, PdfDocument, type Rgb, textWidth, wrapText } from './pdf';
 
 const MARGIN = 40;
-const BOTTOM = 56;
+const BOTTOM = 64; // room for the legal footer (two lines) and the page number
+const LOGO_WIDTH = 150;
 
 export interface Column {
   header: string;
-  /** Points; the last column takes what is left when `width` is 0. */
+  /** Points; the column with `width` 0 takes what is left. */
   width: number;
   align?: 'left' | 'right';
   font?: Font;
@@ -16,9 +17,18 @@ export class PdfLayout {
   readonly doc: PdfDocument;
   y: number = A4.height - MARGIN;
 
-  constructor(title: string, options: { watermark?: string | null } = {}) {
+  /**
+   * KAYAS header on the first page: the colour signature top left (never stretched) and a thin Citron rule under it. `footer` is the
+   * legal line(s) built from the owner-filled company profile (raison sociale, ICE, RC, address); printed on every page.
+   */
+  constructor(title: string, options: { watermark?: string | null; footer?: readonly string[] } = {}) {
     this.doc = new PdfDocument({ title });
     if (options.watermark) this.doc.watermark(options.watermark);
+    if (options.footer?.length) this.doc.footer(options.footer);
+    this.doc.logo(MARGIN, this.y - 33, LOGO_WIDTH);
+    this.y -= 33 + 7;
+    this.doc.line(MARGIN, this.y, MARGIN + this.width, this.y, 1.5, BRAND.citron);
+    this.y -= 12;
   }
 
   get width(): number {
@@ -37,7 +47,7 @@ export class PdfLayout {
   }
 
   /** Wrapped lines at the left margin. */
-  paragraph(text: string, options: { size?: number; font?: Font; gray?: number } = {}): void {
+  paragraph(text: string, options: { size?: number; font?: Font; gray?: number; color?: Rgb } = {}): void {
     const size = options.size ?? 10;
     for (const line of wrapText(text, this.width, size, options.font)) {
       this.room(size + 3);
@@ -47,7 +57,7 @@ export class PdfLayout {
   }
 
   title(text: string): void {
-    this.paragraph(text, { size: 18, font: 'bold' });
+    this.paragraph(text, { size: 18, font: 'bold', color: BRAND.forest });
     this.gap(4);
   }
 
@@ -85,9 +95,9 @@ export class PdfLayout {
 
   table(columns: readonly Column[], rows: readonly (readonly string[])[]): void {
     const fixed = columns.reduce((n, c) => n + c.width, 0);
-    const widths = columns.map((c, i) =>
-      c.width === 0 && i === columns.length - 1 ? this.width - fixed : c.width,
-    );
+    // The column declared with width 0 takes what is left (the first one when several: the invoice's Désignation, the statement's Solde).
+    const flexible = columns.findIndex((c) => c.width === 0);
+    const widths = columns.map((c, i) => (i === flexible ? this.width - fixed : c.width));
     const edges = widths.reduce<number[]>(
       (acc, w) => [...acc, (acc[acc.length - 1] as number) + w],
       [MARGIN],
@@ -95,8 +105,8 @@ export class PdfLayout {
     const head = () => {
       this.room(18);
       this.y -= 14;
-      this.doc.rect(MARGIN, this.y - 4, this.width, 16, { fillGray: 0.92 });
-      columns.forEach((c, i) => this.cell(c, i, edges, c.header, 'bold'));
+      this.doc.rect(MARGIN, this.y - 4, this.width, 16, { fillRgb: BRAND.forest });
+      columns.forEach((c, i) => this.cell(c, i, edges, c.header, 'bold', BRAND.white));
       this.y -= 4;
     };
     head();
@@ -123,11 +133,12 @@ export class PdfLayout {
     this.y -= 4;
   }
 
-  private cell(c: Column, i: number, edges: readonly number[], text: string, font: Font): void {
+  private cell(c: Column, i: number, edges: readonly number[], text: string, font: Font, color?: Rgb): void {
     const left = edges[i] as number;
     const right = edges[i + 1] as number;
-    if (c.align === 'right') this.doc.text(right - 3, this.y, text, { size: 9, font, align: 'right' });
-    else this.doc.text(left + 3, this.y, text, { size: 9, font });
+    if (c.align === 'right')
+      this.doc.text(right - 3, this.y, text, { size: 9, font, align: 'right', ...(color ? { color } : {}) });
+    else this.doc.text(left + 3, this.y, text, { size: 9, font, ...(color ? { color } : {}) });
   }
 
   build(): Uint8Array {

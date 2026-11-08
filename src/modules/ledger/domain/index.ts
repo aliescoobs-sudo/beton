@@ -129,6 +129,7 @@ export {
   type CompanyProfile,
   type CompanyProfileInput,
   formatRib,
+  legalFooter,
   legalMentions,
   parseCompanyProfileInput,
 } from './company';

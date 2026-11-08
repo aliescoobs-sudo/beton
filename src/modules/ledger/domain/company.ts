@@ -66,6 +66,21 @@ export function formatRib(rib: string): string {
     : rib;
 }
 
+/** Shown in the footer of a document when the owner has not filled the company profile yet. Never replaced by invented details. */
+export const LEGAL_FOOTER_PLACEHOLDER = 'Coordonnées légales à renseigner (raison sociale, ICE, RC, adresse)';
+
+/**
+ * The legal footer of a document, from the owner-filled company profile only: "[raison sociale] - ICE / RC - [adresse]", then the other
+ * registrations (and the RIB when the document shows it). Without a profile: the neutral placeholder.
+ */
+export function legalFooter(p: CompanyProfile | null): string[] {
+  if (!p) return [LEGAL_FOOTER_PLACEHOLDER];
+  return [
+    `${p.legalName} (${p.legalForm}) - ICE ${p.ice} / RC ${p.rcNumber} - ${p.address}`,
+    `IF ${p.ifNumber} · Patente ${p.patente}${p.rib ? ` · RIB ${formatRib(p.rib)}` : ''}`,
+  ];
+}
+
 /** The lines printed at the head of a document: name and form, address, then the registrations. */
 export function legalMentions(p: CompanyProfile): string[] {
   return [

@@ -9,7 +9,7 @@ import {
   getInvoiceForPrint,
   getQuote,
   invoicePdf,
-  legalMentions,
+  legalFooter,
   listAvoirs,
   mayOpen,
   openSupplierInvoiceFile,
@@ -72,7 +72,7 @@ export async function GET(
       if (!note) return notFound();
       if (!(await gate('bl', note.blNo))) return notFound();
       const { company, specimen } = await pdfContext(user);
-      const mentions = company ? legalMentions({ ...company, rib: null }) : [];
+      const mentions = legalFooter(company ? { ...company, rib: null } : null);
       await recordLibraryOpen(pool, user, `${copyId ? 'copy:' : ''}bl:${note.blNo}`);
       return pdfResponse(deliveryNotePdf(note, { specimen, company: mentions }), `BL-${note.blNo}`);
     }

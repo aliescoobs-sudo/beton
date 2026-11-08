@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { formatRib, legalMentions, parseCompanyProfileInput } from './company';
 
 const base = {
-  legalName: '  BELGOBETON  Pilote  ',
+  legalName: '  KAYAS  Pilote  ',
   legalForm: 'SARL',
   ice: '001 234 567 000 089',
   ifNumber: '12345678',
@@ -15,7 +15,7 @@ describe('parseCompanyProfileInput', () => {
   it('cleans spaces, accepts an ICE typed in groups and a RIB, optional fields default to null', () => {
     const r = parseCompanyProfileInput({ ...base, rib: '181 780 0000123456789012 34' });
     expect(r.ok && r.value).toMatchObject({
-      legalName: 'BELGOBETON Pilote',
+      legalName: 'KAYAS Pilote',
       ice: '001234567000089',
       rib: '181780000012345678901234',
       phone: null,
@@ -34,7 +34,7 @@ describe('legalMentions', () => {
   it('prints the identity, the registrations and the RIB when there is one', () => {
     const lines = legalMentions({
       effectiveFrom: '2026-01-01',
-      legalName: 'BELGOBETON',
+      legalName: 'KAYAS',
       legalForm: 'SARL',
       ice: '001234567000089',
       ifNumber: '1',
@@ -46,7 +46,7 @@ describe('legalMentions', () => {
       rib: '181780000012345678901234',
     });
     expect(lines).toEqual([
-      'BELGOBETON (SARL)',
+      'KAYAS (SARL)',
       'Tétouan',
       'ICE 001234567000089 · IF 1 · RC 2 · Patente 3',
       'RIB 181 780 0000123456789012 34',

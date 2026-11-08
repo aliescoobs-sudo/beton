@@ -97,7 +97,7 @@ export function SupplierInvoiceFiles({
         </form>
       )}
       {message && (
-        <p role="alert" className="text-sm text-signal" data-testid="si-file-error">
+        <p role="alert" className="text-sm text-danger" data-testid="si-file-error">
           {message}
         </p>
       )}

@@ -83,7 +83,7 @@ export default async function DeliveryNotePage({
           <p className="text-sm text-muted">{t('company')}</p>
         )}
         {note.cancelled && (
-          <p role="status" className="font-bold text-signal" data-testid="note-cancelled">
+          <p role="status" className="font-bold text-danger" data-testid="note-cancelled">
             {t('cancelled')}
           </p>
         )}

@@ -9,9 +9,8 @@ export function deliveryNotePdf(
 ): Uint8Array {
   const page = new PdfLayout(`BL ${note.blNo}`, {
     watermark: options.specimen ? 'SPÉCIMEN — données fictives' : null,
+    footer: options.company,
   });
-  for (const line of options.company) page.paragraph(line, { size: 9 });
-  page.gap(10);
   page.title(`Bon de livraison ${note.blNo}${note.cancelled ? ' — ANNULÉ' : ''}`);
   page.pairs([
     ['Date', note.loadDate],
