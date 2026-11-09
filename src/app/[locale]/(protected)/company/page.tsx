@@ -28,7 +28,9 @@ export default async function CompanyPage({ params }: { params: Promise<{ locale
           <div data-testid="company-current">
             {legalMentions(current).map((line) => (
               <p key={line}>
-                <bdi dir="ltr">{line}</bdi>
+                <bdi dir="ltr" className="whitespace-normal break-words">
+                  {line}
+                </bdi>
               </p>
             ))}
           </div>

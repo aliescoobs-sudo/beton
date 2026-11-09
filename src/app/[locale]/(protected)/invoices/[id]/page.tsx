@@ -61,7 +61,9 @@ export default async function InvoiceDocumentPage({
             {company ? (
               legalMentions(company).map((line) => (
                 <p key={line}>
-                  <bdi dir="ltr">{line}</bdi>
+                  <bdi dir="ltr" className="whitespace-normal break-words">
+                    {line}
+                  </bdi>
                 </p>
               ))
             ) : (

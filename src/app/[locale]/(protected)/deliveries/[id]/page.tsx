@@ -75,7 +75,9 @@ export default async function DeliveryNotePage({
           <div className="text-sm" data-testid="note-company">
             {legalMentions(company).map((line) => (
               <p key={line}>
-                <bdi dir="ltr">{line}</bdi>
+                <bdi dir="ltr" className="whitespace-normal break-words">
+                  {line}
+                </bdi>
               </p>
             ))}
           </div>
@@ -87,11 +89,11 @@ export default async function DeliveryNotePage({
             {t('cancelled')}
           </p>
         )}
-        <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2">
+        <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-6 gap-y-2">
           {rows.map(([label, value]) => (
             <div key={label} className="contents">
               <dt className="font-bold">{label}</dt>
-              <dd>{value}</dd>
+              <dd className="min-w-0 [&_bdi]:whitespace-normal [&_bdi]:break-words">{value}</dd>
             </div>
           ))}
         </dl>

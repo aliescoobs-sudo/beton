@@ -31,19 +31,26 @@ export async function checkScreen(page: Page, locale: 'fr' | 'ar', name: string)
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     const culprits =
       overflow > 0
-        ? await page.evaluate(() =>
-            [...document.body.querySelectorAll('*')]
-              .filter(
-                (el) =>
-                  Math.round(el.getBoundingClientRect().right) > window.innerWidth ||
-                  Math.round(el.getBoundingClientRect().left) < 0,
-              )
+        ? await page.evaluate(() => {
+            // an element inside a sideways scroller (overflow-x auto/scroll/hidden) is clipped by it and does not widen the page
+            const clipped = (el: Element) => {
+              for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+                const ox = getComputedStyle(p).overflowX;
+                if (ox === 'auto' || ox === 'scroll' || ox === 'hidden') return true;
+              }
+              return false;
+            };
+            return [...document.body.querySelectorAll('*')]
+              .filter((el) => {
+                const r = el.getBoundingClientRect();
+                return (Math.round(r.right) > window.innerWidth || Math.round(r.left) < 0) && !clipped(el);
+              })
               .slice(0, 6)
-              .map(
-                (el) =>
-                  `${el.tagName.toLowerCase()}${el.getAttribute('data-testid') ? `[${el.getAttribute('data-testid')}]` : ''}.${String(el.className).slice(0, 40)}`,
-              ),
-          )
+              .map((el) => {
+                const id = el.getAttribute('data-testid');
+                return `${el.tagName.toLowerCase()}${id ? `[${id}]` : ''}.${String(el.className).slice(0, 40)}="${(el.textContent ?? '').slice(0, 40)}" w=${Math.round(el.getBoundingClientRect().width)}`;
+              });
+          })
         : [];
     expect
       .soft(overflow, `${name} ${locale} ${width}px overflows horizontally ${culprits.join(' | ')}`)
