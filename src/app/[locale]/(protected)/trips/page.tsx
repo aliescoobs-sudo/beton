@@ -8,7 +8,8 @@ import { TripBoard } from '@/modules/operations/ui/trip-board';
 import { can } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/next';
 import { Button, Input, PageHeader } from '@/ui';
-import { recordTripStepAction } from './actions';
+import { TripLive } from '@/modules/operations/ui/trip-live';
+import { confirmTripDeliveredAction, correctTripStageAction, recordTripStepAction } from './actions';
 
 /** The day's rotations on a phone: one tap per step (loaded, departed, arrived, unloading started and finished, back). */
 export default async function TripsPage({
@@ -43,7 +44,16 @@ export default async function TripsPage({
           {t('show')}
         </Button>
       </form>
-      <TripBoard trips={trips.value} canTrack={can(user.role, 'trips.track')} record={recordTripStepAction} />
+      <TripLive date={date} />
+      <TripBoard
+        trips={trips.value}
+        canTrack={can(user.role, 'trips.track')}
+        canCorrect={can(user.role, 'trips.correct')}
+        date={date}
+        record={recordTripStepAction}
+        correct={correctTripStageAction}
+        confirmDelivered={confirmTripDeliveredAction}
+      />
       {photos.length > 0 && (
         <section data-testid="bl-photos" className="space-y-1">
           <h2 className="text-lg font-semibold">{t('blPhotos')}</h2>

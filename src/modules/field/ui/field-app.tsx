@@ -2,6 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { isStage, tapLocal, type StageView } from '@/modules/operations/domain/trip-stages';
 import { PushSetup } from '@/modules/platform-security/ui/push-setup';
 import {
   applyOutcomes,
@@ -108,6 +109,8 @@ interface Trip {
   blNo: string | null;
   loadingStartedAt: string | null;
   steps: Record<string, string>;
+  /** T9: the shared status: who recorded each stage and when. */
+  stages?: StageView[];
   stage: keyof typeof EMERGENCY_OPTIONS;
   unloadedL: number | null;
   blPhotos?: number;
@@ -186,17 +189,33 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
   // cleared synchronously, storage cleanup runs on its own, and the epoch is checked after every await before anything is committed.
   const shown = useRef(false);
   const controllerRef = useRef<ReturnType<typeof createDayController<Day>> | null>(null);
+  // T9: the ETag of the day on screen (the live refresh asks "has it changed?" with it)
+  const etagRef = useRef<string | null>(null);
   // made on first use, inside a callback (it reads refs and the clock, which a render must not)
   const getController = useCallback(() => {
     controllerRef.current ??= createDayController<Day>({
-      fetchSession: (signal) => fetch('/api/field/session', { cache: 'no-store', signal }),
+      fetchSession: async (signal, conditional) => {
+        // T9: the tag of the day this phone shows; an unchanged day is answered 304 without a body
+        const headers: Record<string, string> = {};
+        if (conditional && etagRef.current) headers['if-none-match'] = etagRef.current;
+        const res = await fetch('/api/field/session', { cache: 'no-store', signal, headers });
+        if (res.status === 200) etagRef.current = res.headers.get('etag');
+        else if (res.status !== 304) etagRef.current = null;
+        return res;
+      },
       now: () => Date.now(),
       local: {
         get: (k) => localStorage.getItem(k),
         set: (k, v) => localStorage.setItem(k, v),
       },
-      forgetRead,
-      forgetAll,
+      forgetRead: () => {
+        etagRef.current = null;
+        return forgetRead();
+      },
+      forgetAll: (scope) => {
+        etagRef.current = null;
+        return forgetAll(scope);
+      },
       queuedPhotos,
       owner: {
         get: () => ownerRef.current,
@@ -220,6 +239,12 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
     return controllerRef.current;
   }, [saveQueue]);
   const loadDay = useCallback(() => getController().loadDay(), [getController]);
+  // T9: the live refresh. Only with nothing waiting to be sent (a read would show the server's day, without the taps not yet sent), and the
+  // server answers 304 when nothing changed.
+  const refreshLive = useCallback(() => {
+    if (queueRef.current.length > 0 || document.visibilityState === 'hidden') return;
+    void getController().loadDay(null, { conditional: true });
+  }, [getController]);
   const recheck = useCallback(() => getController().recheck(), [getController]);
 
   // R14-06: the sync, the photo upload and the sign-out share ONE session generation with the day controller (field-session.ts).
@@ -324,6 +349,13 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
       void flushPhotos();
       void recheck();
     }, 20_000);
+    // T9: the plant's stages reach the screen within about 12 s (a little jitter keeps the phones from asking in step)
+    let live: ReturnType<typeof setTimeout> | undefined;
+    const tickLive = () => {
+      refreshLive();
+      live = setTimeout(tickLive, 11_000 + Math.floor(Math.random() * 2_000));
+    };
+    live = setTimeout(tickLive, 11_000 + Math.floor(Math.random() * 2_000));
     return () => {
       window.removeEventListener('online', up);
       window.removeEventListener('offline', down);
@@ -331,8 +363,9 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
       window.removeEventListener('pageshow', resume);
       window.removeEventListener('focus', resume);
       clearInterval(timer);
+      clearTimeout(live);
     };
-  }, [getSession, loadDay, saveQueue, sync, flushPhotos, recheck]);
+  }, [getSession, loadDay, saveQueue, sync, flushPhotos, recheck, refreshLive]);
 
   useEffect(() => {
     shown.current = day !== null && session === 'in';
@@ -378,8 +411,18 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
               x.id !== trip.id
                 ? x
                 : step === 'loading_started'
-                  ? { ...x, loadingStartedAt: at }
-                  : { ...x, steps: { ...x.steps, [step]: at }, unloadedL: volumeL ?? x.unloadedL },
+                  ? {
+                      ...x,
+                      loadingStartedAt: at,
+                      steps: { ...x.steps, loading_started: at },
+                      stages: x.stages ? tapLocal(x.stages, 'loading_started', at) : x.stages,
+                    }
+                  : {
+                      ...x,
+                      steps: { ...x.steps, [step]: at },
+                      unloadedL: volumeL ?? x.unloadedL,
+                      stages: x.stages && isStage(step) ? tapLocal(x.stages, step, at) : x.stages,
+                    },
             ),
           },
     );
@@ -423,7 +466,10 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
       }),
     }).catch(() => null);
     if (!res) return setMessage(t('errors.network'));
-    if (res.ok) return void (await getSession().signedIn());
+    if (res.ok) {
+      etagRef.current = null;
+      return void (await getSession().signedIn());
+    }
     const body = (await res.json().catch(() => ({}))) as { error?: string };
     setMessage(
       t(`errors.${body.error === 'LOCKED' || body.error === 'OTHER_DEVICE' ? body.error : 'WRONG'}` as never),
@@ -609,25 +655,38 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
                     t={t}
                     reason={reasons[trip.id] ?? ''}
                     onReason={(r) => setReasons((m) => ({ ...m, [trip.id]: r }))}
-                    canChoose={next !== null && !('wait' in next)}
+                    canChoose={next !== null}
                   />
                 )}
-                <ol className="space-y-1 text-xl">
-                  {(
-                    [
-                      'loading_started',
-                      'departed',
-                      'arrived',
-                      'unloading_started',
-                      'unloading_finished',
-                      'back',
-                    ] as const
-                  ).map((s) => {
-                    const at = s === 'loading_started' ? trip.loadingStartedAt : trip.steps[s];
+                <ol className="space-y-1 text-xl" data-testid={`stages-${trip.orderCode}`}>
+                  {(trip.stages ?? []).map((st) => {
+                    const waiting = queue.some(
+                      (a) => a.kind === 'step' && a.tripId === trip.id && a.step === st.stage,
+                    );
                     return (
-                      <li key={s} className={at ? 'font-bold' : 'text-muted'}>
-                        {at ? '✓' : '○'} {t(`steps.${s}`)} {at && <bdi dir="ltr">{hhmm(at)}</bdi>}
-                        {s === 'unloading_finished' && trip.unloadedL ? (
+                      <li
+                        key={st.stage}
+                        className={st.done ? 'font-bold' : 'text-muted'}
+                        data-stage={st.stage}
+                        data-done={st.done ? 'true' : 'false'}
+                        data-source={st.source ?? ''}
+                        data-implicit={st.implicit ? 'true' : 'false'}
+                      >
+                        {st.done ? '✓' : '○'} {t(`steps.${st.stage}`)}{' '}
+                        {st.at && <bdi dir="ltr">{hhmm(st.at)}</bdi>}
+                        {st.source && (
+                          <span className="font-normal">
+                            {' · '}
+                            {t(`stage.by.${st.source}`)}
+                            {st.implicit ? ` · ${t('stage.implicit')}` : ''}
+                            {st.corrected ? ` · ${t('stage.corrected')}` : ''}
+                            {st.stage === 'loaded' && st.declared && !st.implicit
+                              ? ` · ${t('stage.declared')}`
+                              : ''}
+                            {waiting ? ` · ⏳ ${t('stage.pending')}` : ''}
+                          </span>
+                        )}
+                        {st.stage === 'unloading_finished' && trip.unloadedL ? (
                           <>
                             {' '}
                             · <bdi dir="ltr">{(trip.unloadedL / 1000).toLocaleString('fr-FR')} m³</bdi>
@@ -637,6 +696,11 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
                     );
                   })}
                 </ol>
+                {(trip.stages ?? []).some((st) => st.stage === 'loaded' && st.done && st.declared) && (
+                  <p className="text-xl" data-testid={`trip-hint-${trip.orderCode}`}>
+                    {t('declaredLoadHint')}
+                  </p>
+                )}
                 {trip.unloadedL ? (
                   <div className="space-y-1" data-testid={`photo-${trip.orderCode}`}>
                     <label className="block w-full cursor-pointer rounded-2xl border-4 border-ink px-4 py-4 text-center text-2xl font-extrabold">
@@ -669,13 +733,6 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
                   <p className="text-2xl font-extrabold" data-testid={`trip-done-${trip.orderCode}`}>
                     {t('idle')}
                   </p>
-                ) : 'wait' in next ? (
-                  <p
-                    className="rounded-xl bg-amber-200 p-3 text-2xl text-black"
-                    data-testid={`trip-wait-${trip.orderCode}`}
-                  >
-                    {t('waitLoad')}
-                  </p>
                 ) : next.step === 'unloading_finished' ? (
                   <button
                     type="button"
@@ -686,14 +743,26 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
                     {t(`steps.${next.step}`)}
                   </button>
                 ) : (
-                  <button
-                    type="button"
-                    className={`${big} bg-signal text-white`}
-                    onClick={() => tapStep(trip, next.step)}
-                    data-testid={`tap-${trip.orderCode}`}
-                  >
-                    {t(`steps.${next.step}`)}
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      className={`${big} bg-signal text-white`}
+                      onClick={() => tapStep(trip, next.step)}
+                      data-testid={`tap-${trip.orderCode}`}
+                    >
+                      {t(`steps.${next.step}`)}
+                    </button>
+                    {next.step === 'loaded' && (
+                      <button
+                        type="button"
+                        className="min-h-[44px] w-full rounded-2xl border-4 border-ink px-4 py-4 text-2xl font-extrabold"
+                        onClick={() => tapStep(trip, 'departed')}
+                        data-testid={`tap-skip-${trip.orderCode}`}
+                      >
+                        {t('skipLoad')}
+                      </button>
+                    )}
+                  </>
                 )}
                 <button
                   type="button"

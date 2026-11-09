@@ -36,8 +36,14 @@ export interface SignOutOp {
 }
 
 export interface DayPorts<D extends { userId: string }> {
-  /** The session read; aborted by the signal. */
-  fetchSession(signal: AbortSignal): Promise<{ status: number; ok: boolean; json(): Promise<unknown> }>;
+  /**
+   * The session read; aborted by the signal. `conditional` (T9, the live refresh): send the tag of the day this phone shows, so that an unchanged
+   * day is answered 304 with no body. The port forgets the tag whenever the day is cleared.
+   */
+  fetchSession(
+    signal: AbortSignal,
+    conditional?: boolean,
+  ): Promise<{ status: number; ok: boolean; json(): Promise<unknown> }>;
   now(): number;
   local: { get(key: string): string | null; set(key: string, value: string): void };
   /** Erase what names a client (the stored day, the caches); the queued work stays. */
@@ -138,7 +144,7 @@ export function createDayController<D extends { userId: string }>(ports: DayPort
   const refused = (): void => clearNow('out');
 
   /** `guard`: the work that asks for the read (a sync, an upload). Refused while fenced, or once the guard's session is over. */
-  async function loadDay(guard?: WorkGuard | null): Promise<void> {
+  async function loadDay(guard?: WorkGuard | null, opts: { conditional?: boolean } = {}): Promise<void> {
     if (fenced || (guard && !guard.alive())) return;
     const mine = ++epoch;
     const gen = generation;
@@ -146,9 +152,21 @@ export function createDayController<D extends { userId: string }>(ports: DayPort
     const deadline = setTimeout(() => ctl.abort(), ports.readTimeoutMs);
     const current = () => mine === epoch && gen === generation && !fenced;
     try {
-      const res = await ports.fetchSession(ctl.signal);
+      const res = await ports.fetchSession(ctl.signal, opts.conditional === true);
       if (!current()) return;
       if (res.status === 401) return refused();
+      if (res.status === 304) {
+        // Nothing changed since the day this phone shows: the server vouches for it again (the stored day's age restarts) and nothing else moves.
+        // Without a stored day of this account there is nothing to vouch for: read it in full.
+        const kept = readStoredDay<D>(ports.local.get(DAY_STORAGE_KEY), ports.now());
+        if (kept && kept.userId === ports.owner.get()) {
+          ports.local.set(DAY_STORAGE_KEY, JSON.stringify(wrapDay(kept.userId, kept.day, ports.now())));
+          ports.ui.setOnline(true);
+          return;
+        }
+        clearTimeout(deadline);
+        return loadDay(guard, { conditional: false });
+      }
       if (!res.ok) throw new Error('bad');
       const data = (await res.json()) as D;
       if (!current()) return;

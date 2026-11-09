@@ -1859,7 +1859,23 @@
       "noDriver": "sans chauffeur",
       "noZone": "Zone inconnue",
       "planned": "Prévu : chargement {load} · départ {depart} · arrivée {arrive} · retour {back}",
+      "by": { "driver": "Chauffeur", "plant": "Centrale", "admin": "Administration" },
+      "implicit": "déduit",
+      "declared": "déclaré par le chauffeur · BL à faire",
+      "corrected": "corrigé",
+      "alreadyBy": "Déjà enregistré par {who} à {time}.",
+      "correct": {
+        "open": "Corriger",
+        "time": "Nouvelle heure",
+        "reason": "Motif (obligatoire)",
+        "save": "Enregistrer la correction",
+        "cancel": "Annuler",
+        "done": "Heure corrigée. La correction est au journal."
+      },
+      "confirmDelivered": "Confirmer la livraison",
+      "deliveredConfirmed": "Livraison confirmée.",
       "step": {
+        "loading_started": "Chargement commencé",
         "loaded": "Chargé",
         "departed": "Parti",
         "arrived": "Arrivé",
@@ -1888,7 +1904,7 @@
       "errors": {
         "INVALID": "Action invalide.",
         "NOT_FOUND": "Rotation introuvable.",
-        "OUT_OF_ORDER": "Cette étape n'est pas la suivante.",
+        "OUT_OF_ORDER": "Cette heure casserait l'ordre des étapes.",
         "ALREADY_RECORDED": "Cette étape est déjà enregistrée.",
         "CANCELLED": "Cette rotation a été annulée par un nouveau planning.",
         "ORDER_CANCELLED": "La commande est annulée.",
@@ -1897,6 +1913,7 @@
         "OVER_ORDER": "Plus que ce qui reste à livrer.",
         "NO_RECETTE": "Aucune recette en vigueur pour ce béton.",
         "CONFLICT": "Réessayez.",
+        "NO_LOAD": "Le chargement de la centrale n'est pas encore enregistré.",
         "FORBIDDEN": "Action non autorisée.",
         "UNAUTHENTICATED": "Session expirée."
       }
@@ -2677,8 +2694,18 @@
     "noTrips": "Aucune livraison aujourd'hui.",
     "idle": "Au repos à la centrale.",
     "waitLoad": "En attente du chargement par la centrale.",
+    "stage": {
+      "by": { "driver": "Chauffeur", "plant": "Centrale", "admin": "Administration" },
+      "implicit": "déduit",
+      "declared": "à confirmer par la centrale",
+      "pending": "en attente d'envoi",
+      "corrected": "corrigé"
+    },
+    "declaredLoadHint": "Chargement déclaré. La centrale confirmera son bon de chargement : vous pouvez continuer.",
+    "skipLoad": "Camion parti (sans déclarer le chargement)",
     "steps": {
       "loading_started": "Chargement commencé",
+      "loaded": "Chargé sur le camion",
       "departed": "Camion parti de la centrale",
       "arrived": "Arrivé sur le chantier",
       "unloading_started": "Déchargement commencé",

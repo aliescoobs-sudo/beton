@@ -7,13 +7,30 @@ import type { Effect } from '@/modules/ledger';
 import { EffectsPanel } from '@/modules/ledger/ui/effects/effects-panel';
 import { Button } from '@/ui';
 import { clockText } from '../domain/dispatch';
-import { TRIP_STEPS, type TripStep } from '../domain/trip-steps';
+import type { TripStep } from '../domain/trip-steps';
 import type { TripView } from '../service/trip-service';
 import { formatM3, ltr } from './format';
 
 export type TripStepResult =
-  | { ok: true; step: string; blNo: string | null; warnings: string[]; effects: Effect[] }
+  | {
+      ok: true;
+      step: string;
+      blNo: string | null;
+      warnings: string[];
+      effects: Effect[];
+      /** False when the stage was already there: `by` is who recorded it and when. */
+      recorded: boolean;
+      by: { source: string; at: string; implicit: boolean; clock: string };
+    }
   | { ok: false; error: string };
+
+export interface CorrectInput {
+  tripId: string;
+  step: string;
+  date: string;
+  time: string;
+  reason: string;
+}
 
 /**
  * The day's rotations on a phone: one card each, the steps taken with their time, and one big button for the next step.
@@ -23,17 +40,28 @@ export type TripStepResult =
 export function TripBoard({
   trips,
   canTrack,
+  canCorrect,
+  date,
   record,
+  correct,
+  confirmDelivered,
 }: {
   trips: TripView[];
   canTrack: boolean;
+  canCorrect: boolean;
+  date: string;
   record: (input: unknown) => Promise<TripStepResult>;
+  correct: (input: CorrectInput) => Promise<{ ok: true } | { ok: false; error: string }>;
+  confirmDelivered: (input: { tripId: string }) => Promise<{ ok: true } | { ok: false; error: string }>;
 }) {
   const t = useTranslations('operations.trips');
   const router = useRouter();
   const [pending, setPending] = useState<string | null>(null);
   const [messages, setMessages] = useState<Record<string, string>>({});
   const [effects, setEffects] = useState<Record<string, Effect[]>>({});
+  // T9: the correction form open on one stage of one rotation
+  const [fixing, setFixing] = useState<{ tripId: string; step: TripStep } | null>(null);
+  const [fix, setFix] = useState({ time: '', reason: '' });
 
   async function tap(trip: TripView, step: TripStep) {
     setPending(trip.id);
@@ -43,6 +71,18 @@ export function TripBoard({
       if (!result.ok) {
         setMessages((m) => ({ ...m, [trip.id]: t(`errors.${result.error}` as never) }));
         if (result.error === 'ALREADY_RECORDED' || result.error === 'OUT_OF_ORDER') router.refresh();
+        return;
+      }
+      if (!result.recorded) {
+        // the stage was already there (the driver's tap, or another screen): the answer is the existing record, nothing was changed
+        setMessages((m) => ({
+          ...m,
+          [trip.id]: t('alreadyBy', {
+            who: t(`by.${result.by.source}` as never),
+            time: result.by.clock,
+          }),
+        }));
+        router.refresh();
         return;
       }
       if (result.effects.length > 0) setEffects((e) => ({ ...e, [trip.id]: result.effects }));
@@ -105,18 +145,107 @@ export function TripBoard({
           </p>
 
           <ol
-            className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-sm sm:grid-cols-3"
+            className="mt-3 grid grid-cols-1 gap-x-3 gap-y-1 text-sm sm:grid-cols-2"
             data-testid="trip-steps"
           >
-            {TRIP_STEPS.map((s) => (
-              <li key={s} data-step={s} data-done={trip.events[s] ? 'true' : 'false'}>
-                <span className={trip.events[s] ? 'font-semibold' : 'text-muted'}>
-                  {t(`step.${s}` as never)}
+            {trip.stages.map((st) => (
+              <li
+                key={st.stage}
+                data-step={st.stage}
+                data-done={st.done ? 'true' : 'false'}
+                data-source={st.source ?? ''}
+                data-implicit={st.implicit ? 'true' : 'false'}
+                className="flex flex-wrap items-center gap-x-1"
+              >
+                <span className={st.done ? 'font-semibold' : 'text-muted'}>
+                  {t(`step.${st.stage}` as never)}
                 </span>{' '}
-                <bdi dir="ltr">{trip.clock[s] ?? '—'}</bdi>
+                <bdi dir="ltr">{trip.clock[st.stage] ?? '—'}</bdi>
+                {st.source && (
+                  <span className="text-muted" data-testid={`stage-by-${trip.orderCode}-${st.stage}`}>
+                    {' · '}
+                    {t(`by.${st.source}` as never)}
+                    {st.implicit ? ` · ${t('implicit')}` : ''}
+                    {st.corrected ? ` · ${t('corrected')}` : ''}
+                    {st.stage === 'loaded' && st.declared && !st.implicit ? ` · ${t('declared')}` : ''}
+                  </span>
+                )}
+                {canCorrect && st.done && (
+                  <button
+                    type="button"
+                    className="min-h-11 min-w-11 px-2 text-xs underline"
+                    onClick={() => {
+                      setFixing({ tripId: trip.id, step: st.stage });
+                      setFix({ time: trip.clock[st.stage] ?? '', reason: '' });
+                    }}
+                    data-testid={`correct-${trip.orderCode}-${st.stage}`}
+                  >
+                    {t('correct.open')}
+                  </button>
+                )}
               </li>
             ))}
           </ol>
+          {fixing?.tripId === trip.id && (
+            <form
+              className="mt-2 flex flex-wrap items-end gap-2 border border-rule p-2"
+              data-testid={`correct-form-${trip.orderCode}`}
+              onSubmit={(e) => {
+                e.preventDefault();
+                void (async () => {
+                  const r = await correct({
+                    tripId: trip.id,
+                    step: fixing.step,
+                    date,
+                    time: fix.time,
+                    reason: fix.reason,
+                  });
+                  setMessages((m) => ({
+                    ...m,
+                    [trip.id]: r.ok ? t('correct.done') : t(`errors.${r.error}` as never),
+                  }));
+                  if (r.ok) {
+                    setFixing(null);
+                    router.refresh();
+                  }
+                })();
+              }}
+            >
+              <label className="block text-sm">
+                <span className="field-label">
+                  {t('correct.time')} · {t(`step.${fixing.step}` as never)}
+                </span>
+                <input
+                  type="time"
+                  required
+                  className="min-h-11 border border-rule px-2"
+                  value={fix.time}
+                  onChange={(e) => setFix((f) => ({ ...f, time: e.target.value }))}
+                  dir="ltr"
+                  data-testid={`correct-time-${trip.orderCode}`}
+                />
+              </label>
+              <label className="block flex-1 text-sm">
+                <span className="field-label">{t('correct.reason')}</span>
+                <input
+                  type="text"
+                  required
+                  minLength={3}
+                  maxLength={500}
+                  className="min-h-11 w-full border border-rule px-2"
+                  value={fix.reason}
+                  onChange={(e) => setFix((f) => ({ ...f, reason: e.target.value }))}
+                  data-testid={`correct-reason-${trip.orderCode}`}
+                />
+              </label>
+              <Button type="submit" className="min-h-11" data-testid={`correct-save-${trip.orderCode}`}>
+                {t('correct.save')}
+              </Button>
+              <Button type="button" variant="secondary" className="min-h-11" onClick={() => setFixing(null)}>
+                {t('correct.cancel')}
+              </Button>
+            </form>
+          )}
 
           <ul className="mt-2 text-sm" data-testid="trip-times">
             {trip.blNo && (
@@ -155,6 +284,39 @@ export function TripBoard({
             )}
           </ul>
 
+          {canTrack &&
+            !trip.delivered &&
+            trip.stages.some((x) => x.stage === 'unloading_finished' && x.done) &&
+            trip.stages.some((x) => x.stage === 'loaded' && x.done && !x.declared) && (
+              <Button
+                className="mt-3 min-h-11 w-full"
+                variant="secondary"
+                onClick={() =>
+                  void (async () => {
+                    const r = await confirmDelivered({ tripId: trip.id });
+                    setMessages((m) => ({
+                      ...m,
+                      [trip.id]: r.ok ? t('deliveredConfirmed') : t(`errors.${r.error}` as never),
+                    }));
+                    if (r.ok) router.refresh();
+                  })()
+                }
+                data-testid={`confirm-delivered-${trip.orderCode}`}
+              >
+                {t('confirmDelivered')}
+              </Button>
+            )}
+          {canTrack && trip.stages.some((x) => x.stage === 'loaded' && x.done && x.declared) && (
+            <Button
+              className="mt-3 min-h-11 w-full"
+              variant="secondary"
+              disabled={pending === trip.id}
+              onClick={() => void tap(trip, 'loaded')}
+              data-testid={`make-load-${trip.orderCode}`}
+            >
+              {t('do.loaded')}
+            </Button>
+          )}
           {canTrack && trip.next && (
             <Button
               className="mt-3 min-h-14 w-full text-lg"
