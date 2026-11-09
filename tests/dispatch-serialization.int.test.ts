@@ -42,7 +42,8 @@ let scene: DeliveryScene;
 let master: Awaited<ReturnType<typeof orderMaster>>;
 let truckA = '',
   truckB = '',
-  truckC = '';
+  truckC = '',
+  truckX = '';
 let driverRow1 = '',
   driverRow2 = '';
 
@@ -213,6 +214,7 @@ beforeAll(async () => {
   truckA = await mk(plantA, 'a');
   truckB = await mk(plantA, 'b');
   truckC = await mk(plantA, 'c');
+  truckX = await mk(plantB, 'x');
 });
 afterAll(async () => {
   if (plantB) await updatePlant(app, owner, plantB, { status: 'archived' });
@@ -540,6 +542,62 @@ describe('the overlap policy: no double-booking without an audited override', ()
     expect(r.value.conflicts).toContain('DRIVER_OVERLAP');
     expect(r.value.overlapOverride).toBe(false);
   });
+  it("T8: another plant's started rotation of the day is neither moved nor refused with 'not found': a plant manager can still reassign his own", async () => {
+    const date = nextDay();
+    const oA = await newOrder(date);
+    const tA = await newTrip(date, oA.id, truckA, null, 1, 480);
+    // a rotation of NO plant (an order and a truck not assigned to a plant, as in the e2e scene) or of another plant, started (the owner reads it as started; the plant manager of plant A may not read its steps)
+    const tB = await withRlsContext(
+      app,
+      { userId: owner.id, role: 'owner', requestId: marker },
+      async (tx) => {
+        await tx.query(`select set_config('app.plant_id', $1, true)`, [plantB]);
+        const oB = await insertOrder(tx, owner.id, { ...master, clientId: scene.clientId }, date);
+        const id = randomUUID();
+        await tx.query(
+          `insert into trip_plan (id, batch_id, trip_date, order_id, seq, truck_id, driver_id, volume_l, load_min, depart_min, arrive_min,
+                                unload_end_min, back_min, created_by)
+         values ($1, $2, $3, $4, 1, $5, $7, 4000, 420, 430, 460, 500, 530, $6)`,
+          [id, randomUUID(), date, oB.id, truckX, owner.id, driverRow1],
+        );
+        return id;
+      },
+    );
+    // a legacy rotation: made before plants existed, so it names no plant (the migrator is not bound by the guards on the application's logins)
+    await migrator.query(`alter table trip_plan disable trigger user`);
+    try {
+      await migrator.query(`alter table sales_order disable trigger user`);
+      await migrator.query(`update trip_plan set plant_id = null where id = $1`, [tB]);
+      await migrator.query(
+        `update sales_order set plant_id = null where id = (select order_id from trip_plan where id = $1)`,
+        [tB],
+      );
+      await migrator.query(`alter table sales_order enable trigger user`);
+    } finally {
+      await migrator.query(`alter table trip_plan enable trigger user`);
+    }
+    await asRole(driver1, (tx) => loadingTap(tx, tB)); // the driver of the other plant's rotation has started
+    const r = await reassignTrip(app, pmA, {
+      tripId: tA,
+      truckId: truckC,
+      driverId: null,
+      reason: 'Camion plus proche',
+    });
+    expect(r.ok, JSON.stringify(r)).toBe(true);
+    // the other plant's rotation is untouched: same row, still live, same truck
+    const live = await livePlans(date);
+    expect(live.find((p) => p.id === tB)?.truck_id).toBe(truckX);
+    expect(live).toHaveLength(2);
+    // and the plant manager cannot move the other plant's rotation
+    const refused = await reassignTrip(app, pmA, {
+      tripId: tB,
+      truckId: truckC,
+      driverId: null,
+      reason: 'Essai',
+    });
+    expect(refused.ok).toBe(false);
+  });
+
   it('R15B-05: a reassignment that re-times ANOTHER driver into a new double-booking needs the override too', async () => {
     const date = nextDay();
     const [o1, o2, o3] = [await newOrder(date), await newOrder(date), await newOrder(date)];

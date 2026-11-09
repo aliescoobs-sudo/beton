@@ -78,6 +78,12 @@ export interface SavedRotation extends Rotation {
   overrideReason: string | null;
   /** The rotation has an event (it is being driven): it stays as it is when the day is replanned. */
   started: boolean;
+  /**
+   * T8: a rotation the acting account does not plan: it belongs to another plant, or to none (a day made before plants existed), and the account is
+   * bound to a plant (`ctx.plant_scope()`: a plant manager). Whether it has started is not readable by that account (`trip_started` answers false), so it is never re-timed,
+   * replaced or cancelled by that account's plan: it stays as it is and only counts in the conflict checks.
+   */
+  foreign: boolean;
 }
 
 export interface DispatchDay {
@@ -258,10 +264,12 @@ async function liveRotations(tx: pg.PoolClient, date: string): Promise<SavedRota
     driver_name: string | null;
     override_reason: string | null;
     started: boolean;
+    foreign_plant: boolean;
   }>(
     `select p.id, p.order_id, p.seq, p.truck_id, p.driver_id, p.volume_l, p.load_min, p.depart_min, p.arrive_min,
             p.unload_end_min, p.back_min, o.code as order_code, o.client_code, t.code as truck_code, d.name as driver_name, p.driver_override_reason as override_reason,
-            public.trip_started(p.id) as started
+            public.trip_started(p.id) as started,
+            (ctx.plant_scope() is not null and p.plant_id is distinct from ctx.plant_scope()) as foreign_plant
        from trip_plan p
        join sales_order_ops o on o.id = p.order_id
        join truck t on t.id = p.truck_id
@@ -288,6 +296,7 @@ async function liveRotations(tx: pg.PoolClient, date: string): Promise<SavedRota
     driverName: r.driver_name,
     overrideReason: r.override_reason,
     started: r.started,
+    foreign: r.foreign_plant,
   }));
 }
 
@@ -377,6 +386,8 @@ export async function saveDispatchIn(
      * for the ones the stored plan already had. `previous[i]` and draft `r{i}` must then be the same rotation (same order of the movable ones).
      */
     overlapBaseline?: boolean;
+    /** T8: rotations of another plant, or of none, stay as they are (see `SavedRotation.foreign`). Set by a reassignment. */
+    keepForeign?: boolean;
   } = {},
 ): Promise<Result<SavedDispatch & { tripIds: string[] }, DispatchError>> {
   await lockDispatchDay(tx, date);
@@ -386,8 +397,10 @@ export async function saveDispatchIn(
   const drivers = await activeDrivers(tx);
   const live = await liveRotations(tx, date);
   // A rotation that has started stays; the others are replaced by the new plan.
-  const fixed: Rotation[] = live.filter((r) => r.started);
-  const previous = live.filter((r) => !r.started);
+  // A reassignment (`keepForeign`) leaves alone the rotations of other plants and of none: a plant manager cannot tell whether they started.
+  const keep = (r: SavedRotation) => r.started || (deps.keepForeign === true && r.foreign);
+  const fixed: Rotation[] = live.filter(keep);
+  const previous = live.filter((r) => !keep(r));
   // Orders already fully loaded drop out of `orders`; a plan for one of them is for an order with nothing left.
   const known = new Set(orders.map((o) => o.orderId));
   if (wanted.some((w) => !known.has(w.orderId))) return err('NOT_FOUND');
@@ -521,9 +534,9 @@ export async function reassignTrip(
       const live = await liveRotations(tx, date);
       const target = live.find((r) => r.key === input.tripId);
       // Gone after the locks: cancelled, postponed or replaced by another change of the day while this one waited.
-      if (!target) return err('CONFLICT');
+      if (!target || target.foreign) return err('CONFLICT');
       if (target.started) return err('STARTED');
-      const movable = live.filter((r) => !r.started);
+      const movable = live.filter((r) => !r.started && !r.foreign);
       const wanted: WantedRotation[] = movable.map((r) =>
         r.key === input.tripId
           ? {
@@ -545,6 +558,7 @@ export async function reassignTrip(
         ...deps,
         overlapReason: input.overlapReason,
         overlapBaseline: true,
+        keepForeign: true,
       });
       if (!saved.ok) return saved;
       const newTripId = saved.value.tripIds[movable.findIndex((r) => r.key === input.tripId)]!;

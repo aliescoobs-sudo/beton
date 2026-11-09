@@ -289,6 +289,7 @@ describe('saving and replanning (AC-OPS-15)', () => {
         'departMin',
         'driverId',
         'driverName',
+        'foreign', // T8: a boolean (another plant's rotation, not planned by this account); no name, no price
         'key',
         'loadMin',
         'orderCode',
