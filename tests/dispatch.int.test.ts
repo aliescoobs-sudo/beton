@@ -81,8 +81,10 @@ const rotation = (truckId: string, volumeL: number, driver: string | null = driv
 });
 
 describe('who may read and write the plan (AC-OPS-15)', () => {
-  it('owner, partner, plant and support read the day; office is refused', async () => {
-    for (const role of ['owner', 'partner', 'plant', 'support'] as const) {
+  it('owner and plant read the day; office, partner and support are refused (T8)', async () => {
+    for (const role of ['partner', 'support'] as const)
+      await expect(getDispatchDay(app, users[role], DAY), role).rejects.toBeInstanceOf(ForbiddenError);
+    for (const role of ['owner', 'plant'] as const) {
       const day = await getDispatchDay(app, users[role], DAY);
       expect(day.ok, role).toBe(true);
       if (day.ok) expect(day.value.orders.some((o) => o.orderId === scene.orderId)).toBe(true);
@@ -90,13 +92,13 @@ describe('who may read and write the plan (AC-OPS-15)', () => {
     await expect(getDispatchDay(app, users.office, DAY)).rejects.toBeInstanceOf(ForbiddenError);
   });
 
-  it('support and office cannot save a plan; plant, partner and owner can', async () => {
-    for (const role of ['support', 'office'] as const) {
+  it('support, partner and office cannot save a plan; plant and owner can', async () => {
+    for (const role of ['support', 'office', 'partner'] as const) {
       await expect(
         saveDispatch(app, users[role], { date: DAY, rotations: [rotation(scene.truckId, 1000)] }),
       ).rejects.toBeInstanceOf(ForbiddenError);
     }
-    for (const role of ['plant', 'partner', 'owner'] as const) {
+    for (const role of ['plant', 'owner'] as const) {
       const saved = await saveDispatch(app, users[role], {
         date: DAY,
         rotations: [rotation(scene.truckId, 1000)],
@@ -106,7 +108,7 @@ describe('who may read and write the plan (AC-OPS-15)', () => {
   });
 
   it('the response carries no price, total, client contact or payment', async () => {
-    for (const role of ['plant', 'partner', 'support'] as const) {
+    for (const role of ['plant', 'owner'] as const) {
       const day = await getDispatchDay(app, users[role], DAY);
       expectNoFields(day, [
         'priceCentimes',

@@ -1506,19 +1506,19 @@ export const TABLE_ACCESS = {
     seed: 'insert',
     read: {
       owner: 'all',
-      partner: 'all',
+      partner: 'none',
       office: 'none',
       plant: 'all',
       system: 'none',
       anonymous: 'none',
-      support: 'all',
+      support: 'none',
     },
     force: true,
     audited: true,
     noDelete: true,
     insertOnly: true,
     exception:
-      'operations O10: what really happened on a planned rotation, one row per trip and step (loaded, departed, arrived, unloading started and finished, back), in order and never before the previous step; the first step links the load. Times and quantities only. Insert-only; waiting time and delays are derived. Owner, partner and plant record. Migration 0122: a plant manager reads the events of his own plant only; partner and support keep the read (the dispatch board).',
+      'operations O10: what really happened on a planned rotation, one row per trip and step (loaded, departed, arrived, unloading started and finished, back), in order and never before the previous step; the first step links the load. Times and quantities only. Insert-only; waiting time and delays are derived. Owner and plant record. Migration 0122: a plant manager reads the events of his own plant only. Migration 0208 (T8): partner and support have no accounts in V1 and no longer read or record steps (tracking is owner, app_admin and the plant manager of the plant).',
   },
   fuel_fill: {
     kind: 'rls',

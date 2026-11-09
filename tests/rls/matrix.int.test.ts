@@ -771,7 +771,7 @@ const FIXTURES: Record<
   },
   trip_event: {
     // Each writer plans a rotation of its own, loads it (a delivery of year 2095) and records the first step.
-    writers: ['owner', 'partner', 'plant'],
+    writers: ['owner', 'plant'], // T8 (0208): partner no longer inserts or reads steps
     seed: async (tx, actor) => {
       const scene = await deliveryScene(app, actors.owner, marker);
       const plan = await tx.query<{ id: string }>(

@@ -66,6 +66,11 @@ const OFFICE_READ = [
 ] as const;
 const PLANT_READ = ['owner', 'app_admin', 'partner', 'plant', 'plant_manager', 'support'] as const;
 const PLANT = ['owner', 'app_admin', 'partner', 'plant', 'plant_manager'] as const;
+/**
+ * Driver and truck tracking (steps, started flag, the dispatch board): owner/app_admin and the plant manager (of that plant: the scope is enforced
+ * by the database). `partner` and `support` have no accounts in V1 (decision of the owner, T8) and are not listed here.
+ */
+const TRACKING = ['owner', 'app_admin', 'plant', 'plant_manager'] as const;
 /** Money: read by the owner and support; written by the owner. */
 const MONEY_READ = ['owner', 'app_admin', 'support'] as const;
 const MONEY_WRITE = ['owner', 'app_admin'] as const;
@@ -298,14 +303,14 @@ export const PERMISSIONS = {
     'plant_manager',
   ],
   // Daily dispatch: the plan of the day's rotations (truck, driver, times); quantities and times only. Office is blind to orders.
-  'dispatch.read': PLANT_READ,
-  'dispatch.write': PLANT,
+  'dispatch.read': TRACKING,
+  'dispatch.write': TRACKING,
   // Office's read-only view of the day's rotations: truck, times, litres, client name, the step reached. No price, no order.
   'dispatch.read_office': ['office', 'office_sales'],
   'drivers.write': MANAGERS,
   // Trip tracking: one tap per step of a rotation (the first one is the load, so the plant's rights); times and quantities only.
-  'trips.read': PLANT_READ,
-  'trips.track': PLANT,
+  'trips.read': TRACKING,
+  'trips.track': TRACKING,
   // Production and consumption report: quantities only (litres, grams), so the plant and the partner read it
   'reports.consumption': PLANT_READ,
   // Fuel per truck: litres and kilometres are quantities (plant, owner, partner record; support reads); the purchases and

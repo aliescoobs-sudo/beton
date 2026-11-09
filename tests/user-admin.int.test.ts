@@ -59,7 +59,7 @@ describe('user admin (T13): owner only', () => {
   });
 
   it('refuses a non-owner and audits the denial', async () => {
-    const partner = await kit.enrolledUser('partner');
+    const partner = await kit.enrolledUser('office');
     const partnerUser = await sessionUserOf(partner.cookie);
     await expect(listUsers(deps(), partnerUser)).rejects.toBeInstanceOf(ForbiddenError);
     const [event] = await kit.auditEvents(`action = 'permission_denied' and actor_user_id = $1`, [

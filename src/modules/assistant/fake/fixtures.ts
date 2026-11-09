@@ -155,9 +155,9 @@ export const FIXTURES: Fixture[] = [
   f('plant', 'darija', 'rje3 BL-2026-00014 rfdo l3mil', 'record_return', { bl: 'BL-2026-00014' }),
 
   // --- partner: operations only
-  f('partner', 'fr', "Quels camions chargent aujourd'hui ?", 'deliveries_today'),
-  f('partner', 'fr', "Qu'est-ce qui est sorti aujourd'hui ?", 'deliveries_today'),
-  f('partner', 'fr', 'Quel est le prochain chargement ?', 'next_load'),
+  f('partner', 'fr', "Quels camions chargent aujourd'hui ?", null),
+  f('partner', 'fr', "Qu'est-ce qui est sorti aujourd'hui ?", null),
+  f('partner', 'fr', 'Quel est le prochain chargement ?', null),
   f('partner', 'fr', 'Combien de jours de couverture en ciment ?', 'stock_and_cover'),
   f('partner', 'fr', 'Où en est le stock de sable ?', 'stock_and_cover'),
   f('partner', 'fr', 'Où en est la commande CMD-2026-00012 ?', 'order_chain'),
@@ -175,15 +175,15 @@ export const FIXTURES: Fixture[] = [
   f('partner', 'fr', 'Quelle est la prévision de trésorerie ?', null),
   f('partner', 'fr', "Où en est l'achat ACH-2026-00003 chez le fournisseur ?", null),
   f('partner', 'fr', 'Prépare une commande de 20 m³ B25 pour demain pour Atlas BTP', null),
-  f('partner', 'ar', 'أي الشاحنات كتحمل اليوم؟', 'deliveries_today'),
+  f('partner', 'ar', 'أي الشاحنات كتحمل اليوم؟', null),
   f('partner', 'ar', 'فين وصل استهلاك الشهر؟', 'consumption_variance'),
-  f('partner', 'ar', 'شنو هو التحميل الجاي؟', 'next_load'),
-  f('partner', 'darija', 'camyonat li khrjo lyoum', 'deliveries_today'),
+  f('partner', 'ar', 'شنو هو التحميل الجاي؟', null),
+  f('partner', 'darija', 'camyonat li khrjo lyoum', null),
   f('partner', 'darija', 'chhal bqa mn simen f stoc ?', 'stock_and_cover'),
 
   // --- support: read-only, money included, no draft
-  f('support', 'fr', "Qu'est-ce qui est sorti aujourd'hui ?", 'deliveries_today'),
-  f('support', 'fr', 'Quel est le prochain chargement ?', 'next_load'),
+  f('support', 'fr', "Qu'est-ce qui est sorti aujourd'hui ?", null),
+  f('support', 'fr', 'Quel est le prochain chargement ?', null),
   f('support', 'fr', 'Combien de jours de couverture en ciment ?', 'stock_and_cover'),
   f('support', 'fr', "Qu'est-ce qu'il reste à facturer ?", 'uninvoiced_bls'),
   f('support', 'fr', "Qu'est-ce qu'il reste à facturer pour Atlas BTP ?", 'uninvoiced_bls', {

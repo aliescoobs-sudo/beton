@@ -7,6 +7,7 @@ import { realClock } from '../src/modules/clock';
 import { createPlant, createTruck, updatePlant } from '../src/modules/master-data';
 import { postponeTrip, reassignTrip, saveDispatch } from '../src/modules/operations';
 import type { SessionUser } from '../src/modules/platform-security/auth/session-gate';
+import { ForbiddenError } from '../src/modules/platform-security/service/user-admin';
 import { superuserUrl, TEST_DATABASE } from '../scripts/db-bootstrap';
 import { SYSTEM_ACTOR_ID } from '../src/modules/platform-security/auth/actors';
 import { testEnv } from './db-env';
@@ -478,9 +479,10 @@ describe('the overlap policy: no double-booking without an audited override', ()
   it('a partner cannot give the override (the door is for the owner, app_admin and plant manager)', async () => {
     const date = nextDay();
     const [o1, o2] = [await newOrder(date), await newOrder(date)];
-    expect(
-      await saveDispatch(app, partner, plan(date, o1.id, o2.id, { overlapReason: 'Je le veux' })),
-    ).toEqual({ ok: false, error: 'FORBIDDEN' });
+    // T8: a partner has no dispatch permission at all any more, so the service refuses before the override is looked at
+    await expect(
+      saveDispatch(app, partner, plan(date, o1.id, o2.id, { overlapReason: 'Je le veux' })),
+    ).rejects.toBeInstanceOf(ForbiddenError);
     expect(await livePlans(date)).toHaveLength(0);
   });
 
@@ -537,5 +539,29 @@ describe('the overlap policy: no double-booking without an audited override', ()
     if (!r.ok) return;
     expect(r.value.conflicts).toContain('DRIVER_OVERLAP');
     expect(r.value.overlapOverride).toBe(false);
+  });
+  it('R15B-05: a reassignment that re-times ANOTHER driver into a new double-booking needs the override too', async () => {
+    const date = nextDay();
+    const [o1, o2, o3] = [await newOrder(date), await newOrder(date), await newOrder(date)];
+    // truck A: driver 1's rotation, then driver 2's; truck B: driver 2's first rotation. Driver 2 is NOT double-booked yet.
+    const first = await newTrip(date, o1.id, truckA, driverRow1, 1, 420);
+    await newTrip(date, o2.id, truckB, driverRow2, 1, 420);
+    await newTrip(date, o3.id, truckA, driverRow2, 1, 540);
+    const move = (extra: object = {}) =>
+      reassignTrip(app, pmA, {
+        tripId: first,
+        truckId: truckC,
+        driverId: driverRow1,
+        reason: 'Panne du premier camion',
+        ...extra,
+      });
+    // moving driver 1 off truck A pulls driver 2's next rotation forward, onto his first one: that is the change's doing
+    expect(await move()).toEqual({ ok: false, error: 'OVERLAP' });
+    expect(await livePlans(date)).toHaveLength(3); // nothing changed
+    const done = await move({ overlapReason: 'Aucun autre camion libre' });
+    expect(done.ok, JSON.stringify(done)).toBe(true);
+    if (!done.ok) return;
+    expect(done.value.conflicts).toContain('DRIVER_OVERLAP');
+    expect(done.value.overlapOverride).toBe(true);
   });
 });

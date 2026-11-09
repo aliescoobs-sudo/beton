@@ -44,11 +44,11 @@ export const MANAGED_ROLES = [
   'accountant',
   'client_portal',
   'supplier_portal',
-  'partner',
   'office',
   'plant',
-  'support',
 ] as const;
+/** `partner` and `support` never get an account in V1 (decision of the owner, T8): refused here, in the UI list and by the database (0208). */
+export const RESERVED_ROLES = ['partner', 'support'] as const;
 export type ManagedRole = (typeof MANAGED_ROLES)[number];
 
 /** Service-level guard (SPEC §4, layer 2): only the owner manages users, whatever the UI did. */
@@ -103,6 +103,8 @@ export async function createManagedUser(
   },
 ): Promise<{ id: string }> {
   await assertCanManage(deps, actor);
+  if ((RESERVED_ROLES as readonly string[]).includes(input.role))
+    throw new Error('This role has no accounts in V1');
   if (!MANAGED_ROLES.includes(input.role)) throw new Error('This role cannot be created here');
   // The portals are defined but their flag is off (DECISIONS 123): no account can be made for them yet.
   if (input.role === 'client_portal' || input.role === 'supplier_portal') {

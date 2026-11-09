@@ -58,12 +58,12 @@ const inCtx = <T>(user: SessionUser, fn: (tx: pg.PoolClient) => Promise<T>) =>
 
 // The matrix of SPEC-assistant §5, first six tools. O P B L S.
 const MATRIX: Record<string, readonly Role[]> = {
-  deliveries_today: ['owner', 'partner', 'office', 'plant', 'support'],
+  deliveries_today: ['owner', 'office', 'plant'],
   stock_and_cover: ['owner', 'partner', 'plant', 'support'],
   uninvoiced_bls: ['owner', 'office', 'support'],
   open_invoices: ['owner', 'support'],
   forecast: ['owner', 'support'],
-  next_load: ['owner', 'partner', 'office', 'plant', 'support'],
+  next_load: ['owner', 'office', 'plant'],
 };
 
 beforeAll(async () => {
@@ -172,8 +172,12 @@ describe('the matrix (AC-ASSIST-03)', () => {
 });
 
 describe('deliveries_today and next_load', () => {
-  it('give every role the day’s rotation, in codes and m³, and no name, plate, driver, site or order', async () => {
-    for (const role of ROLES) {
+  it('give owner, office and plant the day’s rotation, in codes and m³, and no name, plate, driver, site or order; partner and support (no accounts, T8) get nothing', async () => {
+    for (const role of ['partner', 'support'] as const) {
+      expect((await call(role, 'deliveries_today', { date: ROT_DAY }, ROT_DAY)).outcome, role).not.toBe('ok');
+      expect((await call(role, 'next_load', {}, ROT_DAY)).outcome, role).not.toBe('ok');
+    }
+    for (const role of ['owner', 'office', 'plant'] as const) {
       const r = await call(role, 'deliveries_today', { date: ROT_DAY }, ROT_DAY);
       expect(r.outcome, role).toBe('ok');
       const rows = (r.result as { rotations: { client: string; m3: number; step: string; truck: string }[] })
@@ -206,7 +210,7 @@ describe('deliveries_today and next_load', () => {
   });
 
   it('next_load finds the next planned rotation, by client or by truck, and says when there is none', async () => {
-    for (const role of ROLES) {
+    for (const role of ['owner', 'office', 'plant'] as const) {
       const any = await call(role, 'next_load', {}, ROT_DAY);
       expect(any.outcome, role).toBe('ok');
     }

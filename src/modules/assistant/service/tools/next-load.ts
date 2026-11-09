@@ -21,7 +21,7 @@ export const nextLoad: AssistantTool = {
       client: CLIENT_CODE.optional(),
     })
     .strict(),
-  roles: ['owner', 'partner', 'office', 'plant', 'support'],
+  roles: ['owner', 'office', 'plant'],
   permissions: ['trips.read', 'dispatch.read_office'],
   output: () => out,
   async run(ctx, args) {

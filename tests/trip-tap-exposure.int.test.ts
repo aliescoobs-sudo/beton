@@ -142,11 +142,11 @@ describe('the rotation of the fixture belongs to plant A', () => {
   });
 });
 
-describe('trip_event: partner and support keep the dispatch record, a plant manager reads his own plant only', () => {
+describe('trip_event: owner and the plant manager of the plant only (T8: partner and support lost the read, 0208)', () => {
   it.each([
     ['owner', () => owner, 1],
-    ['partner', () => partner, 1],
-    ['support', () => support, 1],
+    ['partner', () => partner, 0],
+    ['support', () => support, 0],
     ['the plant manager of the plant', () => pmA, 1],
     ['the plant manager of ANOTHER plant', () => pmB, 0],
     ['office_sales', () => office, 0],
@@ -154,16 +154,11 @@ describe('trip_event: partner and support keep the dispatch record, a plant mana
   ])('%s sees %i event(s)', async (_who, who, n) => {
     expect(await count(who(), 'trip_event')).toBe(n);
   });
-  it('the dispatch board still shows the steps to the partner and to support (the feature that needs the read)', async () => {
-    for (const u of [partner, support, pmA]) {
-      const r = await listTrips(app, u, date);
-      expect(r.ok, u.role).toBe(true);
-      if (r.ok)
-        expect(
-          r.value.some((t) => t.id === trip && t.events.loaded !== undefined),
-          u.role,
-        ).toBe(true);
-    }
+  it('the board shows the steps to the plant manager of the plant, and is refused outright to the partner and to support', async () => {
+    const r = await listTrips(app, pmA, date);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value.some((t) => t.id === trip && t.events.loaded !== undefined)).toBe(true);
+    for (const u of [partner, support]) await expect(listTrips(app, u, date), u.role).rejects.toThrow();
   });
   it('the plant manager of another plant sees no step of that rotation on his board', async () => {
     const r = await listTrips(app, pmB, date);

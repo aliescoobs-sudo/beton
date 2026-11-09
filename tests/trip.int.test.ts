@@ -58,12 +58,12 @@ beforeAll(async () => {
 });
 
 describe('who may see and tap (AC-OPS-16)', () => {
-  it('office is refused, support reads but cannot tap, plant and partner tap', async () => {
-    await expect(listTrips(app, users.office, DAY)).rejects.toBeInstanceOf(ForbiddenError);
-    await expect(step(users.office, tripId, 'loaded', '07:00')).rejects.toBeInstanceOf(ForbiddenError);
-    const read = await listTrips(app, users.support, DAY);
-    expect(read.ok).toBe(true);
-    await expect(step(users.support, tripId, 'loaded', '07:00')).rejects.toBeInstanceOf(ForbiddenError);
+  it('tracking is for the owner and the plant only: office, partner and support are refused (T8)', async () => {
+    for (const role of ['office', 'partner', 'support'] as const) {
+      await expect(listTrips(app, users[role], DAY), role).rejects.toBeInstanceOf(ForbiddenError);
+      await expect(step(users[role], tripId, 'loaded', '07:00'), role).rejects.toBeInstanceOf(ForbiddenError);
+    }
+    expect((await listTrips(app, users.plant, DAY)).ok).toBe(true);
   });
 
   it('a rotation is not tracked yet: the next step is the load', async () => {
@@ -132,7 +132,7 @@ describe('the steps (AC-OPS-16, 17)', () => {
       ['arrived', '08:10'],
       ['unloading_started', '08:40'],
     ] as const) {
-      const r = await step(s === 'arrived' ? users.partner : users.plant, tripId, s, hhmm);
+      const r = await step(users.plant, tripId, s, hhmm);
       expect(r.ok, s).toBe(true);
     }
     let t = await view();
@@ -159,7 +159,7 @@ describe('the steps (AC-OPS-16, 17)', () => {
   });
 
   it('the view carries no price, total, client contact or payment', async () => {
-    for (const role of ['plant', 'partner', 'support'] as const) {
+    for (const role of ['plant', 'owner'] as const) {
       const trips = await listTrips(app, users[role], DAY);
       expectNoFields(trips, [
         'priceCentimes',

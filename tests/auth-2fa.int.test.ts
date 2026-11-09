@@ -23,7 +23,7 @@ async function newUser() {
     email,
     name: 'Two Factor',
     password,
-    role: 'partner',
+    role: 'office',
     locale: 'ar',
   });
   return { email, id };

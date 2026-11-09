@@ -33,7 +33,7 @@ export const deliveriesToday: AssistantTool = {
   description:
     "The day's truck rotations: truck, planned load and arrival times, volume in m³, client code, product, the step reached and the BL number once loaded. Date defaults to today.",
   params: z.object({ date: z.string().optional() }).strict(),
-  roles: ['owner', 'partner', 'office', 'plant', 'support'],
+  roles: ['owner', 'office', 'plant'],
   permissions: ['trips.read', 'dispatch.read_office'],
   output: () => out,
   async run(ctx, args) {

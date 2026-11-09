@@ -369,7 +369,15 @@ export async function saveDispatchIn(
   actor: SessionUser,
   date: string,
   wanted: readonly WantedRotation[],
-  deps: { today?: string; overlapReason?: string | null; overlapScope?: readonly string[] } = {},
+  deps: {
+    today?: string;
+    overlapReason?: string | null;
+    /**
+     * A reassignment re-times the whole day, so it answers for every double-booking the change CREATES (R15B-05), wherever it falls, but not
+     * for the ones the stored plan already had. `previous[i]` and draft `r{i}` must then be the same rotation (same order of the movable ones).
+     */
+    overlapBaseline?: boolean;
+  } = {},
 ): Promise<Result<SavedDispatch & { tripIds: string[] }, DispatchError>> {
   await lockDispatchDay(tx, date);
   const params = await readDispatchParams(tx);
@@ -408,12 +416,17 @@ export async function saveDispatchIn(
   const conflicts = checkDispatch(timed, { orders, trucks, drivers, params, fixed });
   if (conflicts.some(isBlocking)) return err('BLOCKED');
   // A double-booked driver or truck is refused unless the caller gives the reason of an explicit override, which is recorded and audited.
-  // A reassignment re-times the whole day, so it answers only for the double-bookings of the rotation it moves (`overlapScope`, draft keys);
-  // the others stay in `conflicts`, shown, and are not this change's to refuse.
-  const scope = deps.overlapScope;
-  const overlaps = conflicts
-    .filter(isOverlap)
-    .filter((c) => !scope || c.rotationKeys.some((k) => scope.includes(k)));
+  // A reassignment re-times the whole day (R15B-05): it answers for every double-booking it creates, including an unrelated driver's that the
+  // re-timing causes, and not for the ones the stored plan already had (those stay in `conflicts`, shown).
+  const signature = (c: { kind: string; rotationKeys: readonly string[] }) =>
+    `${c.kind}|${[...c.rotationKeys].sort().join(',')}`;
+  const existing = new Set<string>();
+  if (deps.overlapBaseline) {
+    const stored = previous.map((p, i) => ({ ...p, key: `r${i}` }));
+    for (const c of checkDispatch(stored, { orders, trucks, drivers, params, fixed }).filter(isOverlap))
+      existing.add(signature(c));
+  }
+  const overlaps = conflicts.filter(isOverlap).filter((c) => !existing.has(signature(c)));
   const overlapReason = deps.overlapReason?.trim() ?? '';
   if (overlaps.length > 0 && overlapReason.length < 3) return err('OVERLAP');
   if (overlapReason.length > 300) return err('INVALID');
@@ -531,7 +544,7 @@ export async function reassignTrip(
       const saved = await saveDispatchIn(tx, actor, date, wanted, {
         ...deps,
         overlapReason: input.overlapReason,
-        overlapScope: [`r${movable.findIndex((r) => r.key === input.tripId)}`],
+        overlapBaseline: true,
       });
       if (!saved.ok) return saved;
       const newTripId = saved.value.tripIds[movable.findIndex((r) => r.key === input.tripId)]!;

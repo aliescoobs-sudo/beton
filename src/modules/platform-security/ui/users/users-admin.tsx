@@ -142,7 +142,7 @@ export function UsersAdmin({
               ] as const
             )
               .concat(canMakeAdmin ? (['app_admin'] as never[]) : [])
-              .concat(['partner', 'office', 'plant', 'support'] as never[])
+              .concat(['office', 'plant'] as never[])
               .map((r) => (
                 <option key={r} value={r}>
                   {t(`roles.${r}`)}

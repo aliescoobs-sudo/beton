@@ -165,7 +165,8 @@ describe('overriding it on a rotation (AC-INT-20)', () => {
   it('the override is audited: the insert of the rotation carries the reason', async () => {
     const truck = await newTruck();
     await setTruckDefaultDriver(app, users.owner, { truckId: truck, driverId: usual });
-    await saveDispatch(app, users.partner, {
+    // T8: partner has no dispatch permission any more (tracking is owner, app_admin and plant manager); the plant manager saves
+    await saveDispatch(app, users.plant, {
       date: DAY,
       rotations: [rotation(truck, other, `swap ${marker}`)],
     });
@@ -173,7 +174,7 @@ describe('overriding it on a rotation (AC-INT-20)', () => {
       tx.query<{ n: string }>(
         `select count(*)::text as n from audit_event
           where table_name = 'trip_plan' and action = 'insert' and actor_user_id = $1 and after::text like $2`,
-        [users.partner.id, `%swap ${marker}%`],
+        [users.plant.id, `%swap ${marker}%`],
       ),
     );
     expect(Number(rows[0]?.n)).toBe(1);

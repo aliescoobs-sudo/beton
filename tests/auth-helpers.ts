@@ -56,7 +56,7 @@ export function authTestKit(overrides: Partial<Env> = {}) {
 
   const password = 'correct-horse-battery-staple';
 
-  async function newUser(role: UserRole = 'partner') {
+  async function newUser(role: UserRole = 'office') {
     const email = `user-${Math.random().toString(36).slice(2)}@kayas.test`;
     const { id } = await createUser(auth, authPool, {
       actor: { userId: BOOTSTRAP_ACTOR_ID, role: 'system' },
@@ -75,7 +75,7 @@ export function authTestKit(overrides: Partial<Env> = {}) {
   }
 
   /** Password login + 2FA enrolment. Callers using fake timers should move to the next 30 s step before the next code. */
-  async function enrolledUser(role: UserRole = 'partner') {
+  async function enrolledUser(role: UserRole = 'office') {
     const user = await newUser(role);
     const first = cookieOf(await call('/sign-in/email', { email: user.email, password }));
     const enable = await call('/two-factor/enable', { password }, { cookie: first });

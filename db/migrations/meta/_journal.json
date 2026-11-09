@@ -918,6 +918,13 @@
       "when": 1793805307023,
       "tag": "0122_trip_tap_read_scope",
       "breakpoints": true
+    },
+    {
+      "idx": 208,
+      "version": "7",
+      "when": 1793805367023,
+      "tag": "0208_roles_v1_hardening",
+      "breakpoints": true
     }
   ]
 }
