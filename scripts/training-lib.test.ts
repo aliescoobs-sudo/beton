@@ -215,14 +215,32 @@ describe('R12-02: no secret under an unignored name, nothing left behind, no che
     };
     const age = (d: string, file: string, c: { t: number }) =>
       utimesSync(path.join(d, file), new Date(c.t), new Date(c.t));
-    it("a second seed is refused while the first one's lock is live, and the lock goes when it is released", () => {
+    it("a second seed is refused while the first one's lock is live, and the lock is released (kept as an abandoned mark)", () => {
       const { d, final } = mk();
       const a = acquireSeedLock(final);
       expect(() => acquireSeedLock(final)).toThrow(SeedLockError);
       expect(a.held()).toBe(true);
       a.release();
-      expect(locks(d)).toEqual([]);
+      expect(locks(d)).toEqual([`${SEED_LOCK_NAME}.1`]); // R15B-13: kept as the high-water mark, marked abandoned
       acquireSeedLock(final).release();
+    });
+    it('R15B-13: epoch numbers never restart, so a delayed taker cannot recreate (and then delete) a number a later holder reused', () => {
+      const { d, final } = mk();
+      const first = acquireSeedLock(final);
+      const e1 = /\.(\d+)$/.exec(first.file)![1]!;
+      first.release();
+      // the released lock stays as the high-water mark: with no file the next holder would start again at 1 and reuse a number
+      expect(locks(d)).toEqual([`${SEED_LOCK_NAME}.${e1}`]);
+      const second = acquireSeedLock(final);
+      const e2 = /\.(\d+)$/.exec(second.file)![1]!;
+      expect(Number(e2)).toBeGreaterThan(Number(e1));
+      second.release();
+      const third = acquireSeedLock(final);
+      expect(Number(/\.(\d+)$/.exec(third.file)![1])).toBeGreaterThan(Number(e2));
+      expect(third.held()).toBe(true);
+      third.release();
+      // a delayed exclusive create of an old number fails or is overtaken: the number that was ever used is still there or below the top
+      expect(locks(d)).toHaveLength(1);
     });
     it('an abandoned lock (no heartbeat) is taken over by the NEXT epoch; a live one never is', () => {
       const { d, final } = mk();
@@ -242,7 +260,7 @@ describe('R12-02: no secret under an unignored name, nothing left behind, no che
       dead.release();
       expect(locks(d)).toEqual([`${SEED_LOCK_NAME}.2`]); // ...and its release does not remove the new holder's lock
       taker.release();
-      expect(locks(d)).toEqual([]);
+      expect(locks(d)).toEqual([`${SEED_LOCK_NAME}.2`]); // R15B-13: the released lock stays as the high-water mark
     });
     it("concurrent takers of one abandoned lock: exactly one wins, and the winner's NEW lock is never removed by the loser", () => {
       const { d, final } = mk();

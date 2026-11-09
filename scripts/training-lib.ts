@@ -403,7 +403,16 @@ export function acquireSeedLock(
       if (released) return;
       released = true;
       clearInterval(beat);
-      if (mine()) discardCredentialsFile(file); // only our own lock file is ever removed
+      // R15B-13: our lock file is NOT deleted. It stays as the high-water mark of the epoch numbers, marked abandoned (its time set to the epoch of
+      // the clock), so the next holder takes the next number. With no file the numbering would restart at 1 and a delayed taker could recreate
+      // a number a later holder reused, then delete that holder's live lock. Only our own file is ever touched.
+      if (mine()) {
+        try {
+          utimesSync(file, new Date(0), new Date(0));
+        } catch {
+          discardCredentialsFile(file); // cannot mark it: removing it is the old behaviour
+        }
+      }
     },
   };
 }

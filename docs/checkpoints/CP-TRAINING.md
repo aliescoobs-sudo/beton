@@ -30,7 +30,7 @@ the final review (`docs/reviews/CODEX-REVIEW-FINAL.md`) still stands for real da
 ## What the iMac needs
 | | |
 |---|---|
-| Machine | Intel iMac (2019) runs `linux/amd64` natively: no emulation. |
+| Machine | Intel iMac (2019) runs `linux/amd64` natively: no emulation. On Apple Silicon the compose file pins `platform: linux/amd64` on `db`, `app` and `ops`, so the stack starts without `DOCKER_DEFAULT_PLATFORM` (it runs under emulation: slower, fine for training). |
 | Memory | **8 GB free**; 4 GB go to the Colima virtual machine. |
 | Disk | **20 GB free** (the image, the database, 14 nightly dumps). |
 | Never sleeps | `sudo pmset -a sleep 0 disksleep 0 displaysleep 15` (the screen may sleep; the machine may not). |
@@ -83,7 +83,7 @@ Nothing here is done for you, and no token or password is ever pasted anywhere b
    Prefer a fresh volume. If you have verified yourself that a legacy volume is dedicated to this one database and want to keep it, you may bind its row deliberately, as the
    database superuser in the maintenance database `postgres`: `update public.volume_birth set database_name = 'belgobeton_training' where database_name is null;` (add the column first with
    `alter table public.volume_birth add column if not exists database_name text;` on a very old volume). This is an operator decision, not something any script does for you. The only skip of the marker is for the throwaway test databases and needs a positive test-runner signal as well as the
-   database name; no deployed command offers it. Migrations: all of them through 0118, plus the finance ones.
+   database name; no deployed command offers it. Migrations: all of them, 132 files (0000 to 0122, then 0200 to 0208: the finance ones and the T8 role hardening), applied by `training-up.sh`.
 8. **Local only: nothing is published (R15A-06).** The instance is used on THIS Mac, in its browsers, at `http://localhost:3000`. The app accepts writes only from the exact address in
    `APP_BASE_URL`, and `init-env.sh` writes `http://127.0.0.1:3000` by default: run `./scripts/training/set-url.sh http://localhost:3000` once so that the address you type is the
    one the app expects (`set-url.sh` accepts local addresses only). The app socket is bound to the loopback address
@@ -135,7 +135,7 @@ and the runbook, and it cannot be started with training mode or on a training da
 `docs/reviews/CODEX-REVIEW-R12.md` gave a conditional GO for supervised training with fictitious data only, and `docs/reviews/CODEX-REVIEW-R15A.md` keeps it for supervised
 local exercises on one Mac. The conditions below are mandatory; record each one (without any secret) on the Mac before a session.
 1. **Approved artifact and fresh volume.** A clean checkout of the reviewed commit and the digest of ITS successful image workflow (`pick-image.sh`); the running
-   app and ops use that digest. All migrations applied (through 0121 and the finance ones; the birth token of step 7 is still unused when the seed starts and consumed by it). The stock `belgobeton-training` project on a genuinely NEW dedicated
+   app and ops use that digest. All 132 migrations applied (0000 to 0122 and 0200 to 0208; the birth token of step 7 is still unused when the seed starts and consumed by it). The stock `belgobeton-training` project on a genuinely NEW dedicated
    database volume initialised by the training seed: no import, no partial restore, no reused business database, no hand-inserted marker, no database left from an older version
    whose birth row has no name (a reset refuses it). Keep evidence that the volume was created and the seed completed.
 2. **Mode and credential isolation.** In the RUNNING app: training on, real data and simulation off, `APP_ENV=training`, `TRAINING_ALLOW_UNMARKED` absent or

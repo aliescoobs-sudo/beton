@@ -15,6 +15,8 @@ name: kayas-training
 services:
   db:
     image: postgres:17.11-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
+    # The published app image is linux/amd64 only: pin the platform here so Apple Silicon needs no DOCKER_DEFAULT_PLATFORM (runs under emulation).
+    platform: linux/amd64
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
@@ -34,6 +36,7 @@ services:
 
   app:
     image: ${APP_IMAGE:?set APP_IMAGE in .env.training to ghcr.io/<owner>/kayas@sha256:<digest>}
+    platform: linux/amd64
     restart: unless-stopped
     env_file: .env.training
     environment:
@@ -78,6 +81,7 @@ services:
   # Maintenance: bootstrap of the roles, migrations, seed:training, reset:training. Never started by `up`.
   ops:
     image: ${APP_IMAGE:?set APP_IMAGE in .env.training}
+    platform: linux/amd64
     profiles: [ops]
     env_file: [.env.training, .env.training.ops]
     environment:

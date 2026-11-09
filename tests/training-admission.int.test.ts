@@ -149,7 +149,10 @@ describe('credentials output (R11-04)', () => {
       credentialsFile: file,
     });
     expect(r.applied).toBe(true);
-    expect(readdirSync(dir)).toEqual(['training-accounts.local.txt']);
+    // R15B-13: the released seed lock stays as an abandoned high-water mark; nothing else is left
+    expect(readdirSync(dir).filter((n) => !n.startsWith('training-accounts.seed.lock'))).toEqual([
+      'training-accounts.local.txt',
+    ]);
     expect((statSync(file).mode & 0o777).toString(8)).toBe('600');
     expect((await migrator.query('select 1 from public.training_marker')).rowCount).toBe(1);
   }, 600_000);
@@ -409,6 +412,8 @@ describe('stale staged credentials are swept first', () => {
     ).rejects.toThrow(/not empty/);
     expect(existsSync(s.staged)).toBe(false);
     expect(existsSync(young)).toBe(true);
-    expect(readdirSync(s.dir).filter((n) => n.startsWith('training-accounts.seed.lock'))).toEqual([]); // the lock is released on every way out
+    // the lock is released on every way out (R15B-13: the file stays as an abandoned mark, so no live lock is left)
+    for (const n of readdirSync(s.dir).filter((n) => n.startsWith('training-accounts.seed.lock')))
+      expect(Date.now() - statSync(path.join(s.dir, n)).mtimeMs).toBeGreaterThan(3_600_000);
   });
 });

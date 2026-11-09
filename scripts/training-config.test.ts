@@ -29,6 +29,11 @@ const block = (name: string): string => {
 const initEnv = readFileSync('scripts/training/init-env.sh', 'utf8');
 
 describe('the training stack (T1)', () => {
+  it('T8-C: the db, app and ops services are pinned to linux/amd64, so Apple Silicon needs no DOCKER_DEFAULT_PLATFORM', () => {
+    for (const service of ['db', 'app', 'ops'])
+      expect(block(service), service).toMatch(/\n    platform: linux\/amd64\n/);
+    expect(compose).not.toMatch(/platform: linux\/arm64/);
+  });
   it('runs the app as a training instance on fictitious data, never as production or real data', () => {
     const app = block('app');
     expect(app).toMatch(/TRAINING_MODE: 'true'/);
