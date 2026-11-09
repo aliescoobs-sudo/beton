@@ -122,6 +122,11 @@ const ALLOWED: { reason: string; pattern: RegExp }[] = [
   },
   {
     reason:
+      'R16-04: the pre-KAYAS compose project and its volumes (belgobeton-training, belgobeton-training_pgdata ...), named on purpose by the upgrade procedure and by the pre-check that refuses to start beside that stack',
+    pattern: /belgobeton-training(?:_[a-z]+)?/g,
+  },
+  {
+    reason:
       'E: database role names (belgobeton_app, _system, _auth, _migrator, _seed, _backup, ...) and database names (_test, _e2e, _training...)',
     pattern: /belgobeton_[a-z_]+/gi,
   },

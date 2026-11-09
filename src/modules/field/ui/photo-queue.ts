@@ -140,7 +140,9 @@ function openLegacy(): Promise<IDBDatabase | null> {
     };
     req.onerror = () => {
       clearTimeout(timer);
-      if (!timedOut) created ? resolve(null) : reject(req.error);
+      if (timedOut) return;
+      if (created) resolve(null);
+      else reject(req.error);
     };
     req.onblocked = () => undefined;
   });

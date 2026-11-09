@@ -207,8 +207,10 @@ describe('R16-01: the legal block is inside the page on every page of every docu
 
   it('the maximum valid profile is accepted; an unbroken one too; a block that cannot fit is refused with its own error', () => {
     const { effectiveFrom: _from, ...input } = maximum;
+    void _from;
     expect(parseCompanyProfileInput(input).ok).toBe(true);
     const { effectiveFrom: _f2, ...input2 } = unbroken;
+    void _f2;
     expect(parseCompanyProfileInput(input2).ok).toBe(true);
     expect(legalBlockFits(maximum)).toBe(true);
     // beyond what the field limits allow (a profile built around the validator): refused, never clipped
