@@ -62,7 +62,7 @@ Nothing here is done for you, and no token or password is ever pasted anywhere b
 6. **Pick the image, tied to your commit.** The code you run and the image must be the same commit: `APP_IMAGE=$(./scripts/training/pick-image.sh) ./scripts/training/init-env.sh`.
    `pick-image.sh` takes `git rev-parse HEAD`, finds the **green** run of **Build and publish image** for that exact commit (GitHub CLI), reads the digest that run
    printed with its commit, refuses if there is none or if it names another commit (never simply the newest green build: it can be another commit), and prints
-   `ghcr.io/…/belgobeton@sha256:…` on stdout and the commit on stderr. `init-env.sh` then writes the two secret files (random secrets, mode 600, not printed).
+   `ghcr.io/aliescoobs-sudo/kayas@sha256:…` on stdout and the commit on stderr. Every start (`init-env.sh`, `training-up.sh`, `dc.sh`, `ops.sh`) checks the reference with ONE rule (`scripts/training/image-policy.sh`: exact owner, package `kayas`, `@sha256:` and 64 lowercase hex characters; a tag, another owner or package, or malformed hash is refused before any pull, bootstrap or seed) and prints the accepted digest. `./scripts/training/running-image.sh` prints the image reference and id the `app` and `ops` containers are running, and nothing else (no environment). `init-env.sh` then writes the two secret files (random secrets, mode 600, not printed).
 7. **Start it:** `./scripts/training-up.sh` (the first run takes a few minutes: image, database, roles, structure, training data). Open
    <http://127.0.0.1:3000/fr/login> on the Mac itself (or <http://localhost:3000/fr/login> after `set-url.sh http://localhost:3000`, step 8): the red training banner must show. Give each trainee only their own line:
    `./scripts/training/show-accounts.sh` lists the account names (no secret), `./scripts/training/show-accounts.sh <exact login or code>` (e.g. `CH-02`, `comptable`) shows one block; a generic word or the shared domain matches several accounts and is refused before anything secret is printed. Hand it over in
@@ -102,6 +102,21 @@ Nothing here is done for you, and no token or password is ever pasted anywhere b
    `filestore` volume, and nowhere else. Restore one (stop the app first): `./scripts/training/dc.sh stop app`, then
    `./scripts/training/dc.sh exec -T db pg_restore -U postgres -d belgobeton --clean --if-exists < ~/kayas-training-backups/training-<stamp>.dump`, then `./scripts/training/dc.sh up -d app`.
 
+## Upgrading a pre-KAYAS training install (R16-04)
+The rename is **not** a state migration. The compose project changed from `belgobeton-training` to `kayas-training`, so Docker creates NEW, empty named volumes
+(database, file store, credentials) next to the old ones, and an old container may still own port 3000. The training domain also changed:
+the old `formation.beton.invalid` accounts do **not** get the password-only training exception (only `formation.kayas.invalid` does), and rewriting existing
+accounts is **not supported**. No real or legal identity is migrated: the exercise is fictitious only.
+Recommended path, a fresh fictitious deployment with the old stack explicitly retired:
+1. In the OLD checkout: `./scripts/training-down.sh`, then `docker compose -p belgobeton-training down` (containers and network; volumes are kept).
+2. Decide the old volumes: archive them (`docker volume ls --filter label=com.docker.compose.project=belgobeton-training`; dump what you want to keep) **or** remove them
+   explicitly (`docker volume rm belgobeton-training_pgdata belgobeton-training_filestore belgobeton-training_accounts`). Nothing removes them for you.
+3. In the NEW checkout: new env files (`pick-image.sh`, `init-env.sh`, never copy the old `.env.training*`), then `./scripts/training-up.sh`: new database, new seed, new accounts.
+4. Close every old browser tab of the application before handing a phone over (an old page can hold the phone's former photo database open; the new page shows
+   "cleanup pending" until it is closed). Unsent photos of the same account are kept and migrated; discard synthetic photos on purpose, never silently.
+`training-up.sh` refuses to start (it starts and removes nothing) when it finds containers or volumes of the `belgobeton-training` project, or another
+container publishing the port. Do not apply this rename to a stateful production deployment without a reviewed data migration.
+
 ## Day to day
 - Stop: `./scripts/training-down.sh` (data kept). Start: `./scripts/training-up.sh`.
 - Nothing is public (step 8): there is no address to close. When nobody is training, `./scripts/training-down.sh` stops the instance.
@@ -135,7 +150,7 @@ and the runbook, and it cannot be started with training mode or on a training da
 `docs/reviews/CODEX-REVIEW-R12.md` gave a conditional GO for supervised training with fictitious data only, and `docs/reviews/CODEX-REVIEW-R15A.md` keeps it for supervised
 local exercises on one Mac. The conditions below are mandatory; record each one (without any secret) on the Mac before a session.
 1. **Approved artifact and fresh volume.** A clean checkout of the reviewed commit and the digest of ITS successful image workflow (`pick-image.sh`); the running
-   app and ops use that digest. All 132 migrations applied (0000 to 0122 and 0200 to 0208; the birth token of step 7 is still unused when the seed starts and consumed by it). The stock `belgobeton-training` project on a genuinely NEW dedicated
+   app and ops use that digest. All 132 migrations applied (0000 to 0122 and 0200 to 0208; the birth token of step 7 is still unused when the seed starts and consumed by it). The stock `kayas-training` project on a genuinely NEW dedicated
    database volume initialised by the training seed: no import, no partial restore, no reused business database, no hand-inserted marker, no database left from an older version
    whose birth row has no name (a reset refuses it). Keep evidence that the volume was created and the seed completed.
 2. **Mode and credential isolation.** In the RUNNING app: training on, real data and simulation off, `APP_ENV=training`, `TRAINING_ALLOW_UNMARKED` absent or

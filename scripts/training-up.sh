@@ -14,6 +14,22 @@ done
 configured=$(sed -n 's/^APP_IMAGE=//p' .env.training | head -n1)
 kayas_require_image "$configured" training-up.sh
 docker info >/dev/null 2>&1 || { echo "training-up.sh: Docker does not answer. On the iMac start it first:  colima start --arch x86_64 --cpu 2 --memory 4 --disk 40" >&2; exit 1; }
+# R16-04: the rename to KAYAS changed the compose project (belgobeton-training -> kayas-training), so the volumes and the published port of an
+# old stack are NOT this stack's: starting now would silently create a second, empty stack next to it (or fail on the port). Stop and say so.
+# Retire the old stack explicitly first (docs/checkpoints/CP-TRAINING.md, "Upgrading a pre-KAYAS training install"); nothing is removed here.
+old_project=belgobeton-training
+new_project=kayas-training
+if [ -n "$(docker ps -a -q --filter "label=com.docker.compose.project=$old_project" 2>/dev/null)" ] \
+  || [ -n "$(docker volume ls -q --filter "label=com.docker.compose.project=$old_project" 2>/dev/null)" ]; then
+  echo "training-up.sh: a pre-KAYAS training stack ($old_project) still exists on this machine (containers or volumes). Starting would create a second, empty stack. Retire it explicitly first: see 'Upgrading a pre-KAYAS training install' in docs/checkpoints/CP-TRAINING.md. Nothing was started or removed." >&2
+  exit 1
+fi
+port="${APP_PORT:-3000}"
+holder=$(docker ps --filter "publish=$port" --format '{{.Names}}|{{.Label "com.docker.compose.project"}}' 2>/dev/null | grep -v "|$new_project\$" | head -n1 || true)
+if [ -n "$holder" ]; then
+  echo "training-up.sh: port $port is already published by another container (${holder%%|*}), which is not the $new_project stack. Stop it first (see 'Upgrading a pre-KAYAS training install' in docs/checkpoints/CP-TRAINING.md). Nothing was started." >&2
+  exit 1
+fi
 $dc pull
 # R11-04: the credentials file lives in a Docker volume ("accounts"), not in a folder of this checkout that other users of the machine could
 # reach: the folder is made owned by the container user (10001) and closed to everybody else (0700) before the seed writes into it.

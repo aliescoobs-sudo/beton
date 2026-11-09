@@ -44,7 +44,7 @@ Si ce n'est pas 0 : `docker logout ghcr.io`, supprime le jeton sur github.com et
 
 **6. Choisir la version à lancer (celle de TON code, pas « la dernière »)**
 L'image et le code doivent être le **même commit**. Tape :
-`APP_IMAGE=$(./scripts/training/pick-image.sh) ./scripts/training/init-env.sh`
+`APP_IMAGE=$(./scripts/training/pick-image.sh) ./scripts/training/init-env.sh` (le digest doit être exactement `ghcr.io/aliescoobs-sudo/kayas@sha256:` suivi de 64 caractères hexadécimaux minuscules ; un tag, un autre propriétaire ou paquet est refusé avant tout téléchargement ; `./scripts/training/running-image.sh` affiche l'image que font tourner `app` et `ops`, sans aucune variable d'environnement)
 Le script prend le commit de ton dossier (`git rev-parse HEAD`), cherche sur GitHub le passage **vert** de « Build and publish image » **pour ce commit exact**, lit le digest
 qu'il a publié avec son commit, et **refuse** s'il n'y en a pas ou si le commit ne correspond pas. Il écrit « wrote .env.training and .env.training.ops » et n'affiche aucun secret.
 (Il refuse d'écraser des fichiers existants : c'est voulu.)
@@ -95,11 +95,25 @@ bloqué (une déconnexion qui ne finit pas, une photo qui reste en attente, une 
 - Nouvelle version : `git pull`, puis `./scripts/training/pick-image.sh` (le digest du build vert de CE commit), remplace la ligne `APP_IMAGE=` dans `.env.training`, relance `./scripts/training-up.sh`.
 - Ne jamais saisir de vraies données (vrai client, vrai téléphone, vrai chèque).
 
+## Mettre à niveau une installation de formation d'avant KAYAS (R16-04)
+Le changement de nom n'est **pas** une migration d'état. Le projet compose est passé de `belgobeton-training` à `kayas-training` : Docker crée de NOUVEAUX volumes vides
+(base, fichiers, identifiants) à côté des anciens, et un ancien conteneur peut encore occuper le port 3000. Le domaine de formation a aussi changé : les anciens comptes
+`formation.beton.invalid` n'ont **pas** l'exception « mot de passe seul » (seul `formation.kayas.invalid` l'a), et la réécriture de comptes existants n'est **pas** prise
+en charge. Aucune identité réelle ou légale n'est migrée : exercice fictif seulement.
+Chemin recommandé : un déploiement fictif neuf, l'ancienne pile étant retirée explicitement.
+1. Dans l'ANCIEN dossier : `./scripts/training-down.sh`, puis `docker compose -p belgobeton-training down` (conteneurs et réseau ; les volumes sont conservés).
+2. Décider des anciens volumes : les archiver (`docker volume ls --filter label=com.docker.compose.project=belgobeton-training`) **ou** les supprimer explicitement
+   (`docker volume rm belgobeton-training_pgdata belgobeton-training_filestore belgobeton-training_accounts`). Rien ne les supprime à ta place.
+3. Dans le NOUVEAU dossier : nouveaux fichiers d'environnement (`pick-image.sh`, `init-env.sh`, ne jamais copier les anciens `.env.training*`), puis `./scripts/training-up.sh` : nouvelle base, nouveau seed, nouveaux comptes.
+4. Fermer tous les anciens onglets de l'application avant de remettre un téléphone (un ancien onglet peut garder ouverte l'ancienne base de photos ; le nouvel écran affiche
+   « nettoyage en attente » jusqu'à sa fermeture). Les photos non envoyées du même compte sont gardées et migrées ; écarte des photos fictives volontairement, jamais en silence.
+`training-up.sh` refuse de démarrer (il ne démarre ni ne supprime rien) s'il trouve des conteneurs ou volumes du projet `belgobeton-training`, ou un autre conteneur qui publie le port.
+
 ## Conditions obligatoires avant un exercice local surveillé (R12, réduites à la règle « local seulement » par R15A-06)
 `docs/reviews/CODEX-REVIEW-R12.md` a donné un feu vert conditionnel pour une formation surveillée avec des données fictives seulement, et `docs/reviews/CODEX-REVIEW-R15A.md` le maintient pour des
 exercices locaux surveillés sur un seul Mac. Les conditions ci-dessous sont obligatoires ; note chacune (sans aucun secret) sur le Mac avant une séance.
 1. **Version approuvée et volume neuf.** Une copie propre du commit relu et le digest du build vert de CE commit (`pick-image.sh`) ; l'application et `ops` qui
-   tournent utilisent ce digest. Toutes les migrations sont appliquées (jusqu'à 0121 et celles de la finance ; le jeton de naissance est encore intact quand le seed démarre et c'est lui qui le consomme). Le projet `belgobeton-training` d'origine sur un volume
+   tournent utilisent ce digest. Toutes les migrations sont appliquées (132 fichiers : 0000 à 0122, puis 0200 à 0208, la finance et le durcissement des rôles T8 ; le jeton de naissance est encore intact quand le seed démarre et c'est lui qui le consomme). Le projet `kayas-training` d'origine sur un volume
    de base de données **neuf** et dédié, rempli par le seed de formation : aucun import, aucune restauration partielle, aucune base métier réutilisée, aucun marqueur
    posé à la main, aucune base d'une ancienne version dont la ligne de naissance n'a pas de nom (la remise à zéro la refuse). Garde la preuve que le volume a été créé et que le seed est allé au bout.
 2. **Mode et isolation des identifiants.** Dans l'application **qui tourne** : formation activée, données réelles et simulation coupées, `APP_ENV=training`,
