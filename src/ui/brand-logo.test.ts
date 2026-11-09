@@ -1,3 +1,4 @@
+import { BRAND_WIDTHS, PAD_CLASS } from './brand';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
@@ -49,5 +50,12 @@ describe('KAYAS logo rules', () => {
     for (const tone of ['colour', 'forest', 'black', 'white'] as const)
       for (const width of [100, 200])
         expect(() => readFileSync(`public${resolveBrand({ width, tone }).src}`)).not.toThrow();
+  });
+
+  it('every allowed width has a clear-space class equal to a quarter of the symbol height (no inline style: CSP)', () => {
+    for (const width of BRAND_WIDTHS) {
+      const spec = resolveBrand({ variant: width < 160 ? 'symbol' : 'signature', width });
+      expect(PAD_CLASS[spec.height], `width ${width}`).toBe(`p-[${spec.clearSpace}px]`);
+    }
   });
 });

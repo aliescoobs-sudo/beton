@@ -69,7 +69,9 @@ export function AppShell({
       <header className="on-forest bg-forest text-white">
         <div className="mx-auto flex w-full max-w-[1240px] items-stretch gap-1 px-3 md:gap-4 md:px-8">
           <Link href={homeHref} className="flex items-center" aria-label={labels.brand}>
-            <Brand tone="white" width={160} />
+            {/* Under 160 px the symbol alone (brand rule): on a phone the header has no room for the signature. */}
+            <Brand variant="symbol" tone="white" width={48} className="inline-block md:hidden" />
+            <Brand tone="white" width={160} className="hidden md:inline-block" />
           </Link>
           <nav aria-label={labels.mainNav} className="hidden flex-1 items-stretch gap-1 md:flex">
             {groups.map((group) => {
@@ -81,7 +83,7 @@ export function AppShell({
                   data-testid={`tab-${group.id}`}
                   aria-current={isCurrent ? 'page' : undefined}
                   className={cn(
-                    'flex items-center border-b-4 px-3.5 text-sm font-medium',
+                    'flex items-center border-b-4 px-2 text-sm font-medium lg:px-2.5',
                     isCurrent
                       ? 'border-citron text-white'
                       : 'border-transparent text-white/70 hover:text-white',
@@ -104,7 +106,7 @@ export function AppShell({
               autoComplete="off"
               placeholder={labels.searchPlaceholder}
               aria-label={labels.search}
-              className="w-32 rounded border border-white/30 bg-white/10 px-2 py-1 text-sm text-white placeholder:text-white/60"
+              className="w-24 rounded border border-white/30 bg-white/10 px-2 py-1 text-sm text-white placeholder:text-white/60"
               data-testid="search-box"
             />
           </form>

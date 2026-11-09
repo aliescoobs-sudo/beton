@@ -8,9 +8,13 @@ import type { CompanyProfile } from '../src/modules/ledger/domain/company.ts';
 import { legalFooter } from '../src/modules/ledger/domain/company.ts';
 import { deliveryNotePdf } from '../src/modules/operations/pdf/delivery-note-pdf.ts';
 
+const usage = 'usage: node --import ./scripts/register-ts-paths.mjs scripts/pdf-review.ts <output-dir>';
 const out = process.argv[2];
-if (!process.argv[1]?.endsWith('pdf-review.ts') || !out || out.startsWith('-'))
-  throw new Error('usage: node --import ./scripts/register-ts-paths.mjs scripts/pdf-review.ts <output-dir>');
+if (out === '--help' || out === '-h') {
+  console.log(usage);
+  process.exit(0);
+}
+if (!out) throw new Error(usage);
 mkdirSync(out, { recursive: true });
 const company: CompanyProfile = {
   effectiveFrom: '2026-01-01',
