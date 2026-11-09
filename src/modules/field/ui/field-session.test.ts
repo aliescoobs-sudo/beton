@@ -29,7 +29,12 @@ const stalls = <T>(signal: AbortSignal, honour = true) =>
     if (honour) signal.addEventListener('abort', () => reject(new Error('aborted')));
   });
 
-function rig(opts?: { honourAbort?: boolean; confirm?: boolean; mark?: { set: boolean } }) {
+function rig(opts?: {
+  honourAbort?: boolean;
+  confirm?: boolean;
+  mark?: { set: boolean };
+  partialApply?: boolean;
+}) {
   const mark = opts?.mark ?? { set: false };
   const store = new Map<string, string>();
   let owner: string | null = 'u1';
@@ -40,6 +45,7 @@ function rig(opts?: { honourAbort?: boolean; confirm?: boolean; mark?: { set: bo
     syncPosts: 0,
     uploads: [] as string[],
     outcomesApplied: 0,
+    applied: [] as unknown[],
     confirms: [] as number[],
     logouts: 0,
     wipes: [] as WipeScope[],
@@ -106,9 +112,12 @@ function rig(opts?: { honourAbort?: boolean; confirm?: boolean; mark?: { set: bo
       return hooks.post(signal);
     },
     queueLength: () => queue.length,
-    applyOutcomes: () => {
+    applyOutcomes: (body) => {
       log.outcomesApplied++;
-      queue = [];
+      log.applied.push(body);
+      // the real store removes the taps the server answered for and keeps the others (a tap made while the request was on its way)
+      const answered = new Set(((body as { outcomes?: { key: string }[] }).outcomes ?? []).map((o) => o.key));
+      queue = opts?.partialApply ? (queue as { key: string }[]).filter((a) => !answered.has(a.key)) : [];
     },
     listPhotos: () => hooks.listPhotos(),
     enqueuePhoto: (photo, stillCurrent) => hooks.enqueue(photo, stillCurrent),
@@ -158,6 +167,84 @@ function rig(opts?: { honourAbort?: boolean; confirm?: boolean; mark?: { set: bo
 }
 
 afterEach(() => vi.useRealTimers());
+
+// T8 tail: a tap made while a sync is on its way was left for the 20-second timer ("sync is skipped while one runs"), so the plant saw the
+// driver's second tap up to 20 s late (seen in the e2e: the second tap of a quick pair stayed queued with the request of the first in flight).
+describe('a tap made while a sync is on its way is sent as soon as that sync ends', () => {
+  it('asks for one more round when sync() is called during a running sync, and sends the new tap without waiting for the timer', async () => {
+    const r = rig({ partialApply: true });
+    r.setQueue([{ key: 'tap-1' }]);
+    const first = deferred<{ status: number; ok: boolean; json(): Promise<unknown> }>();
+    let call = 0;
+    r.hooks.post = () => {
+      call++;
+      if (call === 1) return first.promise;
+      return Promise.resolve({
+        status: 200,
+        ok: true,
+        json: async () => ({ outcomes: [{ key: 'tap-2', status: 'recorded' }] }),
+      });
+    };
+    const running = r.session.sync();
+    await tick();
+    expect(r.log.syncPosts).toBe(1);
+    r.setQueue([{ key: 'tap-1' }, { key: 'tap-2' }]); // the driver taps again: the request of the first is still out
+    void r.session.sync(); // what the tap triggers: skipped while one runs
+    first.resolve({
+      status: 200,
+      ok: true,
+      json: async () => ({ outcomes: [{ key: 'tap-1', status: 'recorded' }] }),
+    });
+    await running;
+    for (let i = 0; i < 20 && r.log.syncPosts < 2; i++) await tick();
+    expect(r.log.syncPosts).toBe(2); // sent right after, not at the next timer
+    for (let i = 0; i < 20 && r.queue().length > 0; i++) await tick();
+    expect(r.queue()).toEqual([]);
+  });
+
+  it('does not loop: with nothing new queued, a skipped call asks for no extra round beyond the one', async () => {
+    const r = rig({ partialApply: true });
+    r.setQueue([{ key: 'tap-1' }]);
+    const first = deferred<{ status: number; ok: boolean; json(): Promise<unknown> }>();
+    r.hooks.post = () => first.promise;
+    const running = r.session.sync();
+    await tick();
+    void r.session.sync();
+    void r.session.sync();
+    first.resolve({
+      status: 200,
+      ok: true,
+      json: async () => ({ outcomes: [{ key: 'tap-1', status: 'recorded' }] }),
+    });
+    await running;
+    for (let i = 0; i < 10; i++) await tick();
+    expect(r.log.syncPosts).toBe(1); // the queue was empty after the first answer: no second request
+  });
+
+  it('after a sign-out has fenced, the extra round is not started', async () => {
+    const r = rig({ partialApply: true });
+    r.setQueue([{ key: 'tap-1' }]);
+    const first = deferred<{ status: number; ok: boolean; json(): Promise<unknown> }>();
+    r.hooks.post = (signal) => {
+      signal.addEventListener('abort', () => first.reject(new Error('aborted')));
+      return first.promise;
+    };
+    const running = r.session.sync();
+    await tick();
+    r.setQueue([{ key: 'tap-1' }, { key: 'tap-2' }]);
+    void r.session.sync();
+    vi.useFakeTimers();
+    r.hooks.post = (signal) => stalls(signal);
+    const out = r.session.signOut();
+    await vi.advanceTimersByTimeAsync(8_001);
+    await out;
+    vi.useRealTimers();
+    await running;
+    for (let i = 0; i < 10; i++) await tick();
+    expect(r.log.sessionReads).toBe(0);
+    expect(r.ui.session).toBe('out');
+  });
+});
 
 describe('sign-out fences new work first (R14-06)', () => {
   it('a sync in flight on a stalled network is aborted at the fence; its late answer commits nothing and starts no read', async () => {
@@ -292,11 +379,11 @@ describe('re-login after a sign-out (R14-06)', () => {
     r.hooks.session = async () => ({ userId: 'u2', label: 'day-2' });
     r.hooks.post = async () => ({ status: 200, ok: true, json: async () => ({ outcomes: [] }) });
     await r.session.signedIn();
-    const applied = r.log.outcomesApplied;
     answer.resolve({ status: 200, ok: true, json: async () => ({ outcomes: ['old'] }) });
     await old;
     await tick();
-    expect(r.log.outcomesApplied).toBe(applied); // the old answer was not applied
+    // the old answer was not applied (the new session's own send, which waited behind the old one, may be)
+    expect(JSON.stringify(r.log.applied)).not.toContain('old');
     expect(r.ui.day).toEqual({ userId: 'u2', label: 'day-2' });
     expect(r.ui.session).toBe('in');
   });

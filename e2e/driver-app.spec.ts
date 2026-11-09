@@ -96,9 +96,56 @@ const stepsOf = async () =>
     await migrator.query<{ step: string }>('select step from trip_event where trip_id = $1', [tripId])
   ).rows.map((r) => r.step);
 
+/**
+ * Diagnostic for the first spec (it failed 4 times between 23:10 and 23:59 UTC on 8 Nov, "departed" never reached the server, and never
+ * since): what the phone sent and was answered, what it logged, what it kept queued, and what the server and the clocks say. Attached to the
+ * report when the steps do not arrive; it records, it decides nothing.
+ */
+function watchSync(page: Page) {
+  const seen: string[] = [];
+  page.on('console', (m) => {
+    if (['error', 'warning'].includes(m.type())) seen.push(`console.${m.type()}: ${m.text().slice(0, 300)}`);
+  });
+  page.on('pageerror', (e) => seen.push(`pageerror: ${e.message.slice(0, 300)}`));
+  page.on('requestfailed', (r) => seen.push(`requestfailed: ${r.method()} ${r.url()} ${r.failure()?.errorText ?? ''}`));
+  page.on('response', async (r) => {
+    if (!r.url().includes('/api/field/')) return;
+    const body = await r.text().catch(() => '(unreadable)');
+    seen.push(`${new Date().toISOString()} ${r.request().method()} ${new URL(r.url()).pathname} -> ${r.status()} ${body.slice(0, 300)}`);
+  });
+  return async (testInfo: { attach(name: string, o: { body: string; contentType: string }): Promise<void> }) => {
+    const local = await page
+      .evaluate(() => ({
+        now: new Date().toISOString(),
+        tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        offline: !navigator.onLine,
+        keys: Object.keys(localStorage).filter((k) => k.startsWith('kayas') || k.startsWith('bb_')),
+        queue: localStorage.getItem('kayas_field_queue') ?? localStorage.getItem('bb_field_queue'),
+        screen: document.querySelector('[data-testid=field-day]')?.textContent?.slice(0, 400) ?? null,
+      }))
+      .catch((e) => ({ unreadable: String(e) }));
+    const db = await migrator.query(
+      `select now() as db_now, current_setting('TimeZone') as db_tz,
+              (select json_agg(json_build_object('step', step, 'at', at) order by at) from trip_event where trip_id = $1) as events,
+              (select json_agg(json_build_object('kind', kind, 'at', at)) from trip_driver_report where trip_id = $1) as reports,
+              (select json_agg(json_build_object('step', step, 'delay', cumulative_delay_min)) from trip_delay where trip_id = $1) as delays`,
+      [tripId],
+    );
+    await testInfo.attach('driver-app-diagnostic.json', {
+      contentType: 'application/json',
+      body: JSON.stringify(
+        { serverClock: { process: new Date().toISOString(), tzEnv: process.env.TZ ?? null }, phone: local, db: db.rows[0], traffic: seen },
+        null,
+        2,
+      ),
+    });
+  };
+}
+
 test('a driver signs in with code and PIN, taps the steps, and never sees a price (Arabic)', async ({
   page,
-}) => {
+}, testInfo) => {
+  const diagnose = watchSync(page);
   await page.addInitScript((id) => {
     if (!localStorage.getItem('bb_field_device')) localStorage.setItem('bb_field_device', id);
   }, DEVICE);
@@ -118,7 +165,12 @@ test('a driver signs in with code and PIN, taps the steps, and never sees a pric
   await page.getByTestId(`tap-${orderCode}`).click();
   await expect(page.getByTestId(`tap-${orderCode}`)).toContainText('غادرت الشاحنة المحطة');
   await page.getByTestId(`tap-${orderCode}`).click();
-  await expect.poll(stepsOf).toContain('departed');
+  try {
+    await expect.poll(stepsOf).toContain('departed');
+  } catch (error) {
+    await diagnose(testInfo);
+    throw error;
+  }
   const text = (await page.getByTestId('field-day').textContent()) ?? '';
   expect(text).not.toMatch(/MAD|DH|درهم|\d\s?\d{3},\d{2}/);
   // large type: the big button is at least 28 px

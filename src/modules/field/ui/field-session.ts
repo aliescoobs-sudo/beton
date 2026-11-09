@@ -72,6 +72,8 @@ export interface SessionPorts<P extends QueuedPhotoRef> {
 export function createFieldSession<P extends QueuedPhotoRef>(ports: SessionPorts<P>) {
   const day = ports.day;
   let syncRunning: Promise<void> | null = null;
+  // A sync was asked for while one was on its way (a tap made meanwhile): one more round follows the running one.
+  let syncAgain = false;
   let flushRunning: Promise<void> | null = null;
   // R15A-01: a sign-out belongs to the generation that started it. A second press in the SAME generation joins the running one; a press in
   // a later generation (after a new sign-in) is a new operation, whatever became of an older one or of its server call.
@@ -100,7 +102,10 @@ export function createFieldSession<P extends QueuedPhotoRef>(ports: SessionPorts
 
   /** A background sync is skipped while one runs or while a sign-out has fenced. */
   async function sync(): Promise<void> {
-    if (syncRunning) return;
+    if (syncRunning) {
+      syncAgain = true;
+      return;
+    }
     const guard = day.openWork();
     if (!guard) return;
     return startSync(guard);
@@ -118,6 +123,12 @@ export function createFieldSession<P extends QueuedPhotoRef>(ports: SessionPorts
   function startSync(guard: WorkGuard): Promise<void> {
     const run = runSync(guard).finally(() => {
       if (syncRunning === run) syncRunning = null;
+      // The request that just ended was built before the tap that asked again: send the rest now, not at the next timer. `sync()` itself
+      // refuses while a sign-out has fenced, and `runSync` sends nothing when the queue is empty, so this cannot loop.
+      if (syncAgain && syncRunning === null) {
+        syncAgain = false;
+        void sync();
+      }
     });
     syncRunning = run;
     return run;
