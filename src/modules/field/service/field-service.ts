@@ -3,6 +3,12 @@ import { z } from 'zod';
 import { err, ok, type Result } from '@/lib/result';
 import type { FieldCipher } from '@/modules/master-data';
 import { inRequest, require, type SessionUser } from '@/modules/platform-security';
+import {
+  deriveStages,
+  type StageRow,
+  type StageSource,
+  type StageView,
+} from '@/modules/operations/domain/trip-stages';
 import { emergencyStage, type EmergencyStage } from '../domain/steps';
 import type { QueueAction, SyncOutcome } from '../domain/queue';
 
@@ -28,6 +34,8 @@ export interface DriverTrip {
   blNo: string | null;
   loadingStartedAt: string | null;
   steps: Record<string, string>;
+  /** T9: the shared status, the same one the plant's board shows: who recorded each stage and when (an implicit stage is marked). */
+  stages: StageView[];
   stage: EmergencyStage;
   unloadedL: number | null;
   /** How many photos of the signed BL the office already holds for this rotation. */
@@ -102,6 +110,31 @@ export async function getDriverDay(
       [date],
     );
     const photos = new Map(photoRows.rows.map((r) => [r.trip_id, r.n]));
+    // the shared status of the day's rotations (the database scopes it to this driver's own)
+    const stageRes = await tx.query<{
+      trip_id: string;
+      step: StageRow['stage'];
+      at: Date;
+      source: StageSource;
+      implicit: boolean;
+      client_time: Date | null;
+      corrected_at: Date | null;
+      load_linked: boolean;
+    }>('select * from public.trip_stages($1)', [date]);
+    const stageRows = new Map<string, StageRow[]>();
+    for (const r of stageRes.rows) {
+      const list = stageRows.get(r.trip_id) ?? [];
+      list.push({
+        stage: r.step,
+        at: r.at.toISOString(),
+        source: r.source,
+        implicit: r.implicit,
+        clientTime: r.client_time?.toISOString() ?? null,
+        correctedAt: r.corrected_at?.toISOString() ?? null,
+        loadLinked: r.load_linked,
+      });
+      stageRows.set(r.trip_id, list);
+    }
     // A redirect decided by the office on a cancelled or stopped load (R6, REQUIREMENTS-V1 §8) reaches the driver as one more
     // instruction: the new address, the map link, and an acknowledgement that is recorded on the case.
     const redirects = await tx.query<{
@@ -113,7 +146,11 @@ export async function getDriverDay(
     return {
       trips: trips.rows.map((r) => {
         const address = cipher.open(r.address_enc);
-        const steps = Object.fromEntries(r.steps.map((s) => [s.step, new Date(s.at).toISOString()]));
+        const status = deriveStages(stageRows.get(r.trip_id) ?? []);
+        // the effective time of each recorded stage (a correction's when there is one)
+        const steps = Object.fromEntries(
+          status.stages.filter((s) => s.at).map((s) => [s.stage, s.at as string]),
+        );
         return {
           id: r.trip_id,
           seq: r.seq,
@@ -130,8 +167,9 @@ export async function getDriverDay(
           truckCode: r.truck_code,
           loadMin: r.load_min,
           blNo: r.bl_no,
-          loadingStartedAt: r.loading_started_at?.toISOString() ?? null,
+          loadingStartedAt: steps['loading_started'] ?? r.loading_started_at?.toISOString() ?? null,
           steps,
+          stages: status.stages,
           stage: emergencyStage(steps),
           unloadedL: r.unloaded_l,
           blPhotos: photos.get(r.trip_id) ?? 0,
@@ -228,6 +266,8 @@ export async function syncActions(
   appPool: pg.Pool,
   driver: SessionUser,
   actions: unknown,
+  /** The server's instant (the application's clock): the stage is stamped with it; the phone's time of the tap is kept apart. */
+  deps: { now?: Date } = {},
 ): Promise<Result<SyncOutcome[], 'INVALID'>> {
   const parsed = z.array(actionSchema).max(200).safeParse(actions);
   if (!parsed.success) return err('INVALID');
@@ -237,8 +277,8 @@ export async function syncActions(
       const status = await inRequest(appPool, driver, async (tx): Promise<'recorded' | 'replayed'> => {
         if (a.kind === 'step') {
           const r = await tx.query<{ r: 'recorded' | 'replayed' }>(
-            'select public.driver_report($1, $2, $3, $4, $5, $6) as r',
-            [a.tripId, a.step, a.at, a.key, a.volumeL ?? null, a.reason ?? null],
+            'select public.driver_report($1, $2, $3, $4, $5, $6, $7) as r',
+            [a.tripId, a.step, a.at, a.key, a.volumeL ?? null, a.reason ?? null, deps.now ?? null],
           );
           return r.rows[0]?.r ?? 'recorded';
         }

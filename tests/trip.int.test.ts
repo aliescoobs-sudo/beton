@@ -75,19 +75,23 @@ describe('who may see and tap (AC-OPS-16)', () => {
 });
 
 describe('the steps (AC-OPS-16, 17)', () => {
-  it('a step out of order is refused by the service, and by the database', async () => {
-    expect(await step(users.plant, tripId, 'departed', '07:10')).toEqual({
-      ok: false,
-      error: 'OUT_OF_ORDER',
-    });
+  it("the database's guard still refuses a direct insert out of order, and a plant manager has no direct insert at all (T9: every stage goes through record_trip_stage)", async () => {
     await expect(
-      withRlsContext(app, { userId: users.plant.id, role: 'plant', requestId: marker }, (tx) =>
+      withRlsContext(app, { userId: users.owner.id, role: 'owner', requestId: marker }, (tx) =>
         tx.query(
           `insert into trip_event (id, trip_id, step, at, created_by) values (gen_random_uuid(), $1, 'departed', now(), $2)`,
-          [tripId, users.plant.id],
+          [tripId, users.owner.id],
         ),
       ),
     ).rejects.toMatchObject({ code: '23514', message: expect.stringContaining('previous step') });
+    await expect(
+      withRlsContext(app, { userId: users.plant.id, role: 'plant', requestId: marker }, (tx) =>
+        tx.query(
+          `insert into trip_event (id, trip_id, step, at, created_by) values (gen_random_uuid(), $1, 'loaded', now(), $2)`,
+          [tripId, users.plant.id],
+        ),
+      ),
+    ).rejects.toMatchObject({ code: '42501' });
   });
 
   it('the first tap loads: a BL, the stock goes down, the event links the load, with the clock instant', async () => {
@@ -107,23 +111,17 @@ describe('the steps (AC-OPS-16, 17)', () => {
     expect(Number(stock.rows[0]?.n)).toBeGreaterThanOrEqual(2);
   });
 
-  it('a step already recorded is refused, and no second load is made', async () => {
-    expect(await step(users.plant, tripId, 'loaded', '07:05')).toEqual({
-      ok: false,
-      error: 'ALREADY_RECORDED',
+  it('a step already recorded is answered with its record (who, when), and no second load is made', async () => {
+    const again = await step(users.plant, tripId, 'loaded', '07:05');
+    expect(again).toMatchObject({
+      ok: true,
+      value: { recorded: false, by: { source: 'plant', implicit: false, at: '2026-06-02T07:00:00.000Z' } },
     });
     const loads = await migrator.query<{ n: string }>(
       `select count(*)::text as n from delivery where order_id = $1 and volume_l > 0`,
       [scene.orderId],
     );
     expect(Number(loads.rows[0]?.n)).toBe(1);
-  });
-
-  it('a step dated before the previous one is refused', async () => {
-    expect(await step(users.plant, tripId, 'departed', '06:50')).toEqual({
-      ok: false,
-      error: 'OUT_OF_ORDER',
-    });
   });
 
   it('waiting time on site, unloading, round trip and concrete age are derived from the events', async () => {
@@ -151,10 +149,10 @@ describe('the steps (AC-OPS-16, 17)', () => {
       concreteAgeMin: 125,
     });
     expect(t.next).toBeNull();
-    // a sixth tap has nothing left
-    expect(await step(users.plant, tripId, 'back', '10:30')).toEqual({
-      ok: false,
-      error: 'ALREADY_RECORDED',
+    // a seventh tap has nothing left: the existing record comes back, nothing changes
+    expect(await step(users.plant, tripId, 'back', '10:30')).toMatchObject({
+      ok: true,
+      value: { recorded: false },
     });
   });
 
@@ -192,21 +190,67 @@ describe('two taps at once (AC-OPS-16)', () => {
       step(users.plant, id, 'loaded', '11:00'),
       step(users.owner, id, 'loaded', '11:00'),
     ]);
-    expect(results.filter((r) => r.ok)).toHaveLength(1);
-    expect(results.filter((r) => !r.ok).map((r) => (r.ok ? '' : r.error))[0]).toMatch(
-      /ALREADY_RECORDED|CONFLICT|OUT_OF_ORDER/,
-    );
+    // both are answered (T9: a second tap is never an error); exactly one of them recorded the stage and made the load
+    expect(results.every((r) => r.ok)).toBe(true);
+    expect(results.filter((r) => r.ok && r.value.recorded)).toHaveLength(1);
     const events = await withRlsContext(
       app,
       { userId: users.owner.id, role: 'owner', requestId: marker },
       (tx) => tx.query<{ n: string }>(`select count(*)::text as n from trip_event where trip_id = $1`, [id]),
     );
-    expect(Number(events.rows[0]?.n)).toBe(1);
+    // the stage, and the driver's "loading began" filled in before it
+    expect(Number(events.rows[0]?.n)).toBe(2);
     const loads = await migrator.query<{ n: string }>(
       `select count(*)::text as n from delivery where order_id = $1 and volume_l > 0`,
       [orderScene.orderId],
     );
     expect(Number(loads.rows[0]?.n)).toBe(1);
+  });
+});
+
+describe('T9: a later stage fills the skipped ones; the order of the instants never breaks', () => {
+  it('departed tapped first fills loading began and loaded as implicit (no load is made); a step dated before the previous one is recorded at the previous instant', async () => {
+    const other = await deliveryScene(app, users.owner.id, `${marker}c`);
+    const saved = await saveDispatch(app, users.plant, {
+      date: DAY,
+      rotations: [{ orderId: other.orderId, truckId: other.truckId, driverId: null, volumeL: 4000 }],
+    });
+    if (!saved.ok) throw new Error(saved.error);
+    const { rows } = await migrator.query<{ id: string }>(`select id from trip_plan where batch_id = $1`, [
+      saved.value.batchId,
+    ]);
+    const id = rows[0]?.id as string;
+    const departed = await step(users.plant, id, 'departed', '11:00');
+    expect(departed).toMatchObject({ ok: true, value: { recorded: true, load: null } });
+    const stored = await migrator.query<{ step: string; implicit: boolean; delivery_id: string | null }>(
+      `select step, implicit, delivery_id from trip_event where trip_id = $1 order by created_at`,
+      [id],
+    );
+    expect(stored.rows.map((r) => [r.step, r.implicit, r.delivery_id])).toEqual([
+      ['loading_started', true, null],
+      ['loaded', true, null],
+      ['departed', false, null],
+    ]);
+    const loads = await migrator.query<{ n: string }>(
+      `select count(*)::text as n from delivery where order_id = $1`,
+      [other.orderId],
+    );
+    expect(Number(loads.rows[0]?.n)).toBe(0); // the plant's own load was not made by a stage
+    const early = await step(users.plant, id, 'arrived', '10:50'); // the writer's clock is behind
+    expect(early).toMatchObject({
+      ok: true,
+      value: { recorded: true, by: { at: '2026-06-02T11:00:00.000Z' } },
+    });
+    // the plant then makes its own load: it is attached to the implicit stage
+    const made = await step(users.plant, id, 'loaded', '11:30');
+    expect(made).toMatchObject({ ok: true, value: { recorded: true } });
+    if (made.ok) expect(made.value.load?.blNo).toMatch(/^BL-/);
+    const linked = await migrator.query<{ delivery_id: string | null; implicit: boolean }>(
+      `select delivery_id, implicit from trip_event where trip_id = $1 and step = 'loaded'`,
+      [id],
+    );
+    expect(linked.rows[0]?.delivery_id).not.toBeNull();
+    expect(linked.rows[0]?.implicit).toBe(true); // the stage keeps its history; only the load was attached
   });
 });
 

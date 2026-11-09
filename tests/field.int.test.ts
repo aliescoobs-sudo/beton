@@ -237,6 +237,7 @@ describe('the day of a driver: own rotations, never a price (AC-PROD-20, 21)', (
         'seq',
         'siteLabel',
         'stage',
+        'stages',
         'steps',
         'truckCode',
         'typeLabel',
@@ -247,7 +248,7 @@ describe('the day of a driver: own rotations, never a price (AC-PROD-20, 21)', (
     );
   });
 
-  it('the six taps run in order; departing waits for the plant’s load; a replay changes nothing; the m3 is required at the end of unloading', async () => {
+  it('the seven taps run in order; departing no longer waits for the plant (T9: the load is filled in as implicit); a replay changes nothing; the m3 is required; a driver’s unloading delivers nothing', async () => {
     const d = await newDriver();
     const s = await sessionFor(d);
     const trip = await tripFor(d.id, false);
@@ -258,16 +259,14 @@ describe('the day of a driver: own rotations, never a price (AC-PROD-20, 21)', (
       ok: true,
       value: [
         { key: start.key, status: 'recorded' },
-        { key: early.key, status: 'rejected', code: 'wait_previous', retry: true },
+        { key: early.key, status: 'recorded' },
       ],
     });
     // the same start again (lost answer): replayed, nothing stored twice
     r = await syncActions(app, s.user, [start]);
     expect(r).toEqual({ ok: true, value: [{ key: start.key, status: 'replayed' }] });
-    await plantLoads(trip);
-    const rest = [early, tap(trip, 'arrived'), tap(trip, 'unloading_started')];
-    r = await syncActions(app, s.user, rest);
-    expect(r.ok && r.value.map((o) => o.status)).toEqual(['recorded', 'recorded', 'recorded']);
+    r = await syncActions(app, s.user, [tap(trip, 'arrived'), tap(trip, 'unloading_started')]);
+    expect(r.ok && r.value.map((o) => o.status)).toEqual(['recorded', 'recorded']);
     const noVolume = tap(trip, 'unloading_finished');
     r = await syncActions(app, s.user, [noVolume]);
     expect(r.ok && r.value[0]).toMatchObject({ status: 'rejected', retry: false });
@@ -279,6 +278,7 @@ describe('the day of a driver: own rotations, never a price (AC-PROD-20, 21)', (
     expect(day.trips[0]).toMatchObject({ unloadedL: 9500, stage: 'back' });
     expect(Object.keys(day.trips[0]!.steps)).toEqual(
       expect.arrayContaining([
+        'loading_started',
         'loaded',
         'departed',
         'arrived',
@@ -287,14 +287,38 @@ describe('the day of a driver: own rotations, never a price (AC-PROD-20, 21)', (
         'back',
       ]),
     );
-    // unloading ended marks the load delivered (the existing tracking rule)
+    // the shared status: who recorded each stage; the load he skipped is implicit
+    const stages = day.trips[0]!.stages;
+    expect(stages.find((x) => x.stage === 'loaded')).toMatchObject({
+      implicit: true,
+      source: 'driver',
+      declared: true,
+    });
+    expect(stages.find((x) => x.stage === 'departed')).toMatchObject({ implicit: false, source: 'driver' });
+    // a driver's end of unloading delivers nothing: the plant confirms (T9, DECISIONS 206)
     const delivered = await asOwner((tx) =>
       tx.query(
         'select 1 from delivery_delivered d join trip_event e on e.id = d.trip_event_id where e.trip_id = $1',
         [trip],
       ),
     );
-    expect(delivered.rowCount).toBe(1);
+    expect(delivered.rowCount).toBe(0);
+  });
+
+  it('the plant’s own load still delivers at the end of the unloading when the plant records that stage itself, and the driver’s day shows the plant as the author of the load (T9)', async () => {
+    const d = await newDriver();
+    const s = await sessionFor(d);
+    const trip = await tripFor(d.id, true); // the plant has loaded (BL)
+    const r = await syncActions(app, s.user, [tap(trip, 'loading_started'), tap(trip, 'departed')]);
+    expect(r.ok && r.value.map((o) => o.status)).toEqual(['recorded', 'recorded']);
+    const day = await getDriverDay(app, s.user, today, cipher);
+    const mine = day.trips.find((x) => x.id === trip)!;
+    expect(mine.stages.find((x) => x.stage === 'loaded')).toMatchObject({
+      source: 'admin',
+      declared: false,
+      implicit: false,
+    });
+    expect(mine.blNo).not.toBeNull();
   });
 
   it('a driver cannot touch another driver’s rotation, and a tap in the future or long ago is refused', async () => {

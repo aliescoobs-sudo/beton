@@ -3,9 +3,9 @@ import { emergencyStage, EMERGENCY_OPTIONS, nextDriverTap, nextPumpStep } from '
 
 describe('the driver chain (AC-PROD-21)', () => {
   const at = '2026-11-10T08:00:00Z';
-  it('runs the six taps in order, one at a time', () => {
+  it('runs the seven taps in order, one at a time (T9: the driver may declare the load himself)', () => {
     expect(nextDriverTap({ loadingStartedAt: null, steps: {} })).toEqual({ step: 'loading_started' });
-    expect(nextDriverTap({ loadingStartedAt: at, steps: {} })).toEqual({ wait: 'wait_load' });
+    expect(nextDriverTap({ loadingStartedAt: at, steps: {} })).toEqual({ step: 'loaded' });
     expect(nextDriverTap({ loadingStartedAt: at, steps: { loaded: at } })).toEqual({ step: 'departed' });
     expect(nextDriverTap({ loadingStartedAt: at, steps: { loaded: at, departed: at } })).toEqual({
       step: 'arrived',

@@ -6,12 +6,15 @@ const at = (hhmm: string) => `2026-07-06T${hhmm}:00.000Z`;
 
 describe('nextStep', () => {
   it('is the first step not recorded, then null', () => {
-    expect(nextStep({})).toBe('loaded');
-    expect(nextStep({ loaded: at('07:00') })).toBe('departed');
+    expect(nextStep({})).toBe('loading_started');
+    expect(nextStep({ loading_started: at('06:50') })).toBe('loaded');
+    expect(nextStep({ loading_started: at('06:50'), loaded: at('07:00') })).toBe('departed');
     expect(nextStep(Object.fromEntries(TRIP_STEPS.map((s) => [s, at('08:00')])))).toBeNull();
   });
   it('a skipped step is still the next one: the order is never jumped', () => {
-    expect(nextStep({ loaded: at('07:00'), arrived: at('07:40') })).toBe('departed');
+    expect(nextStep({ loading_started: at('06:50'), loaded: at('07:00'), arrived: at('07:40') })).toBe(
+      'departed',
+    );
   });
 });
 

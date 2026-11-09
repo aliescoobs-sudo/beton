@@ -135,9 +135,12 @@ export {
 } from './service/dispatch-service';
 export { type LossError, recordLoss, type RecordedLoss } from './service/loss-service';
 export {
+  getTripStages,
   listTrips,
   type RecordedStep,
   recordTripStep,
+  correctTripStage,
+  confirmTripDelivered,
   type TripError,
   type TripView,
 } from './service/trip-service';
