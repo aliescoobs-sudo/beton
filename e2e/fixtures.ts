@@ -241,6 +241,14 @@ export async function goNav(page: Page, linkTestId: string) {
 export async function logout(page: Page) {
   await page.getByTestId('user-menu').click();
   await page.getByTestId('logout').click();
+  // The sign-out is finished only when the login form is shown AND the session cookie is gone: a spec that signs the next user in
+  // before that races the server's cookie clearing (ledger-opening failed once with the previous user still signed in).
+  await expect(page.locator('input[name=email]')).toBeVisible();
+  await expect
+    .poll(async () => (await page.context().cookies()).some((c) => c.name.endsWith('session_token')), {
+      message: 'the session cookie is still there after the sign-out',
+    })
+    .toBe(false);
 }
 
 /** Password login of a not-yet-enrolled user, then enrolment in the browser. Returns the displayed key. */
