@@ -23,7 +23,7 @@ The guide names Helvetica Neue and Geeza Pro (Apple system fonts, not redistribu
 | Dev volume | belgobeton_belgobeton-pg | kayas_kayas-pg (new, empty; the old volume is untouched) |
 | Backup/key dirs, server dir, host group | belgobeton-backups, belgobeton-keys, /srv/belgobeton, belgobeton-backup | kayas-backups, kayas-keys, /srv/kayas, kayas-backup |
 | Test e-mail domains | belgobeton.test / .invalid, formation.beton.invalid | kayas.test / .invalid, formation.kayas.invalid |
-| Phone photo database (IndexedDB) | belgobeton-field | kayas-field (the old one is deleted by every wipe/sign-out) |
+| Phone photo database (IndexedDB) | belgobeton-field | kayas-field. The unsent photos of the old one are copied into it (same owner), then the old one is deleted. If an old page still holds it open the deletion is only queued: it is shown as pending, retried at each load and before any wipe, and done when that page is closed (R16-02) |
 
 ## Legacy names intentionally unchanged in Phase 1
 

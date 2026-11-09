@@ -24,7 +24,14 @@ import {
 } from '../domain/timing-view';
 import { createDayController } from './day-controller';
 import { createFieldSession } from './field-session';
-import { DAY_KEY, forgetAll, forgetRead, QUEUE_KEY, SIGNED_OUT_KEY } from './offline-store';
+import {
+  DAY_KEY,
+  forgetAll,
+  forgetRead,
+  legacyCleanupPending,
+  QUEUE_KEY,
+  SIGNED_OUT_KEY,
+} from './offline-store';
 import { dropPhoto, type QueuedPhoto, queuedPhotos, queuePhoto, sendPhoto, shrinkPhoto } from './photo-queue';
 
 // The phone app. One big button per step, an emergency button that is always there, large text. Every tap is queued with the
@@ -154,6 +161,8 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
   const [session, setSession] = useState<'unknown' | 'out' | 'in'>('unknown');
   const [day, setDay] = useState<Day | null>(null);
   const [queue, setQueue] = useState<QueueAction[]>([]);
+  // R16-02: the former-named photo database could not be deleted yet (an old page holds it open): shown, and retried at each load.
+  const [legacyPending, setLegacyPending] = useState(false);
   const [online, setOnline] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [sheet, setSheet] = useState<{ tripId: string } | null>(null);
@@ -269,6 +278,13 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
     const result = await getSession().capturePhoto(trip.id, () => shrinkPhoto(file));
     if (result === 'refused') setMessage(t('photo.refused'));
   }
+
+  useEffect(() => {
+    // Listing the photos migrates and retries the deletion of the former database; the pending state is read after it.
+    void queuedPhotos()
+      .catch(() => undefined)
+      .then(() => setLegacyPending(legacyCleanupPending()));
+  }, []);
 
   useEffect(() => {
     if ('serviceWorker' in navigator)
@@ -503,6 +519,15 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
           data-testid="field-offline"
         >
           {t('offline')}
+        </p>
+      )}
+      {legacyPending && (
+        <p
+          role="status"
+          className="rounded-xl bg-amber-200 p-3 text-xl text-black"
+          data-testid="field-legacy-pending"
+        >
+          {t('legacyPending')}
         </p>
       )}
       {pending > 0 && (

@@ -435,3 +435,118 @@ test('another account signing in on the phone finds nothing of the previous one 
     .not.toBe('someone-else');
   expect(JSON.parse((await localState(page)).queue!).actions).toEqual([]);
 });
+
+// R16-02: the former-named photo database (belgobeton-field). An OLD page holds a connection open (the former code never closed one), so a
+// deletion is blocked: it must be reported as pending (never as done), the unsent photo must be counted by the sign-out confirmation, and the
+// cleanup must really finish once the old page is closed.
+const OLD_URL = '/brand/svg/kayas-signature-colour.svg'; // any same-origin document: it runs none of the application's code
+async function holdLegacyOpen(old: Page, rows: { key: string; userId: string }[], trip: string) {
+  await old.goto(OLD_URL);
+  await old.evaluate(
+    ({ rows, trip }) =>
+      new Promise<void>((resolve, reject) => {
+        const req = indexedDB.open('belgobeton-field', 1);
+        req.onupgradeneeded = () => {
+          const s = req.result.createObjectStore('photos', { keyPath: 'key' });
+          for (const r of rows)
+            s.put({ ...r, tripId: trip, takenAt: new Date().toISOString(), blob: new Blob(['x']) });
+        };
+        req.onsuccess = () => {
+          (window as unknown as { __old: IDBDatabase }).__old = req.result; // no versionchange handler, never closed: an old page
+          resolve();
+        };
+        req.onerror = () => reject(req.error);
+      }),
+    { rows, trip },
+  );
+}
+const legacyState = (page: Page) =>
+  page.evaluate(async () => ({
+    names: ((await indexedDB.databases?.()) ?? []).map((d) => d.name),
+    pending: localStorage.getItem('kayas_legacy_cleanup_pending'),
+  }));
+
+test('R16-02 same account: a blocked legacy deletion is reported pending, the unsent photo is counted, then the cleanup completes', async ({
+  page,
+  context,
+}) => {
+  // the photo upload keeps failing (the network answers nothing), so the photo stays queued
+  await page.route('**/api/field/bl-photo', (route) => route.abort());
+  await openAndSignIn(page);
+  const userId = (JSON.parse((await localState(page)).day!) as { userId: string }).userId;
+  const old = await context.newPage();
+  await holdLegacyOpen(old, [{ key: 'legacy-same-0001', userId }], tripId);
+
+  await page.reload();
+  await expect(page.getByTestId('field-day')).toBeVisible();
+  // migrated into the new database; the deletion of the old one is blocked and is NOT reported as done
+  await expect.poll(async () => (await localState(page)).photos).toBe(1);
+  await expect(page.getByTestId('field-legacy-pending')).toBeVisible();
+  let legacy = await legacyState(page);
+  expect(legacy.names).toContain('belgobeton-field');
+  expect(legacy.pending).toBe('1');
+
+  // the sign-out confirmation counts the unsent photo
+  let asked = '';
+  page.once('dialog', (dialog) => {
+    asked = dialog.message();
+    void dialog.accept();
+  });
+  await page.getByTestId('field-signout').click();
+  await expect(page.getByTestId('field-login')).toBeVisible();
+  expect(asked).toMatch(/\b1\b|١/);
+  expect((await localState(page)).photos).toBe(0);
+  // the account's rows are erased from the old database too, but the database itself is still there: pending, not "deleted"
+  expect(
+    await old.evaluate(
+      () =>
+        new Promise<number>((resolve) => {
+          const c = (window as unknown as { __old: IDBDatabase }).__old
+            .transaction('photos')
+            .objectStore('photos')
+            .count();
+          c.onsuccess = () => resolve(c.result);
+        }),
+    ),
+  ).toBe(0);
+  legacy = await legacyState(page);
+  expect(legacy.names).toContain('belgobeton-field');
+  expect(legacy.pending).toBe('1');
+
+  // the old page is closed: the deletion really completes (the browser finishes it, or the next load retries it)
+  await old.close();
+  await page.reload();
+  await expect
+    .poll(async () => (await legacyState(page)).names.includes('belgobeton-field'), { timeout: 20_000 })
+    .toBe(false);
+  await expect.poll(async () => (await legacyState(page)).pending, { timeout: 20_000 }).toBeNull();
+});
+
+test("R16-02 different account: another account's legacy photo is never sent by this driver, and the cleanup completes", async ({
+  page,
+  context,
+}) => {
+  await openAndSignIn(page);
+  const before = (
+    await migrator.query<{ n: string }>('select count(*) as n from driver_bl_photo where trip_id = $1', [
+      tripId,
+    ])
+  ).rows[0]!.n;
+  const old = await context.newPage();
+  await holdLegacyOpen(old, [{ key: 'legacy-other-0001', userId: 'someone-else-0000' }], tripId);
+  await page.reload();
+  await expect(page.getByTestId('field-day')).toBeVisible();
+  // another account taking over the phone finds nothing of the previous one (F02): erased from the new database, never uploaded
+  await expect.poll(async () => (await localState(page)).photos, { timeout: 15_000 }).toBe(0);
+  const after = await migrator.query<{ n: string }>(
+    'select count(*) as n from driver_bl_photo where trip_id = $1',
+    [tripId],
+  );
+  expect(after.rows[0]!.n).toBe(before);
+  expect((await legacyState(page)).names).toContain('belgobeton-field'); // blocked: still there, still pending
+  await old.close();
+  await page.reload();
+  await expect
+    .poll(async () => (await legacyState(page)).names.includes('belgobeton-field'), { timeout: 20_000 })
+    .toBe(false);
+});

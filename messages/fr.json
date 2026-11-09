@@ -2658,6 +2658,7 @@
     "offline": "Hors ligne : vos actions sont gardées et seront envoyées.",
     "queued": "{count} action(s) à envoyer",
     "signOutPending": "{count} élément(s) n'ont pas encore pu être envoyés et seront effacés de ce téléphone si vous vous déconnectez. Se déconnecter quand même ?",
+    "legacyPending": "Un ancien onglet de l'application garde des données sur ce téléphone : fermez-le, elles seront alors supprimées.",
     "timing": {
       "planned": "Prévu : chargement {load} · retour {back}",
       "delay": "écart {min} min",

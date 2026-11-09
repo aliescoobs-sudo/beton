@@ -43,7 +43,7 @@ export interface DayPorts<D extends { userId: string }> {
   /** Erase what names a client (the stored day, the caches); the queued work stays. */
   forgetRead(): Promise<void>;
   /** Erase the phone's local work: day, caches, queue, photos. The photos are erased within the scope only (R14-06). */
-  forgetAll(scope: WipeScope): Promise<void>;
+  forgetAll(scope: WipeScope): Promise<unknown>;
   queuedPhotos(): Promise<{ userId: string }[]>;
   owner: { get(): string | null; set(id: string | null): void };
   /** The taps waiting to be sent, as they are now (for the stored copy). */
@@ -132,7 +132,7 @@ export function createDayController<D extends { userId: string }>(ports: DayPort
     abortWhere(() => true);
     ports.ui.setDay(null);
     ports.ui.setSession(session);
-    cleanup(wipe === 'read' ? ports.forgetRead : () => ports.forgetAll(wipe));
+    cleanup(wipe === 'read' ? ports.forgetRead : () => ports.forgetAll(wipe).then(() => undefined));
   }
 
   const refused = (): void => clearNow('out');

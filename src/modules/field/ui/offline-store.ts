@@ -3,7 +3,9 @@
 // holds only the app shell and the framework's static files (never the day). `forgetRead` erases what names a client; `forgetAll` also
 // erases the work waiting to be sent (an explicit sign-out, or another account taking over the phone).
 import type { WipeScope } from './day-controller';
-import { nextPhotoSeq, wipePhotos } from './photo-queue';
+import { legacyCleanupPending, LEGACY_PENDING_KEY, nextPhotoSeq, wipePhotos } from './photo-queue';
+
+export { legacyCleanupPending, LEGACY_PENDING_KEY };
 
 export const QUEUE_KEY = 'bb_field_queue';
 export const DAY_KEY = 'bb_field_day';
@@ -41,11 +43,13 @@ export async function forgetRead(): Promise<void> {
  * are erased within the scope AND up to the cutoff captured at the start (R14-06, R15A-03): a wipe delayed by slow storage never reaches the
  * photos queued after it began, whoever queued them.
  */
-export async function forgetAll(scope: WipeScope = 'everything'): Promise<void> {
+export async function forgetAll(scope: WipeScope = 'everything'): Promise<{ legacyCleanupPending: boolean }> {
   // R15A-03: the cutoff is taken NOW, before any wait. Whatever is queued after this moment is not this wipe's to erase.
   const cutoff = nextPhotoSeq();
   localStorage.removeItem(DAY_KEY);
   localStorage.removeItem(QUEUE_KEY);
   await wipeCaches();
+  // R16-02: a failed or blocked cleanup of the former database is not a success: it is reported (and kept pending, retried on next load).
   await wipePhotos(scope, cutoff).catch(() => undefined);
+  return { legacyCleanupPending: legacyCleanupPending() };
 }
