@@ -5,7 +5,7 @@ import { withRlsContext } from '../src/lib/db/rls-context';
 import { uuidv7 } from '../src/lib/uuidv7';
 import { realClock } from '../src/modules/clock';
 import { createPlant, createTruck, updatePlant } from '../src/modules/master-data';
-import { postponeTrip, reassignTrip, saveDispatch } from '../src/modules/operations';
+import { getDispatchDay, postponeTrip, reassignTrip, saveDispatch } from '../src/modules/operations';
 import type { SessionUser } from '../src/modules/platform-security/auth/session-gate';
 import { ForbiddenError } from '../src/modules/platform-security/service/user-admin';
 import { superuserUrl, TEST_DATABASE } from '../scripts/db-bootstrap';
@@ -43,7 +43,8 @@ let master: Awaited<ReturnType<typeof orderMaster>>;
 let truckA = '',
   truckB = '',
   truckC = '',
-  truckX = '';
+  truckX = '',
+  truckN = '';
 let driverRow1 = '',
   driverRow2 = '';
 
@@ -71,6 +72,19 @@ async function userRow(role: string, plant: string | null): Promise<SessionUser>
     twoFactorEnabled: true,
     reenrolRequired: false,
   } as unknown as SessionUser;
+}
+/** Superuser statements (the application's logins and the migrator cannot update the append-only plan; a legacy row has to be made by hand). */
+async function superSql(sql: string, params: unknown[] = []): Promise<number> {
+  const c = new pg.Client({ connectionString: superuserUrl(env, TEST_DATABASE) });
+  await c.connect();
+  try {
+    await c.query(`select set_config('app.user_id', $1, false), set_config('app.role', 'system', false)`, [
+      SYSTEM_ACTOR_ID,
+    ]);
+    return (await c.query(sql, params)).rowCount ?? 0;
+  } finally {
+    await c.end();
+  }
 }
 async function newDriver(name: string, user: SessionUser): Promise<string> {
   const code = `CH-${3000 + Math.floor(Math.random() * 4000)}`;
@@ -200,10 +214,12 @@ beforeAll(async () => {
   driver2 = await userRow('driver', null);
   driverRow1 = await newDriver(`Chauffeur un ${marker}`, driver1);
   driverRow2 = await newDriver(`Chauffeur deux ${marker}`, driver2);
-  const mk = async (plant: string, tag: string) => {
+  const mk = async (plant: string | null, tag: string) => {
+    const kind = plant === null ? 'external' : 'mixer';
     for (let i = 0; i < 30; i++) {
       const r = await createTruck(app, owner, {
-        code: `T${100 + Math.floor(Math.random() * 890)}`,
+        code: `${plant === null ? 'X' : 'T'}${100 + Math.floor(Math.random() * 890)}`,
+        kind,
         plate: `DS-${marker.slice(0, 8)}-${tag}${i}`,
         plantId: plant,
       });
@@ -215,6 +231,7 @@ beforeAll(async () => {
   truckB = await mk(plantA, 'b');
   truckC = await mk(plantA, 'c');
   truckX = await mk(plantB, 'x');
+  truckN = await mk(null, 'n'); // a hired truck: no plant
 });
 afterAll(async () => {
   if (plantB) await updatePlant(app, owner, plantB, { status: 'archived' });
@@ -542,60 +559,153 @@ describe('the overlap policy: no double-booking without an audited override', ()
     expect(r.value.conflicts).toContain('DRIVER_OVERLAP');
     expect(r.value.overlapOverride).toBe(false);
   });
-  it("T8: another plant's started rotation of the day is neither moved nor refused with 'not found': a plant manager can still reassign his own", async () => {
-    const date = nextDay();
-    const oA = await newOrder(date);
-    const tA = await newTrip(date, oA.id, truckA, null, 1, 480);
-    // a rotation of NO plant (an order and a truck not assigned to a plant, as in the e2e scene) or of another plant, started (the owner reads it as started; the plant manager of plant A may not read its steps)
-    const tB = await withRlsContext(
-      app,
-      { userId: owner.id, role: 'owner', requestId: marker },
-      async (tx) => {
-        await tx.query(`select set_config('app.plant_id', $1, true)`, [plantB]);
-        const oB = await insertOrder(tx, owner.id, { ...master, clientId: scene.clientId }, date);
-        const id = randomUUID();
-        await tx.query(
-          `insert into trip_plan (id, batch_id, trip_date, order_id, seq, truck_id, driver_id, volume_l, load_min, depart_min, arrive_min,
-                                unload_end_min, back_min, created_by)
-         values ($1, $2, $3, $4, 1, $5, $7, 4000, 420, 430, 460, 500, 530, $6)`,
-          [id, randomUUID(), date, oB.id, truckX, owner.id, driverRow1],
-        );
-        return id;
-      },
-    );
-    // a legacy rotation: made before plants existed, so it names no plant (the migrator is not bound by the guards on the application's logins)
-    await migrator.query(`alter table trip_plan disable trigger user`);
-    try {
-      await migrator.query(`alter table sales_order disable trigger user`);
-      await migrator.query(`update trip_plan set plant_id = null where id = $1`, [tB]);
-      await migrator.query(
-        `update sales_order set plant_id = null where id = (select order_id from trip_plan where id = $1)`,
-        [tB],
+  /**
+   * T8 regression (fdf4a71). The failing case is the one the e2e chain leaves behind: another plant's rotation that is STARTED and whose order is
+   * FULLY loaded (a delivery of the whole volume). The order then drops out of the day's orders, so a plan that carries that rotation along
+   * ("not started", as the plant manager reads it) names an order with nothing left to load and the whole reassignment fails NOT_FOUND.
+   */
+  describe('T8: a plant manager reassigns while another plant has a started, fully loaded rotation the same day', () => {
+    async function otherPlantStarted(date: string, plant: string | null) {
+      const truck = plant === null ? truckN : truckX;
+      const trip = await withRlsContext(
+        app,
+        { userId: owner.id, role: 'owner', requestId: marker },
+        async (tx) => {
+          await tx.query(`select set_config('app.plant_id', $1, true)`, [plantB]);
+          const oB = await insertOrder(tx, owner.id, { ...master, clientId: scene.clientId }, date);
+          const id = randomUUID();
+          await tx.query(
+            `insert into trip_plan (id, batch_id, trip_date, order_id, seq, truck_id, driver_id, volume_l, load_min, depart_min, arrive_min,
+                                  unload_end_min, back_min, created_by)
+             values ($1, $2, $3, $4, 1, $5, $7, 4000, 420, 430, 460, 500, 530, $6)`,
+            [id, randomUUID(), date, oB.id, truck, owner.id, driverRow1],
+          );
+          // the whole volume is loaded (two loads: a truck carries less than the order): the order has nothing left to plan
+          for (let k = 0; k < 2; k++)
+            await insertDelivery(
+              tx,
+              owner.id,
+              { orderId: oB.id, truckId: truck, recetteId: scene.recetteId },
+              5000,
+            );
+          return { id, orderId: oB.id, truck };
+        },
       );
-      await migrator.query(`alter table sales_order enable trigger user`);
-    } finally {
-      await migrator.query(`alter table trip_plan enable trigger user`);
+      if (plant === null) {
+        // a legacy rotation: made before plants existed, so it and its order name no plant
+        await superSql(`alter table trip_plan disable trigger user`);
+        await superSql(`alter table sales_order disable trigger user`);
+        await superSql(`alter table delivery disable trigger user`);
+        try {
+          expect(await superSql(`update trip_plan set plant_id = null where id = $1`, [trip.id])).toBe(1);
+          expect(await superSql(`update sales_order set plant_id = null where id = $1`, [trip.orderId])).toBe(
+            1,
+          );
+        } finally {
+          await superSql(`alter table delivery enable trigger user`);
+          await superSql(`alter table sales_order enable trigger user`);
+          await superSql(`alter table trip_plan enable trigger user`);
+        }
+      }
+      await asDriver1((tx) => loadingTap(tx, trip.id));
+      return trip;
     }
-    await asRole(driver1, (tx) => loadingTap(tx, tB)); // the driver of the other plant's rotation has started
-    const r = await reassignTrip(app, pmA, {
-      tripId: tA,
-      truckId: truckC,
-      driverId: null,
-      reason: 'Camion plus proche',
+
+    for (const kind of ['plant B', 'no plant'] as const) {
+      it(`${kind}: the manager of plant A moves his own rotation; the other one is untouched and cannot be moved`, async () => {
+        const date = nextDay();
+        const oA = await newOrder(date);
+        const tA = await newTrip(date, oA.id, truckA, null, 1, 480);
+        const other = await otherPlantStarted(date, kind === 'plant B' ? plantB : null);
+        const r = await reassignTrip(app, pmA, {
+          tripId: tA,
+          truckId: truckC,
+          driverId: null,
+          reason: 'Camion plus proche',
+        });
+        expect(r, JSON.stringify(r)).toMatchObject({ ok: true });
+        const live = await livePlans(date);
+        expect(live.find((p) => p.id === other.id)?.truck_id).toBe(other.truck); // same row, still live
+        expect(live).toHaveLength(2);
+        expect(
+          await reassignTrip(app, pmA, {
+            tripId: other.id,
+            truckId: truckC,
+            driverId: null,
+            reason: 'Essai',
+          }),
+        ).toMatchObject({
+          ok: false,
+        });
+        expect((await livePlans(date)).find((p) => p.id === other.id)?.truck_id).toBe(other.truck);
+      });
+    }
+
+    it("the day screen and the reassign path tell a plant manager nothing of another plant's rotation (existence of a plant-less one at most)", async () => {
+      const date = nextDay();
+      const oA = await newOrder(date);
+      const tA = await newTrip(date, oA.id, truckA, null, 1, 480);
+      // plant B: a started, fully loaded rotation with its truck, order and driver; and a started one of no plant
+      const b = await otherPlantStarted(date, plantB);
+      const n = await otherPlantStarted(date, null);
+      const bCode = (
+        await migrator.query<{ code: string }>(`select code from sales_order where id = $1`, [b.orderId])
+      ).rows[0]!.code;
+      const day = await getDispatchDay(app, pmA, date, { plantId: plantA });
+      if (!day.ok) throw new Error('day');
+      const wire = JSON.stringify(day.value);
+      // plant B: not in the plan, not in the orders, not in the words of the screen; its ids and its plant never appear
+      expect(day.value.saved.map((r) => r.key)).not.toContain(b.id);
+      expect(day.value.orders.map((o) => o.orderId)).not.toContain(b.orderId);
+      // (the list of active drivers is the company's, not a plant's: a driver id may appear there, with no rotation attached)
+      for (const needle of [b.id, b.orderId, bCode, plantB, truckX]) expect(wire).not.toContain(needle);
+      // the plant-less rotation is visible by the plant's own rule (a day made before plants existed): it is flagged \`foreign\`, and only the
+      // plan's own fields travel with it: no plant id, no price, no step, no event
+      const seen = day.value.saved.find((r) => r.key === n.id);
+      expect(seen?.foreign).toBe(true);
+      expect(seen?.started).toBe(false); // not readable by this account, so never shown as started
+      expect(Object.keys(seen ?? {}).sort()).toEqual(
+        [
+          'arriveMin',
+          'backMin',
+          'clientCode',
+          'departMin',
+          'driverId',
+          'driverName',
+          'foreign',
+          'key',
+          'loadMin',
+          'orderCode',
+          'orderId',
+          'overrideReason',
+          'seq',
+          'started',
+          'truckCode',
+          'truckId',
+          'unloadEndMin',
+          'volumeL',
+        ].sort(),
+      );
+      for (const word of ['plant', 'price', 'centimes', 'ttc', 'event', 'photo'])
+        expect(
+          Object.keys(seen ?? {})
+            .join(' ')
+            .toLowerCase(),
+        ).not.toContain(word);
+      // the reassign path answers a plant B rotation exactly as it answers an id that does not exist (no oracle), and a plant-less one with
+      // the refusal of the rule; neither returns a detail
+      const probe = (tripId: string) =>
+        reassignTrip(app, pmA, { tripId, truckId: truckC, driverId: null, reason: 'Essai' });
+      const unknown = await probe(randomUUID());
+      expect(unknown).toEqual({ ok: false, error: 'NOT_FOUND' });
+      expect(await probe(b.id)).toEqual(unknown);
+      expect(await probe(n.id)).toEqual({ ok: false, error: 'CONFLICT' });
+      // his own rotation is still movable, and the answer is the plan's: a new id, conflict kinds, a flag
+      const mine = await probe(tA);
+      expect(mine.ok).toBe(true);
+      if (mine.ok)
+        expect(Object.keys(mine.value).sort()).toEqual(['conflicts', 'newTripId', 'overlapOverride']);
     });
-    expect(r.ok, JSON.stringify(r)).toBe(true);
-    // the other plant's rotation is untouched: same row, still live, same truck
-    const live = await livePlans(date);
-    expect(live.find((p) => p.id === tB)?.truck_id).toBe(truckX);
-    expect(live).toHaveLength(2);
-    // and the plant manager cannot move the other plant's rotation
-    const refused = await reassignTrip(app, pmA, {
-      tripId: tB,
-      truckId: truckC,
-      driverId: null,
-      reason: 'Essai',
-    });
-    expect(refused.ok).toBe(false);
   });
 
   it('R15B-05: a reassignment that re-times ANOTHER driver into a new double-booking needs the override too', async () => {
