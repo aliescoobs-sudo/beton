@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { Brand, cn } from '@/ui';
+import { findCurrent } from './drawer-model';
+import { MobileDrawer } from './mobile-drawer';
 import type { NavGroup } from './nav-model';
 
 interface ShellLabels {
@@ -14,6 +16,7 @@ interface ShellLabels {
   subNav: string;
   search: string;
   searchPlaceholder: string;
+  noMatch: string;
 }
 
 /**
@@ -48,21 +51,33 @@ export function AppShell({
   const [openAt, setOpenAt] = useState<string | null>(null);
   const open = openAt === pathname;
   const drawer = useRef<HTMLDivElement>(null);
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const subNav = useRef<HTMLElement>(null);
 
-  // Longest matching href wins, so /master-data/clients/123 selects Clients and "/fr" only matches the home link.
-  const all = groups.flatMap((g) => g.links.map((l) => ({ group: g, link: l })));
-  const current = all
-    .filter(({ link }) => pathname === link.href || pathname.startsWith(`${link.href}/`))
-    .sort((a, b) => b.link.href.length - a.link.href.length)[0];
+  // The current link: the longest matching href wins, so /master-data/clients/123 selects Clients and "/fr" only matches the home link.
+  const current = findCurrent(groups, pathname);
   const currentGroup = current?.group;
+
+  // Closing the drawer by hand (Escape, close button, backdrop) gives the focus back to the Menu button.
+  const closeDrawer = () => {
+    setOpenAt(null);
+    menuButton.current?.focus();
+  };
 
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpenAt(null);
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && closeDrawer();
     document.addEventListener('keydown', onKey);
-    drawer.current?.querySelector<HTMLElement>('a')?.focus();
+    drawer.current?.querySelector<HTMLElement>('button, a, input')?.focus();
     return () => document.removeEventListener('keydown', onKey);
   }, [open]);
+
+  // On a phone the sub-navigation scrolls: bring the current page into view so the strip does not open on the wrong side.
+  useEffect(() => {
+    subNav.current
+      ?.querySelector<HTMLElement>('[aria-current="page"]')
+      ?.scrollIntoView({ inline: 'center', block: 'nearest' });
+  }, [pathname]);
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -115,7 +130,8 @@ export function AppShell({
             {userMenu}
             <button
               type="button"
-              className="px-2 py-1 text-sm font-medium underline decoration-2 underline-offset-4 md:hidden"
+              ref={menuButton}
+              className="inline-flex min-h-11 min-w-11 items-center justify-center px-3 text-sm font-medium underline decoration-2 underline-offset-4 md:hidden"
               onClick={() => setOpenAt(pathname)}
               aria-expanded={open}
               aria-controls="app-drawer"
@@ -132,8 +148,9 @@ export function AppShell({
       {currentGroup && currentGroup.links.length > 1 && (
         <div className="border-b border-rule bg-band">
           <nav
+            ref={subNav}
             aria-label={labels.subNav}
-            className="mx-auto flex w-full max-w-[1240px] gap-1 overflow-x-auto px-4 md:px-8"
+            className="scroll-hint mx-auto flex w-full max-w-[1240px] gap-1 overflow-x-auto px-4 md:px-8"
           >
             {currentGroup.links.map((link) => {
               const isCurrent = current?.link.href === link.href;
@@ -144,7 +161,7 @@ export function AppShell({
                   data-testid={link.testId}
                   aria-current={isCurrent ? 'page' : undefined}
                   className={cn(
-                    'whitespace-nowrap border-b-[3px] px-3 py-2.5 text-sm',
+                    'inline-flex min-h-11 shrink-0 items-center whitespace-nowrap border-b-[3px] px-3 text-sm md:min-h-0 md:py-2.5',
                     isCurrent ? 'border-forest font-semibold' : 'border-transparent hover:border-field',
                   )}
                 >
@@ -157,74 +174,20 @@ export function AppShell({
       )}
 
       {open && (
-        <div
-          className="fixed inset-0 z-50 md:hidden"
-          ref={drawer}
-          id="app-drawer"
-          role="dialog"
-          aria-modal="true"
-          aria-label={labels.mainNav}
-        >
-          <button
-            type="button"
-            className="absolute inset-0 bg-graphite/60"
-            onClick={() => setOpenAt(null)}
-            aria-label={labels.close}
-          />
-          <div className="on-forest absolute inset-y-0 start-0 flex w-80 max-w-[88vw] flex-col overflow-y-auto bg-forest text-white">
-            <div className="flex items-center justify-between px-5 py-4">
-              <Brand tone="white" width={160} />
-              <button
-                type="button"
-                onClick={() => setOpenAt(null)}
-                className="px-2 text-sm underline decoration-2 underline-offset-4"
-              >
-                {labels.close}
-              </button>
-            </div>
-            <form action={searchHref} method="get" role="search" className="px-5 pb-3">
-              <input
-                name="q"
-                type="search"
-                minLength={4}
-                maxLength={40}
-                required
-                dir="ltr"
-                autoComplete="off"
-                placeholder={labels.searchPlaceholder}
-                aria-label={labels.search}
-                className="w-full rounded border border-white/30 bg-white/10 px-2 py-1.5 text-sm text-white placeholder:text-white/60"
-                data-testid="drawer-search-box"
-              />
-            </form>
-            <nav className="flex-1 px-5 pb-8">
-              {groups.map((group) => (
-                <div key={group.id} className="mt-5 first:mt-0">
-                  <p className="font-display text-base font-bold text-white/70">{group.label}</p>
-                  <ul className="mt-1">
-                    {group.links.map((link) => (
-                      <li key={link.href}>
-                        <Link
-                          href={link.href}
-                          data-testid={`drawer-${link.testId}`}
-                          aria-current={current?.link.href === link.href ? 'page' : undefined}
-                          className={cn(
-                            'block border-s-4 py-2 ps-3 text-sm',
-                            current?.link.href === link.href
-                              ? 'border-citron font-semibold'
-                              : 'border-transparent text-white/85',
-                          )}
-                        >
-                          {link.label}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </nav>
-          </div>
-        </div>
+        <MobileDrawer
+          groups={groups}
+          labels={{
+            mainNav: labels.mainNav,
+            close: labels.close,
+            search: labels.search,
+            searchPlaceholder: labels.searchPlaceholder,
+            noMatch: labels.noMatch,
+          }}
+          searchHref={searchHref}
+          pathname={pathname}
+          onClose={closeDrawer}
+          panelRef={drawer}
+        />
       )}
 
       <main className="mx-auto w-full max-w-[1240px] flex-1 px-4 py-8 md:px-8 md:py-10">{children}</main>

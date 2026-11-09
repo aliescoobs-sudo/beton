@@ -222,6 +222,35 @@
       min-block-size: 2.75rem;
     }
   }
+  /* Interactive elements that stand alone (cells of a table, header, navigation) are 44 px on a touch screen; inline links in a sentence are exempt. */
+  @media (pointer: coarse) {
+    .data-table td a,
+    .data-table td button,
+    .data-table th a,
+    .data-table th button,
+    header a,
+    header button,
+    nav a,
+    nav button,
+    summary {
+      display: inline-flex;
+      align-items: center;
+      min-block-size: 2.75rem;
+      min-inline-size: 2.75rem;
+      /* an explicit minimum removes the content-based one: a flex child must not shrink below its text */
+      flex-shrink: 0;
+    }
+    .data-table[data-mobile='cards'] td a,
+    .data-table[data-mobile='cards'] td button {
+      justify-content: flex-end;
+    }
+    input[type='checkbox'],
+    input[type='radio'] {
+      inline-size: 1.5rem;
+      block-size: 1.5rem;
+      margin: 0.625rem;
+    }
+  }
   .btn-primary.btn-sm {
     padding-inline: 0.75rem;
   }
@@ -330,6 +359,100 @@
     text-align: end;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
+  }
+
+  /* A document number, a code or an amount is isolated left-to-right in a <bdi dir="ltr">: it never wraps and its digits line up. */
+  bdi[dir='ltr'] {
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* A strip that scrolls sideways shows it: the content fades out at the edge that still has more to show (no shadow, only the page colour). */
+  .scroll-hint {
+    --hint: var(--color-band);
+    background:
+      linear-gradient(to right, var(--hint) 30%, transparent) left center / 2rem 100% no-repeat local,
+      linear-gradient(to left, var(--hint) 30%, transparent) right center / 2rem 100% no-repeat local,
+      linear-gradient(to right, rgb(0 0 0 / 0.18), transparent) left center / 0.75rem 100% no-repeat scroll,
+      linear-gradient(to left, rgb(0 0 0 / 0.18), transparent) right center / 0.75rem 100% no-repeat scroll;
+  }
+  .scroll-hint:dir(rtl) {
+    background:
+      linear-gradient(to left, var(--hint) 30%, transparent) right center / 2rem 100% no-repeat local,
+      linear-gradient(to right, var(--hint) 30%, transparent) left center / 2rem 100% no-repeat local,
+      linear-gradient(to left, rgb(0 0 0 / 0.18), transparent) right center / 0.75rem 100% no-repeat scroll,
+      linear-gradient(to right, rgb(0 0 0 / 0.18), transparent) left center / 0.75rem 100% no-repeat scroll;
+  }
+  .table-wrap {
+    --hint: var(--color-surface);
+  }
+
+  /* Below md a table is a list of cards: the first cell is the title of the card, every other cell is a "label: value" line. The labels come
+     from the header cells (see Table). A table that opts out (data-mobile="scroll") keeps its columns, with a sticky first column. */
+  @media (max-width: 47.999rem) {
+    .table-wrap {
+      max-block-size: none;
+    }
+    /* cards never scroll sideways: no edge hint */
+    .table-wrap:has(> .data-table[data-mobile='cards']) {
+      background: none;
+    }
+    .data-table[data-mobile='cards'] td:empty {
+      display: none;
+    }
+    .data-table[data-mobile='cards'],
+    .data-table[data-mobile='cards'] tbody,
+    .data-table[data-mobile='cards'] tr,
+    .data-table[data-mobile='cards'] td {
+      display: block;
+    }
+    .data-table[data-mobile='cards'] thead {
+      position: absolute;
+      inline-size: 1px;
+      block-size: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+    }
+    .data-table[data-mobile='cards'] tr {
+      padding-block: 0.5rem;
+      border-block-end: 1px solid var(--color-rule);
+    }
+    .data-table[data-mobile='cards'] td {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.25rem 0.875rem;
+      border: 0;
+      text-align: end;
+    }
+    .data-table[data-mobile='cards'] td::before {
+      content: attr(data-label);
+      flex: none;
+      max-inline-size: 45%;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--color-muted);
+      text-align: start;
+    }
+    .data-table[data-mobile='cards'] td:not([data-label])::before,
+    .data-table[data-mobile='cards'] td[data-label='']::before {
+      content: none;
+    }
+    .data-table[data-mobile='cards'] td:first-child {
+      justify-content: flex-start;
+      font-weight: 600;
+      text-align: start;
+    }
+    .data-table[data-mobile='cards'] td:first-child::before {
+      content: none;
+    }
+    .data-table[data-mobile='scroll'] td:first-child,
+    .data-table[data-mobile='scroll'] th:first-child {
+      position: sticky;
+      inset-inline-start: 0;
+      z-index: 2;
+      background: var(--color-surface);
+    }
   }
 
   /* Status: a 10px square in the D21/D22 colour and an ink label. No tinted background. */

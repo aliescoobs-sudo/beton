@@ -56,6 +56,7 @@ export default async function ProtectedLayout({
         subNav: t('shell.nav.sub'),
         search: t('shell.searchLabel'),
         searchPlaceholder: t('shell.searchPlaceholder'),
+        noMatch: t('shell.nav.noMatch'),
       }}
       homeHref={`/${locale}`}
       searchHref={`/${locale}/search`}

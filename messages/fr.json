@@ -20,7 +20,9 @@
       "masterData": "Données de base",
       "administration": "Administration",
       "sub": "Pages du groupe",
-      "finance": "Trésorerie"
+      "finance": "Trésorerie",
+      "noMatch": "Aucune page ne correspond.",
+      "section": "Section"
     },
     "dashboard": {
       "action": "Commencer par les clients",
@@ -59,7 +61,13 @@
     "searchLabel": "Rechercher un document par son numéro",
     "searchPlaceholder": "N° de document",
     "assistant": "Assistant",
-    "language": "Langue"
+    "language": "Langue",
+    "notFound": {
+      "title": "Page introuvable",
+      "body": "L'adresse demandée n'existe pas ou n'est plus disponible. Vérifiez le lien, ou revenez à l'accueil.",
+      "home": "Retour à l'accueil",
+      "code": "Erreur 404"
+    }
   },
   "auth": {
     "login": {

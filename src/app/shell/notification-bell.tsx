@@ -12,7 +12,7 @@ export async function NotificationBell({ user, locale }: { user: SessionUser; lo
   return (
     <Link
       href={`/${locale}/notifications`}
-      className="relative inline-flex items-center px-1 md:px-2 text-paper"
+      className="relative inline-flex min-h-11 min-w-11 items-center justify-center text-paper md:min-h-0 md:min-w-0 md:px-2"
       aria-label={t('bell', { count: n })}
       data-testid="notification-bell"
     >

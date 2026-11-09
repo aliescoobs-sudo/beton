@@ -33,6 +33,9 @@ for (const locale of ['fr', 'ar'] as const) {
     await page.goto(`/${locale}`);
     await page.screenshot({ path: `${OUT}/home-${locale}-phone.png` });
     await page.getByTestId('menu-button').click();
+    // the drawer is an accordion: the sections first, the links of a section once it is opened
+    await expect(page.getByTestId('drawer-section-sales')).toBeVisible();
+    await page.getByTestId('drawer-section-sales').click();
     await expect(page.getByTestId('drawer-clients-link')).toBeVisible();
     await page.screenshot({ path: `${OUT}/menu-${locale}-phone.png` });
   });

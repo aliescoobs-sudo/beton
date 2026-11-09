@@ -1,13 +1,10 @@
 import type { HTMLAttributes, TdHTMLAttributes, ThHTMLAttributes } from 'react';
 import { cn } from './cn';
+import { TableShell } from './table-shell';
 
-/** Scrolls sideways inside its card on a phone (the page itself never overflows); the header stays sticky. */
-export function Table({ className, ...rest }: HTMLAttributes<HTMLTableElement>) {
-  return (
-    <div className="table-wrap">
-      <table className={cn('data-table', className)} {...rest} />
-    </div>
-  );
+/** A table. On a phone each row becomes a card (see TableShell); `mobile="scroll"` keeps the columns instead. */
+export function Table(props: HTMLAttributes<HTMLTableElement> & { mobile?: 'cards' | 'scroll' }) {
+  return <TableShell {...props} />;
 }
 
 /** `numeric` aligns to the inline end (right in French, left in Arabic) with tabular figures. */
