@@ -1,4 +1,4 @@
-# T9b: what reads "delivered", and what a driver's tap may touch (audit, 9 Nov 2026)
+# T9b (done, option B1): what reads "delivered", and what a driver's tap may touch (audit, 9 Nov 2026)
 
 Owner's decision 206, option B: a driver's `unloading_finished` MAY mark the trip/load delivered again (operational status), but nothing billable or
 stock-related may derive from a driver tap: the billable quantity, the stock consumption and "A facturer" come only from the plant's own batch/dispatch record.

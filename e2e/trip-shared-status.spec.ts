@@ -7,7 +7,7 @@ import { withRlsContext } from '../src/lib/db/rls-context';
 import { uuidv7 } from '../src/lib/uuidv7';
 import { businessDateOf, realClock } from '../src/modules/clock';
 import { setDriverPin } from '../src/modules/field';
-import { createPlant } from '../src/modules/master-data';
+import { createPlant, setPlantPhone, updatePlant } from '../src/modules/master-data';
 import { clockOf } from '../src/modules/operations/domain/trip-times';
 import { testEnv } from '../tests/db-env';
 import { realSessionUser } from '../tests/helpers/actors';
@@ -15,7 +15,7 @@ import { deliveryScene, insertOrder, orderMaster } from '../tests/helpers/ledger
 import { BOOTSTRAP_ACTOR_ID } from '../src/modules/platform-security/auth/actors';
 import { createAuth } from '../src/modules/platform-security/auth/create-auth';
 import { createUser } from '../src/modules/platform-security/auth/user-service';
-import { E2E_BASE_URL, E2E_MD, E2E_PASSWORD, loginAndEnrol } from './fixtures';
+import { E2E_BASE_URL, E2E_MD, E2E_PASSWORD, loginAndEnrol, loginOwner } from './fixtures';
 
 // T9, end to end: ONE status of a rotation, shown on the driver's phone and on the plant's board. The plant records "loaded" and the driver's
 // screen shows it (by the Centrale); the driver departs without declaring the load and the plant's board shows loaded (implicit) and departed
@@ -27,7 +27,11 @@ const env = testEnv(E2E_DATABASE);
 const migrator = new pg.Pool({ connectionString: env.DATABASE_URL_MIGRATOR, max: 2 });
 const app = new pg.Pool({ connectionString: env.DATABASE_URL_APP, max: 2 });
 const auth = new pg.Pool({ connectionString: env.DATABASE_URL_AUTH, max: 1 });
-test.afterAll(() => Promise.all([migrator.end(), app.end(), auth.end()]));
+test.afterAll(async () => {
+  // the spec's plant must not stay active: with two active plants the later specs' orders would ask for a plant
+  if (ownerSession && plantRowId) await updatePlant(app, ownerSession, plantRowId, { status: 'archived' });
+  await Promise.all([migrator.end(), app.end(), auth.end()]);
+});
 
 const marker = `e2et9${randomUUID().replace(/-/g, '').slice(0, 8)}`;
 const today = businessDateOf(realClock.now());
@@ -38,11 +42,16 @@ const SHOTS = '.logs/visual-checks';
 let orderA = '';
 let orderB = '';
 let orderC = '';
+let orderD = '';
 let tripA = '';
 let tripB = '';
 let tripC = '';
+let tripD = '';
 let truckCode = '';
 let ownerId = '';
+let ownerSession: Awaited<ReturnType<typeof realSessionUser>> | null = null;
+let plantCode = '';
+let plantRowId = '';
 
 const stage = (page: Page, order: string, s: string) =>
   page.locator(`[data-testid="stages-${order}"] li[data-stage="${s}"]`);
@@ -69,6 +78,7 @@ test.beforeAll(async () => {
   mkdirSync(SHOTS, { recursive: true });
   const owner = await realSessionUser(env.DATABASE_URL_MIGRATOR, 'owner');
   ownerId = owner.id;
+  ownerSession = owner;
   const userId = uuidv7(realClock.now());
   await migrator.query(
     `insert into "user" (id, name, email, "emailVerified", role, locale, status, "twoFactorEnabled", "provisionedAt")
@@ -86,6 +96,10 @@ test.beforeAll(async () => {
   });
   if (!plant.ok) throw new Error(plant.error);
   const plantId = plant.value.id;
+  plantRowId = plantId;
+  plantCode = plant.value.code;
+  const phoneSet = await setPlantPhone(app, owner, plantId, '0539222222');
+  if (!phoneSet.ok) throw new Error(phoneSet.error);
   await createUser(
     createAuth({ authPool: auth, env: { ...env, APP_BASE_URL: E2E_BASE_URL }, log: () => undefined }),
     auth,
@@ -124,6 +138,10 @@ test.beforeAll(async () => {
       tripB = await trip(o2.id, 480);
       const o3 = await insertOrder(tx, owner.id, { ...master, clientId: scene.clientId }, today);
       tripC = await trip(o3.id, 540);
+      const o4 = await insertOrder(tx, owner.id, { ...master, clientId: scene.clientId }, today);
+      tripD = await trip(o4.id, 600);
+      orderD = (await tx.query<{ code: string }>('select code from sales_order where id = $1', [o4.id]))
+        .rows[0]!.code;
       orderC = (await tx.query<{ code: string }>('select code from sales_order where id = $1', [o3.id]))
         .rows[0]!.code;
       orderA = (
@@ -167,6 +185,8 @@ test('the plant records "loaded": the driver\'s screen shows it, done by the Cen
   const driver = await driverCtx.newPage();
   await phone(driver);
   await expect(stage(driver, orderA, 'loaded')).toHaveAttribute('data-done', 'false');
+  // the plant's number is a tel: link on the rotation of that plant (the owner set it)
+  await expect(driver.getByTestId(`call-plant-${orderA}`)).toHaveAttribute('href', 'tel:0539222222');
   // the first tap is offered at once; there is no "waiting for the plant" block any more
   await expect(driver.getByTestId(`trip-wait-${orderA}`)).toHaveCount(0);
 
@@ -429,6 +449,118 @@ test("offline: the tap is queued and marked pending, then replayed once with the
   expect(Math.abs(back[0]!.client_time!.getTime() - tappedAt)).toBeLessThan(30_000); // the phone's own time of the tap
   expect(back[0]!.at.getTime()).toBeGreaterThanOrEqual(back[0]!.client_time!.getTime()); // the server's instant is the later one
   await expect(stage(driver, orderA, 'back')).not.toContainText("en attente d'envoi");
+  await driverCtx.close();
+});
+
+test('T9b: a driver-declared delivery is flagged and never billable; the plant confirms departure and return; the return sets the billing gate once', async ({
+  browser,
+}) => {
+  test.setTimeout(300_000);
+  const gate = async () =>
+    Number(
+      (
+        await migrator.query<{ n: string }>(
+          `select count(*) n from delivery_delivered where delivery_id in (select d.id from delivery d join trip_plan p on p.order_id = d.order_id where p.id = $1)`,
+          [tripD],
+        )
+      ).rows[0]!.n,
+    );
+  const driverCtx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const driver = await driverCtx.newPage();
+  await phone(driver);
+  // the office number, when the company profile has one, is a tel: link; when it has none there is no link
+  const call = driver.getByTestId('call-office');
+  if (await call.count()) expect(await call.getAttribute('href')).toMatch(/^tel:/);
+  for (const _ of ['loading_started', 'loaded', 'departed', 'arrived', 'unloading_started']) {
+    await driver.getByTestId(`tap-${orderD}`).click();
+  }
+  await driver.getByTestId(`tap-${orderD}`).click(); // unloading finished: asks the m3
+  await driver.getByTestId('field-m3').fill('1');
+  await driver.getByTestId('field-m3-ok').click();
+  await driver.getByTestId(`tap-${orderD}`).click(); // back
+  await expect
+    .poll(async () => (await events(tripD)).rows.map((r) => r.step), { timeout: 40_000 })
+    .toContain('back');
+  // the driver's own screen: departed and back wait for the plant; the delivery is his declaration
+  await expect(stage(driver, orderD, 'departed')).toContainText('en attente de la centrale');
+  await expect(stage(driver, orderD, 'unloading_finished')).toContainText('déclarée par le chauffeur');
+  expect(await gate()).toBe(0);
+
+  const mgrCtx = await browser.newContext({
+    viewport: { width: 390, height: 900 },
+    storageState: 'test-results/e2e-t9-manager.json',
+  });
+  const manager = await mgrCtx.newPage();
+  await manager.goto('/fr/trips');
+  await expect(boardStep(manager, orderD, 600, 'unloading_finished')).toContainText(
+    'livraison déclarée par le chauffeur',
+  );
+  await expect(boardStep(manager, orderD, 600, 'departed')).toContainText('en attente de la centrale');
+  // flagged, with a clear label, and not billable: the plant has no load of it
+  await expect(manager.getByTestId(`exception-declared_no_record-${orderD}`)).toBeVisible();
+  await expect(manager.getByTestId(`exception-declared_no_record-${orderD}`)).toContainText(
+    'Déclarée par le chauffeur',
+  );
+  // the plant confirms the departure: its time becomes the one in use
+  await manager.getByTestId(`confirm-stage-${orderD}-departed`).click();
+  await expect(manager.getByTestId(`trip-message-${orderD}`)).toContainText('Étape confirmée');
+  await expect(boardStep(manager, orderD, 600, 'departed')).not.toContainText('en attente de la centrale');
+  // the plant makes its own load, then confirms the return: the gate is set once, by the plant user, in that step
+  await manager.getByTestId(`make-load-${orderD}`).click();
+  await expect(manager.getByTestId(`trip-message-${orderD}`)).toContainText('Chargé');
+  expect(await gate()).toBe(0);
+  await manager.getByTestId(`confirm-stage-${orderD}-back`).click();
+  await expect(manager.getByTestId(`trip-message-${orderD}`)).toContainText('Étape confirmée');
+  expect(await gate()).toBe(1);
+  const via = await migrator.query<{ via: string }>(
+    `select via from delivery_delivered where delivery_id in (select d.id from delivery d join trip_plan p on p.order_id = d.order_id where p.id = $1)`,
+    [tripD],
+  );
+  expect(via.rows[0]!.via).toBe('return');
+  await manager.reload();
+  await expect(manager.getByTestId(`exception-declared_no_record-${orderD}`)).toHaveCount(0);
+  // Arabic: the same status in the labels of the language
+  await manager.goto('/ar/trips');
+  await expect(boardStep(manager, orderD, 600, 'unloading_finished')).toContainText('تسليم صرّح به السائق');
+  await driverCtx.close();
+  await mgrCtx.close();
+});
+
+test('T9b addendum: the owner sets the plant number (audited), the plant manager cannot; the driver sees a tel: link for it', async ({
+  browser,
+}) => {
+  test.setTimeout(240_000);
+  const ownerCtx = await browser.newContext();
+  const owner = await ownerCtx.newPage();
+  await loginOwner(owner, 'fr');
+  await owner.goto('/fr/master-data/plants');
+  await owner.getByTestId(`plant-phone-${plantCode}`).fill('+212 5 39 33 33 33');
+  await owner.getByTestId(`plant-phone-save-${plantCode}`).click();
+  await expect(owner.getByTestId('plant-message')).toBeVisible();
+  await expect
+    .poll(
+      async () =>
+        (await migrator.query<{ phone: string }>('select phone from plant where id = $1', [plantRowId]))
+          .rows[0]!.phone,
+    )
+    .toBe('+212 5 39 33 33 33');
+  const audit = await migrator.query(
+    `select 1 from audit_event where table_name = 'plant' and action = 'update' and row_id = $1 and after->>'phone' = '+212 5 39 33 33 33'`,
+    [plantRowId],
+  );
+  expect(audit.rowCount).toBeGreaterThan(0);
+  await ownerCtx.close();
+
+  const mgrCtx = await browser.newContext({ storageState: 'test-results/e2e-t9-manager.json' });
+  const manager = await mgrCtx.newPage();
+  await manager.goto('/fr/master-data/plants');
+  await expect(manager.getByTestId(`plant-phone-${plantCode}`)).toHaveCount(0); // nobody but the owner and app_admin edits or reads it here
+  await mgrCtx.close();
+
+  const driverCtx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const driver = await driverCtx.newPage();
+  await phone(driver);
+  await expect(driver.getByTestId(`call-plant-${orderA}`)).toHaveAttribute('href', 'tel:+212 5 39 33 33 33');
   await driverCtx.close();
 });
 

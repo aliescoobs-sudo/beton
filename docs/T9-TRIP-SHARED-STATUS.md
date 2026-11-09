@@ -91,3 +91,14 @@ screen shows it; the driver records `departed` and the plant screen shows loaded
 - A stage tapped by mistake cannot be erased (no hard delete): a correction re-times it. A "void" correction is not in this task.
 - A driver who skips `loaded` produces an implicit `loaded` without a load; the plant still has to make its own batch record.
 - The first polling interval is 12 s: a stage can take up to about 12 s to show on the other side; the writer's own screen updates at once.
+
+## 8. T9b (migration 0210): two marks, stage authority, exceptions
+
+- **Two marks.** The driver's `unloading_finished` is the operational "delivered" (the stage row, shown as "déclaré par le chauffeur"). The billing gate `delivery_delivered` is set only by the
+  plant side: its own explicit `unloading_finished`, the plant confirming the RETURN (`trip_event_return_gate` / `trip_confirmation_return_gate` call `_gate_on_return`: same
+  transaction, the plant user as actor, `via = 'return'`, once), or `confirm_trip_delivered()` (`via = 'confirm'`). §4.4 above (a driver's unloading delivers nothing) is unchanged.
+- **Authority per stage** (`STAGE_AUTHORITY`): either side for `loading_started`, `loaded`; the plant for `departed`, `back` (a driver's tap is "awaiting the plant"; `confirm_trip_stage()` writes
+  `trip_event_confirmation`, whose instant is the one the timing figures use); the driver for `arrived`, `unloading_started`, `unloading_finished` (a plant-side record is a flagged fallback).
+- **Exceptions** (`trip_delivery_exceptions(from, to)`, scoped like `trip_stages`): `declared_no_record`, `unconfirmed` (end of the working day + `delivery_confirm_delay_min`), `volume_differs`, `order_differs`.
+- **Contacts:** `company_contact_phone()` for the driver's `tel:` link.
+- **What is recomputed:** see DECISIONS 206 (9).
