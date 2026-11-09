@@ -251,12 +251,15 @@ test('support reads and drafts nothing; partner has the operations questions', a
   await expect(page.locator('[data-testid^=draft-card-]')).toHaveCount(0);
 });
 
-test('partner: the operations questions, no money, no draft but the return', async ({ page }) => {
+test('partner (no account in V1, T8): the rotation questions are refused, no money, no draft', async ({
+  page,
+}) => {
   await loginAndEnrol(page, 'fr', E2E_MD.astPartner.email);
   await page.getByTestId('assistant-open').click();
   await expect(page.locator('[data-testid^=assistant-suggestion-]')).toHaveCount(3);
   const block = await ask(page, "Quels camions chargent aujourd'hui ?");
-  await expect(block.getByTestId('assistant-answer')).toContainText('rotation');
+  await expect(block.getByTestId('assistant-answer')).toContainText('avec vos droits');
+  await expect(block.getByTestId('assistant-answer')).not.toContainText('rotation');
   expect(await page.getByTestId('assistant-panel').textContent()).not.toMatch(MONEY);
 });
 

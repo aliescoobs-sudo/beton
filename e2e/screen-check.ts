@@ -29,7 +29,25 @@ export async function checkScreen(page: Page, locale: 'fr' | 'ar', name: string)
     await expect(page.locator('html')).toHaveAttribute('lang', locale);
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-    expect.soft(overflow, `${name} ${locale} ${width}px overflows horizontally`).toBeLessThanOrEqual(0);
+    const culprits =
+      overflow > 0
+        ? await page.evaluate(() =>
+            [...document.body.querySelectorAll('*')]
+              .filter(
+                (el) =>
+                  Math.round(el.getBoundingClientRect().right) > window.innerWidth ||
+                  Math.round(el.getBoundingClientRect().left) < 0,
+              )
+              .slice(0, 6)
+              .map(
+                (el) =>
+                  `${el.tagName.toLowerCase()}${el.getAttribute('data-testid') ? `[${el.getAttribute('data-testid')}]` : ''}.${String(el.className).slice(0, 40)}`,
+              ),
+          )
+        : [];
+    expect
+      .soft(overflow, `${name} ${locale} ${width}px overflows horizontally ${culprits.join(' | ')}`)
+      .toBeLessThanOrEqual(0);
     const text = await page.locator('body').innerText();
     expect(
       text.match(KEY_PATH)?.[0],

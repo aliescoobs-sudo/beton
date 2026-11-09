@@ -34,6 +34,7 @@ export default async function globalSetup() {
   }
 
   const authPool = new pg.Pool({ connectionString: env.DATABASE_URL_AUTH, max: 2 });
+  const migrator = new pg.Pool({ connectionString: env.DATABASE_URL_MIGRATOR, max: 1 });
   try {
     const auth = createAuth({ authPool, env, log: () => undefined });
     const bootstrap = { userId: BOOTSTRAP_ACTOR_ID, role: 'system' as const };
@@ -186,14 +187,18 @@ export default async function globalSetup() {
       [E2E_MD.astPartner, 'partner', 'fr'],
       [E2E_MD.astOff, 'support', 'fr'],
     ] as const) {
+      // `partner` and `support` have no accounts in V1 and the database refuses them from the application's logins (0208). These fixtures
+      // exercise the policies those roles keep as dead letters, so they are made as `office` and promoted with the migrator, which is not restricted.
+      const reserved = role === 'partner' || role === 'support';
       await createUser(auth, authPool, {
         actor: bootstrap,
         email: user.email,
         name: user.name,
         password: E2E_PASSWORD,
-        role,
+        role: reserved ? 'office' : role,
         locale,
       });
+      if (reserved) await migrator.query(`update "user" set role = $2 where email = $1`, [user.email, role]);
     }
     for (const [locale, user] of Object.entries(E2E_USERS)) {
       await createUser(auth, authPool, {
@@ -201,11 +206,12 @@ export default async function globalSetup() {
         email: user.email,
         name: user.name,
         password: E2E_PASSWORD,
-        role: 'partner',
+        role: 'office',
         locale: locale as 'fr' | 'ar',
       });
+      await migrator.query(`update "user" set role = 'partner' where email = $1`, [user.email]);
     }
   } finally {
-    await authPool.end();
+    await Promise.all([authPool.end(), migrator.end()]);
   }
 }
