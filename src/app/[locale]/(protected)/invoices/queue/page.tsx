@@ -1,6 +1,8 @@
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { getPool } from '@/lib/db/pools';
-import { getInvoiceQueue } from '@/modules/ledger';
+import { addDaysIso, getInvoiceQueue } from '@/modules/ledger';
+import { listDeliveryExceptions } from '@/modules/operations';
+import { getRequestClock } from '@/app/request-clock';
 import { formatM3 } from '@/modules/operations/ui/format';
 import { can, recordMoneyView } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/next';
@@ -22,9 +24,22 @@ export default async function InvoiceQueuePage({ params }: { params: Promise<{ l
   if (withMoney) await recordMoneyView(pool, user, 'screen:invoice-queue');
   const clients = await getInvoiceQueue(pool, user);
   const t = await getTranslations('ledger.invoiceQueue');
+  // T9b: what the driver declared delivered but the plant has not put through the billing gate is not here, and the page says so (never silently)
+  const today = (await getRequestClock()).today();
+  const held = can(user.role, 'trips.read')
+    ? await listDeliveryExceptions(pool, user, { from: addDaysIso(today, -14), to: today }).catch(() => null)
+    : null;
+  const heldCount = held?.ok
+    ? held.value.filter((x) => x.kind === 'declared_no_record' || x.kind === 'unconfirmed').length
+    : 0;
   return (
     <div className="space-y-8">
       <PageHeader title={t('title')} description={t('intro')} />
+      {heldCount > 0 && (
+        <p role="status" className="border-s-4 border-amber bg-band p-3 text-sm" data-testid="queue-held">
+          {t('held', { count: heldCount })}
+        </p>
+      )}
       {clients.length === 0 ? (
         <EmptyState title={t('none')} data-testid="queue-none" />
       ) : (

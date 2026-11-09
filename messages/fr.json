@@ -209,6 +209,7 @@
       "unloading_min": "Durée de déchargement sur chantier (minutes)",
       "loading_min": "Durée de chargement d'un camion à la centrale (minutes)",
       "return_extra_min": "Temps ajouté au retour : lavage de la toupie et retour à la centrale (minutes)",
+      "delivery_confirm_delay_min": "Délai après la fin de la journée avant qu'une livraison déclarée, non confirmée par la centrale, soit signalée (minutes)",
       "working_min": "Durée de la journée de travail d'un camion (minutes)",
       "day_start_min": "Heure de début de la première rotation (minutes depuis minuit)",
       "default_one_way_min": "Trajet simple d'un chantier sans zone (minutes)",
@@ -488,6 +489,8 @@
         "archived": "Archivée"
       },
       "actions": "Actions",
+      "phone": "Téléphone",
+      "phoneSave": "Enregistrer le numéro",
       "add": "Ajouter la centrale",
       "archive": "Archiver",
       "restore": "Réactiver",
@@ -1249,6 +1252,7 @@
       "link": "À facturer",
       "title": "Livré, non facturé",
       "intro": "Les livraisons terminées qu'aucune facture ne porte encore, par client.",
+      "held": "{count} livraison(s) déclarée(s) par le chauffeur non facturable(s) : pas encore de chargement de la centrale, ou pas encore confirmée(s). Elles ne figurent pas ici ; voir « Livraisons à vérifier ».",
       "none": "Tout ce qui est livré est facturé.",
       "summary": "{count, plural, one {# BL} other {# BL}}",
       "ttc": "à facturer TTC",
@@ -1859,6 +1863,32 @@
       "noDriver": "sans chauffeur",
       "noZone": "Zone inconnue",
       "planned": "Prévu : chargement {load} · départ {depart} · arrivée {arrive} · retour {back}",
+      "awaiting": "déclaré par le chauffeur, en attente de la centrale",
+      "fallback": "saisi par la centrale à la place du chauffeur",
+      "confirmStage": "Confirmer",
+      "stageConfirmed": "Étape confirmée.",
+      "declaredDelivery": "livraison déclarée par le chauffeur",
+      "exceptions": {
+        "title": "Livraisons à vérifier",
+        "intro": "Signalées, jamais corrigées. Aucune de ces livraisons n'est facturable tant que la centrale n'a pas son propre enregistrement.",
+        "none": "Aucune livraison à vérifier.",
+        "kind": {
+          "declared_no_record": "Déclarée par le chauffeur, sans chargement de la centrale",
+          "unconfirmed": "Déchargement déclaré, retour ou confirmation de la centrale manquant",
+          "volume_differs": "Volume différent",
+          "order_differs": "Commande : les chargements ne font pas le total"
+        },
+        "hint": {
+          "declared_no_record": "À enregistrer par la centrale ; exclue de « À facturer ».",
+          "unconfirmed": "Confirmez le retour ou la livraison.",
+          "volume_differs": "Le volume de la centrale fait foi ; écart signalé, non corrigé.",
+          "order_differs": "Écart signalé, non corrigé."
+        },
+        "plant": "centrale",
+        "planned": "prévu",
+        "declared": "chauffeur",
+        "order": "commande"
+      },
       "by": { "driver": "Chauffeur", "plant": "Centrale", "admin": "Administration" },
       "implicit": "déduit",
       "declared": "déclaré par le chauffeur · BL à faire",
@@ -2699,9 +2729,14 @@
       "implicit": "déduit",
       "declared": "à confirmer par la centrale",
       "pending": "en attente d'envoi",
+      "awaiting": "en attente de la centrale",
+      "fallback": "saisi par la centrale",
+      "declaredDelivery": "livraison déclarée par le chauffeur",
       "corrected": "corrigé"
     },
     "declaredLoadHint": "Chargement déclaré. La centrale confirmera son bon de chargement : vous pouvez continuer.",
+    "callOffice": "Appeler le bureau",
+    "callPlant": "Appeler la centrale",
     "skipLoad": "Camion parti (sans déclarer le chargement)",
     "steps": {
       "loading_started": "Chargement commencé",

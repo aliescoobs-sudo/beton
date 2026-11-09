@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { type FormEvent, useState } from 'react';
 import { Button, StatusPill, Table, Td, Th } from '@/ui';
-import { createPlantAction, updatePlantAction, type PlantActionResult } from './actions';
+import { createPlantAction, setPlantPhoneAction, updatePlantAction, type PlantActionResult } from './actions';
 
 export interface PlantRow {
   id: string;
@@ -14,7 +14,16 @@ export interface PlantRow {
 }
 
 /** Everyone internal reads the plants; owner and partner add, rename or archive (the server checks again). */
-export function PlantsManager({ plants, editable }: { plants: PlantRow[]; editable: boolean }) {
+export function PlantsManager({
+  plants,
+  editable,
+  phones,
+}: {
+  plants: PlantRow[];
+  editable: boolean;
+  /** Owner and app_admin only: the phone of each plant, editable. Absent for everybody else (nobody else reads it here). */
+  phones?: Record<string, string | null>;
+}) {
   const t = useTranslations('masterData.plants');
   const router = useRouter();
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
@@ -84,6 +93,7 @@ export function PlantsManager({ plants, editable }: { plants: PlantRow[]; editab
             <Th>{t('code')}</Th>
             <Th>{t('name')}</Th>
             <Th>{t('status')}</Th>
+            {phones && <Th>{t('phone')}</Th>}
             {editable && <Th>{t('actions')}</Th>}
           </tr>
         </thead>
@@ -99,6 +109,37 @@ export function PlantsManager({ plants, editable }: { plants: PlantRow[]; editab
                   {t(`statuses.${p.status}`)}
                 </StatusPill>
               </Td>
+              {phones && (
+                <Td>
+                  <form
+                    className="flex items-center gap-2"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const value = String(new FormData(e.currentTarget).get('phone') ?? '');
+                      void setPlantPhoneAction(p.id, value).then(done);
+                    }}
+                  >
+                    <input
+                      name="phone"
+                      type="tel"
+                      dir="ltr"
+                      maxLength={40}
+                      defaultValue={phones[p.id] ?? ''}
+                      className="input min-h-11 w-44"
+                      aria-label={t('phone')}
+                      data-testid={`plant-phone-${p.code}`}
+                    />
+                    <Button
+                      type="submit"
+                      variant="secondary"
+                      small
+                      data-testid={`plant-phone-save-${p.code}`}
+                    >
+                      {t('phoneSave')}
+                    </Button>
+                  </form>
+                </Td>
+              )}
               {editable && (
                 <Td>
                   <Button

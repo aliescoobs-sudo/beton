@@ -2,14 +2,20 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { getRequestClock } from '@/app/request-clock';
 import { getPool } from '@/lib/db/pools';
 import { listTripBlPhotos } from '@/modules/field';
-import { isRealDate } from '@/modules/ledger';
-import { listTrips } from '@/modules/operations';
+import { addDaysIso, isRealDate } from '@/modules/ledger';
+import { listDeliveryExceptions, listTrips } from '@/modules/operations';
 import { TripBoard } from '@/modules/operations/ui/trip-board';
 import { can } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/next';
 import { Button, Input, PageHeader } from '@/ui';
 import { TripLive } from '@/modules/operations/ui/trip-live';
-import { confirmTripDeliveredAction, correctTripStageAction, recordTripStepAction } from './actions';
+import { DeliveryExceptions } from '@/modules/operations/ui/delivery-exceptions';
+import {
+  confirmTripDeliveredAction,
+  confirmTripStageAction,
+  correctTripStageAction,
+  recordTripStepAction,
+} from './actions';
 
 /** The day's rotations on a phone: one tap per step (loaded, departed, arrived, unloading started and finished, back). */
 export default async function TripsPage({
@@ -30,6 +36,10 @@ export default async function TripsPage({
   const photos = can(user.role, 'driver_bl_photos.read')
     ? await listTripBlPhotos(getPool('app'), user, date)
     : [];
+  const exceptions = await listDeliveryExceptions(getPool('app'), user, {
+    from: addDaysIso(date, -7),
+    to: date,
+  });
   const t = await getTranslations('operations.trips');
   if (!trips.ok) return <PageHeader title={t('title')} description={t('errors.INVALID')} />;
   return (
@@ -53,7 +63,9 @@ export default async function TripsPage({
         record={recordTripStepAction}
         correct={correctTripStageAction}
         confirmDelivered={confirmTripDeliveredAction}
+        confirmStage={confirmTripStageAction}
       />
+      {exceptions.ok && <DeliveryExceptions items={exceptions.value} />}
       {photos.length > 0 && (
         <section data-testid="bl-photos" className="space-y-1">
           <h2 className="text-lg font-semibold">{t('blPhotos')}</h2>

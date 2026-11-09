@@ -114,6 +114,7 @@ interface Trip {
   stage: keyof typeof EMERGENCY_OPTIONS;
   unloadedL: number | null;
   blPhotos?: number;
+  plantPhone?: string | null;
 }
 interface Instruction {
   id: string;
@@ -143,6 +144,8 @@ type Day =
       date: string;
       trips: Trip[];
       instructions: Instruction[];
+      /** The office number (the company profile's phone), null when unset. */
+      officePhone?: string | null;
       /** T5: the plan's times, the delay so far and the state, by rotation (the driver's own). */
       timing?: Record<string, TripTimingView>;
     }
@@ -612,6 +615,15 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
                 </button>
               </section>
             ))}
+          {day.officePhone && (
+            <a
+              href={`tel:${day.officePhone}`}
+              className="block min-h-11 text-2xl underline"
+              data-testid="call-office"
+            >
+              {t('callOffice')} <bdi dir="ltr">{day.officePhone}</bdi>
+            </a>
+          )}
           {day.trips.length === 0 && (
             <p className="text-2xl" data-testid="field-none">
               {t('noTrips')}
@@ -633,6 +645,15 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
                 </p>
                 {trip.siteLabel && <p className="text-2xl">{trip.siteLabel}</p>}
                 <AddressBlock address={trip.address} mapUrl={trip.mapUrl} t={t} />
+                {trip.plantPhone && (
+                  <a
+                    href={`tel:${trip.plantPhone}`}
+                    className="block min-h-11 text-2xl underline"
+                    data-testid={`call-plant-${trip.orderCode}`}
+                  >
+                    {t('callPlant')} <bdi dir="ltr">{trip.plantPhone}</bdi>
+                  </a>
+                )}
                 {trip.phone && (
                   <a href={`tel:${trip.phone}`} className="block text-2xl underline">
                     {trip.contactName ? `${trip.contactName} · ` : ''}
@@ -683,6 +704,11 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
                             {st.stage === 'loaded' && st.declared && !st.implicit
                               ? ` · ${t('stage.declared')}`
                               : ''}
+                            {st.stage === 'unloading_finished' && st.source === 'driver' && !st.implicit
+                              ? ` · ${t('stage.declaredDelivery')}`
+                              : ''}
+                            {st.awaiting ? ` · ${t('stage.awaiting')}` : ''}
+                            {st.fallback ? ` · ${t('stage.fallback')}` : ''}
                             {waiting ? ` · ⏳ ${t('stage.pending')}` : ''}
                           </span>
                         )}

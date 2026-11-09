@@ -3,6 +3,9 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { getEngineParams } from '@/app/engine-params';
 import { getRequestClock } from '@/app/request-clock';
 import { getPool } from '@/lib/db/pools';
+import { addDaysIso } from '@/modules/ledger';
+import { listDeliveryExceptions } from '@/modules/operations';
+import { DeliveryExceptions } from '@/modules/operations/ui/delivery-exceptions';
 import { OpsToday, OwnerToday } from '@/modules/owner-dashboard';
 import { can, recordMoneyView } from '@/modules/platform-security';
 import { currentAuthState } from '@/modules/platform-security/auth/request-state';
@@ -43,6 +46,11 @@ export default async function HomePage({
   } else if (user) {
     ops = await loadTodayOps(pool, user, { today, params: params2 }).catch(() => null);
   }
+  // T9b: the delivery exceptions of the last week, for those who track rotations (the plant manager of the plant, the owner): flagged, never corrected
+  const exceptions =
+    user && can(user.role, 'trips.read')
+      ? await listDeliveryExceptions(pool, user, { from: addDaysIso(today, -7), to: today }).catch(() => null)
+      : null;
   // The owner's page has nothing to project on a brand-new database (the invitation shows instead); the others always get
   // their "today", empty or not: "nothing to load today" is an answer.
   const hasData = money
@@ -79,6 +87,11 @@ export default async function HomePage({
         />
       )}
       {ops && <OpsToday view={ops} locale={locale} />}
+      {exceptions?.ok && exceptions.value.length > 0 && (
+        <div className="mt-8">
+          <DeliveryExceptions items={exceptions.value} />
+        </div>
+      )}
       {shortcuts.length > 0 && (
         <section aria-label={t('shell.home.enter')} className="mt-8" data-testid="home-shortcuts">
           <h2 className="mb-3 text-xl">{t('shell.home.enter')}</h2>

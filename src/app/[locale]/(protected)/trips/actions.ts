@@ -5,6 +5,7 @@ import { getPool } from '@/lib/db/pools';
 import type { Effect } from '@/modules/ledger';
 import {
   confirmTripDelivered,
+  confirmTripStage,
   correctTripStage,
   localMidnightMs,
   recordTripStep,
@@ -89,6 +90,24 @@ export async function confirmTripDeliveredAction(input: { tripId: string }): Pro
   if (!allowed.ok) return { ok: false, error: allowed.reason };
   try {
     const result = await confirmTripDelivered(getPool('app'), allowed.user, input);
+    return result.ok ? { ok: true } : { ok: false, error: result.error };
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, error: 'FORBIDDEN' };
+    throw error;
+  }
+}
+
+// @permission trips.track (plant manager of the plant, owner, app_admin): the plant confirms the departure or the return the driver declared
+export async function confirmTripStageAction(input: {
+  tripId: string;
+  step: string;
+}): Promise<{ ok: true } | Failure> {
+  const allowed = await authorize('trips.track', { getState: currentAuthState, appPool: getPool('app') });
+  if (!allowed.ok) return { ok: false, error: allowed.reason };
+  try {
+    const result = await confirmTripStage(getPool('app'), allowed.user, input, {
+      now: (await getRequestClock()).now(),
+    });
     return result.ok ? { ok: true } : { ok: false, error: result.error };
   } catch (error) {
     if (error instanceof ForbiddenError) return { ok: false, error: 'FORBIDDEN' };

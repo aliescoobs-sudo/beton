@@ -45,6 +45,7 @@ export function TripBoard({
   record,
   correct,
   confirmDelivered,
+  confirmStage,
 }: {
   trips: TripView[];
   canTrack: boolean;
@@ -53,6 +54,10 @@ export function TripBoard({
   record: (input: unknown) => Promise<TripStepResult>;
   correct: (input: CorrectInput) => Promise<{ ok: true } | { ok: false; error: string }>;
   confirmDelivered: (input: { tripId: string }) => Promise<{ ok: true } | { ok: false; error: string }>;
+  confirmStage: (input: {
+    tripId: string;
+    step: string;
+  }) => Promise<{ ok: true } | { ok: false; error: string }>;
 }) {
   const t = useTranslations('operations.trips');
   const router = useRouter();
@@ -168,7 +173,31 @@ export function TripBoard({
                     {st.implicit ? ` · ${t('implicit')}` : ''}
                     {st.corrected ? ` · ${t('corrected')}` : ''}
                     {st.stage === 'loaded' && st.declared && !st.implicit ? ` · ${t('declared')}` : ''}
+                    {st.stage === 'unloading_finished' && st.source === 'driver' && !st.implicit
+                      ? ` · ${t('declaredDelivery')}`
+                      : ''}
+                    {st.awaiting ? ` · ${t('awaiting')}` : ''}
+                    {st.fallback ? ` · ${t('fallback')}` : ''}
                   </span>
+                )}
+                {canTrack && st.awaiting && (
+                  <button
+                    type="button"
+                    className="min-h-11 min-w-11 px-2 text-xs font-semibold underline"
+                    onClick={() =>
+                      void (async () => {
+                        const r = await confirmStage({ tripId: trip.id, step: st.stage });
+                        setMessages((m) => ({
+                          ...m,
+                          [trip.id]: r.ok ? t('stageConfirmed') : t(`errors.${r.error}` as never),
+                        }));
+                        if (r.ok) router.refresh();
+                      })()
+                    }
+                    data-testid={`confirm-stage-${trip.orderCode}-${st.stage}`}
+                  >
+                    {t('confirmStage')}
+                  </button>
                 )}
                 {canCorrect && st.done && (
                   <button
