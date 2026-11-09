@@ -39,6 +39,8 @@ export const E2E_PLANT = { email: 'e2e-plant@kayas.test', name: 'Centrale E2E' }
 export const E2E_MD = {
   // T5 trip-timing spec: a plant manager (bound to a plant by the spec), enrolled once
   timingManager: { email: 'e2e-timing-manager@kayas.test', name: 'Chef de centrale Timing' },
+  // T9 shared-status spec: its own plant manager (bound to the plant of the spec), enrolled once
+  sharedManager: { email: 'e2e-t9-manager@kayas.test', name: 'Chef de centrale T9' },
   partnerFr: { email: 'e2e-md-partner-fr@kayas.test', name: 'Associé MD' },
   partnerAr: { email: 'e2e-md-partner-ar@kayas.test', name: 'شريك البيانات' },
   office: { email: 'e2e-md-office@kayas.test', name: 'Bureau MD' },

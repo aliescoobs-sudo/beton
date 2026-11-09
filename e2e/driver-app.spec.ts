@@ -107,13 +107,19 @@ function watchSync(page: Page) {
     if (['error', 'warning'].includes(m.type())) seen.push(`console.${m.type()}: ${m.text().slice(0, 300)}`);
   });
   page.on('pageerror', (e) => seen.push(`pageerror: ${e.message.slice(0, 300)}`));
-  page.on('requestfailed', (r) => seen.push(`requestfailed: ${r.method()} ${r.url()} ${r.failure()?.errorText ?? ''}`));
+  page.on('requestfailed', (r) =>
+    seen.push(`requestfailed: ${r.method()} ${r.url()} ${r.failure()?.errorText ?? ''}`),
+  );
   page.on('response', async (r) => {
     if (!r.url().includes('/api/field/')) return;
     const body = await r.text().catch(() => '(unreadable)');
-    seen.push(`${new Date().toISOString()} ${r.request().method()} ${new URL(r.url()).pathname} -> ${r.status()} ${body.slice(0, 300)}`);
+    seen.push(
+      `${new Date().toISOString()} ${r.request().method()} ${new URL(r.url()).pathname} -> ${r.status()} ${body.slice(0, 300)}`,
+    );
   });
-  return async (testInfo: { attach(name: string, o: { body: string; contentType: string }): Promise<void> }) => {
+  return async (testInfo: {
+    attach(name: string, o: { body: string; contentType: string }): Promise<void>;
+  }) => {
     const local = await page
       .evaluate(() => ({
         now: new Date().toISOString(),
@@ -134,7 +140,12 @@ function watchSync(page: Page) {
     await testInfo.attach('driver-app-diagnostic.json', {
       contentType: 'application/json',
       body: JSON.stringify(
-        { serverClock: { process: new Date().toISOString(), tzEnv: process.env.TZ ?? null }, phone: local, db: db.rows[0], traffic: seen },
+        {
+          serverClock: { process: new Date().toISOString(), tzEnv: process.env.TZ ?? null },
+          phone: local,
+          db: db.rows[0],
+          traffic: seen,
+        },
         null,
         2,
       ),
