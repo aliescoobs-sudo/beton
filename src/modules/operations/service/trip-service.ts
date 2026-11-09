@@ -158,11 +158,13 @@ async function readStageRows(tx: pg.PoolClient, date: string): Promise<Map<strin
     client_time: string | null;
     corrected_at: string | null;
     load_linked: boolean;
+    confirmed_at: string | null;
   }>(
     `select trip_id, step,
             to_char(at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as at, source, implicit,
             to_char(client_time at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as client_time,
-            to_char(corrected_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as corrected_at, load_linked
+            to_char(corrected_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as corrected_at, load_linked,
+            to_char(confirmed_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as confirmed_at
        from public.trip_stages($1)`,
     [date],
   );
@@ -177,6 +179,7 @@ async function readStageRows(tx: pg.PoolClient, date: string): Promise<Map<strin
       clientTime: r.client_time,
       correctedAt: r.corrected_at,
       loadLinked: r.load_linked,
+      confirmedAt: r.confirmed_at,
     });
     byTrip.set(r.trip_id, list);
   }
@@ -374,4 +377,94 @@ export async function getTripStages(
       .sort(([a], [b]) => (a < b ? -1 : 1))
       .map(([id, rows]) => ({ id, stages: deriveStages(rows).stages })),
   });
+}
+
+/**
+ * The plant confirms a stage it is the authority for (the truck leaving, the truck coming back) that the driver declared: its own instant becomes the
+ * one the figures and alerts use. Confirming the RETURN of a rotation whose unloading was declared finished also sets the billing gate, once, in the same
+ * transaction (audited, by this user): the plant is not asked twice.
+ */
+export async function confirmTripStage(
+  appPool: pg.Pool,
+  actor: SessionUser,
+  input: unknown,
+  deps: { now: Date },
+): Promise<Result<{ confirmed: boolean }, 'INVALID' | 'FORBIDDEN' | 'NOT_FOUND'>> {
+  await require(appPool, actor, 'trips.track');
+  const parsed = z.object({ tripId: z.uuid(), step: z.enum(['departed', 'back']) }).safeParse(input);
+  if (!parsed.success) return err('INVALID');
+  try {
+    const r = await inRequest(appPool, actor, (tx) =>
+      tx.query<{ c: boolean }>('select public.confirm_trip_stage($1, $2, $3) as c', [
+        parsed.data.tripId,
+        parsed.data.step,
+        deps.now.toISOString(),
+      ]),
+    );
+    return ok({ confirmed: r.rows[0]!.c });
+  } catch (error) {
+    const e = error as { code?: string };
+    if (e.code === '42501') return err('FORBIDDEN');
+    if (e.code === '23514') return err('NOT_FOUND');
+    if (e.code === '23503' || isMalformedId(error)) return err('NOT_FOUND');
+    throw error;
+  }
+}
+
+export type DeliveryExceptionKind = 'declared_no_record' | 'unconfirmed' | 'volume_differs' | 'order_differs';
+export interface DeliveryException {
+  kind: DeliveryExceptionKind;
+  tripId: string;
+  date: string;
+  orderCode: string;
+  truckCode: string;
+  plantVolumeL: number | null;
+  plannedVolumeL: number | null;
+  declaredVolumeL: number | null;
+  orderVolumeL: number | null;
+}
+
+/**
+ * The exception lists of the delivery (flag only, nothing is corrected): the driver declared the delivery and the plant has no load; the unloading was
+ * declared and the plant's load is still outside the billing gate after the end of the working day; the plant's load differs from the planned volume or
+ * from what the driver declared; the loads of a finished order do not add up to the order. Scoped by the database (a plant manager: his plant's).
+ */
+export async function listDeliveryExceptions(
+  appPool: pg.Pool,
+  actor: SessionUser,
+  range: { from: string; to: string },
+): Promise<Result<DeliveryException[], 'INVALID'>> {
+  await require(appPool, actor, 'trips.read');
+  if (!isRealDate(range.from) || !isRealDate(range.to)) return err('INVALID');
+  const { rows } = await inRequest(appPool, actor, (tx) =>
+    tx.query<{
+      kind: DeliveryExceptionKind;
+      trip_id: string;
+      trip_date: string;
+      order_code: string;
+      truck_code: string;
+      plant_volume_l: number | null;
+      planned_volume_l: number | null;
+      declared_volume_l: number | null;
+      order_volume_l: number | null;
+    }>(
+      `select kind, trip_id, to_char(trip_date, 'YYYY-MM-DD') as trip_date, order_code, truck_code, plant_volume_l, planned_volume_l,
+              declared_volume_l, order_volume_l
+         from public.trip_delivery_exceptions($1, $2) order by trip_date desc, order_code, kind`,
+      [range.from, range.to],
+    ),
+  );
+  return ok(
+    rows.map((r) => ({
+      kind: r.kind,
+      tripId: r.trip_id,
+      date: r.trip_date,
+      orderCode: r.order_code,
+      truckCode: r.truck_code,
+      plantVolumeL: r.plant_volume_l,
+      plannedVolumeL: r.planned_volume_l,
+      declaredVolumeL: r.declared_volume_l,
+      orderVolumeL: r.order_volume_l,
+    })),
+  );
 }

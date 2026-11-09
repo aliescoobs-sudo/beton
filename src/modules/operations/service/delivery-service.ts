@@ -359,7 +359,7 @@ export async function markDelivered(
   try {
     await inRequest(appPool, actor, (tx) =>
       tx.query(
-        `insert into delivery_delivered (id, delivery_id, at, trip_event_id, created_by) values ($1, $2, $3, null, $4)`,
+        `insert into delivery_delivered (id, delivery_id, at, trip_event_id, created_by, via) values ($1, $2, $3, null, $4, 'hand')`,
         [id, parsed.data.deliveryId, deps.now.toISOString(), actor.id],
       ),
     );

@@ -110,6 +110,8 @@ export {
   plantIdOf,
   type PlantError,
   updatePlant,
+  listPlantPhones,
+  setPlantPhone,
   usePlant,
 } from './service/plant-service';
 export {

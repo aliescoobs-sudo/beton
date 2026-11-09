@@ -4,6 +4,7 @@ import {
   deriveStages,
   nextStage,
   planRecord,
+  STAGE_AUTHORITY,
   STAGES,
   type StageRow,
   tapLocal,
@@ -167,5 +168,61 @@ describe("T9: the driver's own tap shows at once (tapLocal)", () => {
     expect(next[0]).toEqual(base[0]);
     expect(next[1]).toEqual(base[1]);
     expect(next[2]).toMatchObject({ done: true, source: 'driver', at: T(40), implicit: false });
+  });
+});
+
+describe('T9b: who is the authority for a stage', () => {
+  it('either side for the loading, the plant for leaving and returning, the driver for the road and the site', () => {
+    expect(STAGE_AUTHORITY).toEqual({
+      loading_started: 'either',
+      loaded: 'either',
+      departed: 'plant',
+      arrived: 'driver',
+      unloading_started: 'driver',
+      unloading_finished: 'driver',
+      back: 'plant',
+    });
+  });
+  it("a plant-authority stage the driver declared is awaiting the plant until it is confirmed; the plant's time is then the one shown", () => {
+    const declared = deriveStages([
+      row('loading_started', 0),
+      row('loaded', 1),
+      row('departed', 30, { source: 'driver' }),
+    ]);
+    expect(declared.stages[2]).toMatchObject({ awaiting: true, confirmed: false, at: T(30) });
+    const confirmed = deriveStages([
+      row('loading_started', 0),
+      row('loaded', 1),
+      row('departed', 30, { source: 'driver', confirmedAt: T(33) }),
+    ]);
+    expect(confirmed.stages[2]).toMatchObject({
+      awaiting: false,
+      confirmed: true,
+      at: T(33),
+      recordedAt: T(30),
+    });
+    // recorded by the plant itself: nothing to confirm
+    const plant = deriveStages([
+      row('loading_started', 0),
+      row('loaded', 1),
+      row('departed', 30, { source: 'plant' }),
+    ]);
+    expect(plant.stages[2]).toMatchObject({ awaiting: false });
+  });
+  it("a driver-authority stage recorded by the plant side is a flagged fallback; the driver's own is not; a filled-in one is neither", () => {
+    const plant = deriveStages([row('arrived', 30, { source: 'plant' })]);
+    expect(plant.stages[3]).toMatchObject({ fallback: true, awaiting: false });
+    const admin = deriveStages([row('unloading_finished', 40, { source: 'admin' })]);
+    expect(admin.stages[5]).toMatchObject({ fallback: true });
+    const driver = deriveStages([row('arrived', 30, { source: 'driver' })]);
+    expect(driver.stages[3]).toMatchObject({ fallback: false });
+    const filled = deriveStages([row('arrived', 30, { source: 'plant', implicit: true })]);
+    expect(filled.stages[3]).toMatchObject({ fallback: false });
+  });
+  it('a correction beats a confirmation', () => {
+    const v = deriveStages([
+      row('departed', 30, { source: 'driver', confirmedAt: T(33), correctedAt: T(31) }),
+    ]);
+    expect(v.stages[2]).toMatchObject({ at: T(31), corrected: true, confirmed: true });
   });
 });

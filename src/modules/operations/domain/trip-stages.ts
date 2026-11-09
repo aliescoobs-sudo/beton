@@ -30,6 +30,8 @@ export interface StageRow {
   correctedAt: string | null;
   /** `loaded` only: the plant's own load (BL, stock) exists and is linked to this stage. */
   loadLinked: boolean;
+  /** The plant's confirmation of a stage it is the authority for (departed, back) that the driver declared; its instant is the one the figures use. */
+  confirmedAt?: string | null;
 }
 
 export interface StageView {
@@ -44,6 +46,13 @@ export interface StageView {
   corrected: boolean;
   /** `loaded` recorded but the plant's own load is not there yet: shown as declared, nothing in stock or billing follows from it. */
   declared: boolean;
+  authority: 'either' | 'plant' | 'driver';
+  /** The plant is the authority and the driver declared it: "declared by the driver, awaiting the plant's confirmation". */
+  awaiting: boolean;
+  /** The driver is the authority and the plant side recorded it for him (not filled in): flagged. */
+  fallback: boolean;
+  /** The plant has confirmed it. */
+  confirmed: boolean;
 }
 
 export interface StatusView {
@@ -53,6 +62,21 @@ export interface StatusView {
   /** The latest stage in order that is done; null before anything. */
   last: Stage | null;
 }
+
+/**
+ * Who is the authority for a stage (decision 206 / T9b): `either` side may record it; the `plant` is the authority for the truck leaving and coming
+ * back (the driver may tap them: shown as declared, awaiting the plant's confirmation, and the plant's time is the one the figures and alerts use);
+ * the `driver` is the authority for what happens on the road and on site (the plant manager, the owner and app_admin may record them as a flagged fallback).
+ */
+export const STAGE_AUTHORITY: Record<Stage, 'either' | 'plant' | 'driver'> = {
+  loading_started: 'either',
+  loaded: 'either',
+  departed: 'plant',
+  arrived: 'driver',
+  unloading_started: 'driver',
+  unloading_finished: 'driver',
+  back: 'plant',
+};
 
 export const isStage = (value: unknown): value is Stage => STAGES.includes(value as Stage);
 
@@ -92,17 +116,26 @@ export function deriveStages(rows: readonly StageRow[]): StatusView {
         implicit: false,
         corrected: false,
         declared: false,
+        authority: STAGE_AUTHORITY[stage],
+        awaiting: false,
+        fallback: false,
+        confirmed: false,
       };
     }
     return {
       stage,
       done: true,
-      at: r.correctedAt ?? r.at,
+      // the instant every figure uses: a correction's, else the plant's confirmation, else the instant it was recorded
+      at: r.correctedAt ?? r.confirmedAt ?? r.at,
       recordedAt: r.at,
       source: r.source,
       implicit: r.implicit,
       corrected: r.correctedAt !== null,
       declared: stage === 'loaded' && !r.loadLinked,
+      authority: STAGE_AUTHORITY[stage],
+      awaiting: STAGE_AUTHORITY[stage] === 'plant' && r.source === 'driver' && !r.implicit && !r.confirmedAt,
+      fallback: STAGE_AUTHORITY[stage] === 'driver' && r.source !== 'driver' && !r.implicit,
+      confirmed: Boolean(r.confirmedAt),
     };
   });
   // "next" and "last" follow the order with no gap: the first missing stage is next, and last is the one just before it
@@ -144,6 +177,9 @@ export function tapLocal(stages: readonly StageView[], target: Stage, at: string
       implicit: i < index,
       corrected: false,
       declared: s.stage === 'loaded',
+      awaiting: STAGE_AUTHORITY[s.stage] === 'plant' && i === index,
+      fallback: false,
+      confirmed: false,
     };
   });
 }

@@ -141,6 +141,10 @@ export {
   recordTripStep,
   correctTripStage,
   confirmTripDelivered,
+  confirmTripStage,
+  listDeliveryExceptions,
+  type DeliveryException,
+  type DeliveryExceptionKind,
   type TripError,
   type TripView,
 } from './service/trip-service';

@@ -89,3 +89,35 @@ export async function updatePlant(
     throw error;
   }
 }
+
+/** The phone number of each plant, for the screen where the owner and app_admin set them (nobody else reads this list). */
+export async function listPlantPhones(
+  appPool: pg.Pool,
+  actor: SessionUser,
+): Promise<Record<string, string | null>> {
+  await require(appPool, actor, 'plants.phone');
+  const { rows } = await inRequest(appPool, actor, (tx) =>
+    tx.query<{ id: string; phone: string | null }>('select id, phone from plant'),
+  );
+  return Object.fromEntries(rows.map((r) => [r.id, r.phone]));
+}
+
+/** Sets (or clears, with an empty text) the phone number of a plant: owner and app_admin; audited. The driver of its rotations gets a tel: link. */
+export async function setPlantPhone(
+  appPool: pg.Pool,
+  actor: SessionUser,
+  id: string,
+  phone: string,
+): Promise<Result<true, 'INVALID' | 'NOT_FOUND'>> {
+  await require(appPool, actor, 'plants.phone');
+  const clean = phone.trim();
+  if (clean !== '' && !/^[0-9+() .-]{3,40}$/.test(clean)) return err('INVALID');
+  try {
+    await inRequest(appPool, actor, (tx) => tx.query('select public.set_plant_phone($1, $2)', [id, clean]));
+    return ok(true);
+  } catch (error) {
+    if (isMalformedId(error)) return err('NOT_FOUND');
+    if ((error as { code?: string }).code === '23514') return err('NOT_FOUND');
+    throw error;
+  }
+}

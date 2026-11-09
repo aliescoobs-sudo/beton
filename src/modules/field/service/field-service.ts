@@ -40,6 +40,8 @@ export interface DriverTrip {
   unloadedL: number | null;
   /** How many photos of the signed BL the office already holds for this rotation. */
   blPhotos: number;
+  /** The phone of the trip's plant (set by the owner / app_admin), null when unset: the screen shows a tel: link or nothing. */
+  plantPhone: string | null;
 }
 
 export interface DriverInstruction {
@@ -73,7 +75,7 @@ export async function getDriverDay(
   driver: SessionUser,
   date: string,
   cipher: FieldCipher,
-): Promise<{ trips: DriverTrip[]; instructions: DriverInstruction[] }> {
+): Promise<{ trips: DriverTrip[]; instructions: DriverInstruction[]; officePhone: string | null }> {
   return inRequest(appPool, driver, async (tx) => {
     const trips = await tx.query<{
       trip_id: string;
@@ -110,6 +112,14 @@ export async function getDriverDay(
       [date],
     );
     const photos = new Map(photoRows.rows.map((r) => [r.trip_id, r.n]));
+    const plantPhones = new Map(
+      (
+        await tx.query<{ trip_id: string; phone: string }>(
+          'select trip_id, phone from public.driver_plant_phones($1)',
+          [date],
+        )
+      ).rows.map((r) => [r.trip_id, r.phone]),
+    );
     // the shared status of the day's rotations (the database scopes it to this driver's own)
     const stageRes = await tx.query<{
       trip_id: string;
@@ -120,6 +130,7 @@ export async function getDriverDay(
       client_time: Date | null;
       corrected_at: Date | null;
       load_linked: boolean;
+      confirmed_at: Date | null;
     }>('select * from public.trip_stages($1)', [date]);
     const stageRows = new Map<string, StageRow[]>();
     for (const r of stageRes.rows) {
@@ -132,6 +143,7 @@ export async function getDriverDay(
         clientTime: r.client_time?.toISOString() ?? null,
         correctedAt: r.corrected_at?.toISOString() ?? null,
         loadLinked: r.load_linked,
+        confirmedAt: r.confirmed_at?.toISOString() ?? null,
       });
       stageRows.set(r.trip_id, list);
     }
@@ -143,7 +155,11 @@ export async function getDriverDay(
       address_enc: string | null;
       acknowledged: boolean;
     }>('select case_id, trip_id, address_enc, acknowledged from public.driver_redirects()');
+    // the office number (the company profile's phone; the only phone setting there is, and no plant has one): a tel: link, none when unset
+    const officePhone =
+      (await tx.query<{ p: string | null }>('select public.company_contact_phone() as p')).rows[0]?.p ?? null;
     return {
+      officePhone,
       trips: trips.rows.map((r) => {
         const address = cipher.open(r.address_enc);
         const status = deriveStages(stageRows.get(r.trip_id) ?? []);
@@ -173,6 +189,7 @@ export async function getDriverDay(
           stage: emergencyStage(steps),
           unloadedL: r.unloaded_l,
           blPhotos: photos.get(r.trip_id) ?? 0,
+          plantPhone: plantPhones.get(r.trip_id) ?? null,
         };
       }),
       instructions: [
