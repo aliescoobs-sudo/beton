@@ -153,6 +153,15 @@ export function wrapText(text: string, maxWidth: number, size: number, font: Fon
   return lines;
 }
 
+/** The legal footer box: inside the left and right margins, 7 pt, stacked upwards from just above the page number. */
+export const FOOTER = { margin: 40, size: 7, leading: 8.5, baseline: 36, maxLines: 10 } as const;
+
+/** The footer lines as they are printed: every line wrapped inside the margins, a word longer than a line force-broken. */
+export function wrapFooter(lines: readonly string[]): string[] {
+  const width = A4.width - 2 * FOOTER.margin;
+  return lines.flatMap((line) => wrapText(line, width, FOOTER.size)).filter((l) => l.length > 0);
+}
+
 export class PdfDocument {
   private readonly pages: string[][] = [];
   private watermarkText: string | null = null;
@@ -227,7 +236,13 @@ export class PdfDocument {
 
   /** Legal lines printed at the foot of every page (above the page number), from the owner-filled company profile. */
   footer(lines: readonly string[]): void {
-    this.footerLines = [...lines];
+    this.footerLines = wrapFooter(lines);
+  }
+
+  /** The y (from the page bottom) of the top of the footer box: page content must stay above it. 0 without a footer. */
+  get footerTop(): number {
+    const n = this.footerLines.length;
+    return n === 0 ? 0 : FOOTER.baseline + (n - 1) * FOOTER.leading + FOOTER.size + 2;
   }
 
   /** A pale diagonal text across every page (drawn under the page's own content), for the pilot's documents. */
@@ -258,10 +273,11 @@ export class PdfDocument {
             ]
           : []),
         ...ops,
-        ...this.footerLines.map(
-          (line, k) =>
-            `0.35 g BT /F1 7 Tf ${num(A4.width / 2 - textWidth(line, 7) / 2)} ${num(46 - 9 * k)} Td <${hex(winAnsi(line))}> Tj ET`,
-        ),
+        ...this.footerLines.map((line, k) => {
+          const x = Math.max(FOOTER.margin, A4.width / 2 - textWidth(line, FOOTER.size) / 2);
+          const y = FOOTER.baseline + (this.footerLines.length - 1 - k) * FOOTER.leading;
+          return `0.35 g BT /F1 ${FOOTER.size} Tf ${num(x)} ${num(y)} Td <${hex(winAnsi(line))}> Tj ET`;
+        }),
         // Page number, last line of every page
         `0.4 g BT /F1 8 Tf ${num(A4.width / 2 - 20)} 24 Td <${hex(winAnsi(`Page ${n + 1} / ${total}`))}> Tj ET`,
       ].join('\n');

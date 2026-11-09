@@ -1,7 +1,7 @@
 import { A4, BRAND, type Font, PdfDocument, type Rgb, textWidth, wrapText } from './pdf';
 
 const MARGIN = 40;
-const BOTTOM = 64; // room for the legal footer (two lines) and the page number
+const MIN_BOTTOM = 64; // room for the page number when there is no footer
 const LOGO_WIDTH = 150;
 
 export interface Column {
@@ -16,6 +16,8 @@ export interface Column {
 export class PdfLayout {
   readonly doc: PdfDocument;
   y: number = A4.height - MARGIN;
+  /** Content never goes below this: it clears the legal footer box, whatever its height. */
+  private bottom: number = MIN_BOTTOM;
 
   /**
    * KAYAS header on the first page: the colour signature top left (never stretched) and a thin Citron rule under it. `footer` is the
@@ -25,6 +27,7 @@ export class PdfLayout {
     this.doc = new PdfDocument({ title });
     if (options.watermark) this.doc.watermark(options.watermark);
     if (options.footer?.length) this.doc.footer(options.footer);
+    this.bottom = Math.max(MIN_BOTTOM, this.doc.footerTop + 8);
     this.doc.logo(MARGIN, this.y - 33, LOGO_WIDTH);
     this.y -= 33 + 7;
     this.doc.line(MARGIN, this.y, MARGIN + this.width, this.y, 1.5, BRAND.citron);
@@ -36,7 +39,7 @@ export class PdfLayout {
   }
 
   private room(height: number): void {
-    if (this.y - height < BOTTOM) {
+    if (this.y - height < this.bottom) {
       this.doc.addPage();
       this.y = A4.height - MARGIN;
     }
@@ -115,7 +118,7 @@ export class PdfLayout {
         wrapText(cell, (widths[i] as number) - 6, 9, columns[i]?.font ?? 'regular'),
       );
       const height = Math.max(...wrapped.map((l) => l.length)) * 11 + 3;
-      if (this.y - height < BOTTOM) {
+      if (this.y - height < this.bottom) {
         this.doc.addPage();
         this.y = A4.height - MARGIN;
         head();

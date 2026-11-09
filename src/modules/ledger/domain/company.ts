@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { FOOTER, wrapFooter } from '@/lib/pdf/pdf';
 import { err, ok, type Result } from '@/lib/result';
 import { isRealDate } from './dates';
 
@@ -54,9 +55,23 @@ export interface CompanyProfile {
   rib: string | null;
 }
 
-export function parseCompanyProfileInput(input: unknown): Result<CompanyProfileInput, 'INVALID'> {
+/**
+ * Whether the legal block of the documents (legal name and form, ICE, RC, IF, patente, address and the RIB) fits its footer box on a page at
+ * the printed size: it is refused here rather than clipped on an invoice.
+ */
+export function legalBlockFits(p: Omit<CompanyProfile, 'effectiveFrom'>): boolean {
+  return wrapFooter(legalFooter({ effectiveFrom: '', ...p })).length <= FOOTER.maxLines;
+}
+
+export function parseCompanyProfileInput(
+  input: unknown,
+): Result<CompanyProfileInput, 'INVALID' | 'LEGAL_BLOCK_TOO_LONG'> {
   const parsed = schema.safeParse(input);
-  return parsed.success ? ok(parsed.data) : err('INVALID');
+  if (!parsed.success) return err('INVALID');
+  const v = parsed.data;
+  return legalBlockFits({ ...v, phone: v.phone ?? null, email: v.email ?? null, rib: v.rib ?? null })
+    ? ok(v)
+    : err('LEGAL_BLOCK_TOO_LONG');
 }
 
 /** "181780000012345678901234" → "181 780 000012345678901234 34"-style groups of the RIB: bank 3, branch 3, account 16, key 2. */

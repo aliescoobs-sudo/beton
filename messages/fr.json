@@ -1152,6 +1152,7 @@
       "save": "Enregistrer une nouvelle version",
       "saved": "Version enregistrée.",
       "invalid": "Saisie invalide : vérifiez l'ICE (15 chiffres) et le RIB (24 chiffres).",
+      "tooLong": "Les mentions légales sont trop longues pour tenir en pied de page de chaque document : raccourcissez la raison sociale ou l'adresse.",
       "history": "Versions précédentes"
     },
     "invoiceDocument": {

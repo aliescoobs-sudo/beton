@@ -43,7 +43,7 @@ export function CompanyForm({
       setMessage(t('saved'));
       return router.refresh();
     }
-    setMessage(t('invalid'));
+    setMessage(result.error === 'LEGAL_BLOCK_TOO_LONG' ? t('tooLong') : t('invalid'));
   }
 
   return (

@@ -64,10 +64,10 @@ export async function saveCompanyProfile(
   actor: SessionUser,
   input: unknown,
   deps: { today: string },
-): Promise<Result<{ id: string }, 'INVALID'>> {
+): Promise<Result<{ id: string }, 'INVALID' | 'LEGAL_BLOCK_TOO_LONG'>> {
   await require(appPool, actor, 'company.write');
   const parsed = parseCompanyProfileInput(input);
-  if (!parsed.ok) return err('INVALID');
+  if (!parsed.ok) return err(parsed.error);
   const v = parsed.value;
   const id = randomUUID();
   await inRequest(appPool, actor, (tx) =>
