@@ -245,8 +245,12 @@ describe('"started" includes the driver\'s report that loading began', () => {
     const order = await newOrder(date);
     const trip = await newTrip(date, order.id, truckA, driverRow1);
     await asDriver1((tx) => loadingTap(tx, trip));
-    // no trip_event exists: the old predicate saw an unstarted rotation
-    expect((await migrator.query(`select 1 from trip_event where trip_id = $1`, [trip])).rowCount).toBe(0);
+    // T9: the driver's report is also the first stage of the rotation (and still the legacy report row): the old predicate that read only
+    // the events would have seen a started rotation here, and the one that read only the report still does
+    expect((await migrator.query(`select 1 from trip_event where trip_id = $1`, [trip])).rowCount).toBe(1);
+    expect(
+      (await migrator.query(`select 1 from trip_driver_report where trip_id = $1`, [trip])).rowCount,
+    ).toBe(1);
     expect(
       await reassignTrip(app, pmA, {
         tripId: trip,

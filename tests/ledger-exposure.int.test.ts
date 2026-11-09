@@ -105,7 +105,7 @@ describe('functions the application role can execute', () => {
     'public.driver_bl_photo_counts(p_date date)', // C3: the driver's own rotations only
     'public.driver_emergency(p_trip uuid, p_option text, p_pct integer, p_note text, p_key text, p_at timestamp with time zone)',
     'public.driver_instructions()',
-    'public.driver_report(p_trip uuid, p_step text, p_at timestamp with time zone, p_key text, p_volume_l integer, p_reason text)', // T5: also records the delay of the tap (own rotation only, checked inside)
+    'public.driver_report(p_trip uuid, p_step text, p_at timestamp with time zone, p_key text, p_volume_l integer, p_reason text, p_now timestamp with time zone)', // T5: also records the delay of the tap (own rotation only, checked inside)
     'public.log_dispatch_change(p_kind text, p_old uuid, p_new uuid, p_from_truck uuid, p_to_truck uuid, p_from_driver uuid, p_to_driver uuid, p_reason text)', // T5: owner, app_admin, plant manager of the plant (checked inside)
     'public.set_trip_estimate(p_plant uuid, p_zone uuid, p_stage text, p_minutes integer, p_reason text)', // T5: owner, app_admin, plant manager of the plant (checked inside)
     'public.timing_parameter(p_key text)', // T5: four plan parameters, for the driver, plant manager, owner and app_admin (checked inside)
@@ -113,6 +113,11 @@ describe('functions the application role can execute', () => {
     'public.trip_started(p_trip uuid)', // R14-01: whether a rotation has started (an event, or the driver's loading report); read by the dispatch service
     'public.trip_stage_estimate(p_plant uuid, p_zone uuid, p_stage text)', // T5: the estimate of a stage, same roles (checked inside)
     'public.trip_timing(p_date date)', // T5: the timing inputs of the rotations the caller may see (checked inside, scoped)
+    'public.attach_trip_load(p_trip uuid, p_delivery uuid)', // T9: the plant's load linked once to a declared loaded stage (role and plant checked inside)
+    'public.confirm_trip_delivered(p_trip uuid)', // T9: the plant confirms a delivery the driver declared (role and plant checked inside)
+    'public.correct_trip_stage(p_trip uuid, p_stage text, p_time timestamp with time zone, p_reason text)', // T9: a correction with a reason (plant manager of the plant, owner, app_admin)
+    'public.record_trip_stage(p_trip uuid, p_stage text, p_now timestamp with time zone, p_client_time timestamp with time zone, p_key text, p_delivery uuid, p_reason text)', // T9: the one writer of a stage (role and plant checked inside)
+    'public.trip_stages(p_date date)', // T9: the shared status of the rotations the caller may see (scoped inside)
     'public.driver_trips(p_date date)',
     'public.emergencies_open()',
     'public.emergency_instruct(p_emergency uuid, p_kind text, p_address_enc text, p_map_url text, p_note text, p_join_trip uuid)',

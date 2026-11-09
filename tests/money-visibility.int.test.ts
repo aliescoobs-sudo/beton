@@ -354,7 +354,7 @@ describe('support is read-only everywhere (DECISIONS 81)', () => {
     const missing = await migrator.query<{ relname: string }>(
       `select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
         where n.nspname = 'public' and c.relkind = 'r' and c.relrowsecurity
-          and has_table_privilege('belgobeton_app', c.oid, 'SELECT') and c.relname not in ('security_alert_ack', 'notification', 'push_subscription', 'training_marker', 'trip_delay', 'trip_estimate_override', 'trip_dispatch_change', 'trip_overlap_override', 'trip_driver_report', 'trip_event')  -- support reads its own bell only (R5, D145); nobody reads push endpoints; support never reads the delays of named drivers (T5, D179) nor the raw driver reports (0122, D194), nor the raw steps (0208, T8)
+          and has_table_privilege('belgobeton_app', c.oid, 'SELECT') and c.relname not in ('security_alert_ack', 'notification', 'push_subscription', 'training_marker', 'trip_delay', 'trip_estimate_override', 'trip_dispatch_change', 'trip_overlap_override', 'trip_driver_report', 'trip_event', 'trip_event_correction')  -- support reads its own bell only (R5, D145); nobody reads push endpoints; support never reads the delays of named drivers (T5, D179) nor the raw driver reports (0122, D194), nor the raw steps (0208, T8) nor their corrections (0209, T9)
           and not exists (select 1 from pg_policies p where p.schemaname = 'public' and p.tablename = c.relname
                             and p.policyname = 'support_read')`,
     );

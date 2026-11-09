@@ -925,6 +925,13 @@
       "when": 1793805367023,
       "tag": "0208_roles_v1_hardening",
       "breakpoints": true
+    },
+    {
+      "idx": 209,
+      "version": "7",
+      "when": 1793805427023,
+      "tag": "0209_trip_shared_status",
+      "breakpoints": true
     }
   ]
 }

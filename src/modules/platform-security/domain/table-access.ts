@@ -1518,7 +1518,25 @@ export const TABLE_ACCESS = {
     noDelete: true,
     insertOnly: true,
     exception:
-      'operations O10: what really happened on a planned rotation, one row per trip and step (loaded, departed, arrived, unloading started and finished, back), in order and never before the previous step; the first step links the load. Times and quantities only. Insert-only; waiting time and delays are derived. Owner and plant record. Migration 0122: a plant manager reads the events of his own plant only. Migration 0208 (T8): partner and support have no accounts in V1 and no longer read or record steps (tracking is owner, app_admin and the plant manager of the plant).',
+      "operations O10: what really happened on a planned rotation, one row per trip and step (loaded, departed, arrived, unloading started and finished, back), in order and never before the previous step; the first step links the load. Times and quantities only. Insert-only; waiting time and delays are derived. Owner and plant record. Migration 0122: a plant manager reads the events of his own plant only. Migration 0208 (T8): partner and support have no accounts in V1 and no longer read or record steps (tracking is owner, app_admin and the plant manager of the plant). Migration 0209 (T9): seven stages (the driver's first tap added), written by record_trip_stage (driver, plant manager, owner, app_admin) with the author's role, the way (driver / plant / admin), the phone's time and the implicit flag; a plant manager no longer inserts directly. The one update the table allows is the plant's load linked once to a loaded stage declared without one (trigger).",
+  },
+  trip_event_correction: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'none',
+      office: 'none',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'none',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'T9 (DECISIONS 206): a correction of the time of a recorded stage of a rotation, as a new row that supersedes it (the stage is never touched): the new time, the time it replaces, a mandatory reason, the actor and role. Written only by correct_trip_stage (plant manager of the plant, owner, app_admin); also a `reverse` event in the hash-chained audit log. Read by the owner and the plant manager of the plant. Insert-only (trigger).',
   },
   fuel_fill: {
     kind: 'rls',

@@ -771,7 +771,7 @@ const FIXTURES: Record<
   },
   trip_event: {
     // Each writer plans a rotation of its own, loads it (a delivery of year 2095) and records the first step.
-    writers: ['owner', 'plant'], // T8 (0208): partner no longer inserts or reads steps
+    writers: ['owner'], // T8 (0208): partner no longer inserts or reads steps; T9 (0209): the plant manager records through record_trip_stage, not by direct insert
     seed: async (tx, actor) => {
       const scene = await deliveryScene(app, actors.owner, marker);
       const plan = await tx.query<{ id: string }>(
@@ -788,7 +788,20 @@ const FIXTURES: Record<
       );
     },
     visible: `select e.created_by::text as owner from trip_event e join trip_plan p on p.id = e.trip_id
-                where p.trip_date = '2095-03-02' and $1::text is not null`,
+                where p.trip_date = '2095-03-02' and e.step = 'loaded' and $1::text is not null`,
+  },
+  trip_event_correction: {
+    // T9: written by correct_trip_stage; the fixture writes the row as the definer would, on the committed first stage of the shared rotation.
+    writers: ['owner'],
+    seed: (_tx, actor) =>
+      withRlsContext(migratorPool, { userId: actor, role: 'owner', requestId: marker }, (m) =>
+        m.query(
+          `insert into trip_event_correction (id, trip_id, step, corrected_at, previous_at, reason, actor_id, actor_role)
+           values (gen_random_uuid(), $1, 'loading_started', now(), now(), $2, $3, 'owner')`,
+          [preField.trip, marker, actor],
+        ),
+      ),
+    visible: `select c.actor_id::text as owner from trip_event_correction c where c.reason = $1`,
   },
   fuel_fill: {
     writers: ['owner', 'partner', 'plant'],
@@ -1414,6 +1427,11 @@ beforeAll(async () => {
         [scene.orderId, scene.truckId, actors.owner],
       );
       preField.trip = trip.rows[0]!.id;
+      // T9: a committed first stage on that rotation, for the corrections fixture to refer to
+      await tx.query(
+        `insert into trip_event (id, trip_id, step, at, created_by) values (gen_random_uuid(), $1, 'loading_started', now(), $2)`,
+        [preField.trip, actors.owner],
+      );
     });
   }
   for (const key of ['status', 'hold'] as const) {

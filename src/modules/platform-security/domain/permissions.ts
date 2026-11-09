@@ -311,6 +311,8 @@ export const PERMISSIONS = {
   // Trip tracking: one tap per step of a rotation (the first one is the load, so the plant's rights); times and quantities only.
   'trips.read': TRACKING,
   'trips.track': TRACKING,
+  // T9: the time of a recorded stage is corrected (a new row, a reason, the audit log) by the same roles; the database re-checks the plant
+  'trips.correct': TRACKING,
   // Production and consumption report: quantities only (litres, grams), so the plant and the partner read it
   'reports.consumption': PLANT_READ,
   // Fuel per truck: litres and kilometres are quantities (plant, owner, partner record; support reads); the purchases and
