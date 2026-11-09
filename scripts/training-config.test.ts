@@ -110,13 +110,14 @@ describe('init-env.sh really produces a working training environment', () => {
   const dir = mkdtempSync(path.join(tmpdir(), 'bb-trainenv-'));
   mkdirSync(path.join(dir, 'scripts/training'), { recursive: true });
   copyFileSync('scripts/training/init-env.sh', path.join(dir, 'scripts/training/init-env.sh'));
+  copyFileSync('scripts/training/image-policy.sh', path.join(dir, 'scripts/training/image-policy.sh'));
   const run = () =>
     spawnSync('bash', [path.join(dir, 'scripts/training/init-env.sh')], {
       encoding: 'utf8',
       env: {
         ...process.env,
         APP_BASE_URL: 'http://localhost:3000',
-        APP_IMAGE: `ghcr.io/o/kayas@sha256:${'a'.repeat(64)}`,
+        APP_IMAGE: `ghcr.io/aliescoobs-sudo/kayas@sha256:${'a'.repeat(64)}`,
       },
     });
   const parse = (file: string) =>
@@ -460,9 +461,10 @@ describe('pick-image.sh and the stub sandbox (R11)', () => {
   };
 
   describe('pick-image.sh', () => {
-    const SHA_LINE = (sha: string) => `IMAGE_REF=ghcr.io/o/kayas@sha256:${'c'.repeat(64)} COMMIT=${sha}`;
+    const SHA_LINE = (sha: string) =>
+      `IMAGE_REF=ghcr.io/aliescoobs-sudo/kayas@sha256:${'c'.repeat(64)} COMMIT=${sha}`;
     const pick = (runList: string, log: (sha: string) => string) => {
-      const root = sbx(['pick-image.sh'], '');
+      const root = sbx(['pick-image.sh', 'image-policy.sh'], '');
       const git = (...a: string[]) => spawnSync('git', a, { cwd: root, encoding: 'utf8' });
       git('init', '-q');
       git('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'x');
@@ -481,7 +483,7 @@ describe('pick-image.sh and the stub sandbox (R11)', () => {
     it('prints the digest of the green run of this very commit', () => {
       const { r, sha } = pick('777', SHA_LINE);
       expect(r.status, r.stderr).toBe(0);
-      expect(r.stdout.trim()).toBe(`ghcr.io/o/kayas@sha256:${'c'.repeat(64)}`);
+      expect(r.stdout.trim()).toBe(`ghcr.io/aliescoobs-sudo/kayas@sha256:${'c'.repeat(64)}`);
       expect(r.stderr).toContain(sha);
     });
     it('refuses when no green run exists for the commit, when the run built another commit, and when the log has no reference', () => {
@@ -519,13 +521,20 @@ describe('the public helpers are retired (R15A-06)', () => {
     const root = mkdtempSync(path.join(tmpdir(), 'bb-r15up-'));
     mkdirSync(path.join(root, 'scripts/training'), { recursive: true });
     copyFileSync('scripts/training-up.sh', path.join(root, 'scripts/training-up.sh'));
+    copyFileSync('scripts/training/image-policy.sh', path.join(root, 'scripts/training/image-policy.sh'));
     const stub = (name: string, body: string) =>
       writeFileSync(path.join(root, 'scripts/training', name), `#!/usr/bin/env bash\n${body}\n`, {
         mode: 0o755,
       });
     stub('dc.sh', `case "$*" in *"exec -T app wget"*) echo '{"status":"ready"}';; esac`);
     stub('ops.sh', 'exit 0');
-    writeFileSync(path.join(root, '.env.training'), 'X=1\n', { mode: 0o600 });
+    writeFileSync(
+      path.join(root, '.env.training'),
+      `APP_IMAGE=ghcr.io/aliescoobs-sudo/kayas@sha256:${'a'.repeat(64)}\n`,
+      {
+        mode: 0o600,
+      },
+    );
     writeFileSync(path.join(root, '.env.training.ops'), 'X=1\n', { mode: 0o600 });
     const bin = path.join(root, 'bin');
     mkdirSync(bin);
@@ -554,6 +563,7 @@ describe('init-env.sh creates its files exclusively, never through a link (R12)'
     const root = mkdtempSync(path.join(tmpdir(), 'bb-initenv-'));
     mkdirSync(path.join(root, 'scripts/training'), { recursive: true });
     copyFileSync('scripts/training/init-env.sh', path.join(root, 'scripts/training/init-env.sh'));
+    copyFileSync('scripts/training/image-policy.sh', path.join(root, 'scripts/training/image-policy.sh'));
     return root;
   };
   const run = (root: string, extraPath = '') =>
@@ -562,7 +572,7 @@ describe('init-env.sh creates its files exclusively, never through a link (R12)'
       env: {
         ...process.env,
         PATH: `${extraPath}${process.env.PATH}`,
-        APP_IMAGE: `ghcr.io/o/kayas@sha256:${'a'.repeat(64)}`,
+        APP_IMAGE: `ghcr.io/aliescoobs-sudo/kayas@sha256:${'a'.repeat(64)}`,
       },
     });
   it('refuses an existing file and an existing link (dangling or not), and writes nothing', () => {

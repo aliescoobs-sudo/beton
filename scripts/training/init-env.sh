@@ -9,6 +9,8 @@ cd "$(dirname "$0")/../.."
 base="${APP_BASE_URL:-http://127.0.0.1:3000}"
 domain="${APP_DOMAIN:-}"
 image="${APP_IMAGE:?set APP_IMAGE (ghcr.io/<owner>/kayas@sha256:<digest>)}"
+. ./scripts/training/image-policy.sh
+kayas_require_image "$image" init-env.sh
 for f in .env.training .env.training.ops; do
   { [ -e "$f" ] || [ -L "$f" ]; } && { echo "init-env.sh: $f already exists (or is a link): not overwritten" >&2; exit 1; }
 done

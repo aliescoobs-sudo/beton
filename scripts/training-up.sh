@@ -9,6 +9,10 @@ ops=./scripts/training/ops.sh
 for f in .env.training .env.training.ops; do
   [ -r "$f" ] || { echo "training-up.sh: $f is missing. First run:  APP_IMAGE=ghcr.io/<owner>/kayas@sha256:<digest> ./scripts/training/init-env.sh" >&2; exit 1; }
 done
+# R16-03: the image in the env file must be the accepted digest BEFORE any pull, bootstrap or seed (a tag left in an old file is refused).
+. ./scripts/training/image-policy.sh
+configured=$(sed -n 's/^APP_IMAGE=//p' .env.training | head -n1)
+kayas_require_image "$configured" training-up.sh
 docker info >/dev/null 2>&1 || { echo "training-up.sh: Docker does not answer. On the iMac start it first:  colima start --arch x86_64 --cpu 2 --memory 4 --disk 40" >&2; exit 1; }
 $dc pull
 # R11-04: the credentials file lives in a Docker volume ("accounts"), not in a folder of this checkout that other users of the machine could
