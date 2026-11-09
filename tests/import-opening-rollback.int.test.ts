@@ -97,7 +97,7 @@ describe('soft rollback after balances were imported (R14-10)', () => {
     );
   });
 
-  it('after the rollback, the opening date cannot be re-entered: a new file with another date does not move it', async () => {
+  it('after the rollback, the opening date cannot be re-entered: a new file with another date is REFUSED (R15B-11) and does not move it', async () => {
     const again = buildWorkbook([
       {
         name: 'Clients',
@@ -124,7 +124,9 @@ describe('soft rollback after balances were imported (R14-10)', () => {
       requireEveryMappedSheet: false,
       openingDate: '2026-09-09',
     });
-    expect(r.applied).toBe(true);
+    // R15B-11: a contradicting date is refused as a whole, not silently replaced by the stored one
+    expect(r.applied).toBe(false);
+    expect(r.totals.error).toBeGreaterThan(0);
     expect((await migrator.query('select opening_date::text d from ledger_opening')).rows).toEqual([
       { d: '2026-02-01' },
     ]); // unchanged
@@ -170,5 +172,103 @@ describe('rollback by an app_admin (R14-10 follow-up)', () => {
     // the opening balances are listed for an app_admin too (the code counters are audit rows an app_admin does not read: the inventory of the
     // owner is the complete one, which the operator guide says)
     expect(back.staysAsRecorded).toMatchObject({ opening_party_balance: 1 });
+  });
+});
+
+describe('R15B-11: the opening date the operator confirmed is the one that is used', () => {
+  const soldes = (name: string) =>
+    buildWorkbook([
+      {
+        name: 'Clients',
+        rows: [
+          ['Nom', 'Type', 'ICE'],
+          [name, 'person', ''],
+        ],
+      },
+      {
+        name: 'Soldes',
+        rows: [
+          ['Tiers', 'Code', 'Montant'],
+          ['client', name, '10,00'],
+        ],
+      },
+    ]);
+  it('refuses a contradicting --opening-date once the books are opened, instead of silently using the stored one', async () => {
+    const stored = (await migrator.query<{ d: string }>('select opening_date::text d from ledger_opening'))
+      .rows[0]!.d;
+    const other = stored === '2026-03-01' ? '2026-04-01' : '2026-03-01';
+    const name = `Client Fictif Date ${tag}`;
+    const client = await importWorkbook({
+      appPool: app,
+      actor: owner,
+      file: buildWorkbook([
+        {
+          name: 'Clients',
+          rows: [
+            ['Nom', 'Type', 'ICE'],
+            [name, 'person', ''],
+          ],
+        },
+      ]),
+      mappings: [map('Clients', 'clients')],
+      mode: 'apply',
+      environment: PROD,
+      requireEveryMappedSheet: false,
+    });
+    expect(client.applied).toBe(true);
+    const dry = await importWorkbook({
+      appPool: app,
+      actor: owner,
+      file: soldes(name),
+      mappings: [map('Soldes', 'opening_balances')],
+      mode: 'dry-run',
+      environment: PROD,
+      requireEveryMappedSheet: false,
+      openingDate: other,
+    });
+    expect(dry.totals.error).toBe(1);
+    expect(dry.sheets[0]?.report.rows[0]?.message).toMatch(/opening date/i);
+    // the same date as the stored one, or none at all, is accepted (the stored date is the one used)
+    for (const openingDate of [stored, undefined]) {
+      const ok = await importWorkbook({
+        appPool: app,
+        actor: owner,
+        file: soldes(name),
+        mappings: [map('Soldes', 'opening_balances')],
+        mode: 'dry-run',
+        environment: PROD,
+        requireEveryMappedSheet: false,
+        ...(openingDate ? { openingDate } : {}),
+      });
+      expect(ok.totals.error, String(openingDate)).toBe(0);
+    }
+  });
+});
+
+describe('R15B-12: the rollback inventory also lists what the run UPDATED and cannot undo', () => {
+  it('a client created by an import advances the existing code counter; the rollback says the advance stays', async () => {
+    const name = `Client Fictif Compteur ${tag}`;
+    const done = await importWorkbook({
+      appPool: app,
+      actor: owner,
+      file: buildWorkbook([
+        {
+          name: 'Clients',
+          rows: [
+            ['Nom', 'Type', 'ICE'],
+            [name, 'person', ''],
+          ],
+        },
+      ]),
+      mappings: [map('Clients', 'clients')],
+      mode: 'apply',
+      environment: PROD,
+      requireEveryMappedSheet: false,
+    });
+    expect(done.applied).toBe(true);
+    const back = await rollbackImport({ appPool: app, actor: owner, runId: done.runId!, environment: PROD });
+    expect(back.blocked).toEqual([]);
+    expect(back.archived).toMatchObject({ client: 1 });
+    expect(back.staysAsRecorded).toMatchObject({ 'code_sequence (updated)': 1 });
   });
 });

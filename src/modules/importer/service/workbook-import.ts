@@ -124,14 +124,12 @@ const emptyTotals = (): WorkbookReport['totals'] => ({
 /** Validates a workbook and, in `apply` mode, writes it in one audited transaction. */
 export async function importWorkbook(opts: WorkbookOptions): Promise<WorkbookReport> {
   const hash = sha256(opts.file);
-  assertActor(opts.actor, opts.mode, {
-    given: opts.stepUp,
-    operation: importConfirmation({
-      fileSha256: hash,
-      mappings: opts.mappings,
-      openingDate: opts.openingDate ?? null,
-    }).operation,
-  });
+  const operation = importConfirmation({
+    fileSha256: hash,
+    mappings: opts.mappings,
+    openingDate: opts.openingDate ?? null,
+  }).operation;
+  assertActor(opts.actor, opts.mode, { given: opts.stepUp, operation });
   await assertImportEnvironment(opts.appPool, opts.environment);
   const report: WorkbookReport = {
     sha256: hash,
@@ -196,9 +194,18 @@ export async function importWorkbook(opts: WorkbookOptions): Promise<WorkbookRep
     // idempotency: the same bytes, already imported and not rolled back
     const previous = await findAppliedRun(pool, opts.actor, hash);
     if (previous) {
-      report.alreadyImportedRunId = previous;
       ended = true;
       await rollbackAndRelease(client);
+      // R15B-10: "already imported" is about the file AND the operation (mappings, opening date). The same bytes asked for with another
+      // interpretation are not an import that was done: say so instead of reporting success for work that was never planned.
+      // (Runs recorded before the operation was stored have no digest and keep the old meaning.)
+      if (previous.operation && previous.operation !== operation) {
+        report.fileProblems.push(
+          `This file was already imported (run ${previous.runId}) with another mapping or opening date: roll that import back first, or change the file.`,
+        );
+        return report;
+      }
+      report.alreadyImportedRunId = previous.runId;
       return report;
     }
 
@@ -246,6 +253,7 @@ export async function importWorkbook(opts: WorkbookOptions): Promise<WorkbookRep
           after: {
             run_id: runId,
             sha256: hash,
+            operation,
             size_bytes: opts.file.length,
             sheets: report.sheets.map((s) => ({
               kind: s.kind,
@@ -282,16 +290,20 @@ const auditContext = (actor: SessionUser) => ({
 });
 
 /** The run that imported these bytes and has not been rolled back since, if any. */
-async function findAppliedRun(pool: pg.Pool, actor: SessionUser, hash: string): Promise<string | null> {
+async function findAppliedRun(
+  pool: pg.Pool,
+  actor: SessionUser,
+  hash: string,
+): Promise<{ runId: string; operation: string | null } | null> {
   return withRlsContext(pool, auditContext(actor), async (tx) => {
-    const { rows } = await tx.query<{ row_id: string }>(
-      `select i.row_id from audit_event i
+    const { rows } = await tx.query<{ row_id: string; operation: string | null }>(
+      `select i.row_id, i.after->>'operation' as operation from audit_event i
         where i.action = 'import' and i.table_name = 'import' and i.after->>'sha256' = $1
           and not exists (select 1 from audit_event r where r.action = 'reverse' and r.table_name = 'import' and r.row_id = i.row_id)
         order by i.id desc limit 1`,
       [hash],
     );
-    return rows[0]?.row_id ?? null;
+    return rows[0] ? { runId: rows[0].row_id, operation: rows[0].operation } : null;
   });
 }
 
@@ -383,6 +395,19 @@ export async function rollbackImport(opts: {
           where action = 'insert' and request_id like $1 order by id desc`,
         [`${RUN_TAG_PREFIX}${opts.runId}|%`],
       );
+      // R15B-12: what the run UPDATED in rows it did not create (an existing counter that advanced, say) cannot be undone by archiving; it is
+      // listed, so the inventory is not only the inserts. Only the rows this account may read are visible to the query (the guide says so).
+      const touched = await tx.query<{ table_name: string; row_id: string }>(
+        `select distinct table_name, row_id from audit_event
+          where action = 'update' and request_id like $1`,
+        [`${RUN_TAG_PREFIX}${opts.runId}|%`],
+      );
+      const insertedHere = new Set(made.rows.map((m) => `${m.table_name}|${m.row_id}`));
+      for (const { table_name: table, row_id: id } of touched.rows) {
+        if (insertedHere.has(`${table}|${id}`) || table === 'import') continue;
+        const key = `${table} (updated)`;
+        report.staysAsRecorded[key] = (report.staysAsRecorded[key] ?? 0) + 1;
+      }
       for (const { table_name: table, row_id: id } of made.rows) {
         if ((ARCHIVABLE as readonly string[]).includes(table)) {
           const done = await tx.query(

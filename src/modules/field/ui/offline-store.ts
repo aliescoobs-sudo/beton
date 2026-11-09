@@ -7,6 +7,8 @@ import { nextPhotoSeq, wipePhotos } from './photo-queue';
 
 export const QUEUE_KEY = 'bb_field_queue';
 export const DAY_KEY = 'bb_field_day';
+/** R15B-02: set when this phone signed out and the server has not confirmed it (it holds no data; a wipe does not remove it). */
+export const SIGNED_OUT_KEY = 'bb_field_signed_out';
 
 // The service worker keeps only the app shell and static files (bb-field-v2). Anything from the API, and every older cache version (the
 // first one kept the day), is erased; the shell stays so that the app still opens offline to its sign-in.

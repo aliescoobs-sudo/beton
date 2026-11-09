@@ -29,7 +29,8 @@ const stalls = <T>(signal: AbortSignal, honour = true) =>
     if (honour) signal.addEventListener('abort', () => reject(new Error('aborted')));
   });
 
-function rig(opts?: { honourAbort?: boolean; confirm?: boolean }) {
+function rig(opts?: { honourAbort?: boolean; confirm?: boolean; mark?: { set: boolean } }) {
+  const mark = opts?.mark ?? { set: false };
   const store = new Map<string, string>();
   let owner: string | null = 'u1';
   let queue: unknown[] = [{ key: 'tap-1' }];
@@ -131,10 +132,16 @@ function rig(opts?: { honourAbort?: boolean; confirm?: boolean }) {
       log.logouts++;
       return hooks.logout(signal);
     },
+    signOutMark: {
+      set: () => void (mark.set = true),
+      clear: () => void (mark.set = false),
+      isSet: () => mark.set,
+    },
     drainDeadlineMs: 8_000,
     logoutDeadlineMs: 6_000,
   });
   return {
+    mark,
     controller,
     session,
     store,
@@ -611,5 +618,58 @@ describe('photo capture is tied to the session it started in (R15A-04)', () => {
     r.setQueue([]);
     await r.session.signOut();
     expect(await r.session.capturePhoto('t1', async () => blob)).toBe('refused');
+  });
+});
+
+describe('R15B-02: a failed logout is not treated as finished, and a reload does not restore the session', () => {
+  it('the logout answered OK: the sign-out mark is cleared and a reload goes on normally', async () => {
+    const r = rig();
+    r.hooks.logout = async () => ({ ok: true });
+    await r.session.signOut();
+    expect(r.mark.set).toBe(false);
+    expect(await r.session.startup()).toBe('proceed');
+  });
+
+  it.each([
+    ['the request fails (offline)', async () => Promise.reject(new Error('offline'))],
+    ['the server answers an error status', async () => ({ ok: false })],
+    [
+      'the request never answers and is aborted at its deadline',
+      (signal: AbortSignal) => stalls<unknown>(signal),
+    ],
+  ])(
+    '%s: the mark stays, and the reload shows the sign-in screen, reads no day, and tries the logout again',
+    async (_n, logout) => {
+      vi.useFakeTimers();
+      const first = rig();
+      first.hooks.logout = logout as never;
+      const out = first.session.signOut();
+      await vi.advanceTimersByTimeAsync(9_000);
+      await out;
+      vi.useRealTimers();
+      expect(first.mark.set).toBe(true);
+      // the page is reloaded (same stored mark), the cookie is still valid: the day must not come back
+      const second = rig({ mark: first.mark });
+      second.hooks.logout = async () => ({ ok: true });
+      expect(await second.session.startup()).toBe('signed-out');
+      expect(second.log.sessionReads).toBe(0);
+      expect(second.log.logouts).toBe(1);
+      expect(second.mark.set).toBe(false); // the retry reached the server: the next load is normal
+      expect(second.ui.session).not.toBe('in');
+    },
+  );
+
+  it('while the retry keeps failing the mark stays and every reload stays signed out', async () => {
+    const r = rig({ mark: { set: true } });
+    r.hooks.logout = async () => ({ ok: false });
+    expect(await r.session.startup()).toBe('signed-out');
+    expect(r.mark.set).toBe(true);
+    expect(r.log.sessionReads).toBe(0);
+  });
+
+  it('a successful sign-in clears the mark', async () => {
+    const r = rig({ mark: { set: true } });
+    await r.session.signedIn();
+    expect(r.mark.set).toBe(false);
   });
 });

@@ -126,18 +126,39 @@ function sheetParts(buf: Buffer, zip: Map<string, ZipEntry>): { name: string; pa
   return named.length ? named : byFile.map((part, i) => ({ name: `Sheet${i + 1}`, part }));
 }
 
+/** The five predefined XML entities and numeric (decimal or hexadecimal) character references. */
+function xmlDecode(v: string): string {
+  return v
+    .replace(/&#x([0-9a-f]+);/gi, (_m, h: string) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_m, d: string) => String.fromCodePoint(Number(d)))
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
+}
+
 /** Every sheet of a workbook with its name, in workbook order. Empty cells are ''. A date cell comes as its serial number. */
 export function readXlsxSheets(buf: Buffer): NamedSheet[] {
   const zip = zipEntries(buf);
   // R14-04: the workbook's date system. A date cell is a number of days from an origin that depends on it (1899-12-30, or 1904-01-01,
   // 1462 days later). This reader only knows the first, so a 1904 workbook is refused, never read with the wrong origin.
   const wbXml = zip.get('xl/workbook.xml') ? readEntry(buf, zip.get('xl/workbook.xml') as ZipEntry) : '';
-  const pr = /<workbookPr\b([^>]*?)\/?>/.exec(wbXml)?.[1] ?? '';
-  const d1904 = /\bdate1904\s*=\s*"([^"]*)"/.exec(pr)?.[1]?.toLowerCase();
-  if (d1904 === '1' || d1904 === 'true')
-    throw new SheetError(
-      'this workbook uses the 1904 date system, which is not supported: in Excel, untick "Use 1904 date system" (File > Options > Advanced) and save it again',
-    );
+  // R15B-08: namespace-aware enough to be positive about the flag. Any prefix on the element, either quote character, spaces around "=",
+  // numeric/hexadecimal character references and entities are understood; a value that is not plainly false ("0"/"false") is refused.
+  for (const m of wbXml.matchAll(/<(?:[\w.-]+:)?workbookPr\b([^>]*?)\/?>/g)) {
+    for (const a of (m[1] ?? '').matchAll(/([\w.:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g)) {
+      const name = (a[1] ?? '').split(':').pop();
+      if (name !== 'date1904') continue;
+      const value = xmlDecode(a[2] ?? a[3] ?? '')
+        .trim()
+        .toLowerCase();
+      if (value !== '0' && value !== 'false')
+        throw new SheetError(
+          'this workbook uses the 1904 date system, which is not supported: in Excel, untick "Use 1904 date system" (File > Options > Advanced) and save it again',
+        );
+    }
+  }
   const shared = zip.get('xl/sharedStrings.xml');
   const strings = shared
     ? [...readEntry(buf, shared).matchAll(/<si>([\s\S]*?)<\/si>/g)].map((m) => textOf(m[1] ?? ''))

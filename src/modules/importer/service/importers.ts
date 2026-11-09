@@ -41,6 +41,28 @@ import type { SessionUser } from '@/modules/platform-security';
 import { type DateFormat, type Sheet, toIsoDate, toRecords } from '../domain/sheet';
 import { parseImportAmount, parseWholeNumber } from '../domain/values';
 
+/**
+ * R15B-09: a name or a code that belongs to SEVERAL records identifies none of them. The importers used a Map keyed by name, where the last
+ * duplicate silently won, so money could be attached to the wrong party. Returns the lowercase keys shared by two or more different records;
+ * a row that uses one is refused with a message that asks for the code.
+ */
+export function ambiguousKeys<T extends { id: string }>(
+  items: T[],
+  keysOf: (item: T) => string[],
+): Set<string> {
+  const owner = new Map<string, string>();
+  const shared = new Set<string>();
+  for (const item of items) {
+    for (const key of new Set(keysOf(item))) {
+      const first = owner.get(key);
+      if (first !== undefined && first !== item.id) shared.add(key);
+      else owner.set(key, item.id);
+    }
+  }
+  return shared;
+}
+const AMBIGUOUS = 'several records have this name or code: identify it by its unique code';
+
 // Excel importers (REQUIREMENTS-V1 §14). Every row goes through the same parser and the same service as the screen, so the same
 // rules, row-level security and audit apply. A DRY RUN (the default) validates every row, looks for what exists already, writes
 // nothing, and says what a real run would do. A real run only starts when the dry run found no error, and re-running is safe:
@@ -288,6 +310,7 @@ async function plan(
     const records = rawRecords.map((r) => ({ row: r.row, values: full('clients', r.values) }));
     const existing = await listClients(appPool, actor);
     const names = new Map(existing.map((c) => [c.name.trim().toLowerCase(), c]));
+    const ambNames = ambiguousKeys(existing, (c) => [c.name.trim().toLowerCase()]);
     const ices = new Set(existing.flatMap((c) => (c.ice ? [c.ice] : [])));
     const seenN = new Set<string>();
     const seenI = new Set<string>();
@@ -309,6 +332,7 @@ async function plan(
           label: v.name,
           error: 'invalid row (name, type company/person, ICE 15 digits for a company, terms in days)',
         });
+      else if (ambNames.has(key)) planned.push({ row, label: v.name, error: AMBIGUOUS });
       else if (names.has(key)) {
         const e = names.get(key)!;
         const d = differences([
@@ -342,6 +366,7 @@ async function plan(
     const records = rawRecords.map((r) => ({ row: r.row, values: full('suppliers', r.values) }));
     const existing = await listSuppliers(appPool, actor);
     const names = new Map(existing.map((s) => [s.name.trim().toLowerCase(), s]));
+    const ambNames = ambiguousKeys(existing, (s) => [s.name.trim().toLowerCase()]);
     const seen = new Set<string>();
     for (const { row, values: v } of records) {
       const category = v.category.trim().toLowerCase();
@@ -360,6 +385,8 @@ async function plan(
           label: v.name,
           error: `category must be one of ${SUPPLIER_CATEGORIES.join(', ')}`,
         });
+      } else if (ambNames.has(key)) {
+        planned.push({ row, label: v.name, error: AMBIGUOUS });
       } else if (names.has(key)) {
         const e = names.get(key)!;
         const d = differences([
@@ -506,6 +533,7 @@ async function plan(
     const records = rawRecords.map((r) => ({ row: r.row, values: full('components', r.values) }));
     const existing = await listComponents(appPool, actor);
     const names = new Map(existing.map((c) => [c.nameFr.trim().toLowerCase(), c]));
+    const ambNames = ambiguousKeys(existing, (c) => [c.nameFr.trim().toLowerCase()]);
     const purchaseUnits = await listPurchaseUnits(appPool, actor);
     const seen = new Set<string>();
     for (const { row, values: v } of records) {
@@ -523,6 +551,7 @@ async function plan(
           label: v.nameFr,
           error: `content of the purchase unit: a whole number of ${unit}`,
         });
+      else if (ambNames.has(key)) planned.push({ row, label: v.nameFr, error: AMBIGUOUS });
       else if (names.has(key)) {
         const e = names.get(key)!;
         const mine = purchaseUnits.filter((u) => u.componentId === e.id && u.status === 'active');
@@ -578,6 +607,7 @@ async function plan(
       byRef.set(c.code.toLowerCase(), c);
       byRef.set(c.nameFr.trim().toLowerCase(), c);
     }
+    const ambRef = ambiguousKeys(components, (c) => [c.code.toLowerCase(), c.nameFr.trim().toLowerCase()]);
     // rows of one version: the same type and date
     type Line = { row: number; componentId: string; qtyPerM3: number };
     const groups = new Map<
@@ -614,6 +644,10 @@ async function plan(
           label,
           error: `date not understood or ambiguous (expected ${ctx.dateFormat ?? 'dmy'})`,
         });
+        continue;
+      }
+      if (ambRef.has(v.component.trim().toLowerCase())) {
+        planned.push({ row, label, error: AMBIGUOUS });
         continue;
       }
       if (!comp) {
@@ -687,10 +721,12 @@ async function plan(
   } else if (kind === 'cheques_in_transit') {
     const records = rawRecords.map((r) => ({ row: r.row, values: full('cheques_in_transit', r.values) }));
     const clients = new Map<string, string>();
-    for (const c of await listClients(appPool, actor)) {
+    const clientList = await listClients(appPool, actor);
+    for (const c of clientList) {
       clients.set(c.code.toLowerCase(), c.id);
       clients.set(c.name.trim().toLowerCase(), c.id);
     }
+    const ambClients = ambiguousKeys(clientList, (c) => [c.code.toLowerCase(), c.name.trim().toLowerCase()]);
     const haveByKey = new Map<string, Awaited<ReturnType<typeof listInstruments>>[number]>();
     for (const i of (await listInstruments(appPool, actor)).filter((x) => x.direction === 'in'))
       haveByKey.set(`${i.partyId}|${(i.number ?? '').toLowerCase()}|${(i.bank ?? '').toLowerCase()}`, i);
@@ -707,7 +743,8 @@ async function plan(
       const written = toIsoDate(v.written, ctx.dateFormat);
       const label = `${v.number} ${v.client}`;
       const key = `${clientId}|${v.number.toLowerCase()}|${v.bank.toLowerCase()}`;
-      if (!clientId) planned.push({ row, label, error: 'unknown client (code or exact name)' });
+      if (ambClients.has(v.client.trim().toLowerCase())) planned.push({ row, label, error: AMBIGUOUS });
+      else if (!clientId) planned.push({ row, label, error: 'unknown client (code or exact name)' });
       else if (!method) planned.push({ row, label, error: 'type must be cheque or lcn' });
       else if (!v.number.trim()) planned.push({ row, label, error: 'the cheque or LCN number is required' });
       else if (!amount.ok || amount.value <= 0)
@@ -790,17 +827,37 @@ async function plan(
     const records = rawRecords.map((r) => ({ row: r.row, values: full('opening_balances', r.values) }));
     const state = await getOpeningState(appPool, actor);
     const date = state.openingDate ?? ctx.openingDate ?? null;
+    // R15B-11: the date the operator confirmed is the one that is used. Once the books are opened on a date, a different --opening-date is a
+    // contradiction to resolve with the accountant, never silently replaced by the stored one.
+    if (state.openingDate && ctx.openingDate && ctx.openingDate !== state.openingDate) {
+      return {
+        planned: records.map((r) => ({
+          row: r.row,
+          label: r.values.code ?? '',
+          error:
+            'the books are already opened on another date than the opening date given: the opening date cannot move; remove the option or give the stored date',
+        })),
+        missing: [],
+      };
+    }
     // a party is named by its code or by its exact name (the company's files know names; the codes are made when the party is created)
     const clients = new Map<string, string>();
-    for (const c of await listClients(appPool, actor)) {
+    const clientList = await listClients(appPool, actor);
+    for (const c of clientList) {
       clients.set(c.code.toLowerCase(), c.id);
       clients.set(c.name.trim().toLowerCase(), c.id);
     }
     const suppliers = new Map<string, string>();
-    for (const x of await listSuppliers(appPool, actor)) {
+    const supplierList = await listSuppliers(appPool, actor);
+    for (const x of supplierList) {
       suppliers.set(x.code.toLowerCase(), x.id);
       suppliers.set(x.name.trim().toLowerCase(), x.id);
     }
+    const ambClients = ambiguousKeys(clientList, (c) => [c.code.toLowerCase(), c.name.trim().toLowerCase()]);
+    const ambSuppliers = ambiguousKeys(supplierList, (x) => [
+      x.code.toLowerCase(),
+      x.name.trim().toLowerCase(),
+    ]);
     const has = new Map(state.parties.map((p) => [`${p.kind}:${p.partyId}`, p]));
     const seenInFile = new Set<string>();
     if (!date) {
@@ -823,7 +880,14 @@ async function plan(
             ? suppliers.get(v.code.trim().toLowerCase())
             : undefined;
       const amount = parseImportAmount(v.amount);
-      if (!id) planned.push({ row, label: v.code, error: 'unknown client or supplier (code or exact name)' });
+      const partyKey = v.code.trim().toLowerCase();
+      if (
+        (party === 'client' && ambClients.has(partyKey)) ||
+        (party === 'supplier' && ambSuppliers.has(partyKey))
+      )
+        planned.push({ row, label: v.code, error: AMBIGUOUS });
+      else if (!id)
+        planned.push({ row, label: v.code, error: 'unknown client or supplier (code or exact name)' });
       else if (!amount.ok || amount.value <= 0)
         planned.push({
           row,
@@ -854,6 +918,12 @@ async function plan(
             if (first) {
               const d = await enterOpeningDate(appPool, actor, { openingDate: date });
               if (!d.ok && d.error !== 'ALREADY_ENTERED') return fail(d);
+              if (!d.ok) {
+                // Someone entered a date while this file was being planned: it must be the one that was confirmed.
+                const now = await getOpeningState(appPool, actor);
+                if (now.openingDate !== date)
+                  return 'the books were opened on another date than the one confirmed: run the import again';
+              }
             }
             const r = await addPartyOpeningBalance(appPool, actor, {
               ...(party === 'client' ? { clientId: id } : { supplierId: id }),

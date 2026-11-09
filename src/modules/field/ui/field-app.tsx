@@ -24,7 +24,7 @@ import {
 } from '../domain/timing-view';
 import { createDayController } from './day-controller';
 import { createFieldSession } from './field-session';
-import { DAY_KEY, forgetAll, forgetRead, QUEUE_KEY } from './offline-store';
+import { DAY_KEY, forgetAll, forgetRead, QUEUE_KEY, SIGNED_OUT_KEY } from './offline-store';
 import { dropPhoto, type QueuedPhoto, queuedPhotos, queuePhoto, sendPhoto, shrinkPhoto } from './photo-queue';
 
 // The phone app. One big button per step, an emergency button that is always there, large text. Every tap is queued with the
@@ -249,6 +249,11 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
       },
       confirmPending: (count) => window.confirm(t('signOutPending', { count })),
       logoutRequest: (signal) => fetch('/api/field/logout', { method: 'POST', signal }),
+      signOutMark: {
+        set: () => localStorage.setItem(SIGNED_OUT_KEY, '1'),
+        clear: () => localStorage.removeItem(SIGNED_OUT_KEY),
+        isSet: () => localStorage.getItem(SIGNED_OUT_KEY) === '1',
+      },
       drainDeadlineMs: SIGN_OUT_DEADLINE_MS,
       logoutDeadlineMs: LOGOUT_DEADLINE_MS,
     });
@@ -275,9 +280,14 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
         ownerRef.current = kept?.userId ?? null;
         saveQueue(kept?.actions ?? []);
       })
-      .then(() => loadDay())
-      .then(() => sync())
-      .then(() => flushPhotos());
+      // R15B-02: a sign-out the server never confirmed is not undone by a reload: sign-in screen, logout sent again, no day read.
+      .then(() => getSession().startup())
+      .then(async (state) => {
+        if (state === 'signed-out') return;
+        await loadDay();
+        await sync();
+        await flushPhotos();
+      });
     const up = () => {
       setOnline(true);
       void sync();
@@ -306,7 +316,7 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
       window.removeEventListener('focus', resume);
       clearInterval(timer);
     };
-  }, [loadDay, saveQueue, sync, flushPhotos, recheck]);
+  }, [getSession, loadDay, saveQueue, sync, flushPhotos, recheck]);
 
   useEffect(() => {
     shown.current = day !== null && session === 'in';

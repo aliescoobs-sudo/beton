@@ -52,8 +52,17 @@ export interface SessionPorts<P extends QueuedPhotoRef> {
   };
   /** Asks the driver whether to sign out although `count` things are still waiting. */
   confirmPending(count: number): boolean;
-  /** The server call of the sign-out. It must honour the signal (an aborted fetch's response is discarded by the browser). */
+  /**
+   * The server call of the sign-out. It must honour the signal (an aborted fetch's response is discarded by the browser). It resolves to the
+   * response; only `{ ok: true }` counts as "the server ended the session" (R15B-02).
+   */
   logoutRequest(signal: AbortSignal): Promise<unknown>;
+  /**
+   * R15B-02: a local tombstone, kept in the phone's storage, that says "this phone signed out and the server has not confirmed it". It is set when
+   * the sign-out begins, cleared when the server answers OK or when a new sign-in succeeds. While it is set, a reload shows the sign-in screen
+   * and retries the logout instead of restoring a session whose cookie is still valid.
+   */
+  signOutMark?: { set(): void; clear(): void; isSet(): boolean };
   /** Overall limit of the sign-out's last send (ms). */
   drainDeadlineMs: number;
   /** Overall limit of the logout request (ms): after it the request is aborted and a new sign-in may go on (R15A-01). */
@@ -218,9 +227,21 @@ export function createFieldSession<P extends QueuedPhotoRef>(ports: SessionPorts
       return;
     }
     op.end();
+    ports.signOutMark?.set();
     day.signedOut();
     ports.ui.clearWaiting();
     await sendLogout();
+  }
+
+  /**
+   * First step of a page load (R15B-02). 'signed-out': a sign-out was not confirmed by the server, so the day is NOT read (the cookie may
+   * still be valid); the screen shows the sign-in and the logout is sent again. 'proceed': load the day as usual.
+   */
+  async function startup(): Promise<'proceed' | 'signed-out'> {
+    if (!ports.signOutMark?.isSet()) return 'proceed';
+    day.signedOut();
+    await sendLogout();
+    return 'signed-out';
   }
 
   /** The server call of one sign-out: its own abort, its own deadline. It never throws and it always settles. */
@@ -233,6 +254,10 @@ export function createFieldSession<P extends QueuedPhotoRef>(ports: SessionPorts
       }, ports.logoutDeadlineMs);
       ports
         .logoutRequest(ctl.signal)
+        .then((res) => {
+          // Only an answer that says OK ends the matter. An error status, a failure or a deadline leaves the mark: the cookie may be alive.
+          if ((res as { ok?: boolean } | null | undefined)?.ok === true) ports.signOutMark?.clear();
+        })
         .catch(() => null)
         .finally(() => {
           clearTimeout(deadline);
@@ -294,6 +319,7 @@ export function createFieldSession<P extends QueuedPhotoRef>(ports: SessionPorts
 
   /** A successful sign-in: a new generation, then the first read and send. */
   async function signedIn(): Promise<void> {
+    ports.signOutMark?.clear();
     day.signedIn();
     await day.loadDay();
     await sync();
@@ -305,6 +331,7 @@ export function createFieldSession<P extends QueuedPhotoRef>(ports: SessionPorts
     capturePhoto,
     signOut,
     signedIn,
+    startup,
     logoutsSettled,
     isSigningOut: () => activeSignOut !== null,
   };

@@ -15,6 +15,37 @@ describe('the 1904 date system (R14-04)', () => {
   });
 });
 
+describe('R15B-08: the 1904 flag is refused in every valid XML spelling', () => {
+  const rows = [['Date'], [43000]];
+  it.each([
+    ['single quotes', "<workbookPr date1904='1'/>"],
+    ['a namespace prefix', '<x:workbookPr date1904="1"/>'],
+    ['a prefix and single quotes', "<x:workbookPr date1904='true'/>"],
+    ['spaces around the equals sign', '<workbookPr date1904 = "1"/>'],
+    ['a numeric character reference', '<workbookPr date1904="&#49;"/>'],
+    ['a hexadecimal character reference', "<workbookPr date1904='&#x31;'/>"],
+    ['the word true in capitals', '<workbookPr date1904="TRUE"/>'],
+    ['another attribute first', '<workbookPr defaultThemeVersion="1" date1904="1"></workbookPr>'],
+    ['an attribute that is a prefixed name', '<workbookPr x:date1904="1"/>'],
+  ])('refuses %s', (_n, pr) => {
+    const f = buildWorkbook([{ name: 'S', rows }], false, { workbookPr: pr });
+    expect(() => readXlsxSheets(f)).toThrow(/1904 date system/);
+  });
+  it.each([
+    ['explicit false', '<workbookPr date1904="0"/>'],
+    ['explicit false in single quotes', "<workbookPr date1904='false'/>"],
+    ['no flag at all', '<workbookPr defaultThemeVersion="1"/>'],
+  ])('still reads a 1900-system workbook: %s', (_n, pr) => {
+    expect(
+      readXlsxSheets(buildWorkbook([{ name: 'S', rows }], false, { workbookPr: pr }))[0]?.rows[1],
+    ).toEqual(['43000']);
+  });
+  it('refuses a flag whose value is not a plain boolean instead of guessing', () => {
+    const f = buildWorkbook([{ name: 'S', rows }], false, { workbookPr: '<workbookPr date1904="maybe"/>' });
+    expect(() => readXlsxSheets(f)).toThrow(/1904 date system|date system/);
+  });
+});
+
 describe('duplicate accepted headers (R14-04)', () => {
   const cols = { name: ['Nom', 'Client'], city: ['Ville'] };
   it('one column per field reads; two columns with an accepted header for the same field are reported, not guessed', () => {

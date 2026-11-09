@@ -53,13 +53,24 @@ function open(): Promise<IDBDatabase> {
   });
 }
 
+/**
+ * R15B-04: a request that succeeded is not a write that is durable. A readwrite operation is finished when its TRANSACTION completes; an abort
+ * (or an error) after the request's success rejects. A readonly read has nothing to commit, so its result is returned when the request succeeds.
+ */
+function finish<T>(tx: IDBTransaction, req: IDBRequest<T>, mode: IDBTransactionMode): Promise<T> {
+  return new Promise((resolve, reject) => {
+    tx.onabort = () => reject(tx.error ?? req.error ?? new Error('transaction aborted'));
+    tx.onerror = () => reject(tx.error ?? req.error);
+    if (mode === 'readonly') req.onsuccess = () => resolve(req.result);
+    else tx.oncomplete = () => resolve(req.result);
+  });
+}
+
 async function run<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest<T>): Promise<T> {
   const db = await open();
-  return new Promise((resolve, reject) => {
-    const req = fn(db.transaction(STORE, mode).objectStore(STORE));
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
+  const tx = db.transaction(STORE, mode);
+  const req = fn(tx.objectStore(STORE));
+  return finish(tx, req, mode);
 }
 
 /**
@@ -71,13 +82,16 @@ export async function queuePhoto(p: QueuedPhoto, stillCurrent: () => boolean = (
   const row: QueuedPhoto = { ...p, seq: p.seq ?? nextPhotoSeq() };
   const db = await open();
   if (!stillCurrent()) return false;
-  await new Promise<void>((resolve, reject) => {
-    const req = db.transaction(STORE, 'readwrite').objectStore(STORE).put(row);
-    req.onsuccess = () => resolve();
-    req.onerror = () => reject(req.error);
-  });
+  const tx = db.transaction(STORE, 'readwrite');
+  await finish(tx, tx.objectStore(STORE).put(row), 'readwrite');
   if (stillCurrent()) return true;
-  await dropPhoto(row.key).catch(() => undefined);
+  // The session ended while the write was on its way: take the row out again. A failed removal is NOT swallowed, because the row
+  // would still be on the phone (R15B-04): the caller must not treat the sign-out as erased.
+  try {
+    await dropPhoto(row.key);
+  } catch {
+    throw new Error('photo cleanup failed: the stale photo may still be stored');
+  }
   return false;
 }
 export const queuedPhotos = () => run<QueuedPhoto[]>('readonly', (s) => s.getAll());

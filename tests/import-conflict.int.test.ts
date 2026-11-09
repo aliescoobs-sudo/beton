@@ -6,6 +6,7 @@ import { importWorkbook, rollbackImport } from './helpers/import-proof';
 import type { SessionUser } from '../src/modules/platform-security/auth/session-gate';
 import { testEnv } from './db-env';
 import { realSessionUser } from './helpers/actors';
+import { createClient } from '../src/modules/master-data';
 import { buildWorkbook } from './helpers/xlsx-writer';
 
 // R14-08: imports are serialized, and "already there" means the same payload. Synthetic data only.
@@ -162,5 +163,146 @@ describe('opening balances (R14-08)', () => {
     expect(r.totals.error).toBe(1);
     expect(r.totals.exists).toBe(0);
     expect(r.sheets[0]?.report.rows.some((x) => /two opening-balance rows/.test(x.message ?? ''))).toBe(true);
+  });
+});
+
+describe('R15B-09: a name shared by several records identifies none of them', () => {
+  const twin = `Client Fictif Jumeau ${tag}`;
+  const codes: string[] = [];
+  beforeAll(async () => {
+    for (const _ of [1, 2]) {
+      const c = await createClient(app, stepped, { name: twin, kind: 'person' });
+      if (!c.ok) throw new Error(c.error);
+      codes.push(c.value.client.code);
+    }
+  });
+  const dry = (file: Buffer, kind: SheetMapping['kind'], sheet: string) =>
+    importWorkbook({
+      appPool: app,
+      actor: stepped,
+      file,
+      mappings: [map(sheet, kind)],
+      mode: 'dry-run',
+      environment: PROD,
+      requireEveryMappedSheet: false,
+      openingDate: '2026-01-01',
+    });
+  it('an opening balance named by the shared name is refused; named by a unique code it is accepted', async () => {
+    const byName = await dry(
+      buildWorkbook([
+        {
+          name: 'Soldes',
+          rows: [
+            ['Tiers', 'Code', 'Montant'],
+            ['client', twin, '10,00'],
+          ],
+        },
+      ]),
+      'opening_balances',
+      'Soldes',
+    );
+    expect(byName.totals.error).toBe(1);
+    expect(byName.sheets[0]?.report.rows[0]?.message).toMatch(/several records/);
+    const byCode = await dry(
+      buildWorkbook([
+        {
+          name: 'Soldes',
+          rows: [
+            ['Tiers', 'Code', 'Montant'],
+            ['client', codes[0]!, '10,00'],
+          ],
+        },
+      ]),
+      'opening_balances',
+      'Soldes',
+    );
+    expect(byCode.sheets[0]?.report.rows[0]?.message ?? '').not.toMatch(/several records/);
+  });
+  it('a cheque for the shared name is refused', async () => {
+    const r = await dry(
+      buildWorkbook([
+        {
+          name: 'Cheques',
+          rows: [
+            ['Client', 'Type', 'Numéro', 'Banque', 'Montant', 'Date'],
+            [twin, 'cheque', `N${tag}`, 'Banque Fictive', '100,00', '01/01/2026'],
+          ],
+        },
+      ]),
+      'cheques_in_transit',
+      'Cheques',
+    );
+    expect(r.sheets[0]?.report.rows[0]?.message).toMatch(/several records/);
+  });
+  it('a clients row with the shared name is refused instead of being compared with an arbitrary one of them', async () => {
+    const r = await dry(clientsFile(twin, fakeIce()), 'clients', 'Clients');
+    expect(r.totals.error).toBe(1);
+    expect(r.sheets[0]?.report.rows[0]?.message).toMatch(/several records/);
+  });
+});
+
+describe('R15B-10: "already imported" means the same file AND the same operation', () => {
+  const two = (tagName: string) =>
+    buildWorkbook([
+      {
+        name: 'Clients',
+        rows: [
+          ['Nom', 'Type', 'ICE'],
+          [`Client Fictif Op ${tagName}`, 'person', ''],
+        ],
+      },
+      {
+        name: 'Soldes',
+        rows: [
+          ['Tiers', 'Code', 'Montant'],
+          ['client', `Client Fictif Op ${tagName}`, '10,00'],
+        ],
+      },
+    ]);
+  const go = (file: Buffer, sheets: [string, SheetMapping['kind']][], mode: 'apply' | 'dry-run') =>
+    importWorkbook({
+      appPool: app,
+      actor: stepped,
+      file,
+      mappings: sheets.map(([s, k]) => map(s, k)),
+      mode,
+      environment: PROD,
+      requireEveryMappedSheet: false,
+      openingDate: '2026-01-01',
+    });
+  it('the same bytes with a mapping that adds a sheet are NOT reported as already imported', async () => {
+    const file = two(`${tag}x`);
+    const first = await go(file, [['Clients', 'clients']], 'apply');
+    expect(first.applied).toBe(true);
+    // identical operation: still "already imported"
+    expect((await go(file, [['Clients', 'clients']], 'dry-run')).alreadyImportedRunId).toBe(first.runId);
+    // another mapping of the same bytes: refused with a reason, never "NOTHING DONE: already imported"
+    const other = await go(
+      file,
+      [
+        ['Clients', 'clients'],
+        ['Soldes', 'opening_balances'],
+      ],
+      'dry-run',
+    );
+    expect(other.alreadyImportedRunId).toBeNull();
+    expect(other.fileProblems.join(' ')).toMatch(/another mapping or opening date/);
+  });
+  it('the same bytes with another opening date are refused too', async () => {
+    const file = two(`${tag}y`);
+    const first = await go(file, [['Clients', 'clients']], 'apply');
+    expect(first.applied).toBe(true);
+    const other = await importWorkbook({
+      appPool: app,
+      actor: stepped,
+      file,
+      mappings: [map('Clients', 'clients')],
+      mode: 'dry-run',
+      environment: PROD,
+      requireEveryMappedSheet: false,
+      openingDate: '2026-02-02',
+    });
+    expect(other.alreadyImportedRunId).toBeNull();
+    expect(other.fileProblems.join(' ')).toMatch(/another mapping or opening date/);
   });
 });

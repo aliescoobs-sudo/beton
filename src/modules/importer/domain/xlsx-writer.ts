@@ -85,11 +85,14 @@ export function buildWorkbook(
   sheets: { name: string; rows: (string | number | { f: string; v: string | number })[][] }[],
   deflate = false,
   /** `date1904`: write the 1904 date system into the workbook (a fixture for the refusal). */
-  opts: { date1904?: boolean } = {},
+  opts: {
+    date1904?: boolean;
+    /** The raw `workbookPr` element, to write other XML spellings of the same flag. */ workbookPr?: string;
+  } = {},
 ): Buffer {
   const files: Record<string, string> = {
     '[Content_Types].xml': '<?xml version="1.0"?><Types/>',
-    'xl/workbook.xml': `<?xml version="1.0"?><workbook xmlns:r="r">${opts.date1904 ? '<workbookPr date1904="1"/>' : ''}<sheets>${sheets
+    'xl/workbook.xml': `<?xml version="1.0"?><workbook xmlns:r="r">${opts.workbookPr ?? (opts.date1904 ? '<workbookPr date1904="1"/>' : '')}<sheets>${sheets
       .map((s, i) => `<sheet name="${escXml(s.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`)
       .join('')}</sheets></workbook>`,
     'xl/_rels/workbook.xml.rels': `<?xml version="1.0"?><Relationships>${sheets
