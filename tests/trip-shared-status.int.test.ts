@@ -459,7 +459,7 @@ describe("T9: authorization is the database's", () => {
           ),
         ),
         u.role,
-      ).toBe(true);
+      ).toBe(u.role !== 'office_sales'); // office_sales alone holds the narrow right to correct (T9b addendum); the correction itself is tested in trip-correct-permission
       expect(await denied(stagesFor(u)), u.role).toBe(true);
     }
     const stranger = { ...owner, id: randomUUID(), role: 'plant_manager' } as unknown as SessionUser; // a user the database does not know
@@ -650,7 +650,7 @@ describe('T9: corrections are new rows, by the plant manager of the plant, the o
     );
     expect(await denied(c(driver1, 'departed', ok, 'Je corrige moi-même'))).toBe(true);
     expect(await denied(c(pmB, 'departed', ok, 'Autre centrale'))).toBe(true);
-    for (const u of [partner, support, sales, accountant])
+    for (const u of [partner, support, accountant])
       expect(await denied(c(u, 'departed', ok, 'Pas mon rôle')), u.role).toBe(true);
     expect(await superRows(`select 1 from trip_event_correction where trip_id = $1`, [trip])).toHaveLength(0);
     // and a correction row can neither be changed nor deleted

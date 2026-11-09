@@ -108,6 +108,8 @@ export const PERMISSIONS = {
   // Plants (REQUIREMENTS-V1 §1): every internal role reads; managers write
   'plants.read': ALL,
   'plants.write': MANAGERS,
+  // The phone number of a plant (the driver's tel: link): the owner and app_admin only
+  'plants.phone': ['owner', 'app_admin'],
   // The driver and pump phone app (R4): accounts, PINs and phones are the owner's and app_admin's; the office handles emergencies
   'field.admin': ['owner', 'app_admin'],
   'field.emergencies': [
@@ -312,7 +314,8 @@ export const PERMISSIONS = {
   'trips.read': TRACKING,
   'trips.track': TRACKING,
   // T9: the time of a recorded stage is corrected (a new row, a reason, the audit log) by the same roles; the database re-checks the plant
-  'trips.correct': TRACKING,
+  // (office_sales holds this one right and no other dispatch power: it can neither plan, nor reassign, nor postpone, nor read the board)
+  'trips.correct': [...TRACKING, 'office_sales'],
   // Production and consumption report: quantities only (litres, grams), so the plant and the partner read it
   'reports.consumption': PLANT_READ,
   // Fuel per truck: litres and kilometres are quantities (plant, owner, partner record; support reads); the purchases and

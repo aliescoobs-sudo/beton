@@ -788,7 +788,7 @@ const FIXTURES: Record<
       );
     },
     visible: `select e.created_by::text as owner from trip_event e join trip_plan p on p.id = e.trip_id
-                where p.trip_date = '2095-03-02' and e.step = 'loaded' and $1::text is not null`,
+                where p.trip_date = '2095-03-02' and e.step = 'loaded' and e.delivery_id is not null and $1::text is not null`,
   },
   trip_event_correction: {
     // T9: written by correct_trip_stage; the fixture writes the row as the definer would, on the committed first stage of the shared rotation.
@@ -802,6 +802,19 @@ const FIXTURES: Record<
         ),
       ),
     visible: `select c.actor_id::text as owner from trip_event_correction c where c.reason = $1`,
+  },
+  trip_event_confirmation: {
+    // T9b: written by confirm_trip_stage; the fixture writes the row as the definer would, on a second committed stage of the shared rotation.
+    writers: ['owner'],
+    seed: (_tx, actor) =>
+      withRlsContext(migratorPool, { userId: actor, role: 'owner', requestId: marker }, (m) =>
+        m.query(
+          `insert into trip_event_confirmation (id, trip_id, step, confirmed_at, actor_id, actor_role)
+           values (gen_random_uuid(), $1, 'departed', $2, $3, 'owner')`,
+          [preField.trip, markedAt(marker), actor],
+        ),
+      ),
+    visible: `select c.actor_id::text as owner from trip_event_confirmation c where c.confirmed_at = ${MARKED_SQL}`,
   },
   fuel_fill: {
     writers: ['owner', 'partner', 'plant'],
@@ -1432,6 +1445,12 @@ beforeAll(async () => {
         `insert into trip_event (id, trip_id, step, at, created_by) values (gen_random_uuid(), $1, 'loading_started', now(), $2)`,
         [preField.trip, actors.owner],
       );
+      for (const step of ['loaded', 'departed']) {
+        await tx.query(
+          `insert into trip_event (id, trip_id, step, at, created_by) values (gen_random_uuid(), $1, $2, now(), $3)`,
+          [preField.trip, step, actors.owner],
+        );
+      }
     });
   }
   for (const key of ['status', 'hold'] as const) {

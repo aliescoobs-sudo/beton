@@ -118,6 +118,11 @@ describe('functions the application role can execute', () => {
     'public.correct_trip_stage(p_trip uuid, p_stage text, p_time timestamp with time zone, p_reason text)', // T9: a correction with a reason (plant manager of the plant, owner, app_admin)
     'public.record_trip_stage(p_trip uuid, p_stage text, p_now timestamp with time zone, p_client_time timestamp with time zone, p_key text, p_delivery uuid, p_reason text)', // T9: the one writer of a stage (role and plant checked inside)
     'public.trip_stages(p_date date)', // T9: the shared status of the rotations the caller may see (scoped inside)
+    'public.confirm_trip_stage(p_trip uuid, p_stage text, p_now timestamp with time zone)', // T9b: the plant confirms departed / back (role and plant checked inside)
+    'public.trip_delivery_exceptions(p_from date, p_to date)', // T9b: the delivery exception lists (scoped inside, flag only)
+    'public.company_contact_phone()', // T9b: the office number for the driver's tel: link (role checked inside, the phone only)
+    'public.set_plant_phone(p_plant uuid, p_phone text)', // T9b addendum: the phone of a plant (owner and app_admin only, checked inside, audited)
+    'public.driver_plant_phones(p_date date)', // T9b addendum: the phone of the plant of the driver's own rotations (checked inside)
     'public.driver_trips(p_date date)',
     'public.emergencies_open()',
     'public.emergency_instruct(p_emergency uuid, p_kind text, p_address_enc text, p_map_url text, p_note text, p_join_trip uuid)',

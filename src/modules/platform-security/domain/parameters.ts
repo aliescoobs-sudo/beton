@@ -99,6 +99,12 @@ export const PARAMETERS = {
     schema: z.number().int().min(0).max(1200),
     description: 'Minute of the day (from midnight) when the first rotation starts loading',
   },
+  delivery_confirm_delay_min: {
+    default: 0,
+    schema: z.number().int().min(0).max(720),
+    description:
+      'Minutes after the end of the working day before a delivery the driver declared, whose plant load is not yet through the billing gate, is listed as an exception',
+  },
   default_one_way_min: {
     default: 30,
     schema: z.number().int().min(5).max(180),

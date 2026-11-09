@@ -1538,6 +1538,24 @@ export const TABLE_ACCESS = {
     exception:
       'T9 (DECISIONS 206): a correction of the time of a recorded stage of a rotation, as a new row that supersedes it (the stage is never touched): the new time, the time it replaces, a mandatory reason, the actor and role. Written only by correct_trip_stage (plant manager of the plant, owner, app_admin); also a `reverse` event in the hash-chained audit log. Read by the owner and the plant manager of the plant. Insert-only (trigger).',
   },
+  trip_event_confirmation: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'none',
+      office: 'none',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'none',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'T9b (DECISIONS 206): the plant confirms a stage it is the authority for (the truck leaving, the truck coming back) that the driver declared; its own instant is the one the figures and alerts use. Written only by confirm_trip_stage (plant manager of the plant, owner, app_admin, the unbound plant account). Confirming the return of a rotation whose unloading was declared also sets the billing gate, once. Read by the owner and the plant manager of the plant. Insert-only (trigger).',
+  },
   fuel_fill: {
     kind: 'rls',
     seed: 'insert',

@@ -234,6 +234,7 @@ describe('the day of a driver: own rotations, never a price (AC-PROD-20, 21)', (
         'mapUrl',
         'orderCode',
         'phone',
+        'plantPhone',
         'seq',
         'siteLabel',
         'stage',
