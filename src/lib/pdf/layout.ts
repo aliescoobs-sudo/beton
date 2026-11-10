@@ -75,11 +75,16 @@ export class PdfLayout {
   pairs(rows: readonly (readonly [string, string])[], labelWidth = 130): void {
     for (const [label, value] of rows) {
       const lines = wrapText(value, this.width - labelWidth, 10);
-      this.room(13 * lines.length);
+      // R17-06: room is asked line by line (the label stays with the first line, up to three lines are kept together): a value longer than
+      // a page continues on the next page(s), instead of running over the footer and off the bottom of the page.
+      this.room(13 * Math.min(lines.length, 3));
       this.y -= 13;
       this.doc.text(MARGIN, this.y, label, { font: 'bold' });
       lines.forEach((line, i) => {
-        if (i > 0) this.y -= 13;
+        if (i > 0) {
+          this.room(13);
+          this.y -= 13;
+        }
         this.doc.text(MARGIN + labelWidth, this.y, line);
       });
     }

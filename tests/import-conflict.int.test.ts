@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { type ImportEnvironment, type SheetMapping, type WorkbookReport } from '../src/modules/importer';
@@ -7,6 +7,9 @@ import type { SessionUser } from '../src/modules/platform-security/auth/session-
 import { testEnv } from './db-env';
 import { realSessionUser } from './helpers/actors';
 import { createClient } from '../src/modules/master-data';
+import { withRlsContext } from '../src/lib/db/rls-context';
+import { formatWorkbookReport } from '../src/modules/importer';
+import { recordAuditEvent } from '../src/modules/platform-security';
 import { buildWorkbook } from './helpers/xlsx-writer';
 
 // R14-08: imports are serialized, and "already there" means the same payload. Synthetic data only.
@@ -304,5 +307,43 @@ describe('R15B-10: "already imported" means the same file AND the same operation
     });
     expect(other.alreadyImportedRunId).toBeNull();
     expect(other.fileProblems.join(' ')).toMatch(/another mapping or opening date/);
+  });
+
+  it('T10b: an identical operation points to the earlier run and says the books were not compared again', async () => {
+    const file = two(`${tag}z`);
+    const first = await go(file, [['Clients', 'clients']], 'apply');
+    expect(first.applied).toBe(true);
+    const again = await go(file, [['Clients', 'clients']], 'apply');
+    expect(again.alreadyImportedRunId).toBe(first.runId);
+    expect(again.currentStateChecked).toBe(false);
+    expect(again.applied).toBe(false);
+    expect(formatWorkbookReport(again)).toMatch(
+      /not compared with the file again; to import again, roll that run back first/,
+    );
+    // a fresh run reports that it did check
+    expect(first.currentStateChecked).toBe(true);
+    // rolled back, the same file can be imported again (the early exit is about a run still in force)
+    await rollbackImport({ appPool: app, actor: stepped, runId: first.runId as string, environment: PROD });
+    const redone = await go(file, [['Clients', 'clients']], 'dry-run');
+    expect(redone.alreadyImportedRunId).toBeNull();
+    expect(redone.currentStateChecked).toBe(true);
+  });
+  it('T10b: a run recorded before the operation digest existed is refused, never assumed identical', async () => {
+    const file = two(`${tag}legacy`);
+    const sha = createHash('sha256').update(file).digest('hex');
+    // a legacy audit record of an applied import: the hash, no `operation`
+    await withRlsContext(app, { userId: stepped.id, role: 'owner', requestId: tag }, (tx) =>
+      recordAuditEvent(tx, {
+        action: 'import',
+        table: 'import',
+        rowId: randomUUID(),
+        after: { sha256: sha, size_bytes: file.length, sheets: [] },
+        reason: 'excel import',
+      }),
+    );
+    const r = await go(file, [['Clients', 'clients']], 'dry-run');
+    expect(r.alreadyImportedRunId).toBeNull();
+    expect(r.fileProblems.join(' ')).toMatch(/before the import recorded its mappings/);
+    expect(r.applied).toBe(false);
   });
 });

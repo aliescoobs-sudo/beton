@@ -1,5 +1,6 @@
 import { deflateSync } from 'node:zlib';
 import { KAYAS_SIGNATURE_PDF } from './brand-logo-data';
+import { HELVETICA_BOLD_WIDTHS, HELVETICA_WIDTHS } from './helvetica-metrics';
 
 // A small PDF writer: A4 pages, the standard fonts (Helvetica, Courier, bold of each) in WinAnsi, text, lines, rectangles and a
 // diagonal watermark. No dependency, nothing written to disk: `build()` returns the bytes, the route streams them. Characters
@@ -57,57 +58,19 @@ export function winAnsi(text: string): Uint8Array {
 }
 
 // Helvetica widths in thousandths of an em (the standard metrics); an accented letter takes its base letter's width.
-const REGULAR_LOWER =
-  'a556 b556 c500 d556 e556 f278 g556 h556 i222 j222 k500 l222 m833 n556 o556 p556 q556 r333 s500 t278 u556 v500 w722 x500 y500 z500';
-const REGULAR_UPPER =
-  'A667 B667 C722 D722 E667 F611 G778 H722 I278 J500 K667 L556 M833 N722 O778 P667 Q778 R722 S667 T611 U722 V667 W944 X667 Y667 Z611';
-const BOLD_LOWER =
-  'a556 b611 c556 d611 e556 f333 g611 h611 i278 j278 k556 l278 m889 n611 o611 p611 q611 r389 s556 t333 u611 v556 w778 x556 y556 z500';
-const BOLD_UPPER =
-  'A722 B722 C722 D722 E667 F611 G778 H722 I278 J556 K722 L611 M833 N722 O778 P667 Q778 R722 S667 T611 U722 V667 W944 X667 Y667 Z611';
-const table = (s: string) => new Map(s.split(' ').map((p) => [p[0] as string, Number(p.slice(1))]));
-const REGULAR = table(`${REGULAR_LOWER} ${REGULAR_UPPER}`);
-const BOLD = table(`${BOLD_LOWER} ${BOLD_UPPER}`);
-const PUNCT: Record<string, number> = {
-  ' ': 278,
-  '.': 278,
-  ',': 278,
-  ':': 278,
-  ';': 278,
-  '-': 333,
-  '/': 278,
-  '(': 333,
-  ')': 333,
-  '%': 889,
-  '&': 667,
-  '+': 584,
-  '=': 584,
-  "'": 191,
-  '"': 355,
-  '#': 556,
-  $: 556,
-  '?': 556,
-  '!': 278,
-  '@': 1015,
-  '*': 389,
-  _: 556,
-  '|': 260,
-  '[': 278,
-  ']': 278,
-};
-const BASE_LETTER = (ch: string) => ch.normalize('NFD').replace(/[̀-ͯ]/g, '')[0] ?? ch;
-
-/** The width of a text in points at a size. Courier is exact (600 per character); Helvetica follows the standard metrics. */
+/**
+ * The width of a text in points at a size. Courier is exact (600 per character); Helvetica uses the complete Adobe metrics of the byte each
+ * character becomes in WinAnsi (the width of what is DRAWN, so a character that is replaced by "?" is measured as "?"). No glyph falls back to
+ * a default: a byte without a width is a bug and throws.
+ */
 export function textWidth(text: string, size: number, font: Font = 'regular'): number {
+  if (font === 'mono' || font === 'monoBold') return (Array.from(text).length * 600 * size) / 1000;
+  const widths = font === 'bold' ? HELVETICA_BOLD_WIDTHS : HELVETICA_WIDTHS;
   let units = 0;
-  for (const ch of text) {
-    if (font === 'mono' || font === 'monoBold') {
-      units += 600;
-      continue;
-    }
-    const base = BASE_LETTER(ch);
-    const letters = font === 'bold' ? BOLD : REGULAR;
-    units += letters.get(base) ?? (base >= '0' && base <= '9' ? 556 : (PUNCT[ch] ?? 556));
+  for (const byte of winAnsi(text)) {
+    const w = widths.get(byte);
+    if (w === undefined) throw new Error(`pdf: no Helvetica width for byte 0x${byte.toString(16)}`);
+    units += w;
   }
   return (units * size) / 1000;
 }

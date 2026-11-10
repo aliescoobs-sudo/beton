@@ -169,9 +169,56 @@ describe('rollback by an app_admin (R14-10 follow-up)', () => {
     const back = await rollbackImport({ appPool: app, actor: admin, runId: done.runId!, environment: PROD });
     expect(back.blocked).toEqual([]);
     expect(back.archived).toMatchObject({ client: 1 });
-    // the opening balances are listed for an app_admin too (the code counters are audit rows an app_admin does not read: the inventory of the
-    // owner is the complete one, which the operator guide says)
-    expect(back.staysAsRecorded).toMatchObject({ opening_party_balance: 1 });
+    // T10b (R15B-12): the opening balances AND the code counters are listed for an app_admin too (it reads as the owner, migration 0082)
+    expect(back.staysAsRecorded).toMatchObject({ opening_party_balance: 1, 'code_sequence (updated)': 1 });
+  });
+
+  it('the owner and the app_admin see the SAME complete inventory of one kind of run, counters included', async () => {
+    const admin = {
+      ...(await realSessionUser(env.DATABASE_URL_MIGRATOR, 'app_admin')),
+      stepUpVerified: true,
+    } as SessionUser;
+    const run = async (label: string) => {
+      const name = `Client Fictif Inv ${label} ${tag}`;
+      const done = await importWorkbook({
+        appPool: app,
+        actor: owner,
+        file: buildWorkbook([
+          {
+            name: 'Clients',
+            rows: [
+              ['Nom', 'Type', 'ICE'],
+              [name, 'person', ''],
+            ],
+          },
+        ]),
+        mappings: [map('Clients', 'clients')],
+        mode: 'apply',
+        environment: PROD,
+        requireEveryMappedSheet: false,
+      });
+      expect(done.applied).toBe(true);
+      return done.runId!;
+    };
+    const byOwner = await rollbackImport({
+      appPool: app,
+      actor: owner,
+      runId: await run('o'),
+      environment: PROD,
+    });
+    const byAdmin = await rollbackImport({
+      appPool: app,
+      actor: admin,
+      runId: await run('a'),
+      environment: PROD,
+    });
+    expect(byOwner.staysAsRecorded).toMatchObject({ 'code_sequence (updated)': 1 });
+    expect(byAdmin.staysAsRecorded).toEqual(byOwner.staysAsRecorded);
+    expect(byAdmin.archived).toEqual(byOwner.archived);
+    expect(byAdmin.blocked).toEqual(byOwner.blocked);
+    expect(formatRollbackReport(byAdmin)).toBe(
+      formatRollbackReport(byOwner).replace(byOwner.runId, byAdmin.runId),
+    );
   });
 });
 

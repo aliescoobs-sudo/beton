@@ -6,7 +6,7 @@ import type { RollbackReport, WorkbookReport } from './workbook-import';
 
 export function formatWorkbookReport(r: WorkbookReport): string {
   const head = r.alreadyImportedRunId
-    ? `NOTHING DONE: this exact file was already imported (run ${r.alreadyImportedRunId}).`
+    ? `NOTHING DONE: this exact file and operation were already imported (run ${r.alreadyImportedRunId}). The books were not compared with the file again; to import again, roll that run back first.`
     : r.mode === 'dry-run'
       ? 'DRY RUN: validated against the database in a transaction that was rolled back. Nothing was written.'
       : r.applied

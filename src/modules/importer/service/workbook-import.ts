@@ -45,6 +45,8 @@ export interface WorkbookReport {
   applied: boolean;
   /** The same bytes were already imported by an earlier run that was not rolled back: nothing was done. */
   alreadyImportedRunId: string | null;
+  /** False when the answer is "already imported": the earlier run is pointed to and the present state of the books was not re-checked. */
+  currentStateChecked: boolean;
   runId: string | null;
   sheets: SheetReport[];
   /** Sheets of the workbook that no mapping names, by alias ("Sheet 3"): left alone, listed so a forgotten sheet is seen. */
@@ -137,6 +139,7 @@ export async function importWorkbook(opts: WorkbookOptions): Promise<WorkbookRep
     mode: opts.mode,
     applied: false,
     alreadyImportedRunId: null,
+    currentStateChecked: true,
     runId: null,
     sheets: [],
     unmappedSheets: [],
@@ -198,14 +201,24 @@ export async function importWorkbook(opts: WorkbookOptions): Promise<WorkbookRep
       await rollbackAndRelease(client);
       // R15B-10: "already imported" is about the file AND the operation (mappings, opening date). The same bytes asked for with another
       // interpretation are not an import that was done: say so instead of reporting success for work that was never planned.
-      // (Runs recorded before the operation was stored have no digest and keep the old meaning.)
-      if (previous.operation && previous.operation !== operation) {
+      // R17 / decision 207 (T10b): the semantics of an identical operation are this and only this: the earlier run is still in force, so
+      // nothing is planned, validated or written, and the report POINTS to it (`currentStateChecked: false`). The present state of the books
+      // is NOT re-validated against the file: if rows were changed since, the way to import again is to roll that run back first.
+      // A run recorded before the operation digest existed cannot say what it was asked to do, so it is refused, not assumed identical.
+      if (!previous.operation) {
+        report.fileProblems.push(
+          `This file was already imported (run ${previous.runId}) before the import recorded its mappings and opening date, so it cannot be told whether this is the same operation: roll that import back first, or change the file.`,
+        );
+        return report;
+      }
+      if (previous.operation !== operation) {
         report.fileProblems.push(
           `This file was already imported (run ${previous.runId}) with another mapping or opening date: roll that import back first, or change the file.`,
         );
         return report;
       }
       report.alreadyImportedRunId = previous.runId;
+      report.currentStateChecked = false;
       return report;
     }
 
