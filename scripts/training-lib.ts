@@ -14,6 +14,7 @@ import {
   renameSync,
   unlinkSync,
   utimesSync,
+  writeFileSync,
   writeSync,
 } from 'node:fs';
 import path from 'node:path';
@@ -320,8 +321,19 @@ const lockPath = (dir: string, epoch: number): string =>
  */
 export function acquireSeedLock(
   finalFile: string,
-  opts: { now?: () => number; staleMs?: number; heartbeatMs?: number } = {},
+  opts: {
+    now?: () => number;
+    staleMs?: number;
+    heartbeatMs?: number;
+    /** Test seam (R17-09): the two filesystem operations that mark a released lock, so a failure of each can be injected. */
+    io?: {
+      utimes?: (file: string, at: Date, mt: Date) => void;
+      rewrite?: (file: string, content: string) => void;
+    };
+  } = {},
 ): SeedLock {
+  const utimes = opts.io?.utimes ?? ((f: string, a: Date, m: Date) => utimesSync(f, a, m));
+  const rewrite = opts.io?.rewrite ?? ((f: string, c: string) => writeFileSync(f, c));
   const now = opts.now ?? Date.now;
   const staleMs = opts.staleMs ?? SEED_LOCK_STALE_MS;
   const dir = path.dirname(path.resolve(finalFile));
@@ -354,7 +366,20 @@ export function acquireSeedLock(
   const top = epochs.at(-1);
   if (top !== undefined) {
     const st = lstatSync(lockPath(dir, top), { throwIfNoEntry: false });
-    if (st && (!st.isFile() || now() - st.mtimeMs <= staleMs))
+    // a released lock is marked in its own content too (R17-09), for a filesystem that refuses to set times
+    const abandoned =
+      st?.isFile() === true &&
+      (() => {
+        try {
+          return (
+            (JSON.parse(readFileSync(lockPath(dir, top), 'utf8')) as { abandoned?: boolean }).abandoned ===
+            true
+          );
+        } catch {
+          return false;
+        }
+      })();
+    if (st && !abandoned && (!st.isFile() || now() - st.mtimeMs <= staleMs))
       refuse(
         'another training seed holds the credentials folder (its lock is live): wait for it to finish; nothing was swept, written or removed',
       );
@@ -407,10 +432,17 @@ export function acquireSeedLock(
       // the clock), so the next holder takes the next number. With no file the numbering would restart at 1 and a delayed taker could recreate
       // a number a later holder reused, then delete that holder's live lock. Only our own file is ever touched.
       if (mine()) {
+        // R17-09: the file is the DURABLE high-water mark of the epoch numbers: it is never deleted here, whatever fails. First the time is set
+        // to the epoch of the clock; if the filesystem refuses, the file's own content is marked abandoned; if that fails too, the file is left
+        // as it is (a still-fresh lock): the next taker is refused until it goes stale. That is failing closed, and numbering never restarts.
         try {
-          utimesSync(file, new Date(0), new Date(0));
+          utimes(file, new Date(0), new Date(0));
         } catch {
-          discardCredentialsFile(file); // cannot mark it: removing it is the old behaviour
+          try {
+            rewrite(file, JSON.stringify({ token, epoch, abandoned: true, at: now() }));
+          } catch {
+            // left in place, live until it goes stale
+          }
         }
       }
     },

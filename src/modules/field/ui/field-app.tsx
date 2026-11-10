@@ -164,7 +164,49 @@ const deviceId = (): string => {
 const hhmm = (iso: string) =>
   new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
-export function FieldApp({ locale, pushAvailable = false }: { locale: string; pushAvailable?: boolean }) {
+/**
+ * A phone number on the driver's screen. In the fictitious training instance (R17-11) it is NEVER a dial action: a trainee must not be able to
+ * call a number that a synthetic dataset happened to pick, so the number is shown as plain text, marked as an exercise.
+ */
+function Dial({
+  number,
+  training,
+  className,
+  testId,
+  children,
+}: {
+  number: string;
+  training: boolean;
+  className: string;
+  testId?: string;
+  children: React.ReactNode;
+}) {
+  if (training)
+    return (
+      <span
+        className={className.replace(/\bunderline\b/, '').trim()}
+        data-testid={testId}
+        data-dial-disabled="true"
+      >
+        {children}
+      </span>
+    );
+  return (
+    <a href={`tel:${number}`} className={className} data-testid={testId}>
+      {children}
+    </a>
+  );
+}
+
+export function FieldApp({
+  locale,
+  pushAvailable = false,
+  trainingMode = false,
+}: {
+  locale: string;
+  pushAvailable?: boolean;
+  trainingMode?: boolean;
+}) {
   const t = useTranslations('field');
   const [session, setSession] = useState<'unknown' | 'out' | 'in'>('unknown');
   const [day, setDay] = useState<Day | null>(null);
@@ -663,13 +705,14 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
               </section>
             ))}
           {day.officePhone && (
-            <a
-              href={`tel:${day.officePhone}`}
+            <Dial
+              number={day.officePhone}
+              training={trainingMode}
               className="block min-h-11 text-2xl underline"
-              data-testid="call-office"
+              testId="call-office"
             >
               {t('callOffice')} <bdi dir="ltr">{day.officePhone}</bdi>
-            </a>
+            </Dial>
           )}
           {day.trips.length === 0 && (
             <p className="text-2xl" data-testid="field-none">
@@ -693,19 +736,20 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
                 {trip.siteLabel && <p className="text-2xl">{trip.siteLabel}</p>}
                 <AddressBlock address={trip.address} mapUrl={trip.mapUrl} t={t} />
                 {trip.plantPhone && (
-                  <a
-                    href={`tel:${trip.plantPhone}`}
+                  <Dial
+                    number={trip.plantPhone}
+                    training={trainingMode}
                     className="block min-h-11 text-2xl underline"
-                    data-testid={`call-plant-${trip.orderCode}`}
+                    testId={`call-plant-${trip.orderCode}`}
                   >
                     {t('callPlant')} <bdi dir="ltr">{trip.plantPhone}</bdi>
-                  </a>
+                  </Dial>
                 )}
                 {trip.phone && (
-                  <a href={`tel:${trip.phone}`} className="block text-2xl underline">
+                  <Dial number={trip.phone} training={trainingMode} className="block text-2xl underline">
                     {trip.contactName ? `${trip.contactName} · ` : ''}
                     <bdi dir="ltr">{trip.phone}</bdi>
-                  </a>
+                  </Dial>
                 )}
                 <p className="text-xl">
                   <bdi dir="ltr">{trip.truckCode}</bdi>

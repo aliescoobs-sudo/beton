@@ -360,14 +360,14 @@ export async function seedTraining(opts: SeedTrainingOptions): Promise<SeedTrain
       }),
     );
 
-    // Obviously fictitious parties: fake ICE, fake phones (06 00 00 00 xx).
+    // Obviously fictitious parties: fake ICE, fake phones that cannot be dialled (0000 00 xxxx: 00 is the international prefix and no country code starts with 0).
     const supplierCement = must(
       'supplier Ciment Démo',
       await createSupplier(app, owner, {
         name: 'Ciment Démo',
         category: 'cement',
         ice: '000000000000101',
-        phone: '0600000101',
+        phone: '0000 00 0101',
         paymentTermsDays: 30,
         leadTimeDays: 3,
       }),
@@ -378,7 +378,7 @@ export async function seedTraining(opts: SeedTrainingOptions): Promise<SeedTrain
         name: 'Carburant Démo',
         category: 'fuel',
         ice: '000000000000102',
-        phone: '0600000102',
+        phone: '0000 00 0102',
         paymentTermsDays: 15,
         leadTimeDays: 1,
       }),
@@ -391,7 +391,7 @@ export async function seedTraining(opts: SeedTrainingOptions): Promise<SeedTrain
           name: `Client Démo ${i}`,
           kind: 'company',
           ice: `00000000000020${i}`,
-          phone: `060000000${i}`,
+          phone: `0000 00 000${i}`,
           paymentTermsDays: 30,
         }),
       );

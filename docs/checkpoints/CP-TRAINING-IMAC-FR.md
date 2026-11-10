@@ -104,6 +104,8 @@ Chemin recommandé : un déploiement fictif neuf, l'ancienne pile étant retiré
 1. Dans l'ANCIEN dossier : `./scripts/training-down.sh`, puis `docker compose -p belgobeton-training down` (conteneurs et réseau ; les volumes sont conservés).
 2. Décider des anciens volumes : les archiver (`docker volume ls --filter label=com.docker.compose.project=belgobeton-training`) **ou** les supprimer explicitement
    (`docker volume rm belgobeton-training_pgdata belgobeton-training_filestore belgobeton-training_accounts`). Rien ne les supprime à ta place.
+   **Archiver ne supprime rien** : une copie laisse les anciens volumes (et leur étiquette compose) en place, et `training-up.sh` refuse de démarrer tant qu'il en reste un.
+   Après l'archive, SUPPRIME donc les trois volumes (l'archive est ta copie). Il n'y a pas d'exemption : garder un ancien volume sur cette machine, c'est ne pas démarrer ici la nouvelle pile.
 3. Dans le NOUVEAU dossier : nouveaux fichiers d'environnement (`pick-image.sh`, `init-env.sh`, ne jamais copier les anciens `.env.training*`), puis `./scripts/training-up.sh` : nouvelle base, nouveau seed, nouveaux comptes.
 4. Fermer tous les anciens onglets de l'application avant de remettre un téléphone (un ancien onglet peut garder ouverte l'ancienne base de photos ; le nouvel écran affiche
    « nettoyage en attente » jusqu'à sa fermeture). Les photos non envoyées du même compte sont gardées et migrées ; écarte des photos fictives volontairement, jamais en silence.

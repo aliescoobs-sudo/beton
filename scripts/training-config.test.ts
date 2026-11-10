@@ -526,7 +526,10 @@ describe('the public helpers are retired (R15A-06)', () => {
       writeFileSync(path.join(root, 'scripts/training', name), `#!/usr/bin/env bash\n${body}\n`, {
         mode: 0o755,
       });
-    stub('dc.sh', `case "$*" in *"exec -T app wget"*) echo '{"status":"ready"}';; esac`);
+    stub(
+      'dc.sh',
+      `case "$*" in *"exec -T app wget"*) echo '{"status":"ready"}';; config) printf 'name: kayas-training\\nservices:\\n  app:\\n    ports:\\n      - published: "3000"\\n';; esac`,
+    );
     stub('ops.sh', 'exit 0');
     writeFileSync(
       path.join(root, '.env.training'),

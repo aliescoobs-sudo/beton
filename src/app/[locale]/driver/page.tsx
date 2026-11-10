@@ -16,5 +16,11 @@ export default async function DriverPage({ params }: { params: Promise<{ locale:
   if (!getEnv().FIELD_APP_ENABLED) notFound();
   const env = getEnv();
   // R11-07: no push subscription action in training mode (or without the notifications module).
-  return <FieldApp locale={locale} pushAvailable={env.NOTIFICATIONS_ENABLED && !env.TRAINING_MODE} />;
+  return (
+    <FieldApp
+      locale={locale}
+      pushAvailable={env.NOTIFICATIONS_ENABLED && !env.TRAINING_MODE}
+      trainingMode={env.TRAINING_MODE}
+    />
+  );
 }

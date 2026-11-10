@@ -6,6 +6,7 @@ import { createAuth } from '../src/modules/platform-security/auth/create-auth';
 import { BOOTSTRAP_ACTOR_ID } from '../src/modules/platform-security/auth/actors';
 import { createUser } from '../src/modules/platform-security/auth/user-service';
 import { testEnv } from '../tests/db-env';
+import { assertE2eTarget } from './admission';
 import {
   E2E_BASE_URL,
   E2E_CSP,
@@ -23,6 +24,13 @@ import {
 export default async function globalSetup() {
   resetOwnerState();
   const env = { ...testEnv(E2E_DATABASE), APP_BASE_URL: E2E_BASE_URL };
+  assertE2eTarget(process.env, [
+    env.DATABASE_URL_APP,
+    env.DATABASE_URL_MIGRATOR,
+    env.DATABASE_URL_AUTH,
+    env.DATABASE_URL_SYSTEM,
+    env.DATABASE_URL_SEED,
+  ]);
   await ensureRoles(env, env.DATABASE_URL_SEED);
   await recreateDatabase(env, E2E_DATABASE);
   await runMigrations(env.DATABASE_URL_MIGRATOR);

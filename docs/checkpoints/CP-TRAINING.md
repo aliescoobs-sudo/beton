@@ -111,6 +111,8 @@ Recommended path, a fresh fictitious deployment with the old stack explicitly re
 1. In the OLD checkout: `./scripts/training-down.sh`, then `docker compose -p belgobeton-training down` (containers and network; volumes are kept).
 2. Decide the old volumes: archive them (`docker volume ls --filter label=com.docker.compose.project=belgobeton-training`; dump what you want to keep) **or** remove them
    explicitly (`docker volume rm belgobeton-training_pgdata belgobeton-training_filestore belgobeton-training_accounts`). Nothing removes them for you.
+   **An archive does not remove anything**: a dump or copy leaves the old volumes (and their compose label) in place, and `training-up.sh` refuses to start while any exists.
+   So after archiving, REMOVE the three volumes (the archive is your copy). There is no exemption switch: keeping an old volume on this machine means not starting the new stack here.
 3. In the NEW checkout: new env files (`pick-image.sh`, `init-env.sh`, never copy the old `.env.training*`), then `./scripts/training-up.sh`: new database, new seed, new accounts.
 4. Close every old browser tab of the application before handing a phone over (an old page can hold the phone's former photo database open; the new page shows
    "cleanup pending" until it is closed). Unsent photos of the same account are kept and migrated; discard synthetic photos on purpose, never silently.

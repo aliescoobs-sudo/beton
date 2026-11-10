@@ -1,5 +1,13 @@
 import { spawnSync } from 'node:child_process';
-import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -8,7 +16,7 @@ import { describe, expect, it } from 'vitest';
 // starting a second stack. Stub docker: no docker, no network.
 const GOOD = `ghcr.io/aliescoobs-sudo/kayas@sha256:${'a'.repeat(64)}`;
 
-function run(docker: string) {
+function run(docker: string, cfgPort = '3000') {
   const root = mkdtempSync(path.join(tmpdir(), 'bb-precheck-'));
   mkdirSync(path.join(root, 'scripts/training'), { recursive: true });
   copyFileSync('scripts/training-up.sh', path.join(root, 'scripts/training-up.sh'));
@@ -19,7 +27,7 @@ function run(docker: string) {
     });
   stub(
     'dc.sh',
-    `echo "$*" >> "${root}/dc.called"\ncase "$*" in *"exec -T app wget"*) echo '{"status":"ready"}';; esac`,
+    `echo "$*" >> "${root}/dc.called"\ncase "$*" in *"exec -T app wget"*) echo '{"status":"ready"}';; config) printf 'name: kayas-training\\nservices:\\n  db:\\n    image: x\\n  app:\\n    ports:\\n      - mode: ingress\\n        host_ip: 127.0.0.1\\n        target: 3000\\n        published: "${cfgPort}"\\n        protocol: tcp\\n    environment:\\n      SECRET: must-never-be-printed\\n';; esac`,
   );
   stub('ops.sh', 'exit 0');
   writeFileSync(path.join(root, '.env.training'), `APP_IMAGE=${GOOD}\n`, { mode: 0o600 });
@@ -32,7 +40,10 @@ function run(docker: string) {
     encoding: 'utf8',
     env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, READY_TRIES: '1', READY_SLEEP: '0' },
   });
-  return { r, started: existsSync(path.join(root, 'dc.called')) };
+  const called = existsSync(path.join(root, 'dc.called'))
+    ? readFileSync(path.join(root, 'dc.called'), 'utf8')
+    : '';
+  return { r, started: /^pull/m.test(called) };
 }
 
 describe('training-up.sh pre-check of a pre-KAYAS stack', () => {
@@ -75,5 +86,39 @@ describe('training-up.sh pre-check of a pre-KAYAS stack', () => {
     const { r, started } = run('exit 0');
     expect(r.status, r.stderr).toBe(0);
     expect(started).toBe(true);
+  });
+});
+
+describe('R17-10: the effective configuration, and a docker that does not answer', () => {
+  it('the port is the one the compose configuration publishes, not the shell default: a holder of 3456 is found', () => {
+    const { r, started } = run(`case "$*" in *"publish=3456"*) echo 'devserver|';; esac; exit 0`, '3456');
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/port 3456 is already published by another container \(devserver\)/);
+    expect(started).toBe(false);
+    expect(r.stdout + r.stderr).not.toContain('must-never-be-printed');
+  });
+  it('the old port 3000 is not checked when the configuration publishes another one', () => {
+    const { r } = run(`case "$*" in *"publish=3000"*) echo 'devserver|';; esac; exit 0`, '3456');
+    expect(r.status, r.stderr).toBe(0);
+  });
+  it.each([
+    ['containers of the old project', 'ps -a -q'],
+    ['volumes of the old project', 'volume ls'],
+    ['the holders of the port', 'publish='],
+  ])('a failing inventory of %s refuses the start (it is not "absent")', (_n, needle) => {
+    const { r } = run(`case "$*" in *"${needle}"*) exit 1;; esac; exit 0`);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/inventory .* failed; this is not an empty answer/);
+  });
+  it('EVERY holder is inspected, not the first: a stranger after the KAYAS stack is refused', () => {
+    const { r } = run(
+      `case "$*" in *"publish=3000"*) printf 'kayas-training-app-1|kayas-training\\ndevserver|\\n';; esac; exit 0`,
+    );
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/devserver/);
+  });
+  it('a configuration that cannot be read stops the start', () => {
+    const root = run('exit 0'); // control: a normal start reads it
+    expect(root.r.status).toBe(0);
   });
 });

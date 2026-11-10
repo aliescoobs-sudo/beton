@@ -453,3 +453,49 @@ describe('R12-02: no secret under an unignored name, nothing left behind, no che
     }
   });
 });
+
+// R17-09: the released lock file is the durable high-water mark of the epoch numbers; no failure of the filesystem deletes it.
+describe('R17-09: a failing release never removes the high-water mark', () => {
+  const folder = () => path.join(mkdtempSync(path.join(tmpdir(), 'bb-hw-')), 'accounts.txt');
+  const locks = (final: string) => readdirSync(path.dirname(final)).filter((f) => f.includes('lock'));
+  const boom = () => {
+    throw new Error('EPERM');
+  };
+  it('utimes fails: the file stays (marked abandoned in its content), numbering continues, the next taker is not stuck', () => {
+    const final = folder();
+    const a = acquireSeedLock(final, { io: { utimes: boom } });
+    const first = locks(final);
+    a.release();
+    expect(locks(final)).toEqual(first); // not deleted
+    const b = acquireSeedLock(final); // the abandoned mark lets it in, with the NEXT number
+    expect(b.file).not.toBe(a.file);
+    expect(Number(path.basename(b.file).match(/(\d+)\D*$/)?.[1])).toBeGreaterThan(
+      Number(path.basename(a.file).match(/(\d+)\D*$/)?.[1]),
+    );
+    b.release();
+  });
+  it('utimes AND the content mark fail: the file stays and the next taker is REFUSED while it is fresh (fail closed), then proceeds once stale', () => {
+    const final = folder();
+    let t = 1_000_000;
+    const a = acquireSeedLock(final, { now: () => t, staleMs: 60_000, io: { utimes: boom, rewrite: boom } });
+    a.release();
+    expect(locks(final).length).toBeGreaterThan(0);
+    expect(() => acquireSeedLock(final, { now: () => t, staleMs: 60_000 })).toThrow(SeedLockError);
+    t += 10 * 60_000;
+    // (the fresh-looking file's mtime is real time, so a taker whose clock is past it sees it stale)
+    const b = acquireSeedLock(final, { now: () => Date.now() + 10 * 60_000, staleMs: 60_000 });
+    expect(Number(path.basename(b.file).match(/(\d+)\D*$/)?.[1])).toBeGreaterThan(
+      Number(path.basename(a.file).match(/(\d+)\D*$/)?.[1]),
+    );
+    b.release();
+  });
+  it('a delayed taker that judged the same lock abandoned is refused (exclusive creation of the same number), also after a faulted release', () => {
+    const final = folder();
+    const a = acquireSeedLock(final, { io: { utimes: boom } });
+    a.release();
+    const b = acquireSeedLock(final);
+    // the delayed taker saw the same state as b did: the next number is taken, so its creation of the SAME name fails
+    expect(() => acquireSeedLock(final)).toThrow(SeedLockError);
+    b.release();
+  });
+});
