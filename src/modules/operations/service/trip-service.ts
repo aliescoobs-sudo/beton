@@ -468,3 +468,21 @@ export async function listDeliveryExceptions(
     })),
   );
 }
+
+/**
+ * T10a addendum: the NUMBER of deliveries the driver declared that the plant has not put through the billing gate (declared with no plant load, or
+ * unconfirmed after the working day). A count and nothing else: no trip, order, client, truck or driver. Readable by whoever works the invoice queue
+ * (owner, app_admin, office_sales, office: `invoices.queue`); the details need `trips.read`.
+ */
+export async function countHeldDeliveries(
+  appPool: pg.Pool,
+  actor: SessionUser,
+  range: { from: string; to: string },
+): Promise<Result<number, 'INVALID'>> {
+  await require(appPool, actor, 'invoices.queue');
+  if (!isRealDate(range.from) || !isRealDate(range.to)) return err('INVALID');
+  const { rows } = await inRequest(appPool, actor, (tx) =>
+    tx.query<{ n: number }>('select public.trip_delivery_held_count($1, $2) as n', [range.from, range.to]),
+  );
+  return ok(rows[0]?.n ?? 0);
+}

@@ -17,7 +17,7 @@ import {
   type DeliveryScene,
 } from './helpers/ledger-fixtures';
 import { getInvoiceQueue } from '../src/modules/ledger';
-import { listDeliveryExceptions } from '../src/modules/operations';
+import { countHeldDeliveries, listDeliveryExceptions } from '../src/modules/operations';
 import { v1Actors } from './helpers/v1-actors';
 
 // T9 (docs/T9-TRIP-SHARED-STATUS.md): ONE shared status of a rotation, written by the driver and by the plant through record_trip_stage.
@@ -561,6 +561,45 @@ describe('T9b: the exception lists (flag only, scoped)', () => {
       expect(await denied(exceptionsFor(u)), u.role).toBe(true);
     const r = await listDeliveryExceptions(app, pmA, { from: YESTERDAY, to: DAY });
     expect(r.ok && r.value.some((x) => x.tripId === mine.trip && x.kind === 'declared_no_record')).toBe(true);
+  });
+
+  it('the held COUNT (a number only) is visible to office_sales, who cannot read the details; plant side and owners as before; the others are refused', async () => {
+    const mine = await unloadedTrip({ link: false, day: YESTERDAY });
+    const range = { from: YESTERDAY, to: DAY };
+    const held = async (u: SessionUser) => {
+      const r = await countHeldDeliveries(app, u, range);
+      return r.ok ? r.value : null;
+    };
+    const detailsOf = async (u: SessionUser) =>
+      (await exceptionsFor(u)).filter((x) => x.kind === 'declared_no_record' || x.kind === 'unconfirmed')
+        .length;
+    // the details stay closed to the office
+    expect(await denied(exceptionsFor(sales))).toBe(true);
+    await expect(listDeliveryExceptions(app, sales, range)).rejects.toThrow();
+    // the count is a number, the same one the owner's details add up to, and carries nothing else
+    const n = await held(sales);
+    expect(typeof n).toBe('number');
+    expect(n).toBe(await detailsOf(owner));
+    expect(n).toBeGreaterThan(0);
+    const wire = JSON.stringify(await countHeldDeliveries(app, sales, range));
+    for (const needle of [mine.trip, 'CMD', 'T1', 'driver', 'client']) expect(wire).not.toContain(needle);
+    expect(await held(owner)).toBe(n);
+    expect(await held(appAdmin)).toBe(n);
+    // the plant side is scoped by the database as the details are: manager B sees none of A's
+    const rows = await asRole(pmB, (tx) =>
+      tx.query<{ n: number }>('select public.trip_delivery_held_count($1, $2) as n', [YESTERDAY, DAY]),
+    );
+    expect(rows.rows[0]!.n).toBe(await detailsOf(pmB));
+    expect(rows.rows[0]!.n).toBeLessThan(n as number);
+    // roles that do not work the queue, a driver and a missing actor: refused
+    for (const u of [driver1, accountant])
+      expect(
+        await denied(
+          asRole(u, (tx) => tx.query('select public.trip_delivery_held_count($1, $2)', [YESTERDAY, DAY])),
+        ),
+        u.role,
+      ).toBe(true);
+    await expect(countHeldDeliveries(app, accountant, range)).rejects.toThrow();
   });
 
   it('the invoice queue shows nothing of a driver-declared delivery with no plant load, nor of one not yet through the gate', async () => {

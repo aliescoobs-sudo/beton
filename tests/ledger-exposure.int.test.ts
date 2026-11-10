@@ -121,6 +121,7 @@ describe('functions the application role can execute', () => {
     'public.trip_stages(p_date date)', // T9: the shared status of the rotations the caller may see (scoped inside)
     'public.confirm_trip_stage(p_trip uuid, p_stage text, p_now timestamp with time zone)', // T9b: the plant confirms departed / back (role and plant checked inside)
     'public.trip_delivery_exceptions(p_from date, p_to date)', // T9b: the delivery exception lists (scoped inside, flag only)
+    'public.trip_delivery_held_count(p_from date, p_to date)', // T10a addendum: a NUMBER only (no trip, order, client, truck or driver) for the office roles that work the invoice queue
     'public.company_contact_phone()', // T9b: the office number for the driver's tel: link (role checked inside, the phone only)
     'public.set_plant_phone(p_plant uuid, p_phone text)', // T9b addendum: the phone of a plant (owner and app_admin only, checked inside, audited)
     'public.driver_plant_phones(p_date date)', // T9b addendum: the phone of the plant of the driver's own rotations (checked inside)

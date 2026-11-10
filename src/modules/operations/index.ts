@@ -142,6 +142,7 @@ export {
   correctTripStage,
   confirmTripDelivered,
   confirmTripStage,
+  countHeldDeliveries,
   listDeliveryExceptions,
   type DeliveryException,
   type DeliveryExceptionKind,

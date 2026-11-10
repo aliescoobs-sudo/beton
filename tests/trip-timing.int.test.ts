@@ -29,7 +29,7 @@ import { v1Actors } from './helpers/v1-actors';
 
 // T5 phase 2: the delay of every driver tap is recorded, the board and the statistics are scoped in the database (the driver's own, his
 // plant manager's plant, owner and app_admin), estimates fall back from history to an audited override, and a plant manager can reassign or
-// postpone a rotation that has not started. Rotations are on YESTERDAY so the taps are inside the door's 48 hours whatever the hour.
+// postpone a rotation that has not started. Rotations are on a fixed day and the taps carry a fixed server instant of it (see DAY).
 const env = testEnv();
 const app = new pg.Pool({ connectionString: env.DATABASE_URL_APP, max: 4 });
 const migrator = new pg.Pool({ connectionString: env.DATABASE_URL_MIGRATOR, max: 2 });
@@ -38,7 +38,9 @@ const letters = (n: number) =>
   Array.from({ length: n }, () => String.fromCharCode(65 + Math.floor(Math.random() * 26))).join('');
 const addDays = (iso: string, n: number) =>
   new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
-const DAY = addDays(businessDateOf(realClock.now()), -1);
+// T10d: a FIXED business day, and the taps are made at a fixed instant of that day (p_now): nothing depends on the hour the run starts or how long it
+// takes (a day computed from the clock made the door's 48-hour window depend on both).
+const DAY = '2026-06-20';
 const AT = (min: number) => new Date(localMidnightMs(DAY) + min * 60_000);
 const NOW_MS = localMidnightMs(DAY) + 8 * 3600_000 + 30 * 60_000; // 08:30 yesterday, for the board
 
@@ -181,13 +183,14 @@ const tap = (
   reason: string | null = null,
 ) =>
   withRlsContext(app, { userId: u.id, role: u.role as never, requestId: marker }, (tx) =>
-    tx.query<{ r: string }>('select public.driver_report($1, $2, $3, $4, $5, $6) as r', [
+    tx.query<{ r: string }>('select public.driver_report($1, $2, $3, $4, $5, $6, $7) as r', [
       trip,
       step,
       at,
       key,
       vol,
       reason,
+      new Date(localMidnightMs(DAY) + 24 * 3600_000 - 60_000),
     ]),
   );
 const refused = async (p: Promise<unknown>) => {

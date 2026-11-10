@@ -35,8 +35,36 @@ const used = async (ip: string | null) =>
       )
     ).rows[0]?.n ?? 0,
   );
-const randomIp = () => `198.51.100.${Math.floor(Math.random() * 250) + 1}`;
+// T10d: addresses are handed out by a counter, never drawn at random (a random draw from 250 collided with an earlier test's full bucket in
+// about one run in twenty, which made the parallel-reservation tests see 0 grants). The test database is created fresh for each run.
+let ipCounter = 0;
+const randomIp = () => `198.51.100.${++ipCounter}`;
 
+/** While `gate.on`, every database call of the guard waits: the requests that got in stay in flight until the test opens it. */
+const gate = { on: false, open: () => undefined as void, wait: Promise.resolve(), entered: 0 };
+const gatedPool = new Proxy(kit.authPool, {
+  get(target, prop) {
+    if (prop === 'query')
+      return async (...args: unknown[]) => {
+        if (gate.on) {
+          gate.entered++;
+          await gate.wait;
+        }
+        return (target.query as (...a: unknown[]) => unknown)(...args);
+      };
+    if (prop === 'connect')
+      return async () => {
+        // the reservation takes a client: the request is held here while the gate is on (it is then inside the guard, counted as in flight)
+        if (gate.on) {
+          gate.entered++;
+          await gate.wait;
+        }
+        return target.connect();
+      };
+    const v = Reflect.get(target, prop, target);
+    return typeof v === 'function' ? v.bind(target) : v;
+  },
+});
 let server: Server;
 let base = '';
 let maxInFlight = 8;
@@ -57,7 +85,7 @@ beforeAll(async () => {
     });
     const response = await handleFieldLogin(request, {
       deps: deps(),
-      guard: guard(),
+      guard: { ...guard(), pool: gatedPool },
       trustedHops: 1,
       now: new Date(),
       maxInFlight,
@@ -183,12 +211,24 @@ describe('real HTTP requests in parallel', () => {
   it('the in-flight bound answers BUSY without reserving anything', async () => {
     const ip = randomIp();
     maxInFlight = 2;
-    const burst = await Promise.all(Array.from({ length: 12 }, () => post(ip, wrong())));
-    const busy = burst.filter((r) => r.status === 503);
-    const done = burst.filter((r) => r.status === 401);
-    expect(busy.length).toBeGreaterThan(0);
-    expect(done.length + busy.length).toBe(12);
-    expect(await used(ip)).toBe(done.length); // a BUSY answer reserved nothing
+    // deterministic: the first two requests are held inside the guard (the gate), so exactly the other ten meet the bound
+    let release!: () => void;
+    gate.wait = new Promise<void>((r) => (release = r));
+    gate.entered = 0;
+    gate.on = true;
+    const pending = Array.from({ length: 12 }, () => post(ip, wrong()));
+    const settled: { status: number }[] = [];
+    pending.forEach((p) => void p.then((r) => settled.push(r)));
+    for (let i = 0; i < 400 && (settled.length < 10 || gate.entered < 2); i++)
+      await new Promise((r) => setTimeout(r, 10));
+    expect(settled.map((r) => r.status)).toEqual(Array(10).fill(503)); // ten BUSY answers while two are in flight
+    expect(await used(ip)).toBe(0); // and a BUSY answer reserved nothing
+    gate.on = false;
+    release();
+    const burst = await Promise.all(pending);
+    expect(burst.filter((r) => r.status === 503)).toHaveLength(10);
+    expect(burst.filter((r) => r.status === 401)).toHaveLength(2);
+    expect(await used(ip)).toBe(2);
     maxInFlight = 8;
   }, 60_000);
 
