@@ -483,7 +483,7 @@ describe('R17-09: a failing release never removes the high-water mark', () => {
     expect(() => acquireSeedLock(final, { now: () => t, staleMs: 60_000 })).toThrow(SeedLockError);
     t += 10 * 60_000;
     // (the fresh-looking file's mtime is real time, so a taker whose clock is past it sees it stale)
-    const b = acquireSeedLock(final, { now: () => Date.now() + 10 * 60_000, staleMs: 60_000 });
+    const b = acquireSeedLock(final, { now: () => realClock.now().getTime() + 10 * 60_000, staleMs: 60_000 });
     expect(Number(path.basename(b.file).match(/(\d+)\D*$/)?.[1])).toBeGreaterThan(
       Number(path.basename(a.file).match(/(\d+)\D*$/)?.[1]),
     );
