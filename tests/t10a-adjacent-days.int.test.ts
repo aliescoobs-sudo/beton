@@ -77,13 +77,17 @@ describe('R15B-05: adjacent days', () => {
     const night = await scene('n2', '2093-06-09');
     const morning = await scene('m2', '2093-06-10');
     await nightTrip(night.truck, night.order, '2093-06-09');
-    const other = await migrator.query<{ id: string }>(
-      `select id from truck where id <> $1 and capacity_l >= 4000 and public.truck_available_on(id, '2093-06-10') order by code limit 1`,
-      [night.truck],
+    // a truck of its own (the shared ones may be broken or busy in a full run)
+    const otherId = randomUUID();
+    await as((tx) =>
+      tx.query(
+        `insert into truck (id, code, plate, capacity_l) values ($1, 'T' || (100 + floor(random() * 899))::int, $2, 8000)`,
+        [otherId, `AD-${marker}`],
+      ),
     );
     const r = await saveDispatch(app, owner, {
       date: '2093-06-10',
-      rotations: [{ orderId: morning.order, truckId: other.rows[0]!.id, volumeL: 4000 }],
+      rotations: [{ orderId: morning.order, truckId: otherId, volumeL: 4000 }],
     });
     expect(r.ok, JSON.stringify(r)).toBe(true);
     if (r.ok) expect(r.value.overlapOverride).toBe(false);
