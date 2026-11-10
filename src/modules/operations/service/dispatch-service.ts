@@ -18,7 +18,10 @@ import {
   type DispatchParams,
   type DispatchTruck,
   isBlocking,
+  introducedOverlaps,
   isOverlap,
+  onNeighbourClock,
+  overlapMinutes,
   retime,
   isDriverOverride,
   type Rotation,
@@ -225,7 +228,14 @@ async function activeDrivers(tx: pg.PoolClient): Promise<DispatchDriver[]> {
  * day takes these first and READS THE STATE AFTER, so a start that was waiting is already visible. A lock held by this transaction costs nothing.
  */
 export async function lockDispatchDay(tx: pg.PoolClient, date: string): Promise<void> {
-  await tx.query(`select pg_advisory_xact_lock(hashtextextended('trip_plan_day:' || $1::text, 0))`, [date]);
+  // R15B-05: the day before and the day after are locked too (a rotation, a truck's or a driver's, runs past midnight), always in date
+  // order, so two planners of neighbouring days queue instead of deadlocking.
+  const { rows: days } = await tx.query<{ d: string }>(
+    `select to_char(d, 'YYYY-MM-DD') as d from unnest(array[$1::date - 1, $1::date, $1::date + 1]) as d order by d`,
+    [date],
+  );
+  for (const { d } of days)
+    await tx.query(`select pg_advisory_xact_lock(hashtextextended('trip_plan_day:' || $1::text, 0))`, [d]);
   const { rows } = await tx.query<{ id: string }>(
     `select p.id from trip_plan p
       where p.trip_date = $1 and not exists (select 1 from trip_plan_cancellation c where c.trip_id = p.id)
@@ -243,6 +253,49 @@ async function tripDate(tx: pg.PoolClient, tripId: string): Promise<string | nul
     [tripId],
   );
   return rows[0]?.d ?? null;
+}
+
+/** The live rotations of the day before and the day after, on this day's clock (R15B-05); RLS decides what the actor can see of them. */
+async function neighbourRotations(tx: pg.PoolClient, date: string): Promise<Rotation[]> {
+  const { rows } = await tx.query<{
+    id: string;
+    order_id: string;
+    seq: number;
+    truck_id: string;
+    driver_id: string | null;
+    volume_l: number;
+    load_min: number;
+    depart_min: number;
+    arrive_min: number;
+    unload_end_min: number;
+    back_min: number;
+    offset_min: number;
+  }>(
+    `select p.id, p.order_id, p.seq, p.truck_id, p.driver_id, p.volume_l, p.load_min, p.depart_min, p.arrive_min, p.unload_end_min, p.back_min,
+            ((p.trip_date - $1::date) * 1440) as offset_min
+       from trip_plan p
+      where p.trip_date in ($1::date - 1, $1::date + 1)
+        and not exists (select 1 from trip_plan_cancellation c where c.trip_id = p.id)`,
+    [date],
+  );
+  return rows.map((r) =>
+    onNeighbourClock(
+      {
+        key: r.id,
+        orderId: r.order_id,
+        seq: r.seq,
+        truckId: r.truck_id,
+        driverId: r.driver_id,
+        volumeL: r.volume_l,
+        loadMin: r.load_min,
+        departMin: r.depart_min,
+        arriveMin: r.arrive_min,
+        unloadEndMin: r.unload_end_min,
+        backMin: r.back_min,
+      },
+      Number(r.offset_min),
+    ),
+  );
 }
 
 async function liveRotations(tx: pg.PoolClient, date: string): Promise<SavedRotation[]> {
@@ -426,20 +479,23 @@ export async function saveDispatchIn(
     };
   });
   const timed = retime(draft, orders, params, fixed);
-  const conflicts = checkDispatch(timed, { orders, trucks, drivers, params, fixed });
+  const neighbours = await neighbourRotations(tx, date);
+  const conflicts = checkDispatch(timed, { orders, trucks, drivers, params, fixed, neighbours });
   if (conflicts.some(isBlocking)) return err('BLOCKED');
   // A double-booked driver or truck is refused unless the caller gives the reason of an explicit override, which is recorded and audited.
   // A reassignment re-times the whole day (R15B-05): it answers for every double-booking it creates, including an unrelated driver's that the
   // re-timing causes, and not for the ones the stored plan already had (those stay in `conflicts`, shown).
-  const signature = (c: { kind: string; rotationKeys: readonly string[] }) =>
-    `${c.kind}|${[...c.rotationKeys].sort().join(',')}`;
-  const existing = new Set<string>();
+  // The baseline keeps HOW MUCH each stored pair overlaps: a pair that already overlapped is reported again when the change makes it longer.
+  const sharedMin = (list: readonly Rotation[]) => (c: { rotationKeys: readonly string[] }) => {
+    const [a, b] = c.rotationKeys.map((k) => [...list, ...fixed, ...neighbours].find((r) => r.key === k));
+    return a && b ? overlapMinutes(a, b) : 0;
+  };
+  let overlaps = conflicts.filter(isOverlap);
   if (deps.overlapBaseline) {
     const stored = previous.map((p, i) => ({ ...p, key: `r${i}` }));
-    for (const c of checkDispatch(stored, { orders, trucks, drivers, params, fixed }).filter(isOverlap))
-      existing.add(signature(c));
+    const before = checkDispatch(stored, { orders, trucks, drivers, params, fixed, neighbours });
+    overlaps = introducedOverlaps(conflicts, before, sharedMin(timed), sharedMin(stored));
   }
-  const overlaps = conflicts.filter(isOverlap).filter((c) => !existing.has(signature(c)));
   const overlapReason = deps.overlapReason?.trim() ?? '';
   if (overlaps.length > 0 && overlapReason.length < 3) return err('OVERLAP');
   if (overlapReason.length > 300) return err('INVALID');

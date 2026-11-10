@@ -7,9 +7,13 @@ import {
   type DispatchOrder,
   type DispatchParams,
   type DispatchTruck,
+  introducedOverlaps,
   isBlocking,
   isDriverOverride,
+  onNeighbourClock,
+  overlapMinutes,
   planDispatch,
+  type Rotation,
   retime,
   rotationTimes,
 } from './dispatch';
@@ -314,3 +318,72 @@ describe('rotations that already started (fixed)', () => {
     ).toEqual([]);
   });
 });
+
+describe('R15B-05: the neighbouring days and the severity of a stored overlap', () => {
+  const rot = (
+    key: string,
+    truckId: string,
+    driverId: string | null,
+    loadMin: number,
+    backMin: number,
+  ): Rotation => ({
+    key,
+    orderId: 'o-1',
+    seq: 1,
+    truckId,
+    driverId,
+    volumeL: 4000,
+    loadMin,
+    departMin: loadMin,
+    arriveMin: loadMin,
+    unloadEndMin: backMin,
+    backMin,
+  });
+  const ctx = (neighbours: Rotation[]) => ({
+    orders: [order('1', 4000)],
+    trucks: [truck(1)],
+    drivers,
+    params: P,
+    neighbours,
+  });
+
+  it('a rotation of the day before that runs past midnight overlaps a first-hour rotation of this day (truck and driver)', () => {
+    const yesterday = onNeighbourClock(rot('y', 't1', 'd1', 1400, 1900), -1440); // 23:20 → 07:40 of today's clock = -40 → 460
+    expect(yesterday.loadMin).toBe(-40);
+    expect(yesterday.backMin).toBe(460);
+    const today = rot('r0', 't1', 'd1', 420, 520);
+    const kinds = checkDispatch([today], ctx([yesterday])).map((c) => c.kind);
+    expect(kinds).toContain('TRUCK_OVERLAP');
+    expect(kinds).toContain('DRIVER_OVERLAP');
+    // the day after, the other way round
+    const tomorrow = onNeighbourClock(rot('t', 't1', 'd1', 20, 100), 1440);
+    expect(checkDispatch([rot('r1', 't1', 'd1', 1400, 1500)], ctx([tomorrow])).map((c) => c.kind)).toContain(
+      'TRUCK_OVERLAP',
+    );
+  });
+
+  it('a neighbour that ends before this day starts is no conflict, and two neighbours are not this plan’s business', () => {
+    const early = onNeighbourClock(rot('y', 't1', 'd1', 1000, 1300), -1440);
+    expect(checkDispatch([rot('r0', 't1', 'd1', 420, 520)], ctx([early])).filter(isOverlapKind)).toEqual([]);
+    const a = onNeighbourClock(rot('a', 't1', 'd1', 1400, 1900), -1440);
+    const b = onNeighbourClock(rot('b', 't1', 'd1', 1400, 1900), -1440);
+    expect(checkDispatch([], ctx([a, b])).filter(isOverlapKind)).toEqual([]);
+  });
+
+  it('overlapMinutes, and a stored overlap that the change makes LONGER is reported again; a shorter or equal one is not', () => {
+    expect(overlapMinutes(rot('a', 't1', 'd1', 0, 100), rot('b', 't1', 'd1', 60, 200))).toBe(40);
+    expect(overlapMinutes(rot('a', 't1', 'd1', 0, 50), rot('b', 't1', 'd1', 60, 200))).toBe(0);
+    const c = (keys: string[]) => ({
+      kind: 'TRUCK_OVERLAP' as const,
+      rotationKeys: keys,
+      orderId: null,
+      amount: null,
+    });
+    const mins = (m: number) => () => m;
+    expect(introducedOverlaps([c(['a', 'b'])], [c(['a', 'b'])], mins(40), mins(40))).toEqual([]);
+    expect(introducedOverlaps([c(['a', 'b'])], [c(['b', 'a'])], mins(30), mins(40))).toEqual([]);
+    expect(introducedOverlaps([c(['a', 'b'])], [c(['a', 'b'])], mins(70), mins(40))).toHaveLength(1);
+    expect(introducedOverlaps([c(['a', 'b'])], [], mins(10), mins(0))).toHaveLength(1);
+  });
+});
+const isOverlapKind = (c: { kind: string }) => c.kind === 'TRUCK_OVERLAP' || c.kind === 'DRIVER_OVERLAP';

@@ -104,6 +104,7 @@ describe('functions the application role can execute', () => {
     'public.driver_attach_bl_photo(p_trip uuid, p_file uuid, p_type text, p_size integer, p_sha text, p_at timestamp with time zone, p_key text)', // C3: the driver of the rotation only (checked inside)
     'public.driver_bl_photo_counts(p_date date)', // C3: the driver's own rotations only
     'public.driver_emergency(p_trip uuid, p_option text, p_pct integer, p_note text, p_key text, p_at timestamp with time zone)',
+    'public.driver_in_plant_scope(p_driver uuid)', // T10a: a scope predicate for the driver_read / trip_plan policies; true only for the owner roles and a plant manager's own drivers, false without an actor
     'public.driver_instructions()',
     'public.driver_report(p_trip uuid, p_step text, p_at timestamp with time zone, p_key text, p_volume_l integer, p_reason text, p_now timestamp with time zone)', // T5: also records the delay of the tap (own rotation only, checked inside)
     'public.log_dispatch_change(p_kind text, p_old uuid, p_new uuid, p_from_truck uuid, p_to_truck uuid, p_from_driver uuid, p_to_driver uuid, p_reason text)', // T5: owner, app_admin, plant manager of the plant (checked inside)

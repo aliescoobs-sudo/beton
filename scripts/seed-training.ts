@@ -4,6 +4,7 @@
 // database is a training database. Credentials are generated once and written to the file named by TRAINING_ACCOUNTS_FILE (required, no
 // default: a private folder outside any checkout or build context; in the containers /app/out/training-accounts.local.txt); never printed.
 //   corepack pnpm seed:training         (an already seeded database is left alone: use `reset:training`)
+import { assertNoUsableReservedAccounts } from '../src/modules/platform-security/service/reserved-admission.ts';
 import { existsSync } from 'node:fs';
 import pg from 'pg';
 import { realClock } from '../src/modules/clock/index.ts';
@@ -220,6 +221,7 @@ export async function seedTraining(opts: SeedTrainingOptions): Promise<SeedTrain
     if ((await migrator.query('select 1 from public.training_marker')).rowCount)
       return { applied: false, accounts: 0, credentialsFile: null };
     await assertSeedTargetEmpty(migrator);
+    await assertNoUsableReservedAccounts(migrator);
     // R13-01: provenance. Checked (without being consumed) before the first write; consumed right after the destination is vetted.
     const database = databaseNameOf(env.DATABASE_URL_MIGRATOR);
     if (needToken && !(await hasBirthToken(env, database))) throw new SeedError(PROVENANCE_REFUSAL);

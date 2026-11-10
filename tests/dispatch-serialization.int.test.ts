@@ -645,7 +645,7 @@ describe('the overlap policy: no double-booking without an audited override', ()
       });
     }
 
-    it("the day screen and the reassign path tell a plant manager nothing of another plant's rotation (existence of a plant-less one at most)", async () => {
+    it("the day screen and the reassign path tell a plant manager nothing of another plant's rotation (existence of a a plant-less one either)", async () => {
       const date = nextDay();
       const oA = await newOrder(date);
       const tA = await newTrip(date, oA.id, truckA, null, 1, 480);
@@ -663,47 +663,17 @@ describe('the overlap policy: no double-booking without an audited override', ()
       expect(day.value.orders.map((o) => o.orderId)).not.toContain(b.orderId);
       // (the list of active drivers is the company's, not a plant's: a driver id may appear there, with no rotation attached)
       for (const needle of [b.id, b.orderId, bCode, plantB, truckX]) expect(wire).not.toContain(needle);
-      // the plant-less rotation is visible by the plant's own rule (a day made before plants existed): it is flagged \`foreign\`, and only the
-      // plan's own fields travel with it: no plant id, no price, no step, no event
-      const seen = day.value.saved.find((r) => r.key === n.id);
-      expect(seen?.foreign).toBe(true);
-      expect(seen?.started).toBe(false); // not readable by this account, so never shown as started
-      expect(Object.keys(seen ?? {}).sort()).toEqual(
-        [
-          'arriveMin',
-          'backMin',
-          'clientCode',
-          'departMin',
-          'driverId',
-          'driverName',
-          'foreign',
-          'key',
-          'loadMin',
-          'orderCode',
-          'orderId',
-          'overrideReason',
-          'seq',
-          'started',
-          'truckCode',
-          'truckId',
-          'unloadEndMin',
-          'volumeL',
-        ].sort(),
-      );
-      for (const word of ['plant', 'price', 'centimes', 'ttc', 'event', 'photo'])
-        expect(
-          Object.keys(seen ?? {})
-            .join(' ')
-            .toLowerCase(),
-        ).not.toContain(word);
-      // the reassign path answers a plant B rotation exactly as it answers an id that does not exist (no oracle), and a plant-less one with
-      // the refusal of the rule; neither returns a detail
+      // decision 207: the plant-less rotation is not for a plant manager at all: not in the plan, not in the orders, not in the wire
+      expect(day.value.saved.map((r) => r.key)).not.toContain(n.id);
+      expect(day.value.orders.map((o) => o.orderId)).not.toContain(n.orderId);
+      for (const needle of [n.id, n.orderId]) expect(wire).not.toContain(needle);
+      // the reassign path answers a plant B rotation and a plant-less one exactly as it answers an id that does not exist (no oracle)
       const probe = (tripId: string) =>
         reassignTrip(app, pmA, { tripId, truckId: truckC, driverId: null, reason: 'Essai' });
       const unknown = await probe(randomUUID());
       expect(unknown).toEqual({ ok: false, error: 'NOT_FOUND' });
       expect(await probe(b.id)).toEqual(unknown);
-      expect(await probe(n.id)).toEqual({ ok: false, error: 'CONFLICT' });
+      expect(await probe(n.id)).toEqual(unknown);
       // his own rotation is still movable, and the answer is the plan's: a new id, conflict kinds, a flag
       const mine = await probe(tA);
       expect(mine.ok).toBe(true);

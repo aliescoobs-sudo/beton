@@ -1,3 +1,4 @@
+import { RESERVED_ROLES, isLoginRole } from '../domain/login-roles';
 import type pg from 'pg';
 import { realClock } from '@/modules/clock';
 import { auditAuthEvent } from '../auth/audit';
@@ -48,7 +49,7 @@ export const MANAGED_ROLES = [
   'plant',
 ] as const;
 /** `partner` and `support` never get an account in V1 (decision of the owner, T8): refused here, in the UI list and by the database (0208). */
-export const RESERVED_ROLES = ['partner', 'support'] as const;
+export { RESERVED_ROLES };
 export type ManagedRole = (typeof MANAGED_ROLES)[number];
 
 /** Service-level guard (SPEC §4, layer 2): only the owner manages users, whatever the UI did. */
@@ -131,6 +132,9 @@ export async function setUserStatus(
   ]);
   if (!rows[0]) throw new Error('Unknown user');
   if (rows[0].role === 'owner') throw new Error('The owner account cannot be disabled');
+  // R17-03: a reserved-role (or unknown-role) account is never usable again; it can only be, and stay, disabled
+  if (status === 'active' && !isLoginRole(rows[0].role))
+    throw new Error('This account has no V1 role and cannot be enabled');
   if (rows[0].role === 'app_admin' && actor.role !== 'owner') throw new ForbiddenError();
 
   await deps.authPool.query('update "user" set status = $2, "updatedAt" = $3 where id = $1', [

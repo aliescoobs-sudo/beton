@@ -26,6 +26,8 @@ export async function runMigrations(migratorUrl: string): Promise<void> {
   try {
     await migrate(drizzle(pool), { migrationsFolder: MIGRATIONS_FOLDER });
     await applySeedRoleGrants(pool);
+    // R17-03: on every run (not only the one that applied 0212): their sessions are revoked, and a usable reserved-role account stops it
+    await pool.query('select public.admit_no_reserved_accounts()');
   } finally {
     await pool.end();
   }

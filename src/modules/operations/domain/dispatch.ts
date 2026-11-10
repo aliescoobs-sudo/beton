@@ -226,7 +226,46 @@ export function retime(
 
 const overlaps = (a: Rotation, b: Rotation): boolean => a.loadMin < b.backMin && b.loadMin < a.backMin;
 
+/** How long two rotations share the clock (0 when they do not): the severity of an overlap, compared against the stored plan (R15B-05). */
+export const overlapMinutes = (a: Rotation, b: Rotation): number =>
+  Math.max(0, Math.min(a.backMin, b.backMin) - Math.max(a.loadMin, b.loadMin));
+
+const overlapSignature = (c: { kind: string; rotationKeys: readonly string[] }): string =>
+  `${c.kind}|${[...c.rotationKeys].sort().join(',')}`;
+
+/**
+ * The overlaps a change is answerable for (R15B-05): those of `after` that are not in `before` (the stored plan), plus those that were
+ * already there and are now LONGER. `minutes` says how long a conflict's two rotations share the clock, in the plan it belongs to.
+ */
+export function introducedOverlaps(
+  after: readonly Conflict[],
+  before: readonly Conflict[],
+  minutesAfter: (c: Conflict) => number,
+  minutesBefore: (c: Conflict) => number,
+): Conflict[] {
+  const was = new Map(before.filter(isOverlap).map((c) => [overlapSignature(c), minutesBefore(c)]));
+  return after
+    .filter(isOverlap)
+    .filter((c) => !was.has(overlapSignature(c)) || minutesAfter(c) > (was.get(overlapSignature(c)) ?? 0));
+}
+
+/** A rotation of another day seen on this day's clock (day before: -1440, day after: +1440), under a key that cannot clash with the plan's. */
+export const onNeighbourClock = (r: Rotation, offsetMin: number): Rotation => ({
+  ...r,
+  key: `n:${r.key}`,
+  loadMin: r.loadMin + offsetMin,
+  departMin: r.departMin + offsetMin,
+  arriveMin: r.arriveMin + offsetMin,
+  unloadEndMin: r.unloadEndMin + offsetMin,
+  backMin: r.backMin + offsetMin,
+});
+
 export interface DispatchContext {
+  /**
+   * The live rotations of the day before and the day after, on this day's clock (a rotation may run to 48 h): only their resource overlaps
+   * with the plan are judged (R15B-05), never their own conflicts.
+   */
+  neighbours?: readonly Rotation[];
   /** Rotations that already started: only their overlaps with the plan are judged. */
   fixed?: readonly Rotation[];
   orders: readonly DispatchOrder[];
@@ -264,7 +303,7 @@ export function checkDispatch(rotations: readonly Rotation[], ctx: DispatchConte
     ['truckId', 'TRUCK_OVERLAP'],
     ['driverId', 'DRIVER_OVERLAP'],
   ] as const) {
-    const all = [...sorted, ...(ctx.fixed ?? [])];
+    const all = [...sorted, ...(ctx.fixed ?? []), ...(ctx.neighbours ?? [])];
     for (let i = 0; i < all.length; i++) {
       for (let j = i + 1; j < all.length; j++) {
         const a = all[i] as Rotation;

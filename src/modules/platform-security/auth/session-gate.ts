@@ -1,6 +1,7 @@
 import { isTrainingEmail } from '@/lib/training';
 import { realClock } from '@/modules/clock';
 import { APIError } from 'better-auth/api';
+import { isLoginRole } from '../domain/login-roles';
 import type { Auth } from './create-auth';
 import type { UserRole } from './user-service';
 import type { UserLocale } from '../domain/locale';
@@ -54,6 +55,8 @@ export async function resolveAuthState(
     throw error;
   }
   if (!result) return { kind: 'anonymous' };
+  // R17-03: a session that belongs to a reserved, unknown or missing role is not a session (also for one created before this rule)
+  if (!isLoginRole((result.user as { role?: unknown }).role)) return { kind: 'anonymous' };
 
   const user: SessionUser = {
     id: result.user.id,

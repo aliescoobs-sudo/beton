@@ -124,14 +124,16 @@ describe('who may read and write the plan (AC-OPS-15)', () => {
     }
   });
 
-  it('only owner and partner add drivers; the code is the next free CH-nn', async () => {
+  it('only the owner adds drivers; the code is the next free CH-nn', async () => {
     await expect(createDriver(app, users.plant, { name: 'x' })).rejects.toBeInstanceOf(ForbiddenError);
-    const a = await createDriver(app, users.partner, { name: `A ${marker}` });
+    const a = await createDriver(app, users.owner, { name: `A ${marker}` });
     const b = await createDriver(app, users.owner, { name: `B ${marker}` });
     if (!a.ok || !b.ok) throw new Error('driver');
     expect(a.value.code).toMatch(/^CH-\d{2,}$/);
     expect(Number(b.value.code.slice(3))).toBe(Number(a.value.code.slice(3)) + 1);
+    // (a plant account bound to no plant reads the roster; a plant MANAGER only his plant's drivers: tests/t10a-isolation.int.test.ts)
     expect((await listDrivers(app, users.plant)).some((d) => d.id === a.value.id)).toBe(true);
+    expect((await listDrivers(app, users.owner)).some((d) => d.id === a.value.id)).toBe(true);
     expect(await createDriver(app, users.owner, { name: '   ' })).toEqual({ ok: false, error: 'INVALID' });
   });
 });

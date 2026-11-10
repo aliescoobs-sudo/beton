@@ -16,6 +16,7 @@ import {
 import { readParameters } from '../service/parameter-service';
 import { baseAuthOptions } from './options';
 import { enforceAbsoluteLifetime } from './session-lifetime';
+import { isLoginRole } from '../domain/login-roles';
 import { afterTwoFactor, beforeTwoFactor, TWO_FACTOR_PATHS } from './two-factor-hooks';
 
 /** Auth endpoints reachable over HTTP; everything else Better Auth ships answers 404 (ADR 0001). */
@@ -75,11 +76,13 @@ export function createAuth({ authPool, env, log }: CreateAuthDeps) {
         create: {
           before: async (session) => {
             // Disabled users never get a session (AC-SEC-14), whichever flow creates it.
-            const { rows } = await authPool.query<{ status: string }>(
-              'select status from "user" where id = $1',
+            const { rows } = await authPool.query<{ status: string; role: string | null }>(
+              'select status, role from "user" where id = $1',
               [session.userId],
             );
             if (rows[0]?.status !== 'active') return false;
+            // R17-03: a reserved, unknown or missing role never gets a session (the database refuses it too)
+            if (!isLoginRole(rows[0]?.role)) return false;
             // Raw IPs are never stored (a CHECK constraint enforces it); login_attempt keeps a keyed hash.
             return { data: { ...session, ipAddress: null } };
           },

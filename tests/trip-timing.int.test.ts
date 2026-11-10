@@ -141,6 +141,7 @@ async function newTrip(
   loadMin: number,
   seq = 1,
   existingOrder?: string,
+  tripDate = DAY,
 ): Promise<string> {
   return asOwner(plant, async (tx) => {
     const o = existingOrder
@@ -154,7 +155,7 @@ async function newTrip(
       [
         id,
         randomUUID(),
-        DAY,
+        tripDate,
         o.id,
         seq,
         truckId,
@@ -614,6 +615,8 @@ describe('the explanation never leaves the restricted tables (R14-02)', () => {
       return o.id;
     });
     const t1 = await newTrip(plantA, scene.truckId, driverRow1, 700, 1, moved);
+    // decision 207: the manager of plant A can plan only a driver who is attached to his plant: driverRow2 has a rotation at plant A (another day)
+    await newTrip(plantA, scene.truckId, driverRow2, 300, 1, undefined, '2092-12-30');
     const r = await reassignTrip(
       app,
       pmA,

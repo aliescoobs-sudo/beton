@@ -87,3 +87,14 @@ async function readTrainingMarker(attempts = 60, waitMs = 1000): Promise<boolean
     }
   }
 }
+
+/** Node-only (R17-03): refuse to serve while an account with a reserved role is usable. */
+export async function assertReservedAccountsOrExit(): Promise<void> {
+  try {
+    const { assertNoUsableReservedAccounts } = await import('./service/reserved-admission');
+    await assertNoUsableReservedAccounts(getPool('system'));
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
+}
