@@ -2705,6 +2705,9 @@
     "offline": "Hors ligne : vos actions sont gardées et seront envoyées.",
     "queued": "{count} action(s) à envoyer",
     "signOutPending": "{count} élément(s) n'ont pas encore pu être envoyés et seront effacés de ce téléphone si vous vous déconnectez. Se déconnecter quand même ?",
+    "signOutPendingUnknown": "Au moins {count} élément(s) n'ont pas pu être envoyés, et certaines photos n'ont pas pu être lues : on ne sait pas combien il en reste. Elles peuvent être effacées de ce téléphone si vous vous déconnectez. Se déconnecter quand même ?",
+    "eraseIncomplete": "L'effacement des données de ce téléphone n'est pas terminé. Ne considérez pas le téléphone comme vidé.",
+    "eraseRetry": "Réessayer l'effacement",
     "legacyPending": "Un ancien onglet de l'application garde des données sur ce téléphone : fermez-le, elles seront alors supprimées.",
     "timing": {
       "planned": "Prévu : chargement {load} · retour {back}",

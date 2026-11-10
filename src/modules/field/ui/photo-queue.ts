@@ -11,29 +11,43 @@ export interface QueuedPhoto {
   /** The account that took it: another account never sends it, and signing out or switching account erases it (F02). */
   userId: string;
   /**
-   * R15A-03: a creation stamp, taken when the photo is queued (before any wait), increasing within and across page loads. A wipe
-   * captures a cutoff when it STARTS and erases only photos stamped at or before it; a photo without a stamp (older than this field)
-   * counts as old.
+   * R15A-03 / T10c: a creation stamp, taken when the photo is queued (before any wait) from a PERSISTENT monotonic epoch shared by every page
+   * of this phone (a counter in the database itself, never a clock: reloads, other tabs and a clock set back cannot reorder it). A wipe takes
+   * its cutoff from the same counter when it STARTS and erases only photos stamped at or before it; a photo without a stamp counts as old.
    */
   seq?: number;
 }
 
-let lastSeq = 0;
-/** The next creation stamp. Also the cutoff a wipe captures when it starts: nothing queued after that moment is at or below it. */
-export function nextPhotoSeq(): number {
-  lastSeq = Math.max(lastSeq + 1, Date.now() * 1000);
-  return lastSeq;
-}
-
 const DB = 'kayas-field';
+const DB_VERSION = 2;
 /** The database of the application's former name (BELGOBETON). Its unsent photos are migrated to the new database, then it is deleted. */
 export const LEGACY_DB = 'belgobeton-field';
 const STORE = 'photos';
+/** T10c: small facts of the new database: the persistent epoch, the tombstones of the wipes, the fallback lock. */
+const META = 'meta';
 /** R16-02: set while the deletion of the former database is not proven to be finished (blocked or failed); retried on next load and before any wipe. */
 export const LEGACY_PENDING_KEY = 'kayas_legacy_cleanup_pending';
+const LOCK_NAME = 'kayas-photo-store';
 
 /** What happened to the deletion of the former database. Only `deleted` is a success: `blocked` (another page holds it open) and `error` are not. */
 export type LegacyOutcome = 'deleted' | 'blocked' | 'error';
+
+/**
+ * T10c: test seams, read lazily from `globalThis.__kayasPhotoHooks` (undefined in production: nothing runs). `pause(point)` lets a test hold
+ * the code at a named point (after the legacy snapshot, before the copy commits...); `fail(point)` makes that step throw, to prove the
+ * failure is reported and not swallowed. Points: snapshot, copy, erase-new, erase-legacy, open-new, read-legacy, read-new, delete-legacy.
+ */
+interface Hooks {
+  pause?: (point: string) => Promise<void> | void;
+  fail?: (point: string) => boolean;
+}
+const hooks = (): Hooks | undefined => (globalThis as { __kayasPhotoHooks?: Hooks }).__kayasPhotoHooks;
+async function point(name: string): Promise<void> {
+  const h = hooks();
+  if (!h) return;
+  await h.pause?.(name);
+  if (h.fail?.(name)) throw new Error(`injected failure at ${name}`);
+}
 
 const flag = {
   set: () => {
@@ -113,7 +127,7 @@ async function legacyExists(): Promise<boolean> {
 
 /**
  * Opens the former database; it closes itself when another page wants to delete or upgrade it, so it never blocks that. Null when it did not
- * exist (nothing is created: the upgrade is aborted) or when the browser did not answer in time (the open waits behind a queued deletion).
+ * exist (nothing is created: the upgrade is aborted), when it has no photo store any more (fenced), or when the browser did not answer in time.
  */
 function openLegacy(): Promise<IDBDatabase | null> {
   if (deletionQueued) return Promise.resolve(null);
@@ -157,57 +171,270 @@ function readAll(db: IDBDatabase): Promise<QueuedPhoto[]> {
   });
 }
 
-/** The unsent photos still in the former database (read only; none when it is gone). */
+/** The unsent photos still in the former database (read only). Rejects when they cannot be read: the caller must say so, not assume none. */
 async function legacyRows(): Promise<QueuedPhoto[]> {
   if (!(await legacyExists())) return [];
   const db = await openLegacy();
   if (!db) return [];
   try {
+    await point('read-legacy');
     return await readAll(db);
   } finally {
     db.close();
   }
 }
 
-/**
- * R16-02, step 1: the unsent photos of a phone that used the former name are COPIED into the new database, keeping their owner (another account
- * never sends them, and a wipe of that account erases them). A row without a creation stamp counts as old. Nothing is deleted here.
- * `none`: there was nothing; `error`: the copy is not committed (the former rows stay, and `queuedPhotos` still lists them).
- */
-async function copyLegacyPhotos(): Promise<'none' | 'copied' | 'error'> {
-  if (deletionQueued || !(await legacyExists())) return 'none';
-  const rows = await legacyRows().catch(() => null);
-  if (rows === null) return 'error';
-  if (rows.length === 0) return 'copied';
+// ---------------------------------------------------------------------------------------------------------------------------------
+// The new database, its epoch, its tombstones, its lock
+// ---------------------------------------------------------------------------------------------------------------------------------
+
+function open(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    void point('open-new').then(() => {
+      const req = indexedDB.open(DB, DB_VERSION);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: 'key' });
+        if (!db.objectStoreNames.contains(META)) {
+          db.createObjectStore(META);
+          // The persistent epoch starts above every stamp an earlier build wrote from the wall clock (seconds x 1000 at most), and only ever grows by one.
+          req.transaction?.objectStore(META).put(Date.now() * 1000, 'epoch');
+        }
+      };
+      req.onsuccess = () => {
+        const db = req.result;
+        db.onversionchange = () => db.close();
+        resolve(db);
+      };
+      req.onerror = () => reject(req.error);
+    }, reject);
+  });
+}
+
+/** One readwrite transaction on the meta store; resolves when it COMMITS. */
+async function meta<T>(fn: (s: IDBObjectStore, done: (v: T) => void) => void): Promise<T> {
   const db = await open();
   try {
-    await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction(STORE, 'readwrite');
-      const store = tx.objectStore(STORE);
-      for (const row of rows) {
-        // a photo already in the new database (an interrupted copy) is not overwritten
-        const exists = store.getKey(row.key);
-        exists.onsuccess = () => {
-          if (exists.result === undefined) store.put({ ...row, seq: row.seq ?? 0 });
-        };
-      }
-      tx.oncomplete = () => resolve();
+    return await new Promise<T>((resolve, reject) => {
+      const tx = db.transaction(META, 'readwrite');
+      let value: T;
+      fn(tx.objectStore(META), (v) => {
+        value = v;
+      });
+      tx.oncomplete = () => resolve(value);
       tx.onerror = () => reject(tx.error);
-      tx.onabort = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error ?? new Error('transaction aborted'));
     });
-  } catch {
-    return 'error';
   } finally {
     db.close();
   }
-  // The copy is committed: the former rows are taken out of the former database BEFORE its deletion is asked. A deletion that is blocked stays
-  // queued and that database cannot be opened again meanwhile, so it must not keep any photo while it waits. A failure here is not fatal:
-  // the rows stay (and are never lost), and the outcome of the deletion is still reported.
+}
+
+/**
+ * The next stamp of the persistent epoch: one atomic read-increment-write in the database, so two tabs (or a reload, or a clock set back)
+ * can never draw the same or a lower number than one drawn before. It is the creation stamp of a photo and the cutoff of a wipe.
+ */
+export function reserveEpoch(): Promise<number> {
+  return meta<number>((s, done) => {
+    const get = s.get('epoch');
+    get.onsuccess = () => {
+      const next = (typeof get.result === 'number' ? get.result : Date.now() * 1000) + 1;
+      s.put(next, 'epoch');
+      done(next);
+    };
+  });
+}
+const currentEpoch = (): Promise<number> =>
+  meta<number>((s, done) => {
+    const get = s.get('epoch');
+    get.onsuccess = () => done(typeof get.result === 'number' ? get.result : 0);
+  });
+
+interface Tombstone {
+  /** The epoch at which the wipe took its cutoff. */
+  at: number;
+  cutoff: number;
+  scope: WipeScope;
+}
+const MAX_TOMBSTONES = 50;
+const covers = (t: Tombstone, row: QueuedPhoto): boolean =>
+  (t.scope === 'everything'
+    ? true
+    : 'only' in t.scope
+      ? row.userId === t.scope.only
+      : row.userId !== t.scope.except) && (row.seq ?? 0) <= t.cutoff;
+
+/**
+ * Serializes everything that moves or erases photos across pages: the Web Locks API when the browser has it, else a lease in the database
+ * (an expiring record, renewed while held). A lock that cannot be had in time REJECTS: the caller reports an incomplete operation.
+ */
+export async function withStoreLock<T>(fn: () => Promise<T>): Promise<T> {
+  const locks = (
+    globalThis as { navigator?: { locks?: { request: (n: string, cb: () => Promise<T>) => Promise<T> } } }
+  ).navigator?.locks;
+  if (locks?.request) return locks.request(LOCK_NAME, fn);
+  const me = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const LEASE_MS = 10_000;
+  const acquire = () =>
+    meta<boolean>((s, done) => {
+      const get = s.get('lock');
+      get.onsuccess = () => {
+        const cur = get.result as { owner: string; until: number } | undefined;
+        if (!cur || cur.until < Date.now() || cur.owner === me) {
+          s.put({ owner: me, until: Date.now() + LEASE_MS }, 'lock');
+          done(true);
+        } else done(false);
+      };
+    });
+  const deadline = Date.now() + 20_000;
+  while (!(await acquire())) {
+    if (Date.now() > deadline) throw new Error('photo store busy: the lock could not be had');
+    await new Promise((r) => setTimeout(r, 40));
+  }
+  const beat = setInterval(() => void acquire().catch(() => undefined), LEASE_MS / 3);
+  try {
+    return await fn();
+  } finally {
+    clearInterval(beat);
+    await meta<void>((s, done) => {
+      const get = s.get('lock');
+      get.onsuccess = () => {
+        if ((get.result as { owner?: string } | undefined)?.owner === me) s.delete('lock');
+        done(undefined);
+      };
+    }).catch(() => undefined);
+  }
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// The migration of the former database (T10c: fenced, serialized, tombstone-checked, never deleting what was not copied)
+// ---------------------------------------------------------------------------------------------------------------------------------
+
+/**
+ * The FENCE. A versionchange transaction on the former database runs only when no page holds it open, and nobody can write while it runs. If
+ * the photo store is empty inside it, the store is removed: an old page that opens it later cannot write a photo that nothing would send or
+ * erase (it fails loudly). If it holds a row, the upgrade is aborted and nothing changes (`rows`). `blocked`: an old page keeps it open.
+ */
+function fenceLegacy(): Promise<'fenced' | 'rows' | 'blocked' | 'error'> {
+  if (deletionQueued) return Promise.resolve('blocked'); // a request of this page is already queued on it
+  return new Promise((resolve) => {
+    try {
+      let probed = false;
+      // an open that waits behind a queued request answers nothing: that is "blocked", not a hang
+      const waitTimer = setTimeout(() => {
+        if (!probed) resolve('blocked');
+      }, 1500);
+      const probe = indexedDB.open(LEGACY_DB);
+      probe.onerror = () => resolve('error');
+      probe.onupgradeneeded = () => probe.transaction?.abort(); // it did not exist: nothing created
+      probe.onsuccess = () => {
+        probed = true;
+        clearTimeout(waitTimer);
+        const db = probe.result;
+        const version = db.version;
+        const has = db.objectStoreNames.contains(STORE);
+        db.close();
+        if (!has) return resolve('fenced');
+        const req = indexedDB.open(LEGACY_DB, version + 1);
+        let outcome: 'fenced' | 'rows' | 'error' | null = null;
+        req.onupgradeneeded = () => {
+          const tx = req.transaction as IDBTransaction;
+          const count = tx.objectStore(STORE).count();
+          count.onsuccess = () => {
+            if (count.result > 0) {
+              outcome = 'rows';
+              tx.abort();
+            } else {
+              req.result.deleteObjectStore(STORE);
+              outcome = 'fenced';
+            }
+          };
+        };
+        let wasBlocked = false;
+        req.onsuccess = () => {
+          deletionQueued = false;
+          req.result.close();
+          resolve(outcome ?? 'fenced');
+          // the queued fence ran after the old page let go and removed the (empty) store: now the cleanup of the database itself
+          if (wasBlocked && outcome !== 'rows') void deleteLegacyPhotoStore();
+        };
+        req.onerror = () => {
+          deletionQueued = false;
+          resolve(outcome === 'rows' ? 'rows' : 'error');
+        };
+        // The request stays queued in the browser and runs (atomically) when the old page lets go; until then it holds the database's queue,
+        // so this page does not open it again (same rule as a queued deletion). The pending flag stays, and the next load finishes the cleanup.
+        req.onblocked = () => {
+          deletionQueued = true;
+          wasBlocked = true;
+          resolve('blocked');
+        };
+      };
+    } catch {
+      resolve('error');
+    }
+  });
+}
+
+type CopyResult = 'none' | 'copied' | 'error';
+
+/**
+ * One round: snapshot the former rows, COPY them into the new database in one transaction (skipping a photo already there, and a photo a
+ * wipe that started after the snapshot has erased), and only after that commit take out of the former database exactly the keys it handled.
+ * Rows an old page wrote after the snapshot are not in the copy, so they are never touched here (the next round copies them).
+ */
+async function copyRound(): Promise<CopyResult> {
+  if (deletionQueued || !(await legacyExists())) return 'none';
+  let rows: QueuedPhoto[];
+  let snapshotEpoch: number;
+  try {
+    snapshotEpoch = await currentEpoch();
+    rows = await legacyRows();
+    await point('snapshot');
+  } catch {
+    return 'error';
+  }
+  if (rows.length === 0) return 'copied';
+  const handled: string[] = [];
+  try {
+    await point('copy');
+    const db = await open();
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction([STORE, META], 'readwrite');
+        const store = tx.objectStore(STORE);
+        const wipes = tx.objectStore(META).get('wipes');
+        wipes.onsuccess = () => {
+          const tombs = ((wipes.result as Tombstone[] | undefined) ?? []).filter((t) => t.at > snapshotEpoch);
+          for (const row of rows) {
+            // a wipe took its cutoff after this snapshot began: the photo it covers was erased on purpose and is not put back
+            if (tombs.some((t) => covers(t, { ...row, seq: row.seq ?? 0 }))) {
+              handled.push(row.key);
+              continue;
+            }
+            const exists = store.getKey(row.key);
+            exists.onsuccess = () => {
+              if (exists.result === undefined) store.put({ ...row, seq: row.seq ?? 0 });
+              handled.push(row.key);
+            };
+          }
+        };
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error ?? new Error('copy aborted'));
+      });
+    } finally {
+      db.close();
+    }
+  } catch {
+    return 'error'; // nothing was committed: the former rows stay exactly as they were
+  }
+  // Committed. Take out ONLY the keys the committed copy handled.
   const legacy = await openLegacy().catch(() => null);
   if (legacy) {
     await new Promise<void>((resolve) => {
       const tx = legacy.transaction(STORE, 'readwrite');
-      for (const row of rows) tx.objectStore(STORE).delete(row.key);
+      for (const key of handled) tx.objectStore(STORE).delete(key);
       tx.oncomplete = () => resolve();
       tx.onerror = () => resolve();
       tx.onabort = () => resolve();
@@ -216,36 +443,57 @@ async function copyLegacyPhotos(): Promise<'none' | 'copied' | 'error'> {
   return 'copied';
 }
 
-/**
- * Copies the former database's photos, then (only when the copy is committed) asks for its deletion and returns the outcome. Also the retry of
- * a pending deletion. `none` when there is no former database. A failed copy is `error` and nothing is deleted.
- */
-export async function migrateLegacyPhotos(): Promise<LegacyOutcome | 'none'> {
-  if (deletionQueued) return 'blocked'; // already asked by this page; the browser finishes it when the old page closes
-  const copied = await copyLegacyPhotos();
-  if (copied === 'none') {
-    if (!(await legacyExists().catch(() => true))) flag.clear();
-    return flag.isSet() ? 'blocked' : 'none';
+/** The migration proper, to be called under the store lock. Returns what became of the former database. */
+async function migrateLocked(): Promise<LegacyOutcome | 'none' | 'error-copy'> {
+  if (deletionQueued) return 'blocked';
+  if (!(await legacyExists().catch(() => true))) {
+    flag.clear();
+    return 'none';
   }
-  if (copied === 'error') {
-    flag.set();
-    return 'error';
+  for (let round = 0; round < 6; round++) {
+    const copied = await copyRound();
+    if (copied === 'none') {
+      if (!(await legacyExists().catch(() => true))) flag.clear();
+      return flag.isSet() ? 'blocked' : 'none';
+    }
+    if (copied === 'error') {
+      flag.set();
+      return 'error-copy';
+    }
+    // the copy is committed and the former rows it handled are out: fence, which only succeeds when nothing is left (and nobody is writing)
+    const fenced = await fenceLegacy();
+    if (fenced === 'fenced') {
+      await point('delete-legacy').catch(() => {
+        flag.set();
+      });
+      return deleteLegacyPhotoStore();
+    }
+    if (fenced === 'blocked') {
+      flag.set();
+      return 'blocked';
+    }
+    if (fenced === 'error') {
+      flag.set();
+      return 'error';
+    }
+    // 'rows': an old page wrote after the snapshot: another round copies it
   }
-  return deleteLegacyPhotoStore();
+  flag.set();
+  return 'blocked'; // an old page keeps writing: the former database stays, with its rows, and is reported as pending
 }
 
-function open(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB, 1);
-    req.onupgradeneeded = () => req.result.createObjectStore(STORE, { keyPath: 'key' });
-    req.onsuccess = () => {
-      const db = req.result;
-      db.onversionchange = () => db.close();
-      resolve(db);
-    };
-    req.onerror = () => reject(req.error);
-  });
+/**
+ * Copies the former database's photos, then (only when everything is moved and the database is fenced) asks for its deletion and returns the
+ * outcome. Also the retry of a pending deletion. `none` when there is no former database. Serialized with every wipe, across pages.
+ */
+export async function migrateLegacyPhotos(): Promise<LegacyOutcome | 'none'> {
+  const r = await withStoreLock(migrateLocked);
+  return r === 'error-copy' ? 'error' : r;
 }
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// Reading, writing, erasing
+// ---------------------------------------------------------------------------------------------------------------------------------
 
 /**
  * R15B-04: a request that succeeded is not a write that is durable. A readwrite operation is finished when its TRANSACTION completes; an abort
@@ -273,11 +521,18 @@ async function run<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRe
  * ends while the write is on its way, the row is taken out again. Answers whether the photo was kept.
  */
 export async function queuePhoto(p: QueuedPhoto, stillCurrent: () => boolean = () => true): Promise<boolean> {
-  const row: QueuedPhoto = { ...p, seq: p.seq ?? nextPhotoSeq() };
+  const row: QueuedPhoto = { ...p, seq: p.seq ?? (await reserveEpoch()) };
   const db = await open();
-  if (!stillCurrent()) return false;
+  if (!stillCurrent()) {
+    db.close();
+    return false;
+  }
   const tx = db.transaction(STORE, 'readwrite');
-  await finish(tx, tx.objectStore(STORE).put(row), 'readwrite');
+  try {
+    await finish(tx, tx.objectStore(STORE).put(row), 'readwrite');
+  } finally {
+    db.close();
+  }
   if (stillCurrent()) return true;
   // The session ended while the write was on its way: take the row out again. A failed removal is NOT swallowed, because the row
   // would still be on the phone (R15B-04): the caller must not treat the sign-out as erased.
@@ -288,53 +543,133 @@ export async function queuePhoto(p: QueuedPhoto, stillCurrent: () => boolean = (
   }
   return false;
 }
-/**
- * Every unsent photo of this phone. A leftover of the former database is migrated first (and its deletion retried when it is still pending);
- * whatever could not be moved yet is still listed, so it is counted by the sign-out confirmation and never silently lost.
- */
-export async function queuedPhotos(): Promise<QueuedPhoto[]> {
-  if (flag.isSet() || (await legacyExists().catch(() => false)))
-    await migrateLegacyPhotos().catch(() => undefined);
-  const rows = await run<QueuedPhoto[]>('readonly', (s) => s.getAll());
-  const known = new Set(rows.map((r) => r.key));
-  const left = (await legacyRows().catch(() => [] as QueuedPhoto[])).filter((r) => !known.has(r.key));
-  return [...rows, ...left];
-}
-/**
- * Erases the photos within the scope in ONE transaction (R14-06, R15A-03): the photos of one account, of all but one, or all of them,
- * and ONLY those stamped at or before `cutoff`, which the wipe captured when it started. A negative owner predicate ("all but B") that
- * runs late is therefore never the authority to erase what a later session queued.
- */
-export async function wipePhotos(
-  scope: WipeScope = 'everything',
-  cutoff: number = nextPhotoSeq(),
-): Promise<{ legacy: LegacyOutcome | 'none' }> {
-  // R16-02: copy the former database's photos first, so the same scope and cutoff apply to them. The rows in scope are erased from BOTH
-  // databases BEFORE the deletion of the former one is asked (once a deletion is queued, that database cannot be opened again until it
-  // finishes). Then the deletion is asked and its outcome is returned: blocked and error are not success.
-  const copied = await copyLegacyPhotos().catch((): 'error' => 'error');
-  const inScope = (row: QueuedPhoto) =>
-    (scope === 'everything'
-      ? true
-      : 'only' in scope
-        ? row.userId === scope.only
-        : row.userId !== scope.except) && (row.seq ?? 0) <= cutoff;
-  await erase(await open(), inScope);
-  if (copied === 'none') return { legacy: flag.isSet() ? 'blocked' : 'none' };
-  const legacy = await (async (): Promise<LegacyOutcome> => {
-    const db = await openLegacy().catch(() => null);
-    if (db) await erase(db, inScope).catch(() => undefined);
-    if (copied === 'error') {
-      flag.set();
-      return 'error'; // rows that could not be copied stay in the former database: never deleted as if they had been moved
-    }
-    return deleteLegacyPhotoStore();
-  })();
-  return { legacy };
+
+/** Raised by `queuedPhotos` when some photos could not be read: `rows` is what could be, and the real number of photos is UNKNOWN (at least these). */
+export class PhotoListIncomplete extends Error {
+  constructor(readonly rows: QueuedPhoto[]) {
+    super('some queued photos could not be read');
+    this.name = 'PhotoListIncomplete';
+  }
 }
 
-/** Erases the rows in scope in ONE transaction, then closes the connection. */
-function erase(db: IDBDatabase, inScope: (row: QueuedPhoto) => boolean): Promise<void> {
+/**
+ * Every unsent photo of this phone. A leftover of the former database is migrated first (and its deletion retried when it is still pending);
+ * whatever could not be moved yet is still listed, so it is counted by the sign-out confirmation and never silently lost. When any store cannot be
+ * read the call REJECTS with `PhotoListIncomplete`: a count built from it is "at least this many, unknown".
+ */
+export async function queuedPhotos(): Promise<QueuedPhoto[]> {
+  let unreadable = false;
+  if (flag.isSet() || (await legacyExists().catch(() => false)))
+    await migrateLegacyPhotos().catch(() => {
+      unreadable = true;
+    });
+  let rows: QueuedPhoto[] = [];
+  try {
+    await point('read-new');
+    rows = await run<QueuedPhoto[]>('readonly', (s) => s.getAll());
+  } catch {
+    unreadable = true;
+  }
+  const known = new Set(rows.map((r) => r.key));
+  let left: QueuedPhoto[] = [];
+  try {
+    left = (await legacyRows()).filter((r) => !known.has(r.key));
+  } catch {
+    unreadable = true;
+  }
+  const all = [...rows, ...left];
+  if (unreadable) throw new PhotoListIncomplete(all);
+  return all;
+}
+
+/** What a wipe achieved. `complete` only when every store was erased within the scope and nothing is left to retry. */
+export interface WipeResult {
+  complete: boolean;
+  legacy: LegacyOutcome | 'none';
+  /** Which steps failed: the migration of the former database, the new store, the former store. */
+  failed: ('migrate' | 'new-store' | 'legacy-store' | 'lock')[];
+}
+
+/**
+ * Erases the photos within the scope, ONLY those stamped at or before `cutoff` (taken from the persistent epoch when the wipe starts), in one
+ * transaction per store, and records a tombstone so that no delayed copy can put them back. Serialized with the migration across pages. Never
+ * throws: every failure is in the result, and the caller keeps the erase pending.
+ */
+export async function wipePhotos(scope: WipeScope = 'everything', cutoff?: number): Promise<WipeResult> {
+  const result: WipeResult = { complete: true, legacy: 'none', failed: [] };
+  const fail = (what: WipeResult['failed'][number]) => {
+    result.complete = false;
+    if (!result.failed.includes(what)) result.failed.push(what);
+  };
+  try {
+    await withStoreLock(async () => {
+      const at = await reserveEpoch(); // the wipe's own place in the epoch (a copy that began before it must not put its photos back)
+      const limit = cutoff ?? at;
+      const inScope = (row: QueuedPhoto) =>
+        (scope === 'everything'
+          ? true
+          : 'only' in scope
+            ? row.userId === scope.only
+            : row.userId !== scope.except) && (row.seq ?? 0) <= limit;
+      // 1. move the former database's photos into the new one, so that one scope and one cutoff apply to all of them
+      const migrated = await migrateLocked().catch((): 'error-copy' => 'error-copy');
+      if (migrated === 'error-copy') fail('migrate');
+      else result.legacy = migrated;
+      // 2. the new store, and the tombstone, in ONE transaction
+      try {
+        await point('erase-new');
+        await eraseNew(inScope, { at, cutoff: limit, scope });
+      } catch {
+        fail('new-store');
+      }
+      // 3. whatever could not be moved (blocked, unreadable) is erased in the former database too, within the same scope
+      if (migrated !== 'none' && migrated !== 'deleted') {
+        try {
+          await point('erase-legacy');
+          const db = await openLegacy();
+          if (db) await eraseRows(db, inScope);
+        } catch {
+          fail('legacy-store');
+        }
+      }
+    });
+  } catch {
+    fail('lock');
+  }
+  if (result.legacy === 'blocked' || result.legacy === 'error') result.complete = false;
+  return result;
+}
+
+/** The rows in scope out of the new store, and the tombstone in, in one transaction that must COMMIT. */
+async function eraseNew(inScope: (row: QueuedPhoto) => boolean, tomb: Tombstone): Promise<void> {
+  const db = await open();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction([STORE, META], 'readwrite');
+      const cursor = tx.objectStore(STORE).openCursor();
+      cursor.onsuccess = () => {
+        const c = cursor.result;
+        if (!c) return;
+        if (inScope(c.value as QueuedPhoto)) c.delete();
+        c.continue();
+      };
+      const m = tx.objectStore(META);
+      const wipes = m.get('wipes');
+      wipes.onsuccess = () => {
+        const list = ((wipes.result as Tombstone[] | undefined) ?? []).concat(tomb).slice(-MAX_TOMBSTONES);
+        m.put(list, 'wipes');
+      };
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error ?? new Error('erase aborted'));
+    });
+  } finally {
+    db.close();
+  }
+}
+
+/** Erases the rows in scope of one database in ONE transaction that must commit, then closes the connection. */
+function eraseRows(db: IDBDatabase, inScope: (row: QueuedPhoto) => boolean): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE, 'readwrite');
     const cursor = tx.objectStore(STORE).openCursor();
@@ -346,9 +681,10 @@ function erase(db: IDBDatabase, inScope: (row: QueuedPhoto) => boolean): Promise
     };
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
-    tx.onabort = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error ?? new Error('erase aborted'));
   }).finally(() => db.close());
 }
+
 export async function dropPhoto(key: string): Promise<void> {
   await run('readwrite', (s) => s.delete(key));
   // a copy still in the former database (blocked deletion) is taken out too, or it would be sent again
@@ -360,7 +696,7 @@ export async function dropPhoto(key: string): Promise<void> {
       tx.objectStore(STORE).delete(key);
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
-      tx.onabort = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error ?? new Error('delete aborted'));
     });
   } finally {
     db.close();

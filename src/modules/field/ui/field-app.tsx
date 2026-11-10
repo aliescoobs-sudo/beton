@@ -27,8 +27,10 @@ import { createDayController } from './day-controller';
 import { createFieldSession } from './field-session';
 import {
   DAY_KEY,
+  erasePending,
   forgetAll,
   forgetRead,
+  retryPendingErase,
   legacyCleanupPending,
   QUEUE_KEY,
   SIGNED_OUT_KEY,
@@ -169,6 +171,7 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
   const [queue, setQueue] = useState<QueueAction[]>([]);
   // R16-02: the former-named photo database could not be deleted yet (an old page holds it open): shown, and retried at each load.
   const [legacyPending, setLegacyPending] = useState(false);
+  const [eraseIncomplete, setEraseIncomplete] = useState(false);
   const [online, setOnline] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [sheet, setSheet] = useState<{ tripId: string } | null>(null);
@@ -217,7 +220,8 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
       },
       forgetAll: (scope) => {
         etagRef.current = null;
-        return forgetAll(scope);
+        // the pending notice follows EVERY cleanup outcome, not only the one sampled at mount
+        return forgetAll(scope).finally(() => setLegacyPending(legacyCleanupPending()));
       },
       queuedPhotos,
       owner: {
@@ -229,6 +233,7 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
       queueNow: () => queueRef.current,
       ui: {
         setDay,
+        setEraseIncomplete,
         setSession,
         setOnline,
         clearWaiting: () => {
@@ -284,7 +289,8 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
           setPhotosWaiting({});
         },
       },
-      confirmPending: (count) => window.confirm(t('signOutPending', { count })),
+      confirmPending: (count, unknown) =>
+        window.confirm(unknown ? t('signOutPendingUnknown', { count }) : t('signOutPending', { count })),
       logoutRequest: (signal) => fetch('/api/field/logout', { method: 'POST', signal }),
       signOutMark: {
         set: () => localStorage.setItem(SIGNED_OUT_KEY, '1'),
@@ -312,6 +318,23 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
     void queuedPhotos()
       .catch(() => undefined)
       .then(() => setLegacyPending(legacyCleanupPending()));
+    // an erase left owed by an earlier page (a store could not be written, the lock was lost): retried now, shown until it is done
+    if (erasePending()) {
+      void Promise.resolve().then(() => setEraseIncomplete(true));
+      void retryPendingErase().then((r) => {
+        setEraseIncomplete(!r.complete);
+        setLegacyPending(r.legacyCleanupPending);
+      });
+    }
+  }, []);
+
+  const retryErase = useCallback(async () => {
+    const r = await retryPendingErase().catch(() => ({
+      complete: false,
+      legacyCleanupPending: legacyCleanupPending(),
+    }));
+    setEraseIncomplete(!r.complete);
+    setLegacyPending(r.legacyCleanupPending);
   }, []);
 
   useEffect(() => {
@@ -483,6 +506,28 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
 
   const big = 'w-full rounded-2xl px-4 py-6 text-3xl font-extrabold leading-tight';
 
+  const eraseNotice = (
+    <>
+      {eraseIncomplete && (
+        <div
+          role="alert"
+          className="rounded-xl bg-red-200 p-3 text-xl text-black"
+          data-testid="field-erase-incomplete"
+        >
+          <p>{t('eraseIncomplete')}</p>
+          <button
+            type="button"
+            className="mt-2 rounded-xl bg-black p-3 text-white"
+            data-testid="field-erase-retry"
+            onClick={() => void retryErase()}
+          >
+            {t('eraseRetry')}
+          </button>
+        </div>
+      )}
+    </>
+  );
+
   if (session === 'unknown') return <main className="p-6 text-2xl">…</main>;
 
   if (session === 'out') {
@@ -492,6 +537,7 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
         data-testid="field-login"
       >
         <h1 className="text-4xl font-extrabold">{t('title')}</h1>
+        {eraseNotice}
         <form onSubmit={(e) => void login(e)} className="space-y-4">
           <label className="block text-2xl">
             {t('code')}
@@ -570,6 +616,7 @@ export function FieldApp({ locale, pushAvailable = false }: { locale: string; pu
           {t('offline')}
         </p>
       )}
+      {eraseNotice}
       {legacyPending && (
         <p
           role="status"

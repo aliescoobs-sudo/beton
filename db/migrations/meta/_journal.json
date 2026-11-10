@@ -953,6 +953,13 @@
       "when": 1793805607023,
       "tag": "0212_t10a_isolation_roles",
       "breakpoints": true
+    },
+    {
+      "idx": 213,
+      "version": "7",
+      "when": 1793805667023,
+      "tag": "0213_field_session_revocation",
+      "breakpoints": true
     }
   ]
 }

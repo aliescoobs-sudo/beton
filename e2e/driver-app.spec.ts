@@ -613,3 +613,85 @@ test("R16-02 different account: another account's legacy photo is never sent by 
     .poll(async () => (await legacyState(page)).names.includes('belgobeton-field'), { timeout: 20_000 })
     .toBe(false);
 });
+
+// T10c (R17-07, R17-08): two real tabs of one browser profile, with deterministic pauses and an injected failure through the module's own
+// seams (`window.__kayasPhotoHooks`, undefined in normal use).
+const HOOKS = `
+  window.__kayasPhotoHooks = {
+    pause: (p) => (window.__pauseAt === p ? new Promise((r) => (window.__release = r)) : undefined),
+    fail: (p) => window.__failAt === p,
+  };`;
+const legacyClosed = (page: Page, rows: { key: string; userId: string }[], trip: string) =>
+  page.evaluate(
+    ({ rows, trip }) =>
+      new Promise<void>((resolve, reject) => {
+        const req = indexedDB.open('belgobeton-field', 1);
+        req.onupgradeneeded = () => {
+          const s = req.result.createObjectStore('photos', { keyPath: 'key' });
+          for (const r of rows)
+            s.put({ ...r, tripId: trip, takenAt: new Date().toISOString(), blob: new Blob(['x']) });
+        };
+        req.onsuccess = () => {
+          req.result.close(); // an old page that is gone: nothing holds the database
+          resolve();
+        };
+        req.onerror = () => reject(req.error);
+      }),
+    { rows, trip },
+  );
+
+test('T10c: a sign-out in one tab waits for the other tab’s migration (paused after its snapshot); nothing is lost or put back', async ({
+  page: a,
+  context,
+}) => {
+  await context.route('**/api/field/bl-photo', (route) => route.abort());
+  await openAndSignIn(a);
+  const userId = (JSON.parse((await localState(a)).day!) as { userId: string }).userId;
+  await legacyClosed(a, [{ key: 'legacy-tabs-0001', userId }], tripId);
+  // tab B: its migration pauses right after the snapshot of the former database
+  const b = await context.newPage();
+  await b.addInitScript(`${HOOKS} window.__pauseAt = 'snapshot';`);
+  await b.goto('/ar/driver');
+  await expect
+    .poll(() => b.evaluate(() => typeof (window as unknown as { __release?: unknown }).__release))
+    .toBe('function');
+  // tab A signs out meanwhile: its erase is queued behind B's migration (the lock), not run in between
+  a.once('dialog', (d) => void d.accept());
+  await a.getByTestId('field-signout').click();
+  await a.waitForTimeout(800);
+  // while B holds the migration, A's sign-out (its listing and its erase) is serialized behind it: nothing was erased in between
+  await expect(a.getByTestId('field-login')).toBeHidden();
+  await b.evaluate(() => (window as unknown as { __release: () => void }).__release());
+  await expect(a.getByTestId('field-login')).toBeVisible({ timeout: 20_000 });
+  // the migration finished and then the erase ran: the photo is in neither store, and does not come back
+  await expect.poll(async () => (await localState(a)).photos, { timeout: 20_000 }).toBe(0);
+  await a.waitForTimeout(1500);
+  expect((await localState(a)).photos).toBe(0);
+  const legacy = await legacyState(a);
+  expect(legacy.names.includes('belgobeton-field') ? legacy.pending : null).toBeNull();
+});
+
+test('T10c: an erase that fails is shown as incomplete and kept for retry, never reported as done; the retry finishes it', async ({
+  page,
+  context,
+}) => {
+  await context.route('**/api/field/bl-photo', (route) => route.abort());
+  await page.addInitScript(`${HOOKS}`);
+  await openAndSignIn(page);
+  const userId = (JSON.parse((await localState(page)).day!) as { userId: string }).userId;
+  await legacyClosed(page, [{ key: 'legacy-fail-0001', userId }], tripId);
+  await page.reload();
+  await expect(page.getByTestId('field-day')).toBeVisible();
+  await expect.poll(async () => (await localState(page)).photos).toBe(1);
+  await page.evaluate(() => ((window as unknown as { __failAt: string }).__failAt = 'erase-new'));
+  page.once('dialog', (d) => void d.accept());
+  await page.getByTestId('field-signout').click();
+  await expect(page.getByTestId('field-erase-incomplete')).toBeVisible();
+  expect((await localState(page)).photos).toBe(1); // still on the phone, and the screen says so
+  expect(await page.evaluate(() => localStorage.getItem('kayas_erase_pending'))).not.toBeNull();
+  await page.evaluate(() => ((window as unknown as { __failAt: string }).__failAt = ''));
+  await page.getByTestId('field-erase-retry').click();
+  await expect(page.getByTestId('field-erase-incomplete')).toBeHidden();
+  expect((await localState(page)).photos).toBe(0);
+  expect(await page.evaluate(() => localStorage.getItem('kayas_erase_pending'))).toBeNull();
+});

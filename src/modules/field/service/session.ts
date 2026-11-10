@@ -10,6 +10,8 @@ export const FIELD_SESSION_DAYS = 14;
 export interface FieldToken {
   driverId: string;
   deviceHash: string;
+  /** The generation of the phone's session on the server (T10c): a logout or a newer login moves it and this token stops working. */
+  gen: number;
   /** Expiry, seconds since the epoch. */
   exp: number;
 }
@@ -37,7 +39,13 @@ export function verifyFieldToken(
   if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
   try {
     const t = JSON.parse(Buffer.from(body, 'base64url').toString('utf8')) as Partial<FieldToken>;
-    if (typeof t.driverId !== 'string' || typeof t.deviceHash !== 'string' || typeof t.exp !== 'number')
+    if (
+      typeof t.driverId !== 'string' ||
+      typeof t.deviceHash !== 'string' ||
+      typeof t.exp !== 'number' ||
+      typeof t.gen !== 'number' ||
+      !Number.isInteger(t.gen)
+    )
       return null;
     return t.exp > nowSeconds ? (t as FieldToken) : null;
   } catch {

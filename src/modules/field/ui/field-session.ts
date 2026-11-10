@@ -51,7 +51,7 @@ export interface SessionPorts<P extends QueuedPhotoRef> {
     clearWaiting(): void;
   };
   /** Asks the driver whether to sign out although `count` things are still waiting. */
-  confirmPending(count: number): boolean;
+  confirmPending(count: number, unknown?: boolean): boolean;
   /**
    * The server call of the sign-out. It must honour the signal (an aborted fetch's response is discarded by the browser). It resolves to the
    * response; only `{ ok: true }` counts as "the server ended the session" (R15B-02).
@@ -207,6 +207,15 @@ export function createFieldSession<P extends QueuedPhotoRef>(ports: SessionPorts
     return entry.promise;
   }
 
+  /** The photos on the phone, and whether some could not be read (then the list is only what could be). */
+  async function listKnown(): Promise<{ photos: P[]; unknown: boolean }> {
+    try {
+      return { photos: await ports.listPhotos(), unknown: false };
+    } catch (e) {
+      return { photos: (e as { rows?: P[] }).rows ?? [], unknown: true };
+    }
+  }
+
   async function runSignOut(): Promise<void> {
     const op = day.beginSignOut(); // captured BEFORE the first await; every stage below takes its guard from it
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -218,11 +227,12 @@ export function createFieldSession<P extends QueuedPhotoRef>(ports: SessionPorts
       if (!op.alive()) return null; // expired, cancelled or overtaken: the next stage does not start
       await flushDrain(op);
       if (!op.alive()) return null;
-      return ports.listPhotos().catch(() => [] as P[]);
+      return listKnown();
     })();
     const result = await Promise.race([drain, expired]);
     clearTimeout(timer);
     let photos: P[];
+    let unknown = false;
     if (result === 'expired') {
       // The deadline ends the operation FOR GOOD: what is on its way is aborted and no stage of it can start again, whatever the
       // driver answers below and whoever signs in later. The sign-out goes on with what is known.
@@ -231,9 +241,13 @@ export function createFieldSession<P extends QueuedPhotoRef>(ports: SessionPorts
       photos = [];
     } else if (result === null) {
       return void op.end(); // the session was refused or replaced while the drain ran: nothing is left to sign out of
-    } else photos = result.filter((x) => x.userId === ports.owner());
-    const waiting = ports.queueLength() + photos.length + (result === 'expired' ? 1 : 0);
-    if (waiting > 0 && !ports.confirmPending(waiting)) {
+    } else {
+      photos = result.photos.filter((x) => x.userId === ports.owner());
+      unknown = result.unknown;
+    }
+    // T10c: photos that could not be read count as "unknown", never as none: the driver is told there may be more
+    const waiting = ports.queueLength() + photos.length + (result === 'expired' || unknown ? 1 : 0);
+    if (waiting > 0 && !ports.confirmPending(waiting, unknown)) {
       op.cancel();
       return;
     }

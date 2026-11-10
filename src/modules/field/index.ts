@@ -10,6 +10,7 @@ export {
   loginDriver,
   type LoginError,
   revokeDriverDevice,
+  closeFieldSession,
   sessionOfToken,
   setDriverPin,
 } from './service/auth';

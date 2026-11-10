@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { hashDeviceId, signFieldToken, verifyFieldToken } from './session';
 
 const secret = 'x'.repeat(40);
-const token = { driverId: '0194a8a0-0000-7000-8000-000000000001', deviceHash: 'abc', exp: 2_000_000_000 };
+const token = {
+  driverId: '0194a8a0-0000-7000-8000-000000000001',
+  deviceHash: 'abc',
+  gen: 3,
+  exp: 2_000_000_000,
+};
 
 describe('the phone session token (AC-PROD-25)', () => {
   it('round-trips and expires', () => {
@@ -21,6 +26,12 @@ describe('the phone session token (AC-PROD-25)', () => {
     expect(verifyFieldToken('y'.repeat(40), t, 1)).toBeNull();
     expect(verifyFieldToken(secret, undefined, 1)).toBeNull();
     expect(verifyFieldToken(secret, 'a.b', 1)).toBeNull();
+  });
+  it('T10c: a token without a generation (issued before the server could end sessions) or with a fractional one is refused', () => {
+    const old = { driverId: token.driverId, deviceHash: token.deviceHash, exp: token.exp };
+    expect(verifyFieldToken(secret, signFieldToken(secret, old as never), 1)).toBeNull();
+    expect(verifyFieldToken(secret, signFieldToken(secret, { ...token, gen: 1.5 }), 1)).toBeNull();
+    expect(verifyFieldToken(secret, signFieldToken(secret, { ...token, gen: '3' } as never), 1)).toBeNull();
   });
   it('hashes a device id, the same way each time', () => {
     expect(hashDeviceId(secret, 'phone-1')).toBe(hashDeviceId(secret, 'phone-1'));

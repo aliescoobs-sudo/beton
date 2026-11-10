@@ -292,12 +292,20 @@ export async function loginDriver(
         },
       );
       const maxAgeSeconds = FIELD_SESSION_DAYS * 86_400;
+      // T10c: a new session supersedes the earlier token of this phone; the logout moves the generation again
+      const opened = await deps.authPool.query<{ gen: number | null }>(
+        'select public.field_session_open($1, $2) as gen',
+        [outcome.driverId, deviceHash],
+      );
+      const gen = opened.rows[0]?.gen;
+      if (typeof gen !== 'number') return err('LOCKED');
       return ok({
         kind: outcome.role,
         maxAgeSeconds,
         token: signFieldToken(deps.secret, {
           driverId: outcome.driverId,
           deviceHash,
+          gen,
           exp: Math.floor(now.getTime() / 1000) + maxAgeSeconds,
         }),
       });
@@ -308,11 +316,11 @@ export async function loginDriver(
 /** Every request of the phone: the token is valid, and the database still knows this driver and this phone. */
 export async function sessionOfToken(
   deps: Pick<FieldAuthDeps, 'authPool'>,
-  token: { driverId: string; deviceHash: string },
+  token: { driverId: string; deviceHash: string; gen: number },
 ): Promise<SessionUser | null> {
   const { rows } = await deps.authPool.query<{ user_id: string; kind: 'driver' | 'pump_operator' }>(
-    'select user_id, kind from public.field_session_check($1, $2)',
-    [token.driverId, token.deviceHash],
+    'select user_id, kind from public.field_session_check($1, $2, $3)',
+    [token.driverId, token.deviceHash, token.gen],
   );
   const r = rows[0];
   if (!r) return null;
@@ -325,4 +333,16 @@ export async function sessionOfToken(
     twoFactorEnabled: false,
     reenrolRequired: false,
   };
+}
+
+/** T10c: ends the session of this token on the server, so that no copy of it works any more. True when it was the live one; never an error for "nothing to end". */
+export async function closeFieldSession(
+  deps: Pick<FieldAuthDeps, 'authPool'>,
+  token: { driverId: string; deviceHash: string; gen: number },
+): Promise<boolean> {
+  const { rows } = await deps.authPool.query<{ closed: boolean }>(
+    'select public.field_session_close($1, $2, $3) as closed',
+    [token.driverId, token.deviceHash, token.gen],
+  );
+  return rows[0]?.closed === true;
 }

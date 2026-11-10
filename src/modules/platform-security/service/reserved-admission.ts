@@ -16,9 +16,18 @@ export class ReservedAccountsError extends Error {
   }
 }
 
+/**
+ * The number of usable reserved-role accounts. A database that does not have the function yet (migration 0212 not applied) answers 0: such a
+ * database is not ready to serve anyway (the readiness probe counts the migrations), and the migration itself is an admission check.
+ */
 export async function usableReservedAccounts(pool: pg.Pool): Promise<number> {
-  const { rows } = await pool.query<{ n: string }>('select public.usable_reserved_role_accounts() as n');
-  return Number(rows[0]?.n ?? 0);
+  try {
+    const { rows } = await pool.query<{ n: string }>('select public.usable_reserved_role_accounts() as n');
+    return Number(rows[0]?.n ?? 0);
+  } catch (error) {
+    if ((error as { code?: string }).code === '42883') return 0;
+    throw error;
+  }
 }
 
 export async function assertNoUsableReservedAccounts(pool: pg.Pool): Promise<void> {

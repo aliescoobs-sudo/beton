@@ -49,13 +49,17 @@ export interface DayPorts<D extends { userId: string }> {
   /** Erase what names a client (the stored day, the caches); the queued work stays. */
   forgetRead(): Promise<void>;
   /** Erase the phone's local work: day, caches, queue, photos. The photos are erased within the scope only (R14-06). */
+  /** Resolves with `{ complete: false }` when something was NOT erased (T10c): the controller keeps it visible and retryable. */
   forgetAll(scope: WipeScope): Promise<unknown>;
+  /** Rejects with the rows it could read when some photos are unreadable (their number is then unknown). */
   queuedPhotos(): Promise<{ userId: string }[]>;
   owner: { get(): string | null; set(id: string | null): void };
   /** The taps waiting to be sent, as they are now (for the stored copy). */
   queueNow(): unknown;
   ui: {
     setDay(day: D | null): void;
+    /** T10c: an erase of the phone's local data is not proven finished (true), or is (false). Never claims an erasure that did not happen. */
+    setEraseIncomplete?(incomplete: boolean): void;
     setSession(session: 'unknown' | 'out' | 'in'): void;
     setOnline(online: boolean): void;
     /** After another account took over the phone: its taps and photo counts are gone. */
@@ -127,6 +131,11 @@ export function createDayController<D extends { userId: string }>(ports: DayPort
     abortWhere(() => true);
     fenced = false;
   }
+  /** The result of a wipe: anything but an explicit `complete: true` is an incomplete erase, shown and kept for retry. */
+  const reportErase = (r: unknown): void => {
+    const done = typeof r === 'object' && r !== null && (r as { complete?: unknown }).complete !== false;
+    ports.ui.setEraseIncomplete?.(!done);
+  };
   const cleanup = (job: () => Promise<void>) => {
     void job().catch(() => undefined); // independent of the screen and of the next read (rule 2)
   };
@@ -138,7 +147,11 @@ export function createDayController<D extends { userId: string }>(ports: DayPort
     abortWhere(() => true);
     ports.ui.setDay(null);
     ports.ui.setSession(session);
-    cleanup(wipe === 'read' ? ports.forgetRead : () => ports.forgetAll(wipe).then(() => undefined));
+    cleanup(
+      wipe === 'read'
+        ? ports.forgetRead
+        : () => ports.forgetAll(wipe).then(reportErase, () => reportErase({ complete: false })),
+    );
   }
 
   const refused = (): void => clearNow('out');
@@ -171,7 +184,7 @@ export function createDayController<D extends { userId: string }>(ports: DayPort
       const data = (await res.json()) as D;
       if (!current()) return;
       // Another account on this phone: its day, its taps and its photos are erased before this account sees anything of them.
-      const photos = await ports.queuedPhotos().catch(() => []);
+      const photos = await ports.queuedPhotos().catch((e: { rows?: { userId: string }[] }) => e?.rows ?? []);
       if (!current()) return;
       const holders = [
         readStoredDay<D>(ports.local.get(DAY_STORAGE_KEY), ports.now())?.userId,
@@ -180,7 +193,9 @@ export function createDayController<D extends { userId: string }>(ports: DayPort
       ];
       if (mustWipeForAccount(data.userId, holders)) {
         // A wipe of somebody else's data is completed whatever happens to this read, but it only erases what is not this account's...
-        await ports.forgetAll({ except: data.userId }).catch(() => undefined);
+        await ports
+          .forgetAll({ except: data.userId })
+          .then(reportErase, () => reportErase({ complete: false }));
         // ...and the epoch is checked BEFORE the queue shown is touched: a stale wipe changes nothing of a newer session (R14-06).
         if (!current()) return;
         ports.ui.clearWaiting();

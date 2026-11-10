@@ -3,12 +3,24 @@
 // holds only the app shell and the framework's static files (never the day). `forgetRead` erases what names a client; `forgetAll` also
 // erases the work waiting to be sent (an explicit sign-out, or another account taking over the phone).
 import type { WipeScope } from './day-controller';
-import { legacyCleanupPending, LEGACY_PENDING_KEY, nextPhotoSeq, wipePhotos } from './photo-queue';
+import {
+  legacyCleanupPending,
+  LEGACY_PENDING_KEY,
+  reserveEpoch,
+  wipePhotos,
+  type WipeResult,
+} from './photo-queue';
 
 export { legacyCleanupPending, LEGACY_PENDING_KEY };
 
 export const QUEUE_KEY = 'bb_field_queue';
 export const DAY_KEY = 'bb_field_day';
+/**
+ * T10c (R17-08): set when an erase of this phone's photos is not proven to be finished (a store could not be opened, read or written, the
+ * lock could not be had, the former database is still held open). It holds the scope to retry, never a photo, and is cleared only by an erase
+ * that reports `complete`. A reload retries it, and the screen says so while it is set.
+ */
+export const ERASE_PENDING_KEY = 'kayas_erase_pending';
 /** R15B-02: set when this phone signed out and the server has not confirmed it (it holds no data; a wipe does not remove it). */
 export const SIGNED_OUT_KEY = 'bb_field_signed_out';
 
@@ -38,18 +50,75 @@ export async function forgetRead(): Promise<void> {
   await wipeCaches();
 }
 
+/** What an erase achieved. `complete` is true only when nothing is left to retry; it never claims more. */
+export interface ForgetResult {
+  complete: boolean;
+  legacyCleanupPending: boolean;
+  failed: WipeResult['failed'];
+}
+
+interface Owed {
+  scope: WipeScope;
+  /** The cutoff of the ORIGINAL wipe: a retry never reaches what was queued after that wipe began. */
+  cutoff: number | null;
+}
+const pendingOwed = (): Owed[] => {
+  try {
+    const v = JSON.parse(localStorage.getItem(ERASE_PENDING_KEY) ?? '[]') as unknown;
+    return Array.isArray(v) ? (v as Owed[]) : [];
+  } catch {
+    return [];
+  }
+};
+const sameScope = (a: WipeScope, b: WipeScope) => JSON.stringify(a) === JSON.stringify(b);
+/** Is an erase still owed on this phone? (From the persistent flag, so it survives a reload.) */
+export const erasePending = (): boolean => pendingOwed().length > 0;
+function setPending(owed: Owed, complete: boolean): void {
+  try {
+    const rest = pendingOwed().filter((o) => !sameScope(o.scope, owed.scope));
+    const next = complete ? rest : [...rest, owed];
+    if (next.length) localStorage.setItem(ERASE_PENDING_KEY, JSON.stringify(next));
+    else localStorage.removeItem(ERASE_PENDING_KEY);
+  } catch {
+    // no localStorage: the result still tells the caller
+  }
+}
+
 /**
  * The day, the caches, the queue of taps and the photos waiting. The day and the queue go synchronously, before any await; the photos
- * are erased within the scope AND up to the cutoff captured at the start (R14-06, R15A-03): a wipe delayed by slow storage never reaches the
- * photos queued after it began, whoever queued them.
+ * are erased within the scope AND up to the cutoff taken from the persistent epoch at the start (R14-06, R15A-03, T10c): a wipe delayed by
+ * slow storage never reaches the photos queued after it began, whoever queued them. A failure of any store is RETURNED and kept as a pending
+ * erase (never swallowed): the caller shows it and retries; it never reports an erasure that did not happen.
  */
-export async function forgetAll(scope: WipeScope = 'everything'): Promise<{ legacyCleanupPending: boolean }> {
-  // R15A-03: the cutoff is taken NOW, before any wait. Whatever is queued after this moment is not this wipe's to erase.
-  const cutoff = nextPhotoSeq();
+export async function forgetAll(
+  scope: WipeScope = 'everything',
+  retryCutoff: number | null = null,
+): Promise<ForgetResult> {
   localStorage.removeItem(DAY_KEY);
   localStorage.removeItem(QUEUE_KEY);
+  // The owed erase is written BEFORE the work starts: if the page dies in the middle, the next load still knows.
+  let cutoff: number;
+  try {
+    // R15A-03: the cutoff is taken before any wait of the photo erase. Whatever is queued after this moment is not this wipe's to erase.
+    cutoff = retryCutoff ?? (await reserveEpoch());
+  } catch {
+    setPending({ scope, cutoff: null }, false);
+    return { complete: false, legacyCleanupPending: legacyCleanupPending(), failed: ['new-store'] };
+  }
+  setPending({ scope, cutoff }, false);
   await wipeCaches();
-  // R16-02: a failed or blocked cleanup of the former database is not a success: it is reported (and kept pending, retried on next load).
-  await wipePhotos(scope, cutoff).catch(() => undefined);
-  return { legacyCleanupPending: legacyCleanupPending() };
+  const wiped = await wipePhotos(scope, cutoff);
+  setPending({ scope, cutoff }, wiped.complete);
+  return { complete: wiped.complete, legacyCleanupPending: legacyCleanupPending(), failed: wiped.failed };
+}
+
+/** Retries every erase that is still owed (on load, and when the driver asks). Resolves with whether none is left. */
+export async function retryPendingErase(): Promise<ForgetResult> {
+  const results: ForgetResult[] = [];
+  for (const { scope, cutoff } of pendingOwed()) results.push(await forgetAll(scope, cutoff));
+  return {
+    complete: results.every((r) => r.complete) && !erasePending(),
+    legacyCleanupPending: legacyCleanupPending(),
+    failed: results.flatMap((r) => r.failed),
+  };
 }
