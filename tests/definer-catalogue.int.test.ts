@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { testEnv } from './db-env';
 import { plantWorld, type World } from './helpers/plant-world';
 import { setReservedBoundary } from './setup-db';
+import { insertInstrument, newSupplierInvoice } from './helpers/ledger-fixtures';
 import {
   ACTOR_FIRST_DOORS,
   AUTH_CREDENTIAL_DOORS,
@@ -195,6 +196,7 @@ let real: Real;
 const anyId = async (table: string): Promise<string | null> =>
   (await migrator.query<{ id: string }>(`select id::text as id from ${table} limit 1`)).rows[0]?.id ?? null;
 const reservedUser: { id: string } = { id: '' };
+const DAY = '2026-10-07';
 beforeAll(async () => {
   await setReservedBoundary(env.DATABASE_URL_MIGRATOR, true);
   world = await plantWorld(app, migrator, `dc${randomUUID().replace(/-/g, '').slice(0, 8)}`);
@@ -221,8 +223,7 @@ beforeAll(async () => {
   for (const [key, table] of Object.entries({
     site: 'client_site',
     zone: 'zone',
-    pump: 'pump',
-    instrument: 'instrument',
+    instrument: 'payment_instrument',
     invoice: 'invoice',
     purchase: 'purchase',
     si: 'supplier_invoice',
@@ -234,13 +235,13 @@ beforeAll(async () => {
     conflict: 'pump_conflict',
     kase: 'cancellation_case',
     instruction: 'trip_instruction',
-    emergency: 'driver_emergency',
-    file: 'stored_file',
+    emergency: 'trip_emergency',
     component: 'component',
   })) {
     try {
       real[key] = (await anyId(table)) ?? '';
-    } catch {
+    } catch (e) {
+      console.info('fixture:', String(e));
       real[key] = '';
     }
   }
@@ -260,8 +261,65 @@ beforeAll(async () => {
   real.survey = await asUser(
     world.owner,
     `select public.create_survey('office_sales', 'sweep', $1::jsonb) as id`,
-    [JSON.stringify([{ id: 'q1', kind: 'yes_no', label: 'ok?' }])],
+    [JSON.stringify([{ id: 'q1', kind: 'yes_no', text: 'ok?' }])],
   ).catch(() => '');
+  // cheap real targets for the doors that name them (a supplier invoice with its purchase, an instrument, a pump job and its conflict, an emergency with an instruction)
+  try {
+    const si = await world.asOwnerIn(world.plantA, (tx) =>
+      newSupplierInvoice(tx, world.owner.id, `dc${randomUUID().slice(0, 6)}`, { receive: false }),
+    );
+    real.purchase = si.purchaseId;
+    real.purchaseCode = si.purchaseCode;
+    real.siCode = si.code;
+    real.si = (
+      await migrator.query<{ id: string }>(`select id::text from supplier_invoice where code = $1`, [si.code])
+    ).rows[0]!.id;
+  } catch (e) {
+    console.info('fixture:', String(e));
+    /* reported below as an argument without a real target */
+  }
+  try {
+    real.instrument = (
+      await world.asOwnerIn(world.plantA, (tx) =>
+        insertInstrument(tx, world.owner.id, { clientId: world.scene.clientId, method: 'cheque' }),
+      )
+    ).id;
+  } catch (e) {
+    console.info('fixture:', String(e));
+    /* idem */
+  }
+  try {
+    const job = randomUUID();
+    await world.sup(
+      `insert into pump_job (id, job_date, pump_id, operator_id, site_label, created_by, order_id, plant_id, on_site_min, planned_m3)
+       values ($1, $2, $3, $4, 'sweep', $5, $6, $7, 480, 10)`,
+      [job, DAY, world.truckA, world.driverA, world.owner.id, real.orderB, world.plantA],
+      ['pump_job'],
+    );
+    real.pumpjob = job;
+    real.pump = world.truckA;
+    real.conflict = randomUUID();
+    await world.sup(
+      `insert into pump_conflict (id, kind, job_date, order_id, job_id, plant_id) values ($1, 'pump_double_booked', $2, $3, $4, $5)`,
+      [real.conflict, DAY, real.orderB, job, world.plantA],
+      ['pump_conflict'],
+    );
+    real.emergency = randomUUID();
+    await world.sup(
+      `insert into trip_emergency (id, trip_id, driver_id, step, option, at, client_key) values ($1, $2, $3, 'departed', 'breakdown', now(), $4)`,
+      [real.emergency, real.tripB, world.driverB, `k-${randomUUID()}`],
+      ['trip_emergency'],
+    );
+    real.instruction = randomUUID();
+    await world.sup(
+      `insert into trip_instruction (id, emergency_id, trip_id, kind, created_by) values ($1, $2, $3, 'continue', $4)`,
+      [real.instruction, real.emergency, real.tripB, world.owner.id],
+      ['trip_instruction'],
+    );
+  } catch (e) {
+    console.info('fixture:', String(e));
+    /* idem */
+  }
   const rid = uuidv7(realClock.now());
   await migrator.query(
     `insert into "user" (id, name, email, "emailVerified", role, locale, status, "twoFactorEnabled", "provisionedAt")
@@ -271,6 +329,13 @@ beforeAll(async () => {
   reservedUser.id = rid;
 });
 afterAll(async () => {
+  await world
+    ?.sup(
+      `update pump_conflict set resolved_at = now(), resolved_by = $1 where resolved_at is null and job_date = $2`,
+      [world.owner.id, DAY],
+      ['pump_conflict'],
+    )
+    .catch(() => undefined);
   await migrator
     ?.query(`update "user" set status = 'disabled' where id = $1`, [reservedUser.id])
     .catch(() => undefined);
@@ -323,6 +388,8 @@ function realArg(fn: string, name: string, type: string, variant: 'B' | 'N'): st
   }
   if (type === 'text') {
     if (name === 'p_order_code') return real.orderCodeB;
+    if (name === 'p_purchase_code') return real.purchaseCode || 'x';
+    if (name === 'p_code' && /supplier_invoice/.test(fn)) return real.siCode || 'x';
     if (name === 'p_client_code') return real.clientCode;
     if (name === 'p_code' && /set_order_pumped/.test(fn)) return real.orderCodeB;
     if (name === 'p_key') return `k-${randomUUID()}`;
@@ -426,6 +493,27 @@ describe('R19-01 (d): the sweep with real targets — the exact refusal, nothing
         }
       }
     }
+    // The kinds below have no cheap fixture: each is exercised with a real row by its own suite (reason beside it); the sweep still sends the door a valid shape.
+    const KNOWN_WITHOUT_TARGET: Record<string, string> = {
+      'finance.link_state(p_id)':
+        'a finance link id: the finance module has its own suite (finance.int.test.ts)',
+      'public.allocate_to_invoice(p_invoice)':
+        'an invoice needs a delivered, billed load: allocation-invoices.int.test.ts',
+      'public.invoice_print(p_invoice)': 'idem: invoice.int.test.ts',
+      'public.attach_supplier_invoice_file(p_file)': 'a stored file id: supplier-invoice file suites',
+      'public.driver_attach_bl_photo(p_file)': 'a stored file id: driver-bl-photo.int.test.ts',
+      'public.create_order(p_site)': 'a client site: order suites',
+      'public.decide_cancellation(p_case)':
+        'a cancellation case needs a rotation in a stage: cancellations.int.test.ts',
+      'public.driver_ack_redirect(p_case)': 'idem',
+      'public.redirect_candidates(p_case)': 'idem',
+      'public.transfer_pickup(p_id)': 'a plant transfer needs stock: transfers suite',
+      'public.transfer_receive(p_id)': 'idem',
+    };
+    const unexplained = [...noTarget].filter(
+      (x) => !Object.keys(KNOWN_WITHOUT_TARGET).some((k) => x.startsWith(k)),
+    );
+    expect(unexplained, 'an argument lost its real target').toEqual([]);
     // how many arguments had no real row to point at: reported, and bounded so a regression of the fixtures is visible
     console.info(
       `definer sweep: ${noTarget.size} argument(s) without a real target:\n  ${[...noTarget].join('\n  ')}`,
