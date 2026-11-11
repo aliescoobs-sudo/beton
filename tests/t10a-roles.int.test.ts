@@ -25,6 +25,7 @@ const marker = `tr${randomUUID().replace(/-/g, '').slice(0, 10)}`;
 let owner: SessionUser, pmA: SessionUser, office: SessionUser;
 let plantId = '';
 let done: () => Promise<void>;
+let v1: Awaited<ReturnType<typeof v1Actors>>;
 
 const as = <T>(u: { id: string; role: string }, fn: (tx: pg.PoolClient) => Promise<T>) =>
   withRlsContext(app, { userId: u.id, role: u.role as never, requestId: marker }, fn);
@@ -32,6 +33,7 @@ const deps = () => ({ auth: kit.auth, authPool: kit.authPool, appPool: app });
 
 beforeAll(async () => {
   const v = await v1Actors(app, env.DATABASE_URL_MIGRATOR, marker);
+  v1 = v;
   done = v.done;
   plantId = v.plantId;
   owner = v.owner;
@@ -119,7 +121,11 @@ describe('R17-03: a reserved role (partner, support), an unknown or a missing ro
       await c.query(`savepoint s`);
       await expect(c.query('select public.admit_no_reserved_accounts()')).rejects.toThrow(/1 usable account/);
       await c.query(`rollback to savepoint s`);
-      // disabled, with a live session: passes, and the session is gone
+      // R18-03: the check no longer deletes (a delete followed by a raise was rolled back with it); revoke_reserved_sessions() is the cleanup, called first
+      expect(
+        await c.query('select public.revoke_reserved_sessions() as n').then((r) => Number(r.rows[0].n)),
+      ).toBeGreaterThanOrEqual(1);
+      // disabled, with a live session already revoked: passes, and the session is gone
       await c.query(`update "user" set status = 'disabled' where id = $1`, [a]);
       await c.query('select public.admit_no_reserved_accounts()');
       const left = await c.query(`select 1 from "session" where "userId" = $1`, [a]);
@@ -195,16 +201,28 @@ describe('R17-04: the named NULL-role doors', () => {
     expect(ok.ok).toBe(true);
   });
 
-  it('order_timeline: anonymous, an unknown role and a driver are refused (an allowlist, not a denylist)', async () => {
+  it('order_timeline: anonymous, an unknown role, an unset role and a REAL driver are refused for a REAL order; an allowlisted role is answered', async () => {
+    // R18-02: the target exists (an order with a delivery date), and the driver is a real driver account (the old test used a random id and no driver)
+    const master = await orderMaster(app, owner.id, `${marker}tl`);
+    const scene = await deliveryScene(app, owner.id, `${marker}tl`, '2093-01-01');
+    const order = await as(owner, async (tx) => {
+      await tx.query(`select set_config('app.plant_id', $1, true)`, [plantId]);
+      return insertOrder(tx, owner.id, { ...master, clientId: scene.clientId }, '2093-05-01');
+    });
+    const driverUser = v1.session('driver');
+    expect(driverUser.role).toBe('driver');
     for (const [role, user] of [
       ['anonymous', '00000000-0000-7000-8000-000000000000'],
       ['bogus', pmA.id],
-      [null, null],
+      [null, pmA.id],
+      ['', pmA.id],
+      ['driver', driverUser.id],
+      ['client_portal', pmA.id],
     ] as const) {
-      const r = await ctxQuery(role, user, `select * from public.order_timeline($1)`, [randomUUID()]);
+      const r = await ctxQuery(role, user, `select * from public.order_timeline($1)`, [order.id]);
       expect(r.ok, `role=${String(role)}`).toBe(false);
     }
-    const ok = await ctxQuery('owner', owner.id, `select * from public.order_timeline($1)`, [randomUUID()]);
+    const ok = await ctxQuery('owner', owner.id, `select * from public.order_timeline($1)`, [order.id]);
     expect(ok.ok).toBe(true);
   });
 

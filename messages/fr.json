@@ -1253,6 +1253,7 @@
       "title": "Livré, non facturé",
       "intro": "Les livraisons terminées qu'aucune facture ne porte encore, par client.",
       "held": "{count} livraison(s) déclarée(s) par le chauffeur non facturable(s) : pas encore de chargement de la centrale, ou pas encore confirmée(s). Elles ne figurent pas ici ; voir « Livraisons à vérifier ».",
+      "heldUnavailable": "Le nombre de livraisons déclarées par le chauffeur mais non facturables n’a pas pu être calculé : la file ci-dessous ne le dit pas. Réessayez plus tard.",
       "none": "Tout ce qui est livré est facturé.",
       "summary": "{count, plural, one {# BL} other {# BL}}",
       "ttc": "à facturer TTC",

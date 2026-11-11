@@ -99,6 +99,9 @@ describe('functions the application role can execute', () => {
     'ctx.ai_proposal_id()',
     'ctx.actor_role()',
     'ctx.driver_id()',
+    'ctx.reserved_boundary_on()', // R18-03: a constant the policy functions read (true on every server; the test database switches it off for the reserved-role policy tests)
+    'ctx.in_actor_scope(p_global text[], p_plant uuid)', // R18-02: the positive plant-scope predicate (boolean, never NULL); reveals nothing the caller did not pass
+    'ctx.require_actor(p_door text, p_roles text[])', // R18-02: the actor-first check of the trip doors; it only raises or returns the caller's own role
     'public.create_pump_job(p_date date, p_pump uuid, p_operator uuid, p_client uuid, p_site text, p_address_enc text, p_m3 integer)',
     'public.driver_ack(p_instruction uuid)',
     'public.driver_attach_bl_photo(p_trip uuid, p_file uuid, p_type text, p_size integer, p_sha text, p_at timestamp with time zone, p_key text)', // C3: the driver of the rotation only (checked inside)
@@ -114,6 +117,7 @@ describe('functions the application role can execute', () => {
     'public.trip_started(p_trip uuid)', // R14-01: whether a rotation has started (an event, or the driver's loading report); read by the dispatch service
     'public.trip_stage_estimate(p_plant uuid, p_zone uuid, p_stage text)', // T5: the estimate of a stage, same roles (checked inside)
     'public.trip_timing(p_date date)', // T5: the timing inputs of the rotations the caller may see (checked inside, scoped)
+    'public.mark_load_delivered(p_delivery uuid, p_now timestamp with time zone)', // R18-07: the by-hand door of the billing gate (owner, app_admin, plant manager of the load's plant; checked inside)
     'public.attach_trip_load(p_trip uuid, p_delivery uuid)', // T9: the plant's load linked once to a declared loaded stage (role and plant checked inside)
     'public.confirm_trip_delivered(p_trip uuid)', // T9: the plant confirms a delivery the driver declared (role and plant checked inside)
     'public.correct_trip_stage(p_trip uuid, p_stage text, p_time timestamp with time zone, p_reason text)', // T9: a correction with a reason (plant manager of the plant, owner, app_admin)

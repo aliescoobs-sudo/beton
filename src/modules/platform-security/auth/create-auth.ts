@@ -15,7 +15,7 @@ import {
 } from './login-guard';
 import { readParameters } from '../service/parameter-service';
 import { baseAuthOptions } from './options';
-import { enforceAbsoluteLifetime } from './session-lifetime';
+import { enforceAbsoluteLifetime, enforceLoginRole } from './session-lifetime';
 import { isLoginRole } from '../domain/login-roles';
 import { afterTwoFactor, beforeTwoFactor, TWO_FACTOR_PATHS } from './two-factor-hooks';
 
@@ -108,6 +108,7 @@ export function createAuth({ authPool, env, log }: CreateAuthDeps) {
           }
           return;
         }
+        await enforceLoginRole(ctx, { authPool }, isLoginRole);
         await enforceAbsoluteLifetime(ctx, twoFactorDeps);
         if (ctx.path.startsWith('/two-factor/')) return beforeTwoFactor(ctx, twoFactorDeps);
 

@@ -1,7 +1,7 @@
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { getPool } from '@/lib/db/pools';
 import { addDaysIso, getInvoiceQueue } from '@/modules/ledger';
-import { countHeldDeliveries } from '@/modules/operations';
+import { countHeldDeliveries, heldBanner } from '@/modules/operations';
 import { getRequestClock } from '@/app/request-clock';
 import { formatM3 } from '@/modules/operations/ui/format';
 import { can, recordMoneyView } from '@/modules/platform-security';
@@ -27,16 +27,26 @@ export default async function InvoiceQueuePage({ params }: { params: Promise<{ l
   // T9b: what the driver declared delivered but the plant has not put through the billing gate is not here, and the page says so (never silently)
   const today = (await getRequestClock()).today();
   // a number only (no trip, client or driver): the office roles that work this queue see it too; the details stay with the owner and the plant side
+  // R18-08: a count that could not be taken is NOT zero: the page says so
   const held = await countHeldDeliveries(pool, user, { from: addDaysIso(today, -14), to: today }).catch(
     () => null,
   );
-  const heldCount = held?.ok ? held.value : 0;
+  const banner = heldBanner(held);
   return (
     <div className="space-y-8">
       <PageHeader title={t('title')} description={t('intro')} />
-      {heldCount > 0 && (
+      {banner.kind === 'unavailable' && (
+        <p
+          role="status"
+          className="border-s-4 border-amber bg-band p-3 text-sm"
+          data-testid="queue-held-unavailable"
+        >
+          {t('heldUnavailable')}
+        </p>
+      )}
+      {banner.kind === 'held' && (
         <p role="status" className="border-s-4 border-amber bg-band p-3 text-sm" data-testid="queue-held">
-          {t('held', { count: heldCount })}
+          {t('held', { count: banner.count })}
         </p>
       )}
       {clients.length === 0 ? (

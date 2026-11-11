@@ -100,6 +100,7 @@ describe('a rotation delivers its load (AC-INT-01)', () => {
       ok: false,
       error: 'FOLLOWS_ROTATION',
     });
+    // R18-07: the application login has no INSERT on the gate at all (42501); the by-hand door refuses a load that follows its rotation (23514)
     await expect(
       inCtx(users.plant, (tx) =>
         tx.query(
@@ -107,6 +108,9 @@ describe('a rotation delivers its load (AC-INT-01)', () => {
           [tripDeliveryId, users.plant.id],
         ),
       ),
+    ).rejects.toMatchObject({ code: '42501' });
+    await expect(
+      inCtx(users.plant, (tx) => tx.query('select public.mark_load_delivered($1, now())', [tripDeliveryId])),
     ).rejects.toMatchObject({ code: '23514' });
   });
 

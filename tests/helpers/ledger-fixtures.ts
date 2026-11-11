@@ -518,11 +518,7 @@ export async function insertInvoice(
   const ht = Math.round((78_000 * volumeL) / 1000);
   const vat = Math.round((ht * 2000) / 10_000);
   // Only a delivered load is billed (D97): the fixture's load is delivered if nobody did it yet.
-  await tx.query(
-    `insert into delivery_delivered (id, delivery_id, at, trip_event_id, created_by)
-     values (gen_random_uuid(), $1, now(), null, $2) on conflict (delivery_id) do nothing`,
-    [delivery.id, actorId],
-  );
+  await tx.query('select public.mark_load_delivered($1, now())', [delivery.id]);
   await tx.query(
     `insert into invoice (id, number, order_id, client_id, client_name, invoice_date, issue_deadline, due_date, vat_rate_bp,
                           total_ht_centimes, total_vat_centimes, total_ttc_centimes, created_by)
@@ -604,10 +600,7 @@ export async function newAdvanceInvoice(
     options.loadL ?? 6000,
     2026,
   );
-  await tx.query(
-    `insert into delivery_delivered (id, delivery_id, at, trip_event_id, created_by) values (gen_random_uuid(), $1, now(), null, $2)`,
-    [delivery.id, ownerId],
-  );
+  await tx.query('select public.mark_load_delivered($1, now())', [delivery.id]);
   const made = await tx.query<{ n: string | null }>(
     `select public.create_invoice_from_deliveries(ARRAY[$1]::uuid[], null, $2::date) as n`,
     [delivery.id, options.today ?? '2026-06-10'],
@@ -659,10 +652,7 @@ export async function clientWithLoads(
         for (const litres of loads) {
           const d = await insertDelivery(tx, ownerId, { ...scene, orderId: order.id }, litres, 2026);
           if (options.delivered !== false)
-            await tx.query(
-              `insert into delivery_delivered (id, delivery_id, at, trip_event_id, created_by) values (gen_random_uuid(), $1, now(), null, $2)`,
-              [d.id, ownerId],
-            );
+            await tx.query('select public.mark_load_delivered($1, now())', [d.id]);
           deliveryIds.push(d.id);
           blNos.push(d.blNo);
         }

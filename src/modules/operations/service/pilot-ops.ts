@@ -113,7 +113,7 @@ async function seedLoads(tx: Tx, today: string, rng: Rng): Promise<{ loads: numb
       // fortnight (second wave) deliver theirs through their unloading step.
       if (o.delivery_date < addDaysIso(today, -14)) {
         await tx.query(
-          `insert into delivery_delivered (id, delivery_id, at, trip_event_id, created_by) values ($1, $2, $3::timestamptz + interval '100 minutes', null, $4)`,
+          `insert into delivery_delivered (id, delivery_id, at, trip_event_id, created_by, via) values ($1, $2, $3::timestamptz + interval '100 minutes', null, $4, 'hand')`,
           [randomUUID(), load.id, loadedAt, SYSTEM_ACTOR_ID],
         );
       }

@@ -82,3 +82,4 @@ export {
   producedByType,
   type ReportPeriod,
 } from './consumption-report';
+export { heldBanner, type HeldBanner } from './held-banner';

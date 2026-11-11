@@ -231,7 +231,8 @@ describe('R17-02: a plant manager reads his plant only; a rotation with no plant
       [date, A.order, A.truck, B.driver, pmA.id],
     );
     expect(e?.code).toBe('42501');
-    expect(e?.message).toMatch(/row-level security/);
+    // R18-01: the references are checked first, with one answer that names none (before it was the policy's text)
+    expect(e?.message).toMatch(/reference not available/);
   });
 
   it('the services and the serialized props: the day screen, the trips list and the roster carry nothing of B or of the plant-less rotation', async () => {

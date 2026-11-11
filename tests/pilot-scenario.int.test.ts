@@ -23,6 +23,7 @@ import {
 } from '../src/modules/operations';
 import { seedPilotScenario } from '../src/modules/ledger/service/pilot-scenario';
 import { seedPilotMasterData } from '../src/modules/master-data';
+import { setReservedBoundary } from './setup-db';
 import { testEnv } from './db-env';
 import { realSessionUser } from './helpers/actors';
 
@@ -50,6 +51,7 @@ beforeAll(async () => {
   await ensureRoles(base, base.DATABASE_URL_SEED);
   await recreateDatabase(base, DATABASE);
   await runMigrations(env.DATABASE_URL_MIGRATOR);
+  await setReservedBoundary(env.DATABASE_URL_MIGRATOR, false); // R18-03: this file's policy checks drive the reserved roles as DB actors (see tests/setup-db.ts)
   seed = pool(env.DATABASE_URL_SEED, 1);
   await seedPilotMasterData(seed, allowed);
   app = pool(env.DATABASE_URL_APP, 3);

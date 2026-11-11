@@ -19,6 +19,9 @@ function expectedMigrations(): number {
 export async function GET(): Promise<Response> {
   const headers = { 'cache-control': 'no-store' };
   try {
+    // R18-03: the reserved-account admission has not (yet) passed: not ready. (Unset outside a running server, e.g. in a unit test.)
+    const admission = (globalThis as { __kayasAdmission?: string }).__kayasAdmission;
+    if (admission !== undefined && admission !== 'done') throw new Error('admission pending');
     const { rows } = await getPool('app').query<{ n: number }>('select public.applied_migrations() as n');
     // Behind (a migration of this build not run) is not ready. Ahead is fine: migrations are additive, so an older image runs on a
     // newer schema after a rollback (RUNBOOK §6).

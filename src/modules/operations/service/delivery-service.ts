@@ -355,20 +355,22 @@ export async function markDelivered(
   await require(appPool, actor, 'deliveries.deliver');
   const parsed = z.object({ deliveryId: z.uuid() }).safeParse(input);
   if (!parsed.success) return err('INVALID');
-  const id = randomUUID();
   try {
-    await inRequest(appPool, actor, (tx) =>
-      tx.query(
-        `insert into delivery_delivered (id, delivery_id, at, trip_event_id, created_by, via) values ($1, $2, $3, null, $4, 'hand')`,
-        [id, parsed.data.deliveryId, deps.now.toISOString(), actor.id],
-      ),
+    // R18-07: the application login cannot insert into the gate; the scoped door does (plant, rotation and instant are checked in the database)
+    const { rows } = await inRequest(appPool, actor, (tx) =>
+      tx.query<{ id: string | null }>('select public.mark_load_delivered($1, $2) as id', [
+        parsed.data.deliveryId,
+        deps.now.toISOString(),
+      ]),
     );
+    const id = rows[0]?.id;
+    if (!id) return err('ALREADY_DELIVERED');
     return ok({ id });
   } catch (error) {
     if (isUniqueViolation(error)) return err('ALREADY_DELIVERED');
     const e = error as { code?: string; message?: string };
     if (e.code === '23514' && /follows its rotation/.test(e.message ?? '')) return err('FOLLOWS_ROTATION');
-    if (e.code === '23503' || isMalformedId(error)) return err('NOT_FOUND');
+    if (e.code === '42501' || e.code === '23503' || isMalformedId(error)) return err('NOT_FOUND');
     return err(deliveryFailure(error));
   }
 }

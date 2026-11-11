@@ -24,6 +24,7 @@ import { FINANCE_TABLES } from '../src/modules/finance/domain/table-access';
 import { SCENARIO_TEST_DATABASE, recreateDatabase } from '../scripts/db-bootstrap';
 import { runMigrations } from '../scripts/db-migrate';
 import { seedPilotMasterData } from '../src/modules/master-data';
+import { setReservedBoundary } from './setup-db';
 import { testEnv } from './db-env';
 import { realSessionUser } from './helpers/actors';
 import {
@@ -73,6 +74,7 @@ beforeAll(async () => {
   // Finance owns its test data: the legacy R1 stock assertions assume only their own two plants.
   await recreateDatabase(env, SCENARIO_TEST_DATABASE);
   await runMigrations(env.DATABASE_URL_MIGRATOR);
+  await setReservedBoundary(env.DATABASE_URL_MIGRATOR, false); // R18-03: this file's policy checks drive the reserved roles as DB actors (see tests/setup-db.ts)
   const seed = new pg.Pool({ connectionString: env.DATABASE_URL_SEED, max: 1 });
   try {
     await seedPilotMasterData(seed, { SIMULATION_ENABLED: true, REAL_DATA: false, NODE_ENV: 'test' });

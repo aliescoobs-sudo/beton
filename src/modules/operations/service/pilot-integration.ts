@@ -250,7 +250,7 @@ async function walkSales(
     [C1, dayC],
   ] as const) {
     await tx.query(
-      `insert into delivery_delivered (id, delivery_id, at, trip_event_id, created_by) values ($1, $2, $3::timestamptz + interval '100 minutes', null, $4)`,
+      `insert into delivery_delivered (id, delivery_id, at, trip_event_id, created_by, via) values ($1, $2, $3::timestamptz + interval '100 minutes', null, $4, 'hand')`,
       [randomUUID(), bl.id, `${date}T07:00:00Z`, SYSTEM_ACTOR_ID],
     );
   }

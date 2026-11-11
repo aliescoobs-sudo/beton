@@ -91,8 +91,12 @@ async function readTrainingMarker(attempts = 60, waitMs = 1000): Promise<boolean
 /** Node-only (R17-03): refuse to serve while an account with a reserved role is usable. */
 export async function assertReservedAccountsOrExit(): Promise<void> {
   try {
-    const { assertNoUsableReservedAccounts } = await import('./service/reserved-admission');
+    const { assertNoUsableReservedAccounts, assertReservedBoundaryOn } =
+      await import('./service/reserved-admission');
+    (globalThis as { __kayasAdmission?: string }).__kayasAdmission = 'pending'; // the readiness probe says "not ready" until this passes
     await assertNoUsableReservedAccounts(getPool('system'));
+    await assertReservedBoundaryOn(getPool('system'));
+    (globalThis as { __kayasAdmission?: string }).__kayasAdmission = 'done';
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);

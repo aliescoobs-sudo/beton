@@ -1745,7 +1745,7 @@ export const TABLE_ACCESS = {
     noDelete: true,
     insertOnly: true,
     exception:
-      'integration I1.1: a load is delivered at the unloading step of its rotation (a SECURITY DEFINER trigger writes the row with the step instant) or, outside a rotation, by hand (plant, owner, partner). One row per load; quantities and times only. The view delivered_load drops cancelled and wholly refused loads.',
+      'integration I1.1: a load is delivered at the unloading step of its rotation (a SECURITY DEFINER trigger writes the row with the step instant) or, outside a rotation, by hand (R18-07: through the definer door mark_load_delivered, plant manager of that plant, owner, app_admin; the application login has no INSERT). One row per load; quantities and times only. The view delivered_load drops cancelled and wholly refused loads.',
   },
   ai_interaction: {
     kind: 'rls',

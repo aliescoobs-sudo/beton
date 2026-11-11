@@ -792,7 +792,7 @@ describe('T9: money and stock separation', () => {
     expect(
       await denied(
         asRole(pmA, (tx) => tx.query('select public.attach_trip_load($1, $2)', [other, load])),
-        '23514',
+        '42501', // R18-07: refused by the door itself (one answer), before the stage trigger that used to say 23514
       ),
     ).toBe(true);
   });

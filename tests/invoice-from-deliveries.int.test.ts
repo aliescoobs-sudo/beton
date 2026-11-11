@@ -265,10 +265,7 @@ describe('advances received (AC-INT-07)', () => {
     // a second invoice for the same order finds no advance left
     const second = await inCtx(users.owner, async (tx) => {
       const d = await insertDelivery(tx, users.owner.id, { ...scene, orderId: made.orderId }, 4000, 2026);
-      await tx.query(
-        `insert into delivery_delivered (id, delivery_id, at, trip_event_id, created_by) values (gen_random_uuid(), $1, now(), null, $2)`,
-        [d.id, users.owner.id],
-      );
+      await tx.query('select public.mark_load_delivered($1, now())', [d.id]);
       return d.id;
     });
     const n2 = numberOf(await createInvoice(app, users.owner, { deliveryIds: [second] }, { today: TODAY }));
@@ -286,10 +283,7 @@ describe('advances received (AC-INT-07)', () => {
     expect(first?.netToPayCentimes).toBe(0);
     const next = await inCtx(users.owner, async (tx) => {
       const d = await insertDelivery(tx, users.owner.id, { ...scene, orderId: made.orderId }, 4000, 2026);
-      await tx.query(
-        `insert into delivery_delivered (id, delivery_id, at, trip_event_id, created_by) values (gen_random_uuid(), $1, now(), null, $2)`,
-        [d.id, users.owner.id],
-      );
+      await tx.query('select public.mark_load_delivered($1, now())', [d.id]);
       return d.id;
     });
     const doc = await getInvoiceDocument(

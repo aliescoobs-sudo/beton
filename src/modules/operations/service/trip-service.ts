@@ -481,6 +481,9 @@ export async function countHeldDeliveries(
 ): Promise<Result<number, 'INVALID'>> {
   await require(appPool, actor, 'invoices.queue');
   if (!isRealDate(range.from) || !isRealDate(range.to)) return err('INVALID');
+  // R18-08: the range is bounded (the database enforces the same): from <= to, at most 62 days
+  if (range.from > range.to || (Date.parse(range.to) - Date.parse(range.from)) / 86_400_000 > 62)
+    return err('INVALID');
   const { rows } = await inRequest(appPool, actor, (tx) =>
     tx.query<{ n: number }>('select public.trip_delivery_held_count($1, $2) as n', [range.from, range.to]),
   );
