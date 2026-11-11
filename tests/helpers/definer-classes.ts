@@ -1,0 +1,187 @@
+/**
+ * R19-01 (b)+(c): the reviewed classification of every SECURITY DEFINER function that the application login or the auth login can execute.
+ *
+ * A definer passes the lint (tests/definer-catalogue.int.test.ts) in exactly one of two ways:
+ *   1. it calls the shared helper (ctx.require_admitted_actor, or ctx.require_actor for the staff trip doors) BEFORE its first read or write of a table
+ *      (the helper-first rule: no entry here; an entry for a door that is helper-first is reported as stale);
+ *   2. it is listed below with the class and the written reason of its review.
+ * A NEW definer that is neither helper-first nor listed fails the build. A listed name that no longer exists, or that became helper-first, fails too.
+ */
+export type DefinerClass = 'actor-first' | 'auth-credential' | 'public-by-design' | 'internal-predicate';
+
+export const CLASS_REASON: Record<DefinerClass, string> = {
+  'actor-first':
+    'a role-list or scope door: its first statement reads the validated actor (ctx.actor_role / ctx.role / ctx.driver_id / a named actor check that calls them) ' +
+    'and tests it with a positive list BEFORE its first table access; the catalogue sweep calls it with real targets and every unauthorized actor and ' +
+    'requires the exact SQLSTATE 42501 refusal or a documented empty answer',
+  'auth-credential':
+    'a credential door of the phone login (PIN lock, device binding, session generation, revocation) or the startup admission: executable ONLY by the auth login ' +
+    '(a trusted backend capability with no app actor), never by the application login; the catalogue asserts both facts',
+  'public-by-design':
+    'answers without an actor on purpose: no business data and no write (the reason is beside the name)',
+  'internal-predicate':
+    'a shared actor/scope predicate or the audit writer: it reveals nothing the caller did not pass, or it is the validation itself',
+};
+
+export const PUBLIC_BY_DESIGN: Record<string, string> = {
+  'public.applied_migrations':
+    'a count of applied migrations, read by the readiness probe before any login (no business data)',
+  'public.invoice_timing':
+    'the company-wide invoicing rhythm flag, read to draw the screens (no business data)',
+  'public.training_seeded': 'a boolean: is this the training instance (used before login to draw the banner)',
+  'finance.enabled': 'the finance module flag (a boolean, no data)',
+  'public._pump_in_scope':
+    'a pure scope predicate over a plant id given by the caller; it reveals nothing the caller did not pass',
+};
+
+export const INTERNAL_PREDICATES = [
+  'audit.record',
+  'ctx.actor_role',
+  'ctx.driver_id',
+  'ctx.in_actor_scope',
+  'ctx.manager_tuple_ok',
+  'ctx.plant_scope',
+  'ctx.require_actor',
+  'ctx.require_admitted_actor',
+  'ctx.reserved_boundary_on',
+  'ctx.role',
+  'ctx.sim_now',
+];
+
+/** Executable by the auth login ONLY (never by the application login). */
+export const AUTH_CREDENTIAL_DOORS = [
+  'public.field_accounts',
+  'public.field_login_failed',
+  'public.field_login_lock',
+  'public.field_login_lookup',
+  'public.field_login_ok',
+  'public.field_revoke_device',
+  'public.field_session_check',
+  'public.field_session_close',
+  'public.field_session_open',
+  'public.field_set_pin',
+  'public.revoke_reserved_sessions',
+  'public.usable_reserved_role_accounts',
+];
+
+export const ACTOR_FIRST_DOORS = [
+  'public.record_receipt',
+  'public.record_receipt_lines',
+  'finance.accounting_journal',
+  'finance.link_state',
+  'finance.source_accounts',
+  'finance.source_consumption',
+  'finance.source_flows',
+  'finance.source_fuel',
+  'finance.source_movements',
+  'finance.source_sales',
+  'finance.step_up_minutes',
+  'history.client_volume',
+  'history.expense_report',
+  'history.volume_report',
+  'public.accept_supplier_invoice_gaps',
+  'public.allocate_to_client',
+  'public.allocate_to_invoice',
+  'public.allocate_to_order',
+  'public.allocate_to_purchase',
+  'public.allocate_to_supplier_invoice',
+  'public.anomaly_report',
+  'public.approvals_pending',
+  'public.approve_supplier_invoice',
+  'public.attach_supplier_invoice_file',
+  'public.cancel_unproduced_order',
+  'public.cancellation_trip_stage',
+  'public.client_balance_status',
+  'public.close_day',
+  'public.close_survey',
+  'public.company_contact_phone',
+  'public.confirm_order_price',
+  'public.confirm_receipt_at_plant',
+  'public.confirm_receipt_at_plant_lines',
+  'public.create_invoice',
+  'public.create_invoice_from_deliveries',
+  'public.create_order',
+  'public.create_pump_job',
+  'public.create_quote',
+  'public.create_supplier_invoice',
+  'public.create_survey',
+  'public.day_close_status',
+  'public.day_closes_list',
+  'public.decide_disclosure',
+  'public.decide_document_request',
+  'public.default_cash_account',
+  'public.delivery_note',
+  'public.disclosures_pending',
+  'public.dispatch_office',
+  'public.document_requests_pending',
+  'public.driver_ack',
+  'public.driver_ack_redirect',
+  'public.driver_attach_bl_photo',
+  'public.driver_bl_photo_counts',
+  'public.driver_emergency',
+  'public.driver_in_plant_scope',
+  'public.driver_instructions',
+  'public.driver_plant_phones',
+  'public.driver_redirects',
+  'public.driver_report',
+  'public.driver_trips',
+  'public.emergencies_open',
+  'public.emergency_instruct',
+  'public.field_session_fence',
+  'public.fuel_tank_levels',
+  'public.invoice_payment_state',
+  'public.invoice_print',
+  'public.invoice_print_index',
+  'public.invoice_queue',
+  'public.issue_avoir',
+  'public.ledger_parameter',
+  'public.log_dispatch_change',
+  'public.next_doc_number',
+  'public.open_trip_case',
+  'public.ops_parameter',
+  'public.order_approval_state',
+  'public.order_chain',
+  'public.order_timeline',
+  'public.pump_board',
+  'public.pump_conflicts',
+  'public.pump_jobs',
+  'public.pump_options',
+  'public.pump_report',
+  'public.pump_waiting',
+  'public.receipt_states',
+  'public.record_dispatch_overlap',
+  'public.record_trip_stage',
+  'public.redirect_candidates',
+  'public.reference_prices',
+  'public.reject_supplier_invoice',
+  'public.release_order_hold',
+  'public.request_disclosure',
+  'public.request_document',
+  'public.reschedule_pump_job',
+  'public.resolve_order_price',
+  'public.resolve_pump_conflict',
+  'public.resolve_selling_price',
+  'public.schedule_pump_job',
+  'public.set_cancellation_policy',
+  'public.set_client_credit_limit',
+  'public.set_fuel_tank_opening',
+  'public.set_invoice_sequence',
+  'public.set_invoice_timing',
+  'public.set_order_pumped',
+  'public.set_order_pumped_by_code',
+  'public.set_plant_phone',
+  'public.set_trip_estimate',
+  'public.stock_arrived_pending',
+  'public.supplier_invoice_match',
+  'public.survey_results',
+  'public.surveys_list',
+  'public.timing_parameter',
+  'public.transfer_send',
+  'public.transfers_list',
+  'public.trip_delivery_exceptions',
+  'public.trip_delivery_held_count',
+  'public.trip_stage_estimate',
+  'public.trip_stages',
+  'public.trip_started',
+  'public.trip_timing',
+];

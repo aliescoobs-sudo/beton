@@ -1,16 +1,29 @@
 import { randomUUID } from 'node:crypto';
 import pg from 'pg';
+import { uuidv7 } from '../src/lib/uuidv7';
+import { realClock } from '../src/modules/clock';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { testEnv } from './db-env';
 import { plantWorld, type World } from './helpers/plant-world';
+import { setReservedBoundary } from './setup-db';
+import {
+  ACTOR_FIRST_DOORS,
+  AUTH_CREDENTIAL_DOORS,
+  CLASS_REASON,
+  INTERNAL_PREDICATES,
+  PUBLIC_BY_DESIGN,
+} from './helpers/definer-classes';
 
 /**
- * R17-04: the class fix, as a CATALOGUE test (the regex scan in roles-hardening.int.test.ts stays a regression aid only).
- * EVERY business SECURITY DEFINER function the application login can execute is called with a request that has no valid actor
- * (no role, an empty role, an unknown role, `anonymous` with the anonymous user, a role that no account has) and with a wrong-audience
- * role. Each call runs in a rolled-back transaction. A call passes only if it is REFUSED (any error) or it answers nothing
- * (no row, NULL, false, zero) and has written nothing (no new row in any table we count). The few doors that are public by design
- * are listed below with their reason; the list is checked for stale entries.
+ * R17-04 / R19-01: the class fix, as a CATALOGUE test.
+ * (1) The LINT: EVERY SECURITY DEFINER function that the application login OR the auth login can execute (every schema, the history doors and the phone's
+ *     credential doors included) either calls the shared helper (ctx.require_admitted_actor / ctx.require_actor) BEFORE its first table access, or is listed
+ *     with a class and a written reason in tests/helpers/definer-classes.ts. A new definer that is neither fails the build; a stale entry fails too.
+ * (2) The SWEEP: each application-executable door is called with REAL arguments (existing orders, trips, loads, clients, plants, requests... where a table
+ *     has a row) and with every request that has no valid actor: no role, an empty role, an unknown role, a wrong-audience role, a role that is not the
+ *     user's, a RESERVED role (the production boundary is ON), `anonymous`. The refusal must be EXACT (SQLSTATE 42501), not any exception.
+ *     Doors that answer an empty result instead are listed with the reason in ANSWERS_EMPTY. A call that is wrongly accepted is COMMITTED, so the
+ *     "wrote nothing" check observes a real write.
  */
 const env = testEnv();
 const migrator = new pg.Pool({ connectionString: env.DATABASE_URL_MIGRATOR, max: 2 });
@@ -20,18 +33,6 @@ afterAll(async () => {
   await app.end();
 });
 
-/** Doors that answer without an actor ON PURPOSE (no data of a business, no write). Reason beside each. */
-const PUBLIC_BY_DESIGN: Record<string, string> = {
-  'public.applied_migrations':
-    'a count of applied migrations, read by the readiness probe before any login (no business data)',
-  'public.invoice_timing':
-    'the company-wide invoicing rhythm flag, read to draw the screens (no business data)',
-  'public.training_seeded': 'a boolean: is this the training instance (used before login to draw the banner)',
-  'finance.enabled': 'the finance module flag (a boolean, no data)',
-  'public._pump_in_scope':
-    'a pure scope predicate over a plant id given by the caller; it reveals nothing the caller did not pass',
-};
-
 interface Fn {
   oid: number;
   name: string;
@@ -39,6 +40,299 @@ interface Fn {
   argNames: string[];
   retset: boolean;
   rettype: string;
+  app: boolean;
+  auth: boolean;
+  src: string;
+}
+
+/** Every definer either login can execute, in every business schema (history and finance included). */
+async function catalogue(): Promise<Fn[]> {
+  const { rows } = await migrator.query<Fn>(
+    `select p.oid::int as oid, n.nspname || '.' || p.proname as name,
+            array(select format_type(t, null) from unnest(p.proargtypes::oid[]) with ordinality as u(t, i) order by i) as args,
+            coalesce(p.proargnames[1:p.pronargs], array[]::text[]) as "argNames",
+            p.proretset as retset, format_type(p.prorettype, null) as rettype,
+            has_function_privilege('belgobeton_app', p.oid, 'EXECUTE') as app,
+            has_function_privilege('belgobeton_auth', p.oid, 'EXECUTE') as auth,
+            p.prosrc as src
+       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+      where p.prosecdef and p.prokind = 'f' and n.nspname not in ('pg_catalog', 'information_schema', 'pg_toast')
+        and (has_function_privilege('belgobeton_app', p.oid, 'EXECUTE') or has_function_privilege('belgobeton_auth', p.oid, 'EXECUTE'))
+        and p.prorettype <> 'trigger'::regtype
+      order by 2, 1`,
+  );
+  return rows;
+}
+
+const norm = (src: string): string => src.replace(/--[^\n]*/g, '').replace(/\s+/g, ' ');
+/** Position of the first access to a table (a read or a write) in the body; Infinity if none. */
+const firstData = (src: string): number => {
+  const m = norm(src).search(/\b(FROM|INSERT INTO|UPDATE|DELETE FROM)\b/i);
+  return m < 0 ? Infinity : m;
+};
+const helperAt = (src: string): number => norm(src).search(/ctx\.require_(admitted_)?actor\(/);
+const actorAt = (src: string): number =>
+  norm(src).search(
+    /ctx\.actor_role\(\)|ctx\.role\(\)|ctx\.driver_id\(\)|cancellation_actor_check\(|transfer_actor_ok\(|_require_step_up\(|_pump_actor_check\(|ctx\.in_actor_scope\(|_pump_in_scope\(|ctx\.plant_scope\(\)|confirm_receipt_at_plant\(/,
+  );
+const helperFirst = (fn: Fn): boolean => helperAt(fn.src) >= 0 && helperAt(fn.src) < firstData(fn.src);
+
+/** Doors that, for a request with no valid actor, answer an empty result instead of raising 42501 (reason beside each). */
+const ANSWERS_EMPTY: Record<string, string> = {
+  'public.driver_in_plant_scope':
+    'a boolean scope predicate over a driver id the caller passed: false for a request with no admitted actor (coalesce), no data returned, no write',
+  'public.trip_started':
+    'a boolean read of "has this rotation started": false for a request with no admitted actor (its first statement), no data returned, no write',
+};
+
+describe('R19-01 (b)(c): every definer the app or auth login can execute is helper-first or reviewed', () => {
+  it('lists the catalogue (sanity: the doors are there, history and finance included, and the auth credential doors)', async () => {
+    const fns = await catalogue();
+    expect(fns.length).toBeGreaterThan(100);
+    const names = fns.map((f) => f.name);
+    for (const must of [
+      'history.volume_report',
+      'finance.source_sales',
+      'public.field_session_open',
+      'public.view_disclosure',
+      'ctx.require_admitted_actor',
+    ])
+      expect(names, must).toContain(must);
+  });
+
+  it('every definer calls the helper before its first table access, or is on the reviewed list with a class; the list has no stale or double entry', async () => {
+    const fns = await catalogue();
+    const byName = new Map(fns.map((f) => [f.name, f]));
+    const listed = new Map<string, string[]>();
+    const add = (cls: string, names: string[]) =>
+      names.forEach((n) => listed.set(n, [...(listed.get(n) ?? []), cls]));
+    add('actor-first', ACTOR_FIRST_DOORS);
+    add('auth-credential', AUTH_CREDENTIAL_DOORS);
+    add('public-by-design', Object.keys(PUBLIC_BY_DESIGN));
+    add('internal-predicate', INTERNAL_PREDICATES);
+    const unreviewed = fns.filter((f) => !helperFirst(f) && !listed.has(f.name)).map((f) => f.name);
+    expect(
+      unreviewed,
+      'a new definer must call ctx.require_admitted_actor first or be reviewed in definer-classes.ts',
+    ).toEqual([]);
+    const stale = [...listed.keys()].filter((n) => !byName.has(n));
+    expect(stale, 'listed but no longer an executable definer').toEqual([]);
+    const redundant = [...listed.entries()]
+      .filter(([n]) => byName.get(n) && helperFirst(byName.get(n)!))
+      .map(([n]) => n);
+    expect(
+      redundant.filter((n) => !INTERNAL_PREDICATES.includes(n)),
+      'listed although helper-first: remove the entry',
+    ).toEqual([]);
+    expect([...listed.entries()].filter(([, c]) => c.length > 1).map(([n]) => n)).toEqual([]);
+    expect(CLASS_REASON['actor-first'].length).toBeGreaterThan(40);
+  });
+
+  it('the actor-first class: the validated actor is read before the first table access (not merely mentioned somewhere)', async () => {
+    const fns = new Map((await catalogue()).map((f) => [f.name, f]));
+    const offenders = ACTOR_FIRST_DOORS.filter((n) => {
+      const f = fns.get(n);
+      return !f || !(actorAt(f.src) >= 0 && actorAt(f.src) < firstData(f.src));
+    });
+    expect(offenders).toEqual([]);
+  });
+
+  it('auth credential doors are executable by the auth login ONLY; the auth login holds nothing else of business value', async () => {
+    const fns = await catalogue();
+    for (const n of AUTH_CREDENTIAL_DOORS) {
+      const f = fns.find((x) => x.name === n)!;
+      expect(f, n).toBeTruthy();
+      expect({ n, app: f.app, auth: f.auth }).toEqual({ n, app: false, auth: true });
+    }
+    const allowedForAuth = new Set([
+      ...AUTH_CREDENTIAL_DOORS,
+      ...INTERNAL_PREDICATES,
+      ...Object.keys(PUBLIC_BY_DESIGN),
+      'ctx.require_admitted_actor',
+    ]);
+    expect(fns.filter((f) => f.auth && !allowedForAuth.has(f.name)).map((f) => f.name)).toEqual([]);
+  });
+
+  it('the self-service doors named by R19-01 are helper-first (not merely listed)', async () => {
+    const fns = new Map((await catalogue()).map((f) => [f.name, f]));
+    for (const n of [
+      'view_disclosure',
+      'my_disclosures',
+      'consume_document_copy',
+      'use_document_request',
+      'my_document_requests',
+      'my_notifications',
+      'mark_notifications_read',
+      'unread_notification_count',
+      'send_test_notification',
+      'set_my_locale',
+      'save_push_subscription',
+      'drop_push_subscription',
+      'my_surveys',
+      'answer_survey',
+      'transfer_pickup',
+      'transfer_receive',
+      'decide_cancellation',
+    ])
+      expect(helperFirst(fns.get(`public.${n}`)!), n).toBe(true);
+  });
+});
+
+let world: World;
+/** R18-02: the REAL rows an argument can point at (a trip, load, order, driver, plant of ANOTHER plant, and a trip with no plant). */
+interface Real {
+  tripB: string;
+  tripN: string;
+  loadB: string;
+  orderB: string;
+  orderN: string;
+  orderCodeB: string;
+  clientCode: string;
+  [table: string]: string;
+}
+let real: Real;
+/** One existing row of a table, found by the migrator; `null` when the table is empty in the test database. */
+const anyId = async (table: string): Promise<string | null> =>
+  (await migrator.query<{ id: string }>(`select id::text as id from ${table} limit 1`)).rows[0]?.id ?? null;
+const reservedUser: { id: string } = { id: '' };
+beforeAll(async () => {
+  await setReservedBoundary(env.DATABASE_URL_MIGRATOR, true);
+  world = await plantWorld(app, migrator, `dc${randomUUID().replace(/-/g, '').slice(0, 8)}`);
+  const b = await world.newTrip(world.plantB, world.truckB, world.driverB);
+  const n = await world.newTrip(world.plantA, world.truckN, world.driverA, { nullPlant: true });
+  await world.tap(world.driverUserB, b.trip, 'loaded');
+  const loadB = await world.plantLoad(world.plantB, b.order, world.truckB);
+  const codes = (
+    await migrator.query<{ code: string; ccode: string }>(
+      `select o.code, c.code as ccode from sales_order o join client c on c.id = o.client_id where o.id = $1`,
+      [b.order],
+    )
+  ).rows[0]!;
+  real = {
+    tripB: b.trip,
+    tripN: n.trip,
+    loadB,
+    orderB: b.order,
+    orderN: n.order,
+    orderCodeB: codes.code,
+    clientCode: codes.ccode,
+  };
+  // one real row of every other kind of target a door can name (an empty table gives a random id: the sweep reports how many)
+  for (const [key, table] of Object.entries({
+    site: 'client_site',
+    zone: 'zone',
+    pump: 'pump',
+    instrument: 'instrument',
+    invoice: 'invoice',
+    purchase: 'purchase',
+    si: 'supplier_invoice',
+    survey: 'survey',
+    disclosure: 'disclosure_request',
+    docreq: 'document_request',
+    transfer: 'plant_transfer',
+    pumpjob: 'pump_job',
+    conflict: 'pump_conflict',
+    kase: 'cancellation_case',
+    instruction: 'trip_instruction',
+    emergency: 'driver_emergency',
+    file: 'stored_file',
+    component: 'component',
+  })) {
+    try {
+      real[key] = (await anyId(table)) ?? '';
+    } catch {
+      real[key] = '';
+    }
+  }
+  // real requests, a real survey, so the doors that name them are called with targets that exist
+  const asUser = (u: { id: string; role: string }, sql: string, p: unknown[] = []) =>
+    world.as(u, async (tx) => (await tx.query<{ id: string }>(sql, p)).rows[0]?.id as string);
+  real.disclosure = await asUser(
+    world.sales,
+    `select public.request_disclosure('order_total', $1, 'order', $1, 'sweep') as id`,
+    [codes.code],
+  );
+  real.docreq = await asUser(
+    world.sales,
+    `select public.request_document('releve', 'client', $1, null, null) as id`,
+    [codes.ccode],
+  );
+  real.survey = await asUser(
+    world.owner,
+    `select public.create_survey('office_sales', 'sweep', $1::jsonb) as id`,
+    [JSON.stringify([{ id: 'q1', kind: 'yes_no', label: 'ok?' }])],
+  ).catch(() => '');
+  const rid = uuidv7(realClock.now());
+  await migrator.query(
+    `insert into "user" (id, name, email, "emailVerified", role, locale, status, "twoFactorEnabled", "provisionedAt")
+     values ($1, 'dc reserved', $2, true, 'partner', 'fr', 'active', true, now())`,
+    [rid, `dc-reserved-${rid}@kayas.test`],
+  );
+  reservedUser.id = rid;
+});
+afterAll(async () => {
+  await migrator
+    ?.query(`update "user" set status = 'disabled' where id = $1`, [reservedUser.id])
+    .catch(() => undefined);
+  await world?.done();
+  await setReservedBoundary(env.DATABASE_URL_MIGRATOR, false);
+});
+
+let noTarget = new Set<string>();
+/** An argument value: a real existing row where the name says what it is, otherwise the shape's dummy. */
+function realArg(fn: string, name: string, type: string, variant: 'B' | 'N'): string {
+  const pick = (k: string): string | null => (real[k] ? real[k]! : null);
+  const miss = (what: string): string => {
+    noTarget.add(`${fn}(${name}) ${what}`);
+    return randomUUID();
+  };
+  if (type === 'uuid') {
+    if (/^p_(trip|old|new)$/.test(name)) return variant === 'B' ? real.tripB : real.tripN;
+    if (name === 'p_case')
+      return /cancel|redirect|ack_redirect|decide_cancellation|open_trip_case/.test(fn)
+        ? (pick('kase') ?? miss('case'))
+        : variant === 'B'
+          ? real.tripB
+          : real.tripN;
+    if (/^p_(delivery|load)$/.test(name)) return real.loadB;
+    if (/^p_order/.test(name)) return variant === 'B' ? real.orderB : real.orderN;
+    if (name === 'p_driver' || name === 'p_operator') return world.driverB;
+    if (name === 'p_plant') return variant === 'B' ? world.plantB : world.plantA;
+    if (name === 'p_client' || name === 'p_type')
+      return variant === 'B' ? world.scene.clientId : world.master.typeId;
+    if (name === 'p_site') return pick('site') ?? miss('site');
+    if (name === 'p_zone') return pick('zone') ?? miss('zone');
+    if (name === 'p_pump') return pick('pump') ?? miss('pump');
+    if (name === 'p_instrument') return pick('instrument') ?? miss('instrument');
+    if (name === 'p_invoice') return pick('invoice') ?? miss('invoice');
+    if (name === 'p_purchase') return pick('purchase') ?? miss('purchase');
+    if (name === 'p_si') return pick('si') ?? miss('supplier invoice');
+    if (name === 'p_job') return pick('pumpjob') ?? miss('pump job');
+    if (name === 'p_instruction') return pick('instruction') ?? miss('instruction');
+    if (name === 'p_emergency') return pick('emergency') ?? miss('emergency');
+    if (name === 'p_file') return pick('file') ?? miss('file');
+    if (name === 'p_component') return pick('component') ?? miss('component');
+    if (name === 'p_id') {
+      if (/survey/.test(fn)) return pick('survey') ?? miss('survey');
+      if (/disclosure/.test(fn)) return pick('disclosure') ?? miss('disclosure');
+      if (/document/.test(fn)) return pick('docreq') ?? miss('document request');
+      if (/transfer/.test(fn)) return pick('transfer') ?? miss('transfer');
+      if (/pump_conflict/.test(fn)) return pick('conflict') ?? miss('pump conflict');
+      return miss('p_id');
+    }
+  }
+  if (type === 'text') {
+    if (name === 'p_order_code') return real.orderCodeB;
+    if (name === 'p_client_code') return real.clientCode;
+    if (name === 'p_code' && /set_order_pumped/.test(fn)) return real.orderCodeB;
+    if (name === 'p_key') return `k-${randomUUID()}`;
+    if (name === 'p_stage' || name === 'p_step') return 'loaded'; // a valid stage, so the refusal under test is the actor's, not the argument's
+  }
+  if (type === 'date') return new Date().toISOString().slice(0, 10);
+  if (type.startsWith('timestamp')) return new Date().toISOString();
+  if (type === 'uuid[]') return `{${randomUUID()}}`;
+  if (type === 'text[]') return '{owner}';
+  return dummy(type);
 }
 
 const dummy = (t: string): string => {
@@ -52,91 +346,42 @@ const dummy = (t: string): string => {
   return 'x';
 };
 
-async function catalogue(): Promise<Fn[]> {
-  const { rows } = await migrator.query<{
-    oid: number;
-    name: string;
-    args: string[];
-    argNames: string[];
-    retset: boolean;
-    rettype: string;
-  }>(
-    `select p.oid::int as oid, n.nspname || '.' || p.proname as name,
-            array(select format_type(t, null) from unnest(p.proargtypes::oid[]) with ordinality as u(t, i) order by i) as args,
-            coalesce(p.proargnames[1:p.pronargs], array[]::text[]) as "argNames",
-            p.proretset as retset, format_type(p.prorettype, null) as rettype
-       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-      where p.prosecdef and p.prokind = 'f' and n.nspname in ('public', 'ctx', 'finance')
-        and has_function_privilege('belgobeton_app', p.oid, 'EXECUTE')
-        and p.prorettype <> 'trigger'::regtype
-        and p.proname not in ('actor_role', 'role', 'user_id', 'plant_scope', 'plant_id', 'driver_id')
-      order by 2, 1`,
-  );
-  return rows;
-}
-
-let world: World;
-/** R18-02: the REAL rows an argument can point at (a trip, load, order, driver, plant of ANOTHER plant, and a trip with no plant). */
-interface Real {
-  tripB: string;
-  tripN: string;
-  loadB: string;
-  orderB: string;
-  orderN: string;
-}
-let real: Real;
-beforeAll(async () => {
-  world = await plantWorld(app, migrator, `dc${randomUUID().replace(/-/g, '').slice(0, 8)}`);
-  const b = await world.newTrip(world.plantB, world.truckB, world.driverB);
-  const n = await world.newTrip(world.plantA, world.truckN, world.driverA, { nullPlant: true });
-  await world.tap(world.driverUserB, b.trip, 'loaded');
-  const loadB = await world.plantLoad(world.plantB, b.order, world.truckB);
-  real = { tripB: b.trip, tripN: n.trip, loadB, orderB: b.order, orderN: n.order };
-});
-afterAll(async () => {
-  await world?.done();
-});
-
-/** An argument value: a real existing id where the name says what it is, otherwise the shape's dummy. */
-function realArg(name: string, type: string, variant: 'B' | 'N'): string {
-  if (type === 'uuid') {
-    if (/^p_(trip|old|new|case)$/.test(name)) return variant === 'B' ? real.tripB : real.tripN;
-    if (/^p_(delivery|load)$/.test(name)) return real.loadB;
-    if (/^p_order/.test(name)) return variant === 'B' ? real.orderB : real.orderN;
-    if (name === 'p_driver' || name === 'p_operator') return world.driverB;
-    if (name === 'p_plant') return variant === 'B' ? world.plantB : world.plantA;
-    if (name === 'p_client' || name === 'p_type')
-      return variant === 'B' ? world.scene.clientId : world.master.typeId;
-  }
-  if (type === 'date') return new Date().toISOString().slice(0, 10);
-  return dummy(type);
-}
-
 const CONTEXTS = (): { label: string; role: string | null; user: string | null }[] => [
   { label: 'unset role, no user', role: null, user: null },
-  { label: 'unset role, a REAL user id', role: null, user: world.pmA.id },
+  { label: 'unset role, a REAL plant manager user id', role: null, user: world.pmA.id },
   { label: 'unset role, a REAL driver user id', role: null, user: world.driverUserA.id },
   { label: 'empty role, a real user id', role: '', user: world.pmA.id },
   { label: 'unknown role', role: 'bogus', user: randomUUID() },
+  {
+    label: "a role that is not the user's (owner claimed by a plant manager)",
+    role: 'owner',
+    user: world.pmA.id,
+  },
+  {
+    label: 'a RESERVED role of a stored reserved account (boundary ON)',
+    role: 'partner',
+    user: reservedUser.id,
+  },
   { label: 'anonymous', role: 'anonymous', user: '00000000-0000-7000-8000-000000000000' },
   { label: 'a role no account has', role: 'client_portal', user: randomUUID() },
 ];
 
-describe('R17-04: every app-executable business definer refuses a request without a valid actor', () => {
-  it('lists the catalogue (sanity: the doors are there)', async () => {
-    const fns = await catalogue();
-    expect(fns.length).toBeGreaterThan(20);
-  });
-
-  it('answers nothing and writes nothing without a valid actor — with REAL targets of another plant and of no plant', async () => {
-    const fns = await catalogue();
+describe('R19-01 (d): the sweep with real targets — the exact refusal, nothing answered, nothing written', () => {
+  it('every application-executable business door refuses (SQLSTATE 42501) a request without a valid actor, for real targets of another plant and of none', async () => {
+    noTarget = new Set();
+    const fns = (await catalogue()).filter(
+      (f) =>
+        f.app &&
+        !PUBLIC_BY_DESIGN[f.name] &&
+        !INTERNAL_PREDICATES.includes(f.name) &&
+        !AUTH_CREDENTIAL_DOORS.includes(f.name),
+    );
+    expect(fns.length).toBeGreaterThan(100);
     const offenders: string[] = [];
     for (const fn of fns) {
-      if (PUBLIC_BY_DESIGN[fn.name]) continue;
       for (const [variant, ctxCase] of CONTEXTS().flatMap((c) =>
         (['B', 'N'] as const).map((v) => [v, c] as const),
       )) {
-        // The app login, a fresh transaction per call, always rolled back.
         const c = await app.connect();
         try {
           await c.query('begin');
@@ -148,39 +393,32 @@ describe('R17-04: every app-executable business definer refuses a request withou
           const call = fn.retset
             ? `select count(*)::text as r from ${fn.name}(${params})`
             : `select ${fn.name}(${params})::text as r`;
-          let answer: string | null = null;
-          let refused = false;
-          await c.query('savepoint s');
+          const where = `${fn.name} for: ${ctxCase.label} (${variant} targets)`;
+          let outcome:
+            { kind: 'refused'; code: string; message: string } | { kind: 'answered'; answer: string | null };
           try {
             const res = await c.query<{ r: string | null }>(
               call,
-              fn.args.map((t, i) => realArg(fn.argNames[i] ?? '', t, variant)),
+              fn.args.map((t, i) => realArg(fn.name, fn.argNames[i] ?? '', t, variant)),
             );
-            answer = res.rows[0]?.r ?? null;
-          } catch {
-            refused = true;
-            await c.query('rollback to savepoint s');
+            outcome = { kind: 'answered', answer: res.rows[0]?.r ?? null };
+          } catch (e) {
+            const err = e as { code?: string; message?: string };
+            outcome = { kind: 'refused', code: err.code ?? '?', message: err.message ?? '' };
           }
-          if (!refused) {
-            const emptyLike =
-              answer === null ||
-              answer === '' ||
-              answer === '0' ||
-              answer === 'false' ||
-              answer === '{}' ||
-              answer === '[]';
-            if (!emptyLike)
+          if (outcome.kind === 'refused') {
+            if (outcome.code !== '42501')
               offenders.push(
-                `${fn.name}(${fn.args.join(',')}) answered "${String(answer).slice(0, 40)}" for: ${ctxCase.label} (${variant} targets)`,
+                `${where}: refused with ${outcome.code} (${outcome.message.slice(0, 70)}), not 42501`,
               );
-            // answered nothing: it must also have written nothing (a write gives the transaction an id)
+          } else if (!ANSWERS_EMPTY[fn.name]) {
+            offenders.push(`${where}: ANSWERED "${String(outcome.answer).slice(0, 40)}" instead of refusing`);
+          }
+          if (outcome.kind === 'answered') {
             const w = await c.query<{ x: string | null }>(
               'select pg_current_xact_id_if_assigned()::text as x',
             );
-            if (w.rows[0]?.x)
-              offenders.push(
-                `${fn.name}(${fn.args.join(',')}) WROTE for: ${ctxCase.label} (${variant} targets)`,
-              );
+            if (w.rows[0]?.x) offenders.push(`${where}: WROTE`);
           }
         } finally {
           await c.query('rollback').catch(() => undefined);
@@ -188,7 +426,51 @@ describe('R17-04: every app-executable business definer refuses a request withou
         }
       }
     }
+    // how many arguments had no real row to point at: reported, and bounded so a regression of the fixtures is visible
+    console.info(
+      `definer sweep: ${noTarget.size} argument(s) without a real target:\n  ${[...noTarget].join('\n  ')}`,
+    );
     expect(offenders).toEqual([]);
+    for (const k of Object.keys(ANSWERS_EMPTY))
+      expect(
+        fns.map((f) => f.name),
+        `stale ANSWERS_EMPTY ${k}`,
+      ).toContain(k);
+  });
+
+  it('the helper itself: refuses every non-actor exactly, answers the role of a real admitted actor', async () => {
+    const run = async (role: string | null, user: string | null) => {
+      const c = await app.connect();
+      try {
+        await c.query('begin');
+        await c.query(`select set_config('app.role', $1, true), set_config('app.user_id', $2, true)`, [
+          role ?? '',
+          user ?? '',
+        ]);
+        return (await c.query<{ r: string }>(`select ctx.require_admitted_actor('probe') as r`)).rows[0]!.r;
+      } finally {
+        await c.query('rollback').catch(() => undefined);
+        c.release();
+      }
+    };
+    for (const [role, user] of [
+      [null, world.pmA.id],
+      ['', world.pmA.id],
+    ] as const)
+      await expect(run(role, user)).rejects.toMatchObject({
+        code: '42501',
+        message: 'probe: not an admitted actor',
+      });
+    await expect(run('plant_manager', null)).rejects.toMatchObject({ code: '42501' });
+    for (const [role, user] of [
+      ['owner', world.pmA.id],
+      ['partner', reservedUser.id],
+      ['anonymous', '00000000-0000-7000-8000-000000000000'],
+      ['system', '00000000-0000-7000-8000-000000000001'],
+    ] as const)
+      await expect(run(role, user), `${role}`).rejects.toMatchObject({ code: '42501' });
+    expect(await run('plant_manager', world.pmA.id)).toBe('plant_manager');
+    expect(await run('driver', world.driverUserA.id)).toBe('driver');
   });
 });
 

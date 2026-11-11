@@ -101,7 +101,9 @@ describe('functions the application role can execute', () => {
     'ctx.driver_id()',
     'ctx.reserved_boundary_on()', // R18-03: a constant the policy functions read (true on every server; the test database switches it off for the reserved-role policy tests)
     'ctx.in_actor_scope(p_global text[], p_plant uuid)', // R18-02: the positive plant-scope predicate (boolean, never NULL); reveals nothing the caller did not pass
+    'ctx.manager_tuple_ok(p_plan_plant uuid, p_order_plant uuid, p_truck_plant uuid)', // R19-02: the positive plant-manager tuple predicate (boolean, never NULL); reveals nothing the caller did not pass
     'ctx.require_actor(p_door text, p_roles text[])', // R18-02: the actor-first check of the trip doors; it only raises or returns the caller's own role
+    'ctx.require_admitted_actor(p_door text)', // R19-01: refuses a missing, empty, anonymous, system, reserved or inactive actor; returns the role
     'public.create_pump_job(p_date date, p_pump uuid, p_operator uuid, p_client uuid, p_site text, p_address_enc text, p_m3 integer)',
     'public.driver_ack(p_instruction uuid)',
     'public.driver_attach_bl_photo(p_trip uuid, p_file uuid, p_type text, p_size integer, p_sha text, p_at timestamp with time zone, p_key text)', // C3: the driver of the rotation only (checked inside)
