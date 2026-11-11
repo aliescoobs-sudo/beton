@@ -108,3 +108,39 @@ export function pngWithText(padding = 3): Buffer {
 
 export const simplePdf = (extra = '') =>
   Buffer.from(`%PDF-1.4\n1 0 obj\n<< /Type /Catalog ${extra}>>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n`);
+
+/** R19-11: a JPEG whose JFIF header carries a thumbnail, with a JFXX thumbnail JPEG that has its own EXIF/GPS, an ICC profile text, a multi-picture index. */
+export const NESTED_CANARIES = [
+  'CANARY-NESTED-JFIF-THUMB',
+  'CANARY-NESTED-JFXX-EXIF-GPS',
+  'CANARY-NESTED-ICC-DESC',
+  'CANARY-NESTED-MPF',
+] as const;
+export function jpegNestedMetadata(): Buffer {
+  return Buffer.concat([
+    Buffer.from([0xff, 0xd8]),
+    seg(
+      0xe0,
+      Buffer.concat([
+        Buffer.from('JFIF\0\x01\x01\0\0\x01\0\x01\x02\x02', 'latin1'),
+        Buffer.from(NESTED_CANARIES[0]),
+      ]),
+    ),
+    seg(
+      0xe0,
+      Buffer.concat([Buffer.from('JFXX\0\x10', 'latin1'), jpegWithGps(), Buffer.from(NESTED_CANARIES[1])]),
+    ),
+    seg(
+      0xe2,
+      Buffer.concat([
+        Buffer.from('ICC_PROFILE\0\x01\x01', 'latin1'),
+        Buffer.from(`desc ${NESTED_CANARIES[2]}`),
+      ]),
+    ),
+    seg(0xe2, Buffer.concat([Buffer.from('MPF\0', 'latin1'), Buffer.from(NESTED_CANARIES[3])])),
+    seg(0xdb, Buffer.alloc(65, 1)),
+    seg(0xc0, Buffer.from([8, 0, 1, 0, 1, 1, 1, 0x11, 0])),
+    seg(0xda, Buffer.from([1, 1, 0, 0, 63, 0])),
+    Buffer.from([0x12, 0x34, 0x56, 0xff, 0xd9]),
+  ]);
+}

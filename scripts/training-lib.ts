@@ -257,12 +257,65 @@ export function stageCredentialsFile(file: string, content: string, attempt?: st
   return { tmp, final };
 }
 
-/** Puts the staged file in place (atomic rename). A rename that fails removes the staged file: no secret is left under a staging name. */
-export function commitCredentialsFile(staged: StagedCredentials): void {
+/** Which file this is on its device (a rename keeps it): what a publication is recognised by. */
+export interface FileIdentity {
+  dev: number;
+  ino: number;
+}
+export const identityOf = (file: string): FileIdentity | null => {
+  const st = lstatSync(file, { throwIfNoEntry: false });
+  return st?.isFile() ? { dev: st.dev, ino: st.ino } : null;
+};
+
+/**
+ * Puts the staged file in place (atomic rename). A rename that fails removes the staged file: no secret is left under a staging name.
+ * R19-12: returns the IDENTITY of what was placed, so that a later cleanup removes this publication and nothing else.
+ */
+export function commitCredentialsFile(staged: StagedCredentials): FileIdentity | null {
   try {
+    const id = identityOf(staged.tmp);
     renameSync(staged.tmp, staged.final);
+    return id;
   } catch (error) {
     discardCredentialsFile(staged.tmp);
+    throw error;
+  }
+}
+
+/** Removes `file` only if it still is the very file this attempt placed (same device and inode): a successor's publication under the same name is left alone. */
+export function discardIfSame(file: string, placed: FileIdentity | null): boolean {
+  if (!placed) return false;
+  const now = identityOf(file);
+  if (!now || now.dev !== placed.dev || now.ino !== placed.ino) return false;
+  discardCredentialsFile(file);
+  return true;
+}
+
+/**
+ * R19-12: the publication LIFECYCLE of the seed, in one place: the credentials file is placed (one commit), the marker is written (another commit), and if either
+ * fails the attempt removes what it staged and, only if it did place the file, that very file, found again by identity and removed under the commit mutex. A
+ * displaced attempt (its lock lost between the two publications) therefore cannot remove the credentials a successor placed under the same name.
+ */
+export async function publishCredentials(
+  lock: SeedLock,
+  staged: StagedCredentials,
+  writeMarker: () => unknown | Promise<unknown>,
+  /** Test seam (R19-12): runs between the two publications, where a stalled attempt can be displaced. */
+  between?: () => void | Promise<void>,
+): Promise<void> {
+  let placedAs: FileIdentity | null = null;
+  try {
+    await lock.commit('the placing of the credentials file', () => {
+      placedAs = commitCredentialsFile(staged);
+    });
+    await between?.();
+    await lock.commit('the training marker', writeMarker);
+  } catch (error) {
+    discardCredentialsFile(staged.tmp); // named after this attempt: nobody else's
+    if (placedAs) {
+      const mine = placedAs;
+      lock.cleanup('the removal of the credentials file', () => void discardIfSame(staged.final, mine));
+    }
     throw error;
   }
 }
@@ -300,30 +353,100 @@ export class SeedLockError extends Error {}
  */
 export const SEED_COMMIT_MUTEX = 'training-accounts.seed.commit';
 const commitMutexPath = (dir: string): string => path.join(dir, SEED_COMMIT_MUTEX);
-function commitInFlight(dir: string, hostname: string): { pid: number } | null {
-  const file = commitMutexPath(dir);
-  let content: { pid?: number; host?: string };
+/** Test seam (R19-12): runs between the claim of a dead mutex record and its removal, to replay the interleavings a stalled remover meets. */
+export interface RecoverySeam {
+  betweenClaimAndRemove?: () => void;
+}
+interface MutexRecord {
+  token?: string;
+  pid?: number;
+  host?: string;
+}
+const alive = (pid: number): boolean => {
   try {
-    content = JSON.parse(readFileSync(file, 'utf8')) as { pid?: number; host?: string };
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code !== 'ESRCH'; // EPERM: it exists
+  }
+};
+
+/**
+ * R19-12: removes the record of a DEAD mutex holder, exclusively. Reading a dead pid and later unlinking "the pathname" could remove a NEW live mutex that
+ * was created in between (two recoverers: the first removes the dead record and a committer takes a fresh mutex, the second then unlinks the pathname).
+ * Recovery is therefore CLAIMED first: a claim file named after the exact dead record (`<mutex>.recover.<token>.<n>`) is created exclusively, so of any number of
+ * recoverers only ONE may remove that record, and nobody else removes anything while the record exists (a committer cannot create the mutex while it does).
+ * Under the claim the record is read AGAIN and compared with the one judged dead; the pathname is unlinked only if it still is that record. A claim whose owner
+ * died is skipped to the next generation. A recoverer that cannot claim answers "in flight": it fails closed and never removes.
+ */
+function removeDeadMutex(file: string, dead: MutexRecord, seam?: RecoverySeam): boolean {
+  const base = `${file}.recover.${dead.token ?? `pid${dead.pid}`}`;
+  let claimed = false;
+  for (let n = 1; n <= 4 && !claimed; n++) {
+    const claim = `${base}.${n}`;
+    try {
+      const fd = openSync(
+        claim,
+        constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
+        0o600,
+      );
+      try {
+        writeSync(fd, JSON.stringify({ pid: process.pid }));
+      } finally {
+        closeSync(fd);
+      }
+      claimed = true;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') return false;
+      let owner = -1;
+      try {
+        owner = (JSON.parse(readFileSync(claim, 'utf8')) as { pid?: number }).pid ?? -1;
+      } catch {
+        return false; // unreadable claim: another recoverer is at work
+      }
+      if (owner > 0 && alive(owner)) return false; // someone else is recovering this record
+      // the claimer died: the next generation
+    }
+  }
+  if (!claimed) return false;
+  seam?.betweenClaimAndRemove?.();
+  let now: MutexRecord;
+  try {
+    now = JSON.parse(readFileSync(file, 'utf8')) as MutexRecord;
+  } catch {
+    return false; // gone, or replaced by something unreadable: not ours to remove
+  }
+  if (now.token !== dead.token || now.pid !== dead.pid || now.host !== dead.host) return false; // a replacement: leave it
+  try {
+    unlinkSync(file);
+  } catch {
+    // someone else removed it
+  }
+  return true;
+}
+
+function commitInFlight(dir: string, hostname: string, seam?: RecoverySeam): { pid: number } | null {
+  const file = commitMutexPath(dir);
+  let content: MutexRecord;
+  try {
+    content = JSON.parse(readFileSync(file, 'utf8')) as MutexRecord;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
     return { pid: -1 }; // unreadable: treated as live
   }
   if (typeof content.pid !== 'number' || content.host !== hostname) return { pid: content.pid ?? -1 };
+  if (alive(content.pid)) return { pid: content.pid };
+  // its holder is gone: nobody can resume the commit it was making. Removed EXCLUSIVELY (see removeDeadMutex); a recoverer that could not claim it fails closed.
+  if (removeDeadMutex(file, content, seam)) return null;
+  return commitInFlightAfterRecovery(file);
+}
+/** Called when this recoverer did not remove the record: the mutex may be gone (someone else recovered it) or a new live one; look again, once, without recovering. */
+function commitInFlightAfterRecovery(file: string): { pid: number } | null {
   try {
-    process.kill(content.pid, 0);
-    return { pid: content.pid };
+    const again = JSON.parse(readFileSync(file, 'utf8')) as MutexRecord;
+    return { pid: again.pid ?? -1 };
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ESRCH') {
-      // its holder is gone: nobody can resume the commit it was making
-      try {
-        unlinkSync(file);
-      } catch {
-        // someone else removed it
-      }
-      return null;
-    }
-    return { pid: content.pid }; // EPERM: it exists
+    return (error as NodeJS.ErrnoException).code === 'ENOENT' ? null : { pid: -1 };
   }
 }
 
@@ -344,6 +467,12 @@ export interface SeedLock {
    * the check and the action. Use it for every publication (the credentials file, the training marker).
    */
   commit<T>(step: string, action: () => T | Promise<T>): Promise<T>;
+  /**
+   * R19-12: the REMOVAL of what this attempt published, run under the commit mutex but WITHOUT requiring that the lock is still held (a displaced attempt must be
+   * able to clean up what it placed, and must be unable to publish). Returns false, doing nothing, when the mutex is busy (another attempt is committing: the
+   * file stays; failing closed). The action must itself check that it removes only what this attempt put there (see `discardIfSame`).
+   */
+  cleanup(step: string, action: () => void): boolean;
   release(): void;
 }
 
@@ -370,6 +499,8 @@ export function acquireSeedLock(
     heartbeatMs?: number;
     /** Test seam: the host name written into and compared with the commit mutex. */
     hostname?: string;
+    /** Test seam (R19-12): replays the interleavings of a stalled dead-mutex remover. */
+    recovery?: RecoverySeam;
     /** Test seam (R17-09): the two filesystem operations that mark a released lock, so a failure of each can be injected. */
     io?: {
       utimes?: (file: string, at: Date, mt: Date) => void;
@@ -433,7 +564,7 @@ export function acquireSeedLock(
   // is refused. The winner supersedes the older locks; it never removes anybody's current lock.
   const host = opts.hostname ?? hostname();
   const blockedByCommit = (): string | null => {
-    const inflight = commitInFlight(dir, host);
+    const inflight = commitInFlight(dir, host, opts.recovery);
     return inflight
       ? `a training seed is in the middle of committing (process ${inflight.pid}): it cannot be superseded now; nothing was swept, written or removed`
       : null;
@@ -501,7 +632,7 @@ export function acquireSeedLock(
         );
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
-          if (commitInFlight(dir, host))
+          if (commitInFlight(dir, host, opts.recovery))
             refuse(`training seed stopped before "${step}": another attempt is committing`);
           return refuse(
             `training seed stopped before "${step}": a commit mutex could not be taken (try again)`,
@@ -517,6 +648,35 @@ export function acquireSeedLock(
       try {
         lock_assert(step); // the check that counts: nobody can supersede us from here to the end of the action
         return await action();
+      } finally {
+        try {
+          if ((JSON.parse(readFileSync(mutex, 'utf8')) as { token?: string }).token === token)
+            unlinkSync(mutex);
+        } catch {
+          // already gone
+        }
+      }
+    },
+    cleanup: (_step, action) => {
+      const mutex = commitMutexPath(dir);
+      let fd: number;
+      try {
+        fd = openSync(
+          mutex,
+          constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
+          0o600,
+        );
+      } catch {
+        return false; // busy (or unwritable): leave everything as it is
+      }
+      try {
+        writeSync(fd, JSON.stringify({ token, pid: process.pid, host, at: now(), cleanup: true }));
+      } finally {
+        closeSync(fd);
+      }
+      try {
+        action();
+        return true;
       } finally {
         try {
           if ((JSON.parse(readFileSync(mutex, 'utf8')) as { token?: string }).token === token)

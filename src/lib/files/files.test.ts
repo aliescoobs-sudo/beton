@@ -373,3 +373,140 @@ describe('the disk store', () => {
     expect((await createDiskStore(dir, parseKeyring(k2)).get(id)).equals(pdf())).toBe(true);
   });
 });
+
+describe('R19-11: nested metadata does not survive: thumbnails, descriptive profiles, multi-picture data, animation sub-chunks', () => {
+  const CANARY = {
+    thumb: 'CANARY-JFIF-THUMBNAIL-BYTES',
+    jfxx: 'CANARY-JFXX-EXIF-GPS',
+    icc: 'CANARY-ICC-DESCRIPTION-CREATOR',
+    mpf: 'CANARY-MPF-ENTRY',
+    adobe: 'CANARY-ADOBE-LONG-TEXT',
+    pngIcc: 'CANARY-PNG-ICCP-DESC',
+    webpIcc: 'CANARY-WEBP-ICCP-DESC',
+    webpFrame: 'CANARY-WEBP-FRAME-SUBCHUNK',
+  };
+  const nestedJpeg = jpeg({ orientation: 3 }); // a complete JPEG with its own EXIF, GPS and comment, carried as a thumbnail
+  const loaded = () =>
+    Buffer.concat([
+      Buffer.from([0xff, 0xd8]),
+      // JFIF with a real 2x2 RGB thumbnail after the header
+      seg(
+        0xe0,
+        Buffer.concat([
+          Buffer.from('JFIF\0\x01\x02\x01\0\x48\0\x48\x02\x02', 'latin1'),
+          Buffer.from(CANARY.thumb),
+        ]),
+      ),
+      // JFXX extension: an embedded JPEG thumbnail that has its own EXIF
+      seg(0xe0, Buffer.concat([Buffer.from('JFXX\0\x10', 'latin1'), nestedJpeg, Buffer.from(CANARY.jfxx)])),
+      seg(0xe1, exif(6)),
+      seg(
+        0xe2,
+        Buffer.concat([Buffer.from('ICC_PROFILE\0\x01\x01', 'latin1'), Buffer.from(`desc ${CANARY.icc}`)]),
+      ),
+      seg(0xe2, Buffer.concat([Buffer.from('MPF\0', 'latin1'), Buffer.from(CANARY.mpf)])),
+      seg(
+        0xee,
+        Buffer.concat([
+          Buffer.from('Adobe', 'latin1'),
+          Buffer.from([0, 100, 0, 0, 0, 0, 1]),
+          Buffer.from(CANARY.adobe),
+        ]),
+      ),
+      seg(0xdb, Buffer.alloc(65, 1)),
+      seg(0xc0, Buffer.from([8, 0, 1, 0, 1, 1, 1, 0x11, 0])),
+      seg(0xc4, Buffer.alloc(20, 2)),
+      seg(0xda, Buffer.from([1, 1, 0, 0, 63, 0])),
+      Buffer.from([0x12, 0x34, 0x56, 0xff, 0xd9]),
+    ]);
+  const mustNotContain = (out: Buffer, ...names: (keyof typeof CANARY)[]) => {
+    for (const n of names) expect(out.includes(CANARY[n]), n).toBe(false);
+    expect(out.includes('GPS-LAT'), 'the nested GPS').toBe(false);
+    expect(out.includes('SECRET'), 'any SECRET').toBe(false);
+  };
+
+  it('JPEG: the JFIF thumbnail, the JFXX picture with its EXIF, the ICC profile text, the multi-picture index and a long Adobe block are gone; the picture, the tables and the orientation stay', () => {
+    const input = loaded();
+    for (const n of ['thumb', 'jfxx', 'icc', 'mpf', 'adobe'] as const)
+      expect(input.includes(CANARY[n]), n).toBe(true);
+    const out = Buffer.from(stripJpeg(input));
+    mustNotContain(out, 'thumb', 'jfxx', 'icc', 'mpf', 'adobe');
+    // exactly one APP0, the rebuilt JFIF header (16 bytes, 0 x 0 thumbnail), density kept
+    const app0 = out.indexOf(Buffer.from([0xff, 0xe0]));
+    expect(out.readUInt16BE(app0 + 2)).toBe(16);
+    expect(out.subarray(app0 + 4, app0 + 9).toString('latin1')).toBe('JFIF\0');
+    expect(out.subarray(app0 + 9, app0 + 18).equals(Buffer.from([1, 2, 1, 0, 0x48, 0, 0x48, 0, 0]))).toBe(
+      true,
+    );
+    expect(out.indexOf(Buffer.from([0xff, 0xe0]), app0 + 2)).toBe(-1);
+    // the orientation is the only EXIF, as before; the picture is byte for byte
+    const at = out.indexOf(Buffer.from('Exif\0\0', 'latin1'));
+    expect(exifOrientation(out.subarray(at + 6, at + 6 + 26))).toBe(6);
+    expect(out.subarray(out.length - 5).equals(Buffer.from([0x12, 0x34, 0x56, 0xff, 0xd9]))).toBe(true);
+    expect(out.includes(Buffer.alloc(65, 1))).toBe(true);
+    expect(Buffer.from(stripJpeg(out)).equals(out)).toBe(true);
+    // the upload path applies it
+    const up = validateUpload({ declaredType: 'image/jpeg', bytes: input, maxBytes: 1 << 20 });
+    expect(up.ok).toBe(true);
+    if (up.ok) mustNotContain(Buffer.from(up.value.bytes), 'thumb', 'jfxx', 'icc', 'mpf', 'adobe');
+  });
+
+  it('a well-formed 12-byte Adobe block (the colour transform) is kept', () => {
+    const adobe = seg(0xee, Buffer.from([0x41, 0x64, 0x6f, 0x62, 0x65, 0, 100, 0, 0, 0, 0, 1]));
+    const input = Buffer.concat([jpeg().subarray(0, 2), adobe, jpeg().subarray(2)]);
+    expect(Buffer.from(stripJpeg(input)).includes(adobe)).toBe(true);
+  });
+
+  it('PNG: an iCCP profile (its description and creator are text) is gone; the picture chunks and the fixed-size colour chunks stay', () => {
+    const input = Buffer.concat([
+      PNG_SIG,
+      pngChunk('IHDR', Buffer.from([0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0, 0, 0])),
+      pngChunk('iCCP', Buffer.concat([Buffer.from('desc\0\0', 'latin1'), Buffer.from(CANARY.pngIcc)])),
+      pngChunk('sRGB', Buffer.from([0])),
+      pngChunk('IDAT', Buffer.from([1, 2, 3])),
+      pngChunk('IEND', Buffer.alloc(0)),
+    ]);
+    expect(input.includes(CANARY.pngIcc)).toBe(true);
+    const out = Buffer.from(stripPng(input));
+    mustNotContain(out, 'pngIcc');
+    expect(out.includes('iCCP')).toBe(false);
+    for (const keep of ['IHDR', 'sRGB', 'IDAT', 'IEND']) expect(out.includes(keep), keep).toBe(true);
+    const up = validateUpload({ declaredType: 'image/png', bytes: input, maxBytes: 1 << 20 });
+    expect(up.ok).toBe(true);
+    if (up.ok) mustNotContain(Buffer.from(up.value.bytes), 'pngIcc');
+  });
+
+  it('WebP: the ICCP chunk and its flag, and any sub-chunk of an animation frame that is not a picture, are gone; the frame keeps its picture', () => {
+    const frame = webpChunk(
+      'ANMF',
+      Buffer.concat([
+        Buffer.alloc(16, 7),
+        webpChunk('VP8 ', Buffer.alloc(11, 5)),
+        webpChunk('EXIF', Buffer.from(CANARY.webpFrame)),
+      ]),
+    );
+    const body = Buffer.concat([
+      Buffer.from('WEBP'),
+      webpChunk('VP8X', Buffer.from([0x2e, 0, 0, 0, 0, 0, 0, 0, 0, 0])), // ICC, EXIF, XMP, animation flags
+      webpChunk('ICCP', Buffer.from(CANARY.webpIcc)),
+      webpChunk('ANIM', Buffer.alloc(6)),
+      frame,
+    ]);
+    const head = Buffer.alloc(8);
+    head.write('RIFF', 0, 'ascii');
+    head.writeUInt32LE(body.length, 4);
+    const input = Buffer.concat([head, body]);
+    expect(input.includes(CANARY.webpIcc) && input.includes(CANARY.webpFrame)).toBe(true);
+    const out = Buffer.from(stripWebp(input));
+    mustNotContain(out, 'webpIcc', 'webpFrame');
+    expect(out.readUInt32LE(4) + 8).toBe(out.length);
+    expect(out[out.indexOf(Buffer.from('VP8X')) + 8]! & 0x2c).toBe(0);
+    expect(out[out.indexOf(Buffer.from('VP8X')) + 8]! & 0x02).toBe(0x02); // the animation flag stays
+    expect(out.includes('VP8 ')).toBe(true); // the frame's picture
+    expect(out.includes('ICCP')).toBe(false);
+    expect(Buffer.from(stripWebp(out)).equals(out)).toBe(true);
+    const up = validateUpload({ declaredType: 'image/webp', bytes: input, maxBytes: 1 << 20 });
+    expect(up.ok).toBe(true);
+    if (up.ok) mustNotContain(Buffer.from(up.value.bytes), 'webpIcc', 'webpFrame');
+  });
+});

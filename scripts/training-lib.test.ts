@@ -9,6 +9,7 @@ import {
   realpathSync,
   statSync,
   symlinkSync,
+  unlinkSync,
   utimesSync,
   writeFileSync,
 } from 'node:fs';
@@ -25,6 +26,9 @@ import {
   generatePin,
   acquireSeedLock,
   commitCredentialsFile,
+  discardIfSame,
+  identityOf,
+  publishCredentials,
   SEED_LOCK_NAME,
   SeedLockError,
   renderCredentialsFile,
@@ -599,11 +603,118 @@ describe('R18-11: the commit is one step; a holder paused after its last check c
     expect(() => acquireSeedLock(final, { hostname: 'this-host' })).toThrow(/in the middle of committing/);
   });
 
-  it('seed-training.ts publishes the credentials file and the marker ONLY through lock.commit (no bare assertHeld + action)', () => {
-    const src = readFileSync('scripts/seed-training.ts', 'utf8');
-    expect(src).toMatch(/lock\.commit\('the placing of the credentials file'/);
-    expect(src).toMatch(/lock\.commit\('the training marker'/);
-    expect(src).not.toMatch(/assertHeld\('the placing of the credentials file'\)/);
-    expect(src).not.toMatch(/assertHeld\('the training marker'\)/);
+  it('seed-training.ts publishes through the ONE lifecycle (publishCredentials), whose two publications are lock.commit steps (no bare assertHeld + action)', () => {
+    const seed = readFileSync('scripts/seed-training.ts', 'utf8');
+    expect(seed).toMatch(/publishCredentials\(lock, staged/);
+    expect(seed).not.toMatch(/assertHeld\('the placing of the credentials file'\)/);
+    expect(seed).not.toMatch(/discardCredentialsFile\(staged\.final\)/); // no unconditional removal of the shared final path
+    const lib = readFileSync('scripts/training-lib.ts', 'utf8');
+    expect(lib).toMatch(/lock\.commit\('the placing of the credentials file'/);
+    expect(lib).toMatch(/lock\.commit\('the training marker'/);
+  });
+});
+
+describe('R19-12: the seed publication lifecycle and the recovery of a dead mutex', () => {
+  const mk = () => {
+    const d = mkdtempSync(path.join(tmpdir(), 'bb-r19-12-'));
+    chmodSync(d, 0o700);
+    return { d, final: path.join(d, 'training-accounts.local.txt') };
+  };
+  const clockAt = (t0: number) => {
+    const c = { t: t0, now: () => c.t, heartbeatMs: 3_600_000 };
+    return c;
+  };
+
+  it("pause BETWEEN the two real publications, let a successor complete, resume the old attempt: the successor's credentials and marker stand, and nothing of the successor is removed", async () => {
+    const { d, final } = mk();
+    const c = clockAt(5_000_000);
+    const a = acquireSeedLock(final, c);
+    const stagedA = stageCredentialsFile(final, 'CREDENTIALS-OF-ATTEMPT-A', a.attempt);
+    let markerA = 0;
+    let markerB = 0;
+    let b: ReturnType<typeof acquireSeedLock> | undefined;
+    const publishingA = publishCredentials(
+      a,
+      stagedA,
+      () => void markerA++,
+      async () => {
+        // A has placed its file and stalls: its lease runs out and a successor takes the folder and completes both publications
+        expect(readFileSync(final, 'utf8')).toBe('CREDENTIALS-OF-ATTEMPT-A');
+        utimesSync(a.file, new Date(c.t), new Date(c.t));
+        c.t += 3_600_000;
+        b = acquireSeedLock(final, c);
+        const stagedB = stageCredentialsFile(final, 'CREDENTIALS-OF-ATTEMPT-B', b.attempt);
+        await publishCredentials(b, stagedB, () => void markerB++);
+        expect(readFileSync(final, 'utf8')).toBe('CREDENTIALS-OF-ATTEMPT-B');
+      },
+    );
+    // A resumes: its marker commit is refused (it no longer holds the lock) and its cleanup runs
+    await expect(publishingA).rejects.toBeInstanceOf(SeedLockError);
+    expect(markerA).toBe(0);
+    expect(markerB).toBe(1);
+    // before the fix the catch unlinked the shared final path whatever it held: the successor's completed seed would have no credentials file
+    expect(existsSync(final)).toBe(true);
+    expect(readFileSync(final, 'utf8')).toBe('CREDENTIALS-OF-ATTEMPT-B');
+    expect(readdirSync(d).filter((n) => n.startsWith('training-accounts.staging'))).toEqual([]);
+    b?.release();
+    a.release();
+  });
+
+  it('an attempt whose marker fails removes the file IT placed (and its staged copy) when nobody replaced it', async () => {
+    const { final } = mk();
+    const a = acquireSeedLock(final);
+    const staged = stageCredentialsFile(final, 'ONLY-A', a.attempt);
+    await expect(
+      publishCredentials(a, staged, () => {
+        throw new Error('marker write failed');
+      }),
+    ).rejects.toThrow(/marker write failed/);
+    expect(existsSync(final)).toBe(false);
+    expect(existsSync(staged.tmp)).toBe(false);
+    a.release();
+  });
+
+  it('a dead mutex record is removed by exactly one recoverer; a recoverer paused after its claim does NOT remove a live mutex that replaced the record', () => {
+    const { d, final } = mk();
+    const mutex = path.join(d, 'training-accounts.seed.commit');
+    const dead = spawnSync(process.execPath, ['-e', 'process.stdout.write(String(process.pid))']);
+    const deadPid = Number(dead.stdout.toString());
+    writeFileSync(mutex, JSON.stringify({ token: 'dead-token', pid: deadPid, host: 'h', at: 1 }));
+    const live = JSON.stringify({ token: 'live-token', pid: process.pid, host: 'h', at: 2 });
+    // the remover claims the dead record, then is "paused"; meanwhile another recoverer removed it and a committer created a NEW live mutex
+    let replaced = false;
+    expect(() =>
+      acquireSeedLock(final, {
+        hostname: 'h',
+        recovery: {
+          betweenClaimAndRemove: () => {
+            unlinkSync(mutex);
+            writeFileSync(mutex, live);
+            replaced = true;
+          },
+        },
+      }),
+    ).toThrow(/in the middle of committing/);
+    expect(replaced).toBe(true);
+    expect(readFileSync(mutex, 'utf8')).toBe(live); // the live mutex was NOT removed
+    unlinkSync(mutex);
+  });
+
+  it('two recoverers of the same dead record: the second cannot claim it, answers "in flight" and removes nothing; a claim whose owner died is skipped', () => {
+    const { d, final } = mk();
+    const mutex = path.join(d, 'training-accounts.seed.commit');
+    const dead = spawnSync(process.execPath, ['-e', 'process.stdout.write(String(process.pid))']);
+    const deadPid = Number(dead.stdout.toString());
+    writeFileSync(mutex, JSON.stringify({ token: 'T', pid: deadPid, host: 'h', at: 1 }));
+    // a LIVE claimer (this process) already holds the claim of that record: another recoverer must not remove it
+    writeFileSync(`${mutex}.recover.T.1`, JSON.stringify({ pid: process.pid }));
+    expect(() => acquireSeedLock(final, { hostname: 'h' })).toThrow(/in the middle of committing/);
+    expect(existsSync(mutex)).toBe(true);
+    // the claimer died: the next generation claims and recovers, and the seed can proceed
+    writeFileSync(`${mutex}.recover.T.1`, JSON.stringify({ pid: deadPid }));
+    const ok = acquireSeedLock(final, { hostname: 'h' });
+    expect(ok.held()).toBe(true);
+    expect(existsSync(mutex)).toBe(false);
+    ok.release();
   });
 });

@@ -59,8 +59,7 @@ import {
   generatePassword,
   generatePin,
   acquireSeedLock,
-  commitCredentialsFile,
-  discardCredentialsFile,
+  publishCredentials,
   renderCredentialsFile,
   stageCredentialsFile,
   SeedLockError,
@@ -621,21 +620,11 @@ export async function seedTraining(opts: SeedTrainingOptions): Promise<SeedTrain
           'The accounts exist but nobody knows their passwords and the database is not marked: remove the training volume and start again.',
       );
     }
-    let placed = false;
-    try {
-      // R18-11: each publication is ONE commit step (the commit mutex + the holder re-checked inside it), not a check followed by an action
-      await lock.commit('the placing of the credentials file', () => commitCredentialsFile(staged));
-      placed = true;
-      await lock.commit('the training marker', () =>
-        migrator.query('insert into public.training_marker default values'),
-      );
-    } catch (error) {
-      // the rename failed (commit already removed the staged file) or the marker could not be written: nothing secret stays behind.
-      // The final file is only ever removed if THIS attempt put it there: a displaced attempt never touches a file a newer seed placed.
-      discardCredentialsFile(staged.tmp);
-      if (placed) discardCredentialsFile(staged.final);
-      throw error;
-    }
+    // R19-12: placing the file, writing the marker and the conditional cleanup are ONE lifecycle (publishCredentials): each publication is one commit step,
+    // and a failed attempt removes only the file it placed itself (found by identity, under the commit mutex), never a successor's.
+    await publishCredentials(lock, staged, () =>
+      migrator.query('insert into public.training_marker default values'),
+    );
     return { applied: true, accounts: issued.length, credentialsFile: opts.credentialsFile };
   } finally {
     lock?.release();

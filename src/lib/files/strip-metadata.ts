@@ -135,14 +135,20 @@ export function stripJpeg(input: Uint8Array): Uint8Array {
     }
     if (marker === 0xe1 && scans === 0 && tag(payload, 0) === 'Exif') {
       orientation ??= exifOrientation(payload.subarray(6));
-    } else if (marker === 0xe0 || marker === 0xdb || marker === 0xc4 || marker === 0xdd || marker === 0xee) {
-      out.push(segment); // JFIF, quantization, Huffman, restart interval, Adobe colour
-    } else if (marker === 0xe2 && ascii12(payload) === 'ICC_PROFILE\0') {
-      out.push(segment);
+    } else if (marker === 0xe0) {
+      // R19-11: the JFIF header is REBUILT (version, units and density kept; the thumbnail dimensions zeroed and the thumbnail bytes dropped). A JFXX extension
+      // (an embedded thumbnail that is a JPEG of its own, with its own EXIF) and any other APP0 are dropped.
+      const jfif = jfifSegment(payload);
+      if (jfif) out.push(jfif);
+    } else if (marker === 0xee) {
+      // Adobe colour transform: only the exact 12-byte form (identifier, version, two flags, transform); anything longer could hold text
+      if (payload.length === 12 && tag(payload, 0) === 'Adob' && payload[4] === 0x65) out.push(segment);
+    } else if (marker === 0xdb || marker === 0xc4 || marker === 0xdd) {
+      out.push(segment); // quantization, Huffman, restart interval
     } else if ((marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8) || marker === 0xdc) {
       out.push(segment); // frame headers (and the number-of-lines definition)
     }
-    // every other APPn (an Exif after the first scan included), COM and unknown segment is dropped
+    // every other APPn (an Exif after the first scan included; an ICC profile, whose description and creator are text, R19-11; the multi-picture index), COM and unknown segment is dropped
     at += length;
   }
   if (scans === 0) throw new CorruptFileError('no image data');
@@ -154,7 +160,27 @@ export function stripJpeg(input: Uint8Array): Uint8Array {
   return Buffer.concat(out);
 }
 
-const ascii12 = (b: Uint8Array) => String.fromCharCode(...b.subarray(0, 12));
+/** A clean JFIF APP0 from an original one: "JFIF\0", version, units, densities, and a 0 x 0 thumbnail. Null when the segment is not a JFIF header. */
+function jfifSegment(payload: Uint8Array): Uint8Array | null {
+  if (payload.length < 14 || tag(payload, 0) !== 'JFIF' || payload[4] !== 0) return null;
+  const body = Uint8Array.from([
+    0x4a,
+    0x46,
+    0x49,
+    0x46,
+    0x00, // "JFIF\0"
+    payload[5]!,
+    payload[6]!, // version
+    payload[7]!, // units
+    payload[8]!,
+    payload[9]!,
+    payload[10]!,
+    payload[11]!, // X and Y density
+    0x00,
+    0x00, // no thumbnail
+  ]);
+  return Uint8Array.from([0xff, 0xe0, 0x00, body.length + 2, ...body]);
+}
 
 const PNG_KEEP = new Set([
   'IHDR',
@@ -165,7 +191,6 @@ const PNG_KEEP = new Set([
   'gAMA',
   'cHRM',
   'sRGB',
-  'iCCP',
   'sBIT',
   'pHYs',
   'bKGD',
@@ -198,7 +223,28 @@ export function stripPng(input: Uint8Array): Uint8Array {
   return Buffer.concat(out);
 }
 
-const WEBP_KEEP = new Set(['VP8 ', 'VP8L', 'VP8X', 'ALPH', 'ANIM', 'ANMF', 'ICCP']);
+// R19-11: no ICCP (a profile's description and creator are text); an animation frame (ANMF) is rebuilt from its header and its picture sub-chunks only
+const WEBP_KEEP = new Set(['VP8 ', 'VP8L', 'VP8X', 'ALPH', 'ANIM', 'ANMF']);
+const WEBP_FRAME_KEEP = new Set(['VP8 ', 'VP8L', 'ALPH']);
+
+/** An animation frame: its 16-byte header, then only the picture sub-chunks (alpha, lossy, lossless); every other sub-chunk is dropped. */
+function rebuildFrame(payload: Uint8Array): Buffer {
+  if (payload.length < 16) throw new CorruptFileError('bad frame');
+  const kept: Buffer[] = [Buffer.from(payload.subarray(0, 16))];
+  let at = 16;
+  while (at + 8 <= payload.length) {
+    const size = u32le(payload, at + 4);
+    const padded = size + (size % 2);
+    if (at + 8 + padded > payload.length) throw new CorruptFileError('bad frame chunk');
+    if (WEBP_FRAME_KEEP.has(tag(payload, at))) kept.push(Buffer.from(payload.subarray(at, at + 8 + padded)));
+    at += 8 + padded;
+  }
+  const body = Buffer.concat(kept);
+  const head = Buffer.alloc(8);
+  head.write('ANMF', 0, 'ascii');
+  head.writeUInt32LE(body.length, 4);
+  return Buffer.concat([head, body]); // sizes are even: every kept sub-chunk is padded
+}
 
 export function stripWebp(input: Uint8Array): Uint8Array {
   if (input.length < 12) throw new CorruptFileError('truncated');
@@ -212,9 +258,10 @@ export function stripWebp(input: Uint8Array): Uint8Array {
     if (at + 8 + padded > declared) throw new CorruptFileError('bad chunk size');
     const type = tag(input, at);
     if (WEBP_KEEP.has(type)) {
-      const chunk = Buffer.from(input.subarray(at, at + 8 + padded));
-      // The extended header says which metadata chunks follow: clear EXIF (0x08) and XMP (0x04).
-      if (type === 'VP8X' && size >= 10) chunk[8] = chunk[8]! & ~0x0c;
+      let chunk: Buffer = Buffer.from(input.subarray(at, at + 8 + padded));
+      // The extended header says which metadata chunks follow: clear the ICC profile (0x20), EXIF (0x08) and XMP (0x04) flags.
+      if (type === 'VP8X' && size >= 10) chunk[8] = chunk[8]! & ~0x2c;
+      if (type === 'ANMF') chunk = rebuildFrame(input.subarray(at + 8, at + 8 + size));
       out.push(chunk);
     }
     at += 8 + padded;

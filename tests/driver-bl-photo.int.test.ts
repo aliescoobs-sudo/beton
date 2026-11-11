@@ -24,7 +24,14 @@ import { ForbiddenError } from '../src/modules/platform-security';
 import type { SessionUser } from '../src/modules/platform-security/auth/session-gate';
 import { authTestKit } from './auth-helpers';
 import { realSessionUser } from './helpers/actors';
-import { JPEG_CANARIES, jpegMultiScan, jpegWithGps, simplePdf } from './helpers/file-fixtures';
+import {
+  JPEG_CANARIES,
+  jpegMultiScan,
+  jpegNestedMetadata,
+  jpegWithGps,
+  NESTED_CANARIES,
+  simplePdf,
+} from './helpers/file-fixtures';
 import { deliveryScene } from './helpers/ledger-fixtures';
 
 // C3 (REQUIREMENTS-V1 §7 step 5): the driver's optional photo of the signed BL. Written by one door for the driver of the rotation,
@@ -217,6 +224,24 @@ describe('the driver photo of the signed BL (C3)', () => {
       .rows[0];
     expect(createHash('sha256').update(bytes).digest('hex')).toBe(row.sha256);
     expect(Number(row.size_bytes)).toBe(bytes.length);
+  });
+
+  it('R19-11: a JPEG with a JFIF thumbnail, a JFXX thumbnail picture with its own GPS, an ICC profile text and a multi-picture index is sealed WITHOUT them', async () => {
+    const d = await driverSession();
+    const t = await trip(d.id, true);
+    const upload = { declaredType: 'image/jpeg', bytes: new Uint8Array(jpegNestedMetadata()) };
+    for (const canary of NESTED_CANARIES)
+      expect(Buffer.from(upload.bytes).includes(canary), canary).toBe(true);
+    expect((await attachDriverBlPhoto(app, d.user, shot(t), upload, { store })).ok).toBe(true);
+    const id = (await migrator.query(`select id from driver_bl_photo where trip_id = $1`, [t])).rows[0].id;
+    const opened = await openDriverBlPhoto(app, owner, id, { store });
+    expect(opened.ok).toBe(true);
+    if (!opened.ok) return;
+    const bytes = Buffer.from(opened.value.bytes);
+    for (const canary of NESTED_CANARIES) expect(bytes.includes(canary), canary).toBe(false);
+    expect(bytes.includes('GPS-LAT')).toBe(false);
+    expect(bytes.subarray(0, 2).equals(Buffer.from([0xff, 0xd8]))).toBe(true);
+    expect(bytes.subarray(bytes.length - 2).equals(Buffer.from([0xff, 0xd9]))).toBe(true);
   });
 
   it('leaves no row when the file cannot be sealed', async () => {
