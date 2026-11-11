@@ -38,6 +38,9 @@ export default defineConfig({
           include: ['src/**/*.int.test.ts', 'tests/**/*.int.test.ts'],
           globalSetup: ['tests/setup-db.ts'],
           fileParallelism: false,
+          // T11b: a shared CI runner is slower than a developer machine; two suites (second-factor hashing, plant views) passed the 5 s default
+          // only on an idle machine. A real hang still fails, 20 s later.
+          testTimeout: 20_000,
         },
       },
     ],

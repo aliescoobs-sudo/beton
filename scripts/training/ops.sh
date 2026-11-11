@@ -2,6 +2,8 @@
 # Runs one maintenance job of the training instance in the ops container, with plain node, and RECORDS what ran (R18-11).
 #   ./scripts/training/ops.sh db-bootstrap | db-migrate | seed-training | reset-training | rearm-training [args…]
 #   ./scripts/training/ops.sh --prepare-out        (makes the credentials folder of the ops container: the one job that runs as root)
+#   OPS_TWIN_DIR=$HOME/KAYAS-twin ./scripts/training/ops.sh import-history --dry-run /twin/tetouan --mapping /twin/mapping/deliveries-tetouan.json
+#     (T11b: the fictitious twin folder, made by `pnpm import:twin`, is mounted READ-ONLY at /twin; nothing else of the host is reachable)
 # R17-01: the image check (a shell APP_IMAGE, a second env file's APP_IMAGE, extra compose options, the images compose resolves for app AND ops)
 # is made by dc.sh on every call, so the privileged ops container can only run the validated digest.
 # R18-11: the ops container is run-once and removed, so after the job nothing showed which image it had been. This wrapper runs it UNDER A NAME
@@ -41,6 +43,14 @@ line() {
 }
 record() { line "$@" >> "$evidence" || { echo "ops.sh: could not write the execution evidence: the job was not run (or its record is incomplete)" >&2; return 1; }; }
 
+# T11b: an optional read-only mount of the twin folder (an absolute path to an existing directory; the twin holds fictitious files only)
+mount=()
+if [ -n "${OPS_TWIN_DIR:-}" ]; then
+  case "$OPS_TWIN_DIR" in /*) ;; *) echo "ops.sh: OPS_TWIN_DIR must be an absolute path" >&2; exit 1 ;; esac
+  case "$OPS_TWIN_DIR" in *[!A-Za-z0-9._/-]*) echo "ops.sh: OPS_TWIN_DIR has unexpected characters" >&2; exit 1 ;; esac
+  [ -d "$OPS_TWIN_DIR" ] || { echo "ops.sh: OPS_TWIN_DIR is not a directory" >&2; exit 1; }
+  mount=(-v "$OPS_TWIN_DIR:/twin:ro")
+fi
 job="$mode"
 [ "$mode" = "--prepare-out" ] && job="prepare-out"
 name="kayas-ops-$(date -u +%Y%m%dT%H%M%SZ)-$$"
@@ -56,7 +66,7 @@ started=yes
 if [ "$mode" = "--prepare-out" ]; then
   "$dc" run --name "$name" -T --user root ops sh -c 'mkdir -p /app/out && chown 10001:10001 /app/out && chmod 700 /app/out' || rc=$?
 else
-  "$dc" run --name "$name" -T ops node --import ./scripts/register-ts-paths.mjs "scripts/${mode}.ts" "$@" || rc=$?
+  "$dc" run --name "$name" -T ${mount[@]+"${mount[@]}"} ops node --import ./scripts/register-ts-paths.mjs "scripts/${mode}.ts" "$@" || rc=$?
 fi
 
 # what the finished container really was (a failed query is a failure, never "unknown but fine")

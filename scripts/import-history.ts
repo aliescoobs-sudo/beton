@@ -64,8 +64,14 @@ const environment = {
   realData: env.REAL_DATA,
   simulationEnabled: env.SIMULATION_ENABLED,
 };
-const logReport = (name: string, text: string) =>
-  console.log(`(report saved in ${writePrivateReport('.logs', name, text, realClock.now())})`);
+// T11b: a folder that cannot be written (the read-only ops container) must not turn a finished import into an error exit: the report is on stdout.
+const logReport = (name: string, text: string) => {
+  try {
+    console.log(`(report saved in ${writePrivateReport('.logs', name, text, realClock.now())})`);
+  } catch {
+    console.log('(report not saved: the .logs folder is not writable here; the report above is the record)');
+  }
+};
 
 const appPool = new pg.Pool({ connectionString: env.DATABASE_URL_APP, max: 2 });
 const authPool = new pg.Pool({ connectionString: env.DATABASE_URL_AUTH, max: 1 });

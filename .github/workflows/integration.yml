@@ -1,0 +1,59 @@
+# Integration tests (vitest project "integration") against a throwaway PostgreSQL 17 service container: the same migrations and the same
+# test-database setup as a developer machine (tests/setup-db.ts creates the roles, drops and recreates belgobeton_test, runs every migration,
+# seeds the pilot master data). No e2e here (it needs a production build and ~40 minutes). Secrets are random per run and CI-only.
+name: Integration tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration:
+    name: Integration tests (PostgreSQL 17)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    services:
+      db:
+        image: postgres:17.11-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci-only-throwaway-superuser-password
+          POSTGRES_DB: postgres
+          POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      # poppler: the same real PDF renderer as the unit job. age + a PostgreSQL 17 client: the backup/restore suite seals with age and runs
+      # pg_dump against the version 17 service (a version 16 client refuses a version 17 server).
+      - name: Tools (poppler, age, PostgreSQL 17 client)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends poppler-utils age postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y --no-install-recommends postgresql-client-17
+          echo /usr/lib/postgresql/17/bin >> "$GITHUB_PATH"
+      - name: Environment (random, CI-only)
+        run: PGSUPER=ci-only-throwaway-superuser-password scripts/ci/integration-env.sh localhost 5432 >> "$GITHUB_ENV"
+      - run: pnpm exec vitest run --project integration
+        env:
+          REQUIRE_PDF_RENDERER: '1'
