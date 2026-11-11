@@ -131,7 +131,7 @@ describe('the history reader refuses a package whose main workbook part cannot b
           mode,
           stepUp:
             mode === 'apply'
-              ? { userId: A.owner.id, operation: historyConfirmation(read.setSha).operation }
+              ? { userId: A.owner.id, operation: historyConfirmation(read.setSha, '0'.repeat(64)).operation }
               : undefined,
         }).then(
           (r) => ({ applied: r.applied }),

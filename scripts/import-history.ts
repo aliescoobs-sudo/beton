@@ -170,9 +170,9 @@ try {
       );
       process.exitCode = 1;
     } else {
-      const conf = historyConfirmation(first.setSha);
+      const conf = historyConfirmation(first.setSha, first.decisionsSha);
       console.log(
-        `Confirmation covers: set ${first.setSha} (the files' bytes, the kind, the plant and the mapping).`,
+        `Confirmation covers: set ${first.setSha} (the files' bytes, the kind, the plant and the mapping) and decisions ${first.decisionsSha} (every mapping and correction the set uses).`,
       );
       if ((await prompt.ask(`Type ${conf.phrase} to apply: `)) !== conf.phrase)
         throw new ImportRefused('STEP_UP_REQUIRED', 'Confirmation not typed: nothing was written.');

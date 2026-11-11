@@ -2708,6 +2708,7 @@
     "signOutPending": "{count} élément(s) n'ont pas encore pu être envoyés et seront effacés de ce téléphone si vous vous déconnectez. Se déconnecter quand même ?",
     "signOutPendingUnknown": "Au moins {count} élément(s) n'ont pas pu être envoyés, et certaines photos n'ont pas pu être lues : on ne sait pas combien il en reste. Elles peuvent être effacées de ce téléphone si vous vous déconnectez. Se déconnecter quand même ?",
     "eraseIncomplete": "L'effacement des données de ce téléphone n'est pas terminé. Ne considérez pas le téléphone comme vidé.",
+    "eraseNotPersisted": "L'effacement de ce téléphone n'est pas terminé et ce téléphone ne peut pas le mémoriser : si vous rechargez la page, il sera oublié. Ne rechargez pas, ne passez pas ce téléphone à quelqu'un d'autre, et prévenez le bureau.",
     "eraseRetry": "Réessayer l'effacement",
     "legacyPending": "Un ancien onglet de l'application garde des données sur ce téléphone : fermez-le, elles seront alors supprimées.",
     "timing": {

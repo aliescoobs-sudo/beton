@@ -253,6 +253,25 @@ export function reserveEpoch(): Promise<number> {
     };
   });
 }
+/**
+ * R19-06: the record of an erase that is still OWED, kept in the photo database's meta store as well as in localStorage, so a phone whose localStorage refuses
+ * writes (full, blocked, private mode) still remembers the debt after a reload. `null` clears it. Test seam: the 'owed-write' point can be made to fail.
+ */
+export async function saveOwedRecord(json: string | null): Promise<void> {
+  if (hooks()?.fail?.('owed-write')) throw new Error('owed record not written');
+  await meta<void>((s, done) => {
+    if (json === null) s.delete('owed');
+    else s.put(json, 'owed');
+    done();
+  });
+}
+export async function loadOwedRecord(): Promise<string | null> {
+  return meta<string | null>((s, done) => {
+    const get = s.get('owed');
+    get.onsuccess = () => done(typeof get.result === 'string' ? get.result : null);
+    get.onerror = () => done(null);
+  });
+}
 const currentEpoch = (): Promise<number> =>
   meta<number>((s, done) => {
     const get = s.get('epoch');
@@ -632,7 +651,7 @@ export interface WipeResult {
   complete: boolean;
   legacy: LegacyOutcome | 'none';
   /** Which steps failed: the migration of the former database, the new store, the former store. */
-  failed: ('migrate' | 'new-store' | 'legacy-store' | 'lock')[];
+  failed: ('migrate' | 'new-store' | 'legacy-store' | 'lock' | 'local-storage')[];
 }
 
 /**

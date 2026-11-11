@@ -60,6 +60,8 @@ export interface DayPorts<D extends { userId: string }> {
     setDay(day: D | null): void;
     /** T10c: an erase of the phone's local data is not proven finished (true), or is (false). Never claims an erasure that did not happen. */
     setEraseIncomplete?(incomplete: boolean): void;
+    /** R19-06: the debt of an erase could not be written to ANY durable place of the phone: a reload would forget it. The screen says so. */
+    setEraseNotPersisted?(notPersisted: boolean): void;
     setSession(session: 'unknown' | 'out' | 'in'): void;
     setOnline(online: boolean): void;
     /** After another account took over the phone: its taps and photo counts are gone. */
@@ -135,6 +137,9 @@ export function createDayController<D extends { userId: string }>(ports: DayPort
   const reportErase = (r: unknown): void => {
     const done = typeof r === 'object' && r !== null && (r as { complete?: unknown }).complete !== false;
     ports.ui.setEraseIncomplete?.(!done);
+    ports.ui.setEraseNotPersisted?.(
+      typeof r === 'object' && r !== null && (r as { persistFailed?: unknown }).persistFailed === true,
+    );
   };
   const cleanup = (job: () => Promise<void>) => {
     void job().catch(() => undefined); // independent of the screen and of the next read (rule 2)

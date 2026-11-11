@@ -31,17 +31,21 @@ import {
   type MonthStats,
   type SheetStats,
 } from '../domain/parse';
+import { HISTORY_LOCK_SQL } from './lock';
 import { type FileReport, type InputFile, labelUsage, readSet, type SetRead } from './read-set';
 
 // T11 (decision 211): stage, dry-run, apply and rollback of the history importer. The history is its OWN layer (schema `history`): nothing here
 // writes to stock, invoices, the ledger, trips, orders or dispatch. One audited transaction, serialized by an advisory lock, bound to the typed
 // phrase and the second factor of the operation (the same machinery as the T2 importer). Reports carry counts and row numbers, never a cell.
 
-const HISTORY_LOCK_SQL = `select pg_advisory_xact_lock(hashtextextended('belgobeton:history-import', 0))`;
-
-export const historyConfirmation = (setSha: string) => ({
-  phrase: `HISTORY ${setSha}`,
-  operation: `history:${setSha}`,
+/**
+ * R19-07: the confirmation covers the files (their bytes), the kind, the plant and the mapping (`setSha`) AND the exact effective staging decisions
+ * (`decisionsSha`: every label mapping the set uses and every quarantine decision and correction). A decision changed after the confirmation was given
+ * changes the hash, and the apply refuses with nothing written.
+ */
+export const historyConfirmation = (setSha: string, decisionsSha: string) => ({
+  phrase: `HISTORY ${setSha} ${decisionsSha.slice(0, 16)}`,
+  operation: `history:${setSha}:${decisionsSha}`,
 });
 export const historyRollbackConfirmation = (batchId: string) => ({
   phrase: `HISTORY-ROLLBACK ${batchId}`,
@@ -51,6 +55,8 @@ export const historyRollbackConfirmation = (batchId: string) => ({
 export interface HistoryReport {
   mode: 'dry-run' | 'stage' | 'apply';
   setSha: string;
+  /** R19-07: the hash of the effective staging decisions at the moment of this run (what an apply confirmation must cover). */
+  decisionsSha: string;
   /** The operation the typed phrase and the second factor are bound to (apply). */
   operation: string;
   kind: HistoryMapping['kind'];
@@ -182,7 +188,13 @@ async function fixedRows(
   tx: pg.PoolClient,
   setSha: string,
   mapping: HistoryMapping,
-): Promise<{ deliveries: DeliveryRow[]; expenses: ExpenseRow[]; invalid: number; open: number }> {
+): Promise<{
+  deliveries: DeliveryRow[];
+  expenses: ExpenseRow[];
+  invalid: number;
+  open: number;
+  decisions: unknown[];
+}> {
   const { rows } = await tx.query<{
     file_ord: number;
     sheet_pos: number;
@@ -194,8 +206,15 @@ async function fixedRows(
     `select file_ord, sheet_pos, row_no, raw, fixed, status from history.quarantine where set_sha = $1 and kind = $2 order by file_ord, sheet_pos, row_no`,
     [setSha, mapping.kind],
   );
-  const out = { deliveries: [] as DeliveryRow[], expenses: [] as ExpenseRow[], invalid: 0, open: 0 };
+  const out = {
+    deliveries: [] as DeliveryRow[],
+    expenses: [] as ExpenseRow[],
+    invalid: 0,
+    open: 0,
+    decisions: [] as unknown[],
+  };
   for (const q of rows) {
+    out.decisions.push([q.file_ord, q.sheet_pos, q.row_no, q.status, q.fixed]);
     if (q.status === 'open') out.open++;
     if (q.status !== 'fixed' || !q.fixed) continue;
     const src = { file: q.file_ord, sheet: q.sheet_pos, row: q.row_no };
@@ -238,17 +257,17 @@ const str = (v: string) => (v === '' ? null : v);
 export async function runHistory(opts: HistoryOptions): Promise<HistoryReport> {
   const { mapping } = opts;
   const read = readSet(opts.files, mapping);
-  const conf = historyConfirmation(read.setSha);
-  assertActor(opts.actor, opts.mode === 'apply' ? 'apply' : 'dry-run', {
-    given: opts.stepUp,
-    operation: conf.operation,
-  });
+  // the role first; the proof of an apply is checked below, once the effective decisions are known (it covers them)
+  assertActor(opts.actor, 'dry-run');
+  if (opts.mode === 'apply' && opts.actor.stepUpVerified !== true)
+    assertActor(opts.actor, 'apply', { given: opts.stepUp, operation: '' });
   await assertHistoryEnvironment(opts.appPool, opts.environment, read.facts);
   const t = totalsOf(read);
   const report: HistoryReport = {
     mode: opts.mode,
     setSha: read.setSha,
-    operation: conf.operation,
+    decisionsSha: '',
+    operation: '',
     kind: mapping.kind,
     batchId: null,
     staged: false,
@@ -303,7 +322,7 @@ export async function runHistory(opts: HistoryOptions): Promise<HistoryReport> {
       ).rows[0];
       const fixed = batch
         ? await fixedRows(tx, read.setSha, mapping)
-        : { deliveries: [], expenses: [], invalid: 0, open: 0 };
+        : { deliveries: [], expenses: [], invalid: 0, open: 0, decisions: [] as unknown[] };
       // the rows that will be written: the readable ones and the quarantined ones the owner fixed (not the open or discarded ones)
       const effective: SetRead = {
         ...read,
@@ -312,18 +331,17 @@ export async function runHistory(opts: HistoryOptions): Promise<HistoryReport> {
         expenses: [...read.expenses, ...fixed.expenses],
       };
       // staging and the dry run also list the labels of quarantined rows (the owner decides them up front); the apply checks only what it writes
-      const usage = labelUsage(
-        opts.mode === 'apply' ? effective : { ...effective, quarantine: read.quarantine },
-      );
+      const usageAll = labelUsage({ ...effective, quarantine: read.quarantine });
+      const usage = opts.mode === 'apply' ? labelUsage(effective) : usageAll;
       const known = new Map<string, LabelRow>();
-      for (const kind of new Set([...usage.values()].map((u) => u.kind))) {
+      for (const kind of new Set([...usageAll.values()].map((u) => u.kind))) {
         const { rows } = await tx.query<LabelRow>(
           `select kind, key, status, client_id, truck_id, driver_id, canonical, label from history.label_map where kind = $1`,
           [kind],
         );
         for (const r of rows) known.set(`${r.kind}\u0000${r.key}`, r);
       }
-      return { plant, batch, fixed, effective, usage, known };
+      return { plant, batch, fixed, effective, usage, usageAll, known };
     });
     // R19-03: on the training instance the EFFECTIVE values that will be written (the readable rows and the corrections the owner made after staging) are
     // validated again against what the twin can write; a marker proved nothing at stage time and a correction is typed text.
@@ -337,6 +355,47 @@ export async function runHistory(opts: HistoryOptions): Promise<HistoryReport> {
           'ENVIRONMENT',
           `A value to write is outside what the twin generator can write (fields: ${[...new Set(bad)].join(', ')}): refused on the training instance.`,
         );
+    }
+    // R19-07: the effective decisions, read under the history lock in this transaction: every label the set uses (as decided, or as it would start) and every
+    // quarantine decision and correction of the set. The confirmation of an apply must cover exactly this.
+    report.decisionsSha = createHash('sha256')
+      .update(
+        stableJson({
+          v: 1,
+          labels: [...state.usageAll.keys()].sort().map((id) => {
+            const r = state.known.get(id);
+            return [
+              id,
+              r
+                ? [
+                    r.status,
+                    r.client_id ?? null,
+                    r.truck_id ?? null,
+                    r.driver_id ?? null,
+                    r.canonical ?? null,
+                  ]
+                : 'undecided',
+            ];
+          }),
+          quarantine: state.fixed.decisions,
+        }),
+      )
+      .digest('hex');
+    {
+      const conf = historyConfirmation(read.setSha, report.decisionsSha);
+      report.operation = conf.operation;
+      // a batch already applied is only reported (nothing is written): its decisions moved when it was applied, and the proof of the run that applied it stands
+      if (opts.mode === 'apply' && state.batch?.status !== 'applied') {
+        if (
+          opts.stepUp?.operation?.startsWith(`history:${read.setSha}:`) &&
+          opts.stepUp.operation !== conf.operation
+        )
+          throw new ImportRefused(
+            'STEP_UP_REQUIRED',
+            'The staging decisions (mappings or corrections) changed after the confirmation was given: nothing was done.',
+          );
+        assertActor(opts.actor, 'apply', { given: opts.stepUp, operation: conf.operation });
+      }
     }
     if (mapping.plantCode && !state.plant)
       report.problems.push(`PLANT_UNKNOWN: no active plant has the configured code`);
@@ -601,7 +660,7 @@ export async function runHistory(opts: HistoryOptions): Promise<HistoryReport> {
             }
             await tx.query(
               `update history.batch set status = 'applied', applied_by = $2, applied_at = clock_timestamp(), operation = $3, counts = $4 where id = $1`,
-              [bid, opts.actor.id, conf.operation, JSON.stringify(report.created)],
+              [bid, opts.actor.id, report.operation, JSON.stringify(report.created)],
             );
             // the hash and the counts, never a cell of the files
             await recordAuditEvent(tx, {
@@ -611,7 +670,7 @@ export async function runHistory(opts: HistoryOptions): Promise<HistoryReport> {
               after: {
                 batch_id: bid,
                 set_sha: read.setSha,
-                operation: conf.operation,
+                operation: report.operation,
                 kind: mapping.kind,
                 created: report.created,
                 quarantined_fixed: state.fixed.deliveries.length + state.fixed.expenses.length,
@@ -640,6 +699,8 @@ export interface HistoryRollbackReport {
   batchId: string;
   alreadyRolledBack: boolean;
   archivedClients: number;
+  /** R19-08: clients this batch created that are KEPT active because something outside the batch uses them (a later order, a quote, an invoice...) or another batch's history is attributed to them. */
+  retainedClients: number;
   blocked: string[];
 }
 
@@ -660,6 +721,7 @@ export async function rollbackHistory(opts: {
     batchId: opts.batchId,
     alreadyRolledBack: false,
     archivedClients: 0,
+    retainedClients: 0,
     blocked: [],
   };
   const rollbackId = uuidv7(realClock.now());
@@ -707,7 +769,38 @@ export async function rollbackHistory(opts: {
         `select row_id from audit_event where action = 'insert' and table_name = 'client' and request_id like $1`,
         [`${RUN_TAG_PREFIX}${opts.batchId}|%`],
       );
+      // R19-08: a client the batch created is archived only when NOTHING ELSE uses it. Anything that references it from outside this batch (a later order, quote,
+      // invoice, credit note, payment instrument, pump job, price, site, credit limit, opening balance), or another live batch's history attributed to it, keeps it
+      // active: reversing an unrelated historical batch must not take a live client out of new orders. The mapping of its label stays as it is (it stays usable).
+      const REFERENCES = [
+        'avoir',
+        'client_credit_limit',
+        'client_site',
+        'invoice',
+        'opening_party_balance',
+        'payment_instrument',
+        'pump_job',
+        'quote',
+        'sales_order',
+        'selling_price',
+      ];
+      const usedElsewhere = async (id: string): Promise<boolean> => {
+        for (const table of REFERENCES) {
+          const r = await tx.query(`select 1 from public.${table} where client_id = $1 limit 1`, [id]);
+          if (r.rowCount) return true;
+        }
+        const other = await tx.query(
+          `select 1 from history.delivery d join history.batch ob on ob.id = d.batch_id
+            where d.client_id = $1 and d.batch_id <> $2 and ob.status <> 'rolled_back' limit 1`,
+          [id, opts.batchId],
+        );
+        return (other.rowCount ?? 0) > 0;
+      };
       for (const { row_id: id } of made.rows) {
+        if (await usedElsewhere(id)) {
+          report.retainedClients++;
+          continue;
+        }
         const done = await tx.query(
           `update client set status = 'archived' where id = $1 and status = 'active' returning id`,
           [id],
@@ -728,7 +821,11 @@ export async function rollbackHistory(opts: {
         action: 'reverse',
         table: 'history_import',
         rowId: opts.batchId,
-        after: { batch_id: opts.batchId, archived_clients: report.archivedClients },
+        after: {
+          batch_id: opts.batchId,
+          archived_clients: report.archivedClients,
+          retained_clients: report.retainedClients,
+        },
         reason: 'history import rollback',
       });
     });

@@ -8,7 +8,8 @@ const m3 = (litres: number) => `${Math.floor(litres / 1000)}.${String(litres % 1
 export function formatHistoryReport(r: HistoryReport): string {
   const out: string[] = [];
   out.push(`History import (${r.mode}) of ${r.kind}: set ${r.setSha}`);
-  out.push(`Typed phrase for apply: HISTORY ${r.setSha}`);
+  out.push(`Decisions: ${r.decisionsSha}`);
+  out.push(`Typed phrase for apply: HISTORY ${r.setSha} ${r.decisionsSha.slice(0, 16)}`);
   for (const p of r.problems) out.push(`PROBLEM ${p}`);
   for (const f of r.files) {
     out.push(
@@ -67,7 +68,7 @@ export function formatHistoryRollback(r: HistoryRollbackReport): string {
     `History rollback of batch ${r.batchId}`,
     r.alreadyRolledBack
       ? 'Already rolled back: nothing was done.'
-      : `Archived clients created by the batch: ${r.archivedClients}`,
+      : `Archived clients created by the batch: ${r.archivedClients}; kept active because something else uses them: ${r.retainedClients}`,
     ...r.blocked.map((b) => `BLOCKED ${b}`),
     'The rows stay (no report reads them); staging decisions are kept. Nothing was deleted.',
   ].join('\n');

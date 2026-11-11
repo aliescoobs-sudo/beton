@@ -6,7 +6,9 @@ import type { WipeScope } from './day-controller';
 import {
   legacyCleanupPending,
   LEGACY_PENDING_KEY,
+  loadOwedRecord,
   reserveEpoch,
+  saveOwedRecord,
   wipePhotos,
   type WipeResult,
 } from './photo-queue';
@@ -44,9 +46,19 @@ async function wipeCaches(): Promise<void> {
   }
 }
 
+/** R19-06: a blocked or full localStorage can throw even on a removal; the erase goes on with the other stores and reports what it could not do. */
+function safeRemove(key: string): boolean {
+  try {
+    localStorage.removeItem(key);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** The day read from the server and the service worker's caches: everything that shows a client. The queued work stays. */
 export async function forgetRead(): Promise<void> {
-  localStorage.removeItem(DAY_KEY);
+  safeRemove(DAY_KEY);
   await wipeCaches();
 }
 
@@ -70,6 +82,8 @@ interface Owed {
  */
 let memoryOwed: Owed[] = [];
 let persistFailedLast = false;
+/** R19-06: has the durable (IndexedDB) copy of the debt been written, last time? */
+let durableOk = true;
 const storedOwed = (): Owed[] => {
   try {
     const v = JSON.parse(localStorage.getItem(ERASE_PENDING_KEY) ?? '[]') as unknown;
@@ -85,19 +99,40 @@ const pendingOwed = (): Owed[] => {
 const sameScope = (a: WipeScope, b: WipeScope) => JSON.stringify(a) === JSON.stringify(b);
 /** Is an erase still owed on this phone? (From the persistent flag, so it survives a reload.) */
 export const erasePending = (): boolean => pendingOwed().length > 0;
-function setPending(owed: Owed, complete: boolean): void {
+/**
+ * R19-06: reads the debt back from the second, durable place after a reload. Call it before asking `erasePending()` on a fresh page.
+ * A debt found there joins the memory; nothing is lost when localStorage was the store that refused.
+ */
+export async function hydrateOwed(): Promise<void> {
+  try {
+    const v = JSON.parse((await loadOwedRecord()) ?? '[]') as unknown;
+    if (Array.isArray(v))
+      for (const o of v as Owed[])
+        if (!memoryOwed.some((m) => sameScope(m.scope, o.scope))) memoryOwed.push(o);
+  } catch {
+    // the durable copy cannot be read: the debt in localStorage and in memory still stands
+  }
+}
+async function setPending(owed: Owed, complete: boolean): Promise<void> {
   const rest = pendingOwed().filter((o) => !sameScope(o.scope, owed.scope));
   const next = complete ? rest : [...rest, owed];
   memoryOwed = next; // the memory always holds the truth of this page
+  let lsOk = true;
   try {
     if (next.length) localStorage.setItem(ERASE_PENDING_KEY, JSON.stringify(next));
     else localStorage.removeItem(ERASE_PENDING_KEY);
-    persistFailedLast = false;
-    if (!next.length) memoryOwed = [];
   } catch {
-    // R18-06: not durable. Kept in memory and SURFACED, never silently dropped.
-    persistFailedLast = true;
+    lsOk = false;
   }
+  // R19-06: the second durable place. The debt is "not persisted" only when NEITHER place took it.
+  try {
+    await saveOwedRecord(next.length ? JSON.stringify(next) : null);
+    durableOk = true;
+  } catch {
+    durableOk = false;
+  }
+  persistFailedLast = !lsOk && !durableOk;
+  if (!next.length && lsOk && durableOk) memoryOwed = [];
 }
 /** Was the last change of the owed-erase record impossible to persist? A reload would then forget that an erase is owed. */
 export const erasePendingNotPersisted = (): boolean => persistFailedLast && memoryOwed.length > 0;
@@ -112,15 +147,15 @@ export async function forgetAll(
   scope: WipeScope = 'everything',
   retryCutoff: number | null = null,
 ): Promise<ForgetResult> {
-  localStorage.removeItem(DAY_KEY);
-  localStorage.removeItem(QUEUE_KEY);
+  // R19-06: guarded. A removal that throws leaves the queue/day where they are, so the erase must be reported as owed, not abandoned before the debt is recorded.
+  const removed = [safeRemove(DAY_KEY), safeRemove(QUEUE_KEY)].every(Boolean);
   // The owed erase is written BEFORE the work starts: if the page dies in the middle, the next load still knows.
   let cutoff: number;
   try {
     // R15A-03: the cutoff is taken before any wait of the photo erase. Whatever is queued after this moment is not this wipe's to erase.
     cutoff = retryCutoff ?? (await reserveEpoch());
   } catch {
-    setPending({ scope, cutoff: null }, false);
+    await setPending({ scope, cutoff: null }, false);
     return {
       complete: false,
       legacyCleanupPending: legacyCleanupPending(),
@@ -128,20 +163,21 @@ export async function forgetAll(
       persistFailed: erasePendingNotPersisted(),
     };
   }
-  setPending({ scope, cutoff }, false);
+  await setPending({ scope, cutoff }, false);
   await wipeCaches();
   const wiped = await wipePhotos(scope, cutoff);
-  setPending({ scope, cutoff }, wiped.complete);
+  await setPending({ scope, cutoff }, wiped.complete && removed);
   return {
-    complete: wiped.complete,
+    complete: wiped.complete && removed,
     legacyCleanupPending: legacyCleanupPending(),
-    failed: wiped.failed,
+    failed: removed ? wiped.failed : [...wiped.failed, 'local-storage'],
     persistFailed: erasePendingNotPersisted(),
   };
 }
 
 /** Retries every erase that is still owed (on load, and when the driver asks). Resolves with whether none is left. */
 export async function retryPendingErase(): Promise<ForgetResult> {
+  await hydrateOwed();
   const results: ForgetResult[] = [];
   for (const { scope, cutoff } of pendingOwed()) results.push(await forgetAll(scope, cutoff));
   return {

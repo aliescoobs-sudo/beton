@@ -25,6 +25,7 @@ function rig(opts?: {
   photos?: () => Promise<{ userId: string }[]>;
   forgetRead?: () => Promise<void>;
   forgetAll?: () => Promise<void>;
+  forgetAllResult?: unknown;
   fetchSession?: DayPorts<TestDay>['fetchSession'];
 }) {
   const store = new Map<string, string>();
@@ -33,6 +34,8 @@ function rig(opts?: {
     session: 'unknown' as string,
     online: true,
     waitingCleared: 0,
+    eraseIncomplete: null as boolean | null,
+    eraseNotPersisted: null as boolean | null,
   };
   let owner: string | null = null;
   const caches: string[] = ['api-cache']; // stands for Cache Storage: emptied only when the cleanup finishes
@@ -63,6 +66,7 @@ function rig(opts?: {
       store.delete(QUEUE_KEY);
       await (opts?.forgetAll?.() ?? Promise.resolve());
       caches.length = 0;
+      return opts?.forgetAllResult;
     },
     queuedPhotos: opts?.photos ?? (async () => []),
     owner: { get: () => owner, set: (id) => void (owner = id) },
@@ -72,6 +76,8 @@ function rig(opts?: {
       setSession: (s) => void (ui.session = s),
       setOnline: (o) => void (ui.online = o),
       clearWaiting: () => void ui.waitingCleared++,
+      setEraseIncomplete: (v) => void (ui.eraseIncomplete = v),
+      setEraseNotPersisted: (v) => void (ui.eraseNotPersisted = v),
     },
     readTimeoutMs: 10_000,
     isShown: () => true,
@@ -228,5 +234,24 @@ describe('an older read resuming after a newer refusal or sign-out changes nothi
     await reading;
     expect(r.ui.day).toBeNull();
     expect(r.ui.session).toBe('out');
+  });
+});
+
+describe('R19-06: a debt of erasure that no durable place of the phone could hold is shown to the driver', () => {
+  it('a sign-out whose erase is incomplete AND could not be persisted tells the screen both (the notice survives nothing else)', async () => {
+    const r = rig({ forgetAllResult: { complete: false, persistFailed: true, failed: ['new-store'] } });
+    r.controller.signedOut();
+    await tick();
+    await tick();
+    expect(r.ui.eraseIncomplete).toBe(true);
+    expect(r.ui.eraseNotPersisted).toBe(true);
+  });
+  it('a complete erase clears both notices', async () => {
+    const r = rig({ forgetAllResult: { complete: true, persistFailed: false, failed: [] } });
+    r.controller.signedOut();
+    await tick();
+    await tick();
+    expect(r.ui.eraseIncomplete).toBe(false);
+    expect(r.ui.eraseNotPersisted).toBe(false);
   });
 });

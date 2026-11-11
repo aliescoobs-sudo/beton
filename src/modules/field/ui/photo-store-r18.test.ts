@@ -16,6 +16,7 @@ import {
 // storage that cannot hold the owed erase, and the reload. Real photo-queue / offline-store code over a fake IndexedDB, with the module's own seams.
 const local = new Map<string, string>();
 let localFails = false;
+let removeFails = false;
 type Hooks = { pause?: (p: string) => Promise<void> | void; fail?: (p: string) => boolean };
 const setHooks = (h: Hooks | undefined) =>
   ((globalThis as { __kayasPhotoHooks?: Hooks }).__kayasPhotoHooks = h);
@@ -71,6 +72,7 @@ async function setLock(value: { owner: string; until: number } | null): Promise<
 beforeEach(async () => {
   local.clear();
   localFails = false;
+  removeFails = false;
   setHooks(undefined);
   vi.unstubAllGlobals();
   vi.stubGlobal('localStorage', {
@@ -79,7 +81,10 @@ beforeEach(async () => {
       if (localFails) throw new Error('QuotaExceededError');
       local.set(k, v);
     },
-    removeItem: (k: string) => void local.delete(k),
+    removeItem: (k: string) => {
+      if (removeFails) throw new Error('SecurityError');
+      local.delete(k);
+    },
   });
   vi.stubGlobal('caches', {
     keys: async () => [],
@@ -229,10 +234,10 @@ describe('R18-06: a blocked open of the former database is unknown, not empty', 
 });
 
 describe('R18-06: the owed erase survives a storage that cannot hold it, and the reload', () => {
-  it('localStorage refusing the write: the erase is kept in memory, retried, and the failure is SURFACED', async () => {
+  it('localStorage refusing the write AND the durable copy failing (R19-06: the debt has a second place now): kept in memory, retried, and the failure is SURFACED', async () => {
     await queuePhoto(photo('a', 'A'));
     localFails = true;
-    setHooks({ fail: (p) => p === 'erase-new' });
+    setHooks({ fail: (p) => p === 'erase-new' || p === 'owed-write' });
     const r = await forgetAll({ only: 'A' });
     expect(r.complete).toBe(false);
     expect(r.persistFailed).toBe(true);
@@ -256,5 +261,54 @@ describe('R18-06: the owed erase survives a storage that cannot hold it, and the
     expect((await fresh.retryPendingErase()).complete).toBe(true);
     expect(fresh.erasePending()).toBe(false);
     expect((await (await import('./photo-queue')).queuedPhotos()).map((p) => p.key)).toEqual([]);
+  });
+});
+
+describe('R19-06: the owed erase has a second, durable place, and a storage fault never hides the debt', () => {
+  it('localStorage refusing EVERYTHING (writes and removals) and the erase aborted: the debt is held in IndexedDB, survives a real reload and is finished there', async () => {
+    await queuePhoto(photo('a', 'A'));
+    localFails = true;
+    setHooks({ fail: (p) => p === 'erase-new' });
+    const r = await forgetAll({ only: 'A' });
+    expect(r.complete).toBe(false);
+    expect(r.persistFailed).toBe(false); // the durable copy took it
+    setHooks(undefined);
+    vi.resetModules(); // the page is reloaded: no memory, and localStorage still refuses
+    const fresh = await import('./offline-store');
+    expect(fresh.erasePending()).toBe(false); // nothing is known until the durable copy is read...
+    await fresh.hydrateOwed();
+    expect(fresh.erasePending()).toBe(true); // ...and then the debt is back
+    expect((await fresh.retryPendingErase()).complete).toBe(true);
+    expect(fresh.erasePending()).toBe(false);
+    expect((await (await import('./photo-queue')).queuedPhotos()).map((p) => p.key)).toEqual([]);
+    // and once settled, a further reload finds no debt
+    vi.resetModules();
+    const again = await import('./offline-store');
+    await again.hydrateOwed();
+    expect(again.erasePending()).toBe(false);
+  });
+
+  it('neither place can hold the debt: the result says so (the screen shows the notice), the debt stays in memory and is retried', async () => {
+    await queuePhoto(photo('a', 'A'));
+    localFails = true;
+    setHooks({ fail: (p) => p === 'erase-new' || p === 'owed-write' });
+    const r = await forgetAll({ only: 'A' });
+    expect(r.complete).toBe(false);
+    expect(r.persistFailed).toBe(true);
+    expect(erasePendingNotPersisted()).toBe(true);
+    setHooks(undefined);
+    expect((await retryPendingErase()).complete).toBe(true);
+    expect(erasePendingNotPersisted()).toBe(false);
+  });
+
+  it('a localStorage that THROWS on removal does not stop the erase of the other stores, and is reported as incomplete', async () => {
+    await queuePhoto(photo('a', 'A'));
+    removeFails = true;
+    const r = await forgetAll({ only: 'A' });
+    expect(await keys()).toEqual([]); // the photos were erased although the removals threw
+    expect(r.complete).toBe(false);
+    expect(r.failed).toContain('local-storage');
+    removeFails = false;
+    expect((await retryPendingErase()).complete).toBe(true);
   });
 });

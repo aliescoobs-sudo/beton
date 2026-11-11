@@ -21,6 +21,7 @@ import {
 import { buildWorkbook } from './helpers/xlsx-writer';
 import { createPlant, updatePlant } from '../src/modules/master-data';
 import { testEnv } from './db-env';
+import { insertOrder, orderMaster } from './helpers/ledger-fixtures';
 import { v1Actors } from './helpers/v1-actors';
 
 // T11: the history importer against a real database. Synthetic data only (every name says FICTIF). The production-mode gates apply (a
@@ -151,7 +152,10 @@ async function applyProof(f: ReturnType<typeof files>, m: HistoryMapping) {
     mapping: m,
     environment: PROD,
     mode: 'apply',
-    stepUp: { userId: A.owner.id, operation: historyConfirmation(staged.setSha).operation },
+    stepUp: {
+      userId: A.owner.id,
+      operation: historyConfirmation(staged.setSha, staged.decisionsSha).operation,
+    },
   });
 }
 /** The owner's decisions for every pending label: clients created, the rest mapped or unknown. */
@@ -524,5 +528,95 @@ describe('serialized, rollback of created clients, and the guard (T11)', () => {
   it('an unknown plant code is a problem, not a silent no-plant import', async () => {
     const r = await run('dry-run', files(names(1).map((n) => `${n} PLANT`)), mapping('NOSUCHPL'));
     expect(r.problems.join(' ')).toMatch(/PLANT_UNKNOWN/);
+  });
+});
+
+describe('R19-08: reversing a history batch keeps a live client that something else uses', () => {
+  it('a client used by a LATER ORDER, and a client attributed to ANOTHER batch, stay active; the one only this batch used is archived; the report says so; mappings stay usable', async () => {
+    const [x1, x2, x3] = names(3).map((n) => `${n} RB`) as [string, string, string];
+    const m = mapping(plantACode);
+    // batch 1: three clients created by the import
+    const f1 = files([x1, x2, x3]);
+    await run('stage', f1, m);
+    await decideAll('new');
+    const first = await applyProof(f1, m);
+    expect(first.applied).toBe(true);
+    const idOf = async (name: string) =>
+      (
+        await migrator.query<{ id: string; status: string }>(
+          `select id, status from client where name = $1`,
+          [name],
+        )
+      ).rows[0]!;
+    const [c1, c2, c3] = [await idOf(x1), await idOf(x2), await idOf(x3)];
+    expect([c1.status, c2.status, c3.status]).toEqual(['active', 'active', 'active']);
+    // a real LATER order of client 1 (the live business goes on), made by the owner in plant A
+    const master = await orderMaster(app, A.owner.id, `rb${tag.toLowerCase()}`);
+    const order = await withRlsContext(
+      app,
+      { userId: A.owner.id, role: 'owner', requestId: `rb${tag}`, plantId: A.plantId ?? undefined },
+      (tx) => insertOrder(tx, A.owner.id, { ...master, clientId: c1.id }, '2026-11-12'),
+    );
+    expect(order.id).toBeTruthy();
+    // batch 2: ANOTHER history batch (other bytes) attributed to client 2 through the mapping the first batch left
+    const f2 = files([x2]);
+    await run('stage', f2, m);
+    await decideAll('new');
+    const second = await applyProof(f2, m);
+    expect(second.applied).toBe(true);
+    expect(
+      await count(
+        `select count(*) n from history.delivery where batch_id = '${second.batchId}' and client_id = '${c2.id}'`,
+      ),
+    ).toBe(1);
+    // roll batch 1 back
+    const rb = await rollbackHistory({
+      appPool: app,
+      actor: owner(),
+      batchId: first.batchId!,
+      environment: PROD,
+      stepUp: { userId: A.owner.id, operation: historyRollbackConfirmation(first.batchId!).operation },
+    });
+    expect(rb.blocked).toEqual([]);
+    expect(rb.archivedClients).toBe(1);
+    expect(rb.retainedClients).toBe(2);
+    expect([(await idOf(x1)).status, (await idOf(x2)).status, (await idOf(x3)).status]).toEqual([
+      'active',
+      'active',
+      'archived',
+    ]);
+    // the mapping of the shared client stays usable: a third batch for the same label still attributes to the live client 2
+    const f3 = files(
+      [x2],
+      [
+        [
+          D + 9,
+          x2,
+          'CHANTIER FICTIF 1',
+          3,
+          'B25',
+          `FX${tag}1`,
+          901,
+          'POMPE',
+          'POUR PARTENAIRE FICTIF',
+          `DRV${tag} FICTIF`,
+        ],
+      ],
+    );
+    await run('stage', f3, m);
+    await decideAll('new');
+    const third = await applyProof(f3, m);
+    expect(third.applied).toBe(true);
+    expect(
+      await count(
+        `select count(*) n from history.delivery where batch_id = '${third.batchId}' and client_id = '${c2.id}'`,
+      ),
+    ).toBe(2);
+    // the audit of the rollback counts, with no name
+    const ev = await migrator.query<{ after: { retained_clients: number; archived_clients: number } }>(
+      `select after from audit_event where table_name = 'history_import' and row_id = $1 and reason = 'history import rollback'`,
+      [first.batchId],
+    );
+    expect(ev.rows[0]!.after).toMatchObject({ archived_clients: 1, retained_clients: 2 });
   });
 });

@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -139,7 +139,7 @@ describe('the real step-up path of import:history (production mode, real-shaped 
     return f;
   };
   /** A folder with one monthly file of one plant: names are unique to this set. */
-  const makeSet = (label: string) => {
+  const makeSet = (label: string, withQuarantine = false) => {
     const folder = join(dir, `set-${label}`);
     mkdirSync(folder, { recursive: true });
     writeFileSync(
@@ -150,11 +150,11 @@ describe('the real step-up path of import:history (production mode, real-shaped 
           rows: [
             ['', '', '', { f: 'SUM(D3:D9)', v: 0 }],
             HEAD,
-            ...[0, 1].map((i) => [
+            ...(withQuarantine ? [0, 1, 2] : [0, 1]).map((i) => [
               46083 + i,
               `CLT${tag}${label}${i} FICTIF`,
               'CHANTIER FICTIF 1',
-              7.5 + i,
+              withQuarantine && i === 2 ? '' : 7.5 + i, // no volume: quarantined
               'B25',
               `FX${tag}${label}`,
               100 + i,
@@ -168,14 +168,19 @@ describe('the real step-up path of import:history (production mode, real-shaped 
     );
     return folder;
   };
+  const decisions = (out: string) => {
+    const m = /Decisions: ([0-9a-f]{64})/.exec(out);
+    if (!m) throw new Error(`no decisions hash in: ${out.slice(0, 600)}`);
+    return m[1]!;
+  };
   const sha = (out: string) => {
     const m = /set ([0-9a-f]{64})/.exec(out);
     if (!m) throw new Error(`no set hash in: ${out.slice(0, 600)}`);
     return m[1]!;
   };
   /** Stages a set through the command and takes the owner's decisions on its labels (the History screens' service). */
-  async function stagedSet(label: string) {
-    const folder = makeSet(label);
+  async function stagedSet(label: string, withQuarantine = false) {
+    const folder = makeSet(label, withQuarantine);
     const st = cli(env, ['--stage', folder, '--mapping', mappingFile(), '--account', ownerEmail], PROD);
     expect(st.out).toMatch(/stage|label/i);
     const owner = await realSessionUser(env.DATABASE_URL_MIGRATOR, 'owner');
@@ -193,8 +198,35 @@ describe('the real step-up path of import:history (production mode, real-shaped 
         await decideLabel(app, owner, input as never);
       }
     }
+    let fixedRow = '';
+    if (withQuarantine) {
+      // the owner fixes the quarantined row (the volume), as the staging screen does
+      const open = (await listQuarantine(app, owner, { onlyOpen: true })).filter((q) =>
+        (q.raw.client ?? '').includes(`CLT${tag}${label}`),
+      );
+      expect(open).toHaveLength(1);
+      fixedRow = open[0]!.id;
+      expect(
+        (
+          await decideQuarantine(
+            app,
+            owner,
+            { id: fixedRow, action: 'fix', values: { m3: '6' } },
+            undefined,
+            { trainingMode: false },
+          )
+        ).ok,
+      ).toBe(true);
+    }
     const dry = cli(env, ['--dry-run', folder, '--mapping', mappingFile(), '--account', ownerEmail], PROD);
-    return { folder, dry, set: sha(dry.out) };
+    return {
+      folder,
+      dry,
+      fixedRow,
+      owner,
+      set: sha(dry.out),
+      conf: historyConfirmation(sha(dry.out), decisions(dry.out)),
+    };
   }
 
   beforeAll(async () => {
@@ -231,6 +263,91 @@ describe('the real step-up path of import:history (production mode, real-shaped 
       `audit_event where actor_user_id = '${id}' and action = 'permission_denied' and table_name = 'import'`,
     );
 
+  /** The real command, run asynchronously so that a test can act while it waits at a prompt. */
+  const cliLive = (args: string[]) => {
+    const child = spawn(
+      process.execPath,
+      ['--import', './scripts/register-ts-paths.mjs', 'scripts/import-history.ts', ...args],
+      {
+        env: {
+          ...process.env,
+          DATABASE_URL_APP: env.DATABASE_URL_APP,
+          DATABASE_URL_AUTH: env.DATABASE_URL_AUTH,
+          ...PROD,
+        },
+      },
+    );
+    let out = '';
+    child.stdout.on('data', (d: Buffer) => (out += d.toString()));
+    child.stderr.on('data', (d: Buffer) => (out += d.toString()));
+    const until = async (needle: string) => {
+      for (let i = 0; i < 1200; i++) {
+        if (out.includes(needle)) return;
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      throw new Error(`never printed: ${needle}\n${out.slice(-800)}`);
+    };
+    const done = new Promise<number | null>((resolve) => child.on('close', resolve));
+    return { send: (t: string) => child.stdin.write(t), until, done, out: () => out };
+  };
+
+  it.each([
+    ['a label mapping', 'label'],
+    ['a corrected row', 'row'],
+  ] as const)(
+    'R19-07: %s changed from another actor while the real CLI waits for the authenticator code: the apply is refused and nothing is written',
+    async (_n, what) => {
+      const op = await operator();
+      const a = await stagedSet(`R${Math.floor(Math.random() * 1e4)}`, true);
+      await inFreshStep();
+      const before = await written(migrator);
+      const live = cliLive(['--apply', a.folder, '--mapping', mappingFile(), '--account', op.email]);
+      await live.until('to apply:');
+      live.send(`${a.conf.phrase}\n`);
+      await live.until('Authenticator code'); // paused at the second factor
+      if (what === 'label') {
+        const { labels } = await listLabels(app, a.owner, { kind: 'client' });
+        const mine = labels.find((l) => l.key.includes(`CLT${tag}`) && l.status === 'label_only');
+        expect(mine, 'a decided client label of this set').toBeTruthy();
+        expect(
+          (await decideLabel(app, a.owner, { kind: 'client', key: mine!.key, status: 'new' } as never)).ok,
+        ).toBe(true);
+      } else {
+        expect(
+          (
+            await decideQuarantine(
+              app,
+              a.owner,
+              { id: a.fixedRow, action: 'fix', values: { m3: '9' } },
+              undefined,
+              { trainingMode: false },
+            )
+          ).ok,
+        ).toBe(true);
+      }
+      live.send(`${await code(op.id)}\n`);
+      expect(await live.done).toBe(1);
+      expect(live.out()).toMatch(/staging decisions .* changed after the confirmation/);
+      expect(await written(migrator)).toEqual(before.map((n, i) => (i === 3 && what === 'label' ? n : n))); // no batch applied, no history rows
+      expect(await count(migrator, `history.batch where status = 'applied' and set_sha = '${a.set}'`)).toBe(
+        0,
+      );
+    },
+  );
+
+  it('control: with the decisions unchanged the same flow applies', async () => {
+    const op = await operator();
+    const a = await stagedSet(`K${Math.floor(Math.random() * 1e4)}`, true);
+    await inFreshStep();
+    const live = cliLive(['--apply', a.folder, '--mapping', mappingFile(), '--account', op.email]);
+    await live.until('to apply:');
+    live.send(`${a.conf.phrase}\n`);
+    await live.until('Authenticator code');
+    live.send(`${await code(op.id)}\n`);
+    expect(await live.done).toBe(0);
+    expect(await count(migrator, `history.batch where status = 'applied' and set_sha = '${a.set}'`)).toBe(1);
+  });
+
   it('the typed phrase of ANOTHER set writes nothing', async () => {
     const op = await operator();
     const a = await stagedSet('PH');
@@ -238,7 +355,7 @@ describe('the real step-up path of import:history (production mode, real-shaped 
     const r = applyAs(
       op.email,
       a.folder,
-      `${historyConfirmation('0'.repeat(64)).phrase}\n${await code(op.id)}\n`,
+      `${historyConfirmation('0'.repeat(64), '0'.repeat(64)).phrase}\n${await code(op.id)}\n`,
     );
     expect(r.code).toBe(1);
     expect(r.out).toMatch(/Confirmation not typed/);
@@ -260,7 +377,7 @@ describe('the real step-up path of import:history (production mode, real-shaped 
         : how === 'other'
           ? `${await code(stranger.id)}\n${await code(stranger.id, -1)}\n${await code(stranger.id, 1)}\n`
           : `${await code(op.id, -4)}\n${await code(op.id, -5)}\n${await code(op.id, -6)}\n`;
-    const r = applyAs(op.email, a.folder, `${historyConfirmation(a.set).phrase}\n${codes}`);
+    const r = applyAs(op.email, a.folder, `${a.conf.phrase}\n${codes}`);
     expect(r.code).toBe(1);
     expect(r.out).toMatch(/Second factor not given|account is locked/);
     expect(await written(migrator)).toEqual(before);
@@ -275,7 +392,7 @@ describe('the real step-up path of import:history (production mode, real-shaped 
     const applied0 = await count(migrator, `history.batch where status = 'applied'`);
     await inFreshStep();
     const used = await code(op.id, 0);
-    const ok = applyAs(op.email, first.folder, `${historyConfirmation(first.set).phrase}\n${used}\n`);
+    const ok = applyAs(op.email, first.folder, `${first.conf.phrase}\n${used}\n`);
     expect(ok.code, ok.out).toBe(0);
     const mid = await written(migrator);
     expect(mid[0]).toBe(before[0]!); // the staged batch moved forward; no second batch
@@ -287,16 +404,12 @@ describe('the real step-up path of import:history (production mode, real-shaped 
       ),
     ).toBe(1);
     // the replay: the very code that was just used, for the second set
-    const replay = applyAs(op.email, second.folder, `${historyConfirmation(second.set).phrase}\n${used}\n`);
+    const replay = applyAs(op.email, second.folder, `${second.conf.phrase}\n${used}\n`);
     expect(replay.code).toBe(1);
     expect(replay.out).toMatch(/Wrong code|Second factor not given|locked/);
     expect(await written(migrator)).toEqual(mid);
     // the next step's code is a new claim: it applies the second set
-    const next = applyAs(
-      op.email,
-      second.folder,
-      `${historyConfirmation(second.set).phrase}\n${await code(op.id, 1)}\n`,
-    );
+    const next = applyAs(op.email, second.folder, `${second.conf.phrase}\n${await code(op.id, 1)}\n`);
     expect(next.code, next.out).toBe(0);
     expect(await count(migrator, `history.batch where status = 'applied'`)).toBe(applied0 + 2);
   });
@@ -306,7 +419,7 @@ describe('the real step-up path of import:history (production mode, real-shaped 
     const owner = await realSessionUser(env.DATABASE_URL_MIGRATOR, 'owner');
     const a = await stagedSet('OP');
     const b = await stagedSet('OQ');
-    const proofOfB = historyConfirmation(b.set).operation;
+    const proofOfB = b.conf.operation;
     const env0 = { trainingMode: false, realData: true, simulationEnabled: false };
     const before = await written(migrator);
     const refused = await runHistory({
@@ -325,7 +438,7 @@ describe('the real step-up path of import:history (production mode, real-shaped 
     expect(await written(migrator)).toEqual(before);
     // apply set A properly through the command, then try to roll it back with the apply's proof
     await inFreshStep(28_000); // the apply below spends the step that the replay further down expects to be spent
-    const ok = applyAs(op.email, a.folder, `${historyConfirmation(a.set).phrase}\n${await code(op.id, 0)}\n`);
+    const ok = applyAs(op.email, a.folder, `${a.conf.phrase}\n${await code(op.id, 0)}\n`);
     expect(ok.code, ok.out).toBe(0);
     const batch = (
       await migrator.query<{ id: string }>(
@@ -337,7 +450,7 @@ describe('the real step-up path of import:history (production mode, real-shaped 
       actor: { ...owner, stepUpVerified: true },
       batchId: batch,
       environment: env0,
-      stepUp: { userId: owner.id, operation: historyConfirmation(a.set).operation },
+      stepUp: { userId: owner.id, operation: a.conf.operation },
     }).then(
       () => 'rolled back',
       (e: Error) => `refused: ${e.message}`,
@@ -429,6 +542,7 @@ describe('the whole command on a twin workbook set, TRAINING mode, on a scratch 
       await decideQuarantine(sApp, owner, { id: q.id, action: 'discard' });
     const peek = cli(scratch, ['--dry-run', tetouanDir, '--mapping', mapFile, '--account', email], TRAINING);
     const setSha = sha2(peek.out);
+    const twinConf = historyConfirmation(setSha, /Decisions: ([0-9a-f]{64})/.exec(peek.out)![1]!);
     await inFreshStep();
     // a wrong phrase and a wrong code write nothing
     expect(
@@ -444,7 +558,7 @@ describe('the whole command on a twin workbook set, TRAINING mode, on a scratch 
         scratch,
         ['--apply', tetouanDir, '--mapping', mapFile, '--account', email],
         TRAINING,
-        `${historyConfirmation(setSha).phrase}\n000000\n000001\n000002\n`,
+        `${twinConf.phrase}\n000000\n000001\n000002\n`,
       ).out,
     ).toMatch(/Second factor not given/);
     expect(await count(sMigrator, 'history.delivery')).toBe(0);
@@ -452,7 +566,7 @@ describe('the whole command on a twin workbook set, TRAINING mode, on a scratch 
       scratch,
       ['--apply', tetouanDir, '--mapping', mapFile, '--account', email],
       TRAINING,
-      `${historyConfirmation(setSha).phrase}\n${await code(userId, -1)}\n`,
+      `${twinConf.phrase}\n${await code(userId, -1)}\n`,
     );
     expect(ok.code, ok.out).toBe(0);
     expect(await count(sMigrator, `history.batch where status = 'applied'`)).toBe(1);
@@ -464,11 +578,14 @@ describe('the whole command on a twin workbook set, TRAINING mode, on a scratch 
       ),
     ).toEqual(live0);
     // the same set again: already applied, nothing done
+    // (applying moved the mappings' state, so the decisions hash is a new one: the phrase is read from a fresh dry-run, as an operator would)
+    const peek2 = cli(scratch, ['--dry-run', tetouanDir, '--mapping', mapFile, '--account', email], TRAINING);
+    const twinConf2 = historyConfirmation(setSha, /Decisions: ([0-9a-f]{64})/.exec(peek2.out)![1]!);
     const again = cli(
       scratch,
       ['--apply', tetouanDir, '--mapping', mapFile, '--account', email],
       TRAINING,
-      `${historyConfirmation(setSha).phrase}\n${await code(userId, 0)}\n`,
+      `${twinConf2.phrase}\n${await code(userId, 0)}\n`,
     );
     expect(again.code, again.out).toBe(0);
     expect(again.out).toMatch(/Already applied/);

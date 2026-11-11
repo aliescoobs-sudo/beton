@@ -31,6 +31,7 @@ import {
   erasePending,
   forgetAll,
   forgetRead,
+  hydrateOwed,
   retryPendingErase,
   legacyCleanupPending,
   QUEUE_KEY,
@@ -215,6 +216,7 @@ export function FieldApp({
   // R16-02: the former-named photo database could not be deleted yet (an old page holds it open): shown, and retried at each load.
   const [legacyPending, setLegacyPending] = useState(false);
   const [eraseIncomplete, setEraseIncomplete] = useState(false);
+  const [eraseNotPersisted, setEraseNotPersisted] = useState(false);
   const [online, setOnline] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [sheet, setSheet] = useState<{ tripId: string } | null>(null);
@@ -277,6 +279,7 @@ export function FieldApp({
       ui: {
         setDay,
         setEraseIncomplete,
+        setEraseNotPersisted,
         setSession,
         setOnline,
         clearWaiting: () => {
@@ -363,13 +366,16 @@ export function FieldApp({
       .catch(() => undefined)
       .then(() => setLegacyPending(legacyCleanupPending()));
     // an erase left owed by an earlier page (a store could not be written, the lock was lost): retried now, shown until it is done
-    if (erasePending()) {
+    // R19-06: the debt may be held only in the durable (IndexedDB) copy, when localStorage refused it: read it back before deciding
+    void hydrateOwed().then(() => {
+      if (!erasePending()) return;
       void Promise.resolve().then(() => setEraseIncomplete(true));
       void retryPendingErase().then((r) => {
         setEraseIncomplete(!r.complete);
+        setEraseNotPersisted(r.persistFailed === true);
         setLegacyPending(r.legacyCleanupPending);
       });
-    }
+    });
   }, []);
 
   const retryErase = useCallback(async () => {
@@ -378,6 +384,7 @@ export function FieldApp({
       legacyCleanupPending: legacyCleanupPending(),
     }));
     setEraseIncomplete(!r.complete);
+    setEraseNotPersisted(('persistFailed' in r && r.persistFailed === true) || false);
     setLegacyPending(r.legacyCleanupPending);
   }, []);
 
@@ -555,6 +562,15 @@ export function FieldApp({
 
   const eraseNotice = (
     <>
+      {eraseNotPersisted && (
+        <div
+          role="alert"
+          className="rounded-xl bg-red-200 p-3 text-xl text-black"
+          data-testid="field-erase-not-persisted"
+        >
+          <p>{t('eraseNotPersisted')}</p>
+        </div>
+      )}
       {eraseIncomplete && (
         <div
           role="alert"

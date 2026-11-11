@@ -106,7 +106,7 @@ const apply = async (i: number) => {
     mapping: set[i]!.mapping,
     environment: TRAINING,
     mode: 'apply',
-    stepUp: { userId: owner.id, operation: historyConfirmation(dry.setSha).operation },
+    stepUp: { userId: owner.id, operation: historyConfirmation(dry.setSha, dry.decisionsSha).operation },
   });
 };
 

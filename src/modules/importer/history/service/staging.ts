@@ -4,6 +4,7 @@ import { err, ok, type Result } from '@/lib/result';
 import { realClock } from '@/modules/clock';
 import { inRequest, require, type SessionUser } from '@/modules/platform-security';
 import { CATEGORY_CODES, similarityGroups } from '../domain/normalise';
+import { HISTORY_LOCK_SQL } from './lock';
 import { rawContamination } from '../domain/twin-content';
 import { deliveryFromRaw, expenseFromRaw } from '../domain/parse';
 import type { HistoryMapping } from '../domain/mapping';
@@ -96,6 +97,7 @@ export async function decideLabel(
   if (!parsed.success) return err('INVALID');
   const d = parsed.data;
   return inRequest(appPool, actor, async (tx) => {
+    await tx.query(HISTORY_LOCK_SQL); // R19-07: a decision waits for an apply in progress and cannot slip in between its reads and its writes
     const { rowCount } = await tx.query(
       `update history.label_map set status = $3, client_id = $4, truck_id = $5, driver_id = $6, canonical = $7, decided_by = $8, decided_at = clock_timestamp()
         where kind = $1 and key = $2`,
@@ -223,6 +225,7 @@ export async function decideQuarantine(
   if (!parsed.success || (parsed.data.action === 'fix' && !parsed.data.values)) return err('INVALID');
   const d = parsed.data;
   return inRequest(appPool, actor, async (tx) => {
+    await tx.query(HISTORY_LOCK_SQL); // R19-07 (see decideLabel)
     const q = (
       await tx.query<{
         kind: QuarantineRow['kind'];
