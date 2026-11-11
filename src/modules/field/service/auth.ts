@@ -318,7 +318,7 @@ export async function loginDriver(
 /** Every request of the phone: the token is valid, and the database still knows this driver and this phone. */
 export async function sessionOfToken(
   deps: Pick<FieldAuthDeps, 'authPool'>,
-  token: { driverId: string; deviceHash: string; gen: number; deviceRowId: string },
+  token: { driverId: string; deviceHash: string; gen: number; deviceRowId: string; exp: number },
 ): Promise<SessionUser | null> {
   const { rows } = await deps.authPool.query<{ user_id: string; kind: 'driver' | 'pump_operator' }>(
     'select user_id, kind from public.field_session_check($1, $2, $3, $4)',
@@ -335,7 +335,12 @@ export async function sessionOfToken(
     twoFactorEnabled: false,
     reenrolRequired: false,
     // R18-05: every transaction this user opens is fenced against the live session
-    fieldSession: { driverId: token.driverId, deviceRowId: token.deviceRowId, gen: token.gen },
+    fieldSession: {
+      driverId: token.driverId,
+      deviceRowId: token.deviceRowId,
+      gen: token.gen,
+      exp: token.exp,
+    },
   };
 }
 

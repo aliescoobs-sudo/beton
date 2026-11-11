@@ -10,6 +10,11 @@ const MAX_ENTRIES = 200;
 const MAX_UNCOMPRESSED = 25 * 1024 * 1024;
 const MAX_CELLS = 200_000;
 const MAX_EMPTY_CELLS = 4_000_000;
+// R19-10: coordinates are checked BEFORE any padding is allocated. A row number above MAX_ROW_NO, a column beyond XFD (the last column of the format) and a
+// cumulative amount of padding above MAX_PAD (empty rows and empty slots added to place the cells) refuse the file; a few bytes of XML cannot ask for gigabytes.
+const MAX_ROW_NO = 200_000;
+const MAX_COL_INDEX = 16_383;
+const MAX_PAD = 5_000_000;
 
 export class SheetError extends Error {}
 
@@ -285,10 +290,17 @@ export function readXlsxSheets(buf: Buffer, opts: ReadOptions = {}): NamedSheet[
     const rows: Sheet = [];
     const formulaRows: number[] = [];
     let formulaCells = 0;
+    let pad = 0;
     for (const row of xml.matchAll(/<row\b[^>]*?(?:\/>|>([\s\S]*?)<\/row>)/g)) {
       const line: string[] = [];
       const rowNo = Number(/^<row\b[^>]*?\br="(\d+)"/.exec(row[0])?.[1] ?? rows.length + 1);
-      if (opts.exactRows) while (rows.length < rowNo - 1) rows.push([]);
+      if (!Number.isSafeInteger(rowNo) || rowNo < 1 || rowNo > MAX_ROW_NO)
+        throw new SheetError('a row number is out of range');
+      if (opts.exactRows && rowNo - 1 > rows.length) {
+        pad += rowNo - 1 - rows.length;
+        if (pad > MAX_PAD) throw new SheetError('the sheet asks for too much padding');
+        while (rows.length < rowNo - 1) rows.push([]);
+      }
       for (const c of (row[1] ?? '').matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
         // a formatted-but-empty cell (a spreadsheet may format 257 columns) is not data: it has its own, much larger, bound
         if (c[2] === undefined || c[2] === '') {
@@ -298,6 +310,7 @@ export function readXlsxSheets(buf: Buffer, opts: ReadOptions = {}): NamedSheet[
         if (++cells > MAX_CELLS) throw new SheetError('too many cells');
         const attrs = c[1] ?? '';
         const ref = /\br="([A-Z]+)\d+"/.exec(attrs)?.[1];
+        if (ref !== undefined && ref.length > 3) throw new SheetError('a column reference is out of range');
         const type = /\bt="(\w+)"/.exec(attrs)?.[1];
         const body = c[2] ?? '';
         if (/<f\b/.test(body)) {
@@ -314,6 +327,11 @@ export function readXlsxSheets(buf: Buffer, opts: ReadOptions = {}): NamedSheet[
         } else if (type === 'inlineStr') value = textOf(body);
         else value = decode(/<v>([\s\S]*?)<\/v>/.exec(body)?.[1] ?? '');
         const i = ref ? colIndex(ref) : line.length;
+        if (i > MAX_COL_INDEX) throw new SheetError('a column reference is out of range');
+        if (i > line.length) {
+          pad += i - line.length;
+          if (pad > MAX_PAD) throw new SheetError('the sheet asks for too much padding');
+        }
         while (line.length < i) line.push('');
         line[i] = value.trim();
       }

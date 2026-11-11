@@ -122,7 +122,7 @@ describe('R19-09: the shared strings are the ones the workbook names', () => {
     const mapping = {
       version: 1,
       kind: 'deliveries',
-      plant: 'BELGO',
+      plant: 'PLANTA',
       plantCode: null,
       sheet: 'Sheet1',
       headerRow: 1,

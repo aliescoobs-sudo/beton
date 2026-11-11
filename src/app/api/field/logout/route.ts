@@ -4,7 +4,7 @@ import { getEnv } from '@/lib/server-env';
 import { closeFieldSession, FIELD_COOKIE, verifyFieldToken } from '@/modules/field';
 import { fieldJson, fieldRoute } from '../context';
 
-// @permission none (ends the phone session: on the SERVER, by moving the session generation of the bound phone, and in the browser, by deleting the cookie)
+// @permission none (ends the phone session on the SERVER, by moving the session generation of the bound phone; the response sets no cookie, R19-04)
 export async function POST(request: Request): Promise<Response> {
   return fieldRoute(request, { write: true, session: false }, async ({ deps }) => {
     // R15A-01: idempotent. A logout that carries no phone cookie has nothing to end and sets NO header, so a repeated or late logout
@@ -27,11 +27,12 @@ export async function POST(request: Request): Promise<Response> {
       } catch {
         return fieldJson(503, { error: 'UNAVAILABLE' }, { 'retry-after': '5' });
       }
-      // R18-05: the compare-and-set said "this token was not the live one" (a newer sign-in of the same phone, or the session had already ended): the cookie in the browser
-      // may now be the NEWER one (another tab signed in while this request was on its way), and a Set-Cookie that deletes it would sign that tab out. Nothing is cleared.
-      if (!closed) return fieldJson(200, { ok: true });
+      // R18-05 / R19-04: whether the compare-and-set found the live session (and ended it) or a newer one, THE SERVER'S REVOCATION STANDS and this response never carries
+      // a Set-Cookie. The cookie in the browser is shared by every tab: a deletion header that arrives after another tab signed in would sign that tab out, and no
+      // locking on the phone can order a response header. The revoked cookie left behind is harmless (the next check answers "ended"), the next sign-in overwrites it,
+      // and the client clears its own local state. The same holds for an expired or invalid token: there is nothing to end and nothing to clear.
+      void closed;
     }
-    jar.delete(FIELD_COOKIE);
     return fieldJson(200, { ok: true });
   });
 }

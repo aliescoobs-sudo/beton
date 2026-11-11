@@ -37,7 +37,9 @@ const contextSchema = z.object({
    * R18-05: the phone session this request acts under. When present, the transaction first calls the database fence, which refuses it when the session
    * has ended (a logout, a newer sign-in, a released phone, a changed account) and keeps the device row locked until the transaction ends.
    */
-  fieldSession: z.object({ driverId: z.uuid(), deviceRowId: z.uuid(), gen: z.number().int() }).optional(),
+  fieldSession: z
+    .object({ driverId: z.uuid(), deviceRowId: z.uuid(), gen: z.number().int(), exp: z.number().int() })
+    .optional(),
   /** Run as usual, then roll everything back: what a draft's preview shows is what the service would do, and none of it stays. */
   rollback: z.boolean().optional(),
 });
@@ -75,10 +77,11 @@ export async function withRlsContext<T>(
       ],
     );
     if (ctx.fieldSession)
-      await client.query('select public.field_session_fence($1, $2, $3)', [
+      await client.query('select public.field_session_fence($1, $2, $3, $4)', [
         ctx.fieldSession.driverId,
         ctx.fieldSession.deviceRowId,
         ctx.fieldSession.gen,
+        ctx.fieldSession.exp,
       ]);
     // In simulated mode every transaction (including anonymous failed logins) is stamped with the simulated
     // instant, so audit events never depend on the caller remembering to pass it (AC-SEC-08, sim part).

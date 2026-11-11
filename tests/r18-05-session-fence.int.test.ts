@@ -46,7 +46,12 @@ async function signedInDriver(device?: string) {
   if (!r.ok) throw new Error(r.error);
   const token = verifyFieldToken(kit.env.AUTH_SECRET, r.value.token, Math.floor(Date.now() / 1000))!;
   const user = await sessionOfToken({ authPool: kit.authPool }, token);
-  expect(user?.fieldSession).toEqual({ driverId: w.driverA, deviceRowId: token.deviceRowId, gen: token.gen });
+  expect(user?.fieldSession).toEqual({
+    driverId: w.driverA,
+    deviceRowId: token.deviceRowId,
+    gen: token.gen,
+    exp: token.exp,
+  });
   return { token, user: user!, device: device ?? 'x' };
 }
 const loaded = (tripId: string) => ({

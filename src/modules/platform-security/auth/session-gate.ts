@@ -24,7 +24,7 @@ export interface SessionUser {
    */
   stepUpVerified?: boolean;
   /** R18-05: set only for a phone session. `inRequest` carries it to the database, which fences every transaction against the live session. */
-  fieldSession?: { driverId: string; deviceRowId: string; gen: number };
+  fieldSession?: { driverId: string; deviceRowId: string; gen: number; exp: number };
 }
 
 export interface SessionInfo {

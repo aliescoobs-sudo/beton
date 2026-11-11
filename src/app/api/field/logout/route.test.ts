@@ -63,7 +63,7 @@ beforeEach(() => {
 const post = () => POST(new Request('http://x/api/field/logout', { method: 'POST' }));
 
 describe('POST /api/field/logout', () => {
-  it('ends the session on the server, then drops the cookie', async () => {
+  it('ends the session on the server and sets NO cookie header (R19-04)', async () => {
     jar.value = 'token-a';
     const res = await post();
     expect(res.status).toBe(200);
@@ -76,7 +76,7 @@ describe('POST /api/field/logout', () => {
         exp: 9e9,
       },
     ]);
-    expect(jar.deleted).toBe(1);
+    expect(jar.deleted).toBe(0);
   });
 
   it('a server that cannot record the logout answers 503 and KEEPS the cookie, so the phone retries', async () => {
@@ -87,13 +87,13 @@ describe('POST /api/field/logout', () => {
     expect(jar.deleted).toBe(0);
   });
 
-  it('an expired or forged cookie has nothing to end on the server; the cookie is dropped', async () => {
+  it('an expired or forged cookie has nothing to end on the server; nothing is cleared either (R19-04)', async () => {
     jar.value = 'forged';
     verified = null;
     const res = await post();
     expect(res.status).toBe(200);
     expect(closed).toEqual([]);
-    expect(jar.deleted).toBe(1);
+    expect(jar.deleted).toBe(0);
   });
 
   it('R18-05: a logout whose compare-and-set found the session already superseded (a newer sign-in of the phone) does NOT delete the shared cookie', async () => {
@@ -122,7 +122,7 @@ describe('POST /api/field/logout', () => {
     };
     jar.value = 'tab-b-cookie';
     expect((await post()).status).toBe(200);
-    expect(jar.deleted).toBe(1);
+    expect(jar.deleted).toBe(0); // R19-04: the server ended B's session; no header deletes the shared cookie
     expect(server.gen).toBe(6);
   });
 

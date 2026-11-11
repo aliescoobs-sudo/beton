@@ -65,7 +65,7 @@ const HEAD = [
 const mapping = (): HistoryMapping => ({
   version: 1,
   kind: 'deliveries',
-  plant: 'BELGO',
+  plant: 'PLANTA',
   plantCode,
   sheet: 'LIVRAISON 1',
   headerRow: 2,
