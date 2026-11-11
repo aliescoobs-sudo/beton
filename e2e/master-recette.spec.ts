@@ -9,8 +9,8 @@ const date = new Date(Date.UTC(2200, 0, 1) + Math.floor((Date.now() - 1.78e12) /
   .toISOString()
   .slice(0, 10);
 
-test('a partner publishes a recette version for B25 in French', async ({ page }) => {
-  await loginAndEnrol(page, 'fr', E2E_MD.recettePartnerFr.email);
+test('an app_admin publishes a recette version for B25 in French', async ({ page }) => {
+  await loginAndEnrol(page, 'fr', E2E_MD.recetteAdminFr.email);
   await goNav(page, 'recettes-link');
   await expect(page).toHaveURL('/fr/master-data/recettes');
   await page.getByTestId('recette-open-B25').click();
@@ -52,7 +52,7 @@ test('plant reads the recette with no form', async ({ page }) => {
 });
 
 test('the recettes screen renders right-to-left in Arabic', async ({ page }) => {
-  await loginAndEnrol(page, 'ar', E2E_MD.recettePartnerAr.email);
+  await loginAndEnrol(page, 'ar', E2E_MD.recetteAdminAr.email);
   await goNav(page, 'recettes-link');
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('الوصفات');

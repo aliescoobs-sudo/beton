@@ -63,8 +63,8 @@ describe('suppliers (master-data T5)', () => {
   );
 
   it('seals the phone; a raw SELECT shows ciphertext', async () => {
-    const supplier = await create(users.office, { phone: '0539 12 34 56' });
-    expect(supplier.phone).toBe('0539 12 34 56');
+    const supplier = await create(users.office, { phone: '0500 00 34 56' });
+    expect(supplier.phone).toBe('0500 00 34 56');
     const { rows } = await inCtx(users.office, (tx) =>
       tx.query<{ phone_enc: string }>('select phone_enc from supplier where id = $1', [supplier.id]),
     );

@@ -9,7 +9,7 @@ import { deliveryScene, newDelivery } from '../tests/helpers/ledger-fixtures';
 import { checkScreen, watch } from './screen-check';
 import { E2E_MD, goNav, loginAndEnrol, loginOwner, logout } from './fixtures';
 
-// integration I1.3: delivered, not invoiced. The owner and support see the amounts; office sees BL, date, product and m³
+// integration I1.3: delivered, not invoiced. The owner and accountant see the amounts; office sees BL, date, product and m³
 // and not one amount; every screen in fr and ar (AC-INT-05, AC-INT-24).
 test.describe.configure({ mode: 'serial' });
 

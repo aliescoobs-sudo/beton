@@ -3,7 +3,7 @@ import { E2E_MD, goNav, loginAndEnrol, loginOwner, logout } from './fixtures';
 import { checkScreen, watch } from './screen-check';
 
 // operations O13 (AC-OPS-22): the plant records fills and reads litres, km and litres per m³ with no money; the owner records
-// the fuel bought and sees the price and the cost per m³; the partner reads the quantities only.
+// the fuel bought and sees the price and the cost per m³; the app_admin reads the quantities only.
 test.describe.configure({ mode: 'serial' });
 
 const MONEY = /MAD|DH|\d\s?\d{3},\d{2}/;

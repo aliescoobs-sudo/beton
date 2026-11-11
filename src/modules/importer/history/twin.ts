@@ -333,7 +333,7 @@ export function twinMappings(): Record<string, HistoryMapping> {
     blankHeaderField: null as string | null,
   };
   return {
-    'deliveries-belgo.json': {
+    'deliveries-tetouan.json': {
       ...base,
       kind: 'deliveries',
       plant: 'BELGO',
@@ -383,7 +383,7 @@ export function buildTwin(opts: TwinOptions = {}): TwinFile[] {
     const bl = { next: 1000 };
     for (const month of spec.months) {
       const rows = deliveryRows(rnd, spec, month, perMonth, bl, clients);
-      const file = `${spec.title.toLowerCase()}/BETON ${spec.title} ${pad(month)}.2026${spec.title === 'CHAOUN' && month === 4 ? ' -' : ''}.xlsx`;
+      const file = `${spec.title === 'BELGO' ? 'tetouan' : 'chaoun'}/BETON ${spec.title} ${pad(month)}.2026${spec.title === 'CHAOUN' && month === 4 ? ' -' : ''}.xlsx`;
       files.push({ path: file, buf: plantWorkbook(spec, month, rows) });
     }
   }

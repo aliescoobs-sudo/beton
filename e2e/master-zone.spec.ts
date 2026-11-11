@@ -1,13 +1,13 @@
 import { expect, test } from '@playwright/test';
 import { E2E_MD, loginAndEnrol, goNav } from './fixtures';
 
-// Serial: the office test reads the zone the partner test creates (migrations seed no zone).
+// Serial: the office test reads the zone the app_admin test creates (migrations seed no zone).
 test.describe.configure({ mode: 'serial' });
 
-test('a partner adds, edits and cannot duplicate a zone in French (AC-MD-09 first screen)', async ({
+test('an app_admin adds, edits and cannot duplicate a zone in French (AC-MD-09 first screen)', async ({
   page,
 }) => {
-  await loginAndEnrol(page, 'fr', E2E_MD.partnerFr.email);
+  await loginAndEnrol(page, 'fr', E2E_MD.adminFr.email);
   await goNav(page, 'zones-link');
   await expect(page).toHaveURL('/fr/master-data/zones');
 
@@ -45,8 +45,8 @@ test('an office user reads the zones with no edit control', async ({ page }) => 
   await expect(page.locator('button[type=submit]')).toHaveCount(0);
 });
 
-test('the zones screen renders right-to-left in Arabic and a partner can edit', async ({ page }) => {
-  await loginAndEnrol(page, 'ar', E2E_MD.partnerAr.email);
+test('the zones screen renders right-to-left in Arabic and an app_admin can edit', async ({ page }) => {
+  await loginAndEnrol(page, 'ar', E2E_MD.adminAr.email);
   await goNav(page, 'zones-link');
   await expect(page).toHaveURL('/ar/master-data/zones');
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');

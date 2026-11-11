@@ -7,7 +7,7 @@ import { E2E_DATABASE } from '../scripts/db-bootstrap';
 import { testEnv } from '../tests/db-env';
 import { E2E_MD, goNav, loginAndEnrol, loginOwner, logout, moneySafeSuffix } from './fixtures';
 
-// ledger L14: receive and list payments. Office enters blind (no amount echoed, no list); owner and support list them.
+// ledger L14: receive and list payments. Office enters blind (no amount echoed, no list); owner and accountant list them.
 test.describe.configure({ mode: 'serial' });
 
 const migrator = new pg.Pool({ connectionString: testEnv(E2E_DATABASE).DATABASE_URL_MIGRATOR, max: 1 });

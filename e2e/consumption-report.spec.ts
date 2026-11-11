@@ -10,7 +10,7 @@ import { E2E_MD, goNav, loginAndEnrol } from './fixtures';
 import { checkScreen, watch } from './screen-check';
 
 // operations O11 (AC-OPS-18, 19): production per type and theoretical consumption per component against the counts, read by
-// the plant and the partner (quantities only), refused to office.
+// the plant and the app_admin (quantities only), refused to office.
 test.describe.configure({ mode: 'serial' });
 
 const env = testEnv(E2E_DATABASE);
@@ -74,11 +74,11 @@ test('the plant reads the production and the consumption of the week, with the c
   await expect(page.getByTestId(`produced-${DAY}-${typeLabel}`)).toBeVisible();
 });
 
-test('the partner reads it too; office has no page and no link; Arabic renders right-to-left', async ({
+test('the app_admin reads it too; office has no page and no link; Arabic renders right-to-left', async ({
   page,
   browser,
 }) => {
-  await loginAndEnrol(page, 'fr', E2E_MD.repPartner.email);
+  await loginAndEnrol(page, 'fr', E2E_MD.repAdmin.email);
   await page.goto(`/fr/reports/consumption?${QUERY}`);
   await expect(page.getByTestId('consumption-table')).toBeVisible();
   await expect(page.locator('body')).not.toContainText(MONEY);

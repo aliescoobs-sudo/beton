@@ -5,8 +5,8 @@ import { E2E_MD, loginAndEnrol, goNav } from './fixtures';
 const code = `T${800 + (Date.now() % 100)}`;
 const plate = `E2E-${Date.now().toString(36).toUpperCase()}`.slice(0, 20);
 
-test('a partner adds a truck and the plant then logs a breakdown on it', async ({ page, browser }) => {
-  await loginAndEnrol(page, 'fr', E2E_MD.truckPartnerFr.email);
+test('an app_admin adds a truck and the plant then logs a breakdown on it', async ({ page, browser }) => {
+  await loginAndEnrol(page, 'fr', E2E_MD.truckAdminFr.email);
   await goNav(page, 'trucks-link');
   await expect(page).toHaveURL('/fr/master-data/trucks');
   await page.getByTestId('truck-add').click();
@@ -48,7 +48,7 @@ test('office reads trucks and their log with no edit control', async ({ page }) 
 });
 
 test('the trucks screen renders right-to-left in Arabic', async ({ page }) => {
-  await loginAndEnrol(page, 'ar', E2E_MD.truckPartnerAr.email);
+  await loginAndEnrol(page, 'ar', E2E_MD.truckAdminAr.email);
   await goNav(page, 'trucks-link');
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('الشاحنات');

@@ -9,7 +9,7 @@ import { realSessionUser } from '../tests/helpers/actors';
 import { purchaseMaster } from '../tests/helpers/ledger-fixtures';
 import { E2E_MD, goNav, loginAndEnrol, loginOwner, logout } from './fixtures';
 
-// integration I2.1: the supplier's invoice, linked to its order and receipts. Office enters it blind; the owner and support
+// integration I2.1: the supplier's invoice, linked to its order and receipts. Office enters it blind; the owner and accountant
 // read it with the links to the order; the plant has nothing (AC-INT-13, AC-INT-24).
 test.describe.configure({ mode: 'serial' });
 

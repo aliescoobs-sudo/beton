@@ -425,7 +425,7 @@ export async function seedOperationsScenario(
           `insert into company_profile (id, effective_from, legal_name, legal_form, ice, if_number, rc_number, patente, address,
                                         phone, email, rib, created_by)
            values ($1, $2, 'KAYAS PILOTE (fictif)', 'SARL', '001234567000089', '12345678', 'TET-45678', '98765432',
-                   'Zone industrielle, Tétouan (fictif)', '+212 5 39 00 00 00', 'contact@kayas.test', '181780000012345678901234', $3)`,
+                   'Zone industrielle, Tétouan (fictif)', '+212 5 00 00 00 00', 'contact@kayas.test', '181780000012345678901234', $3)`,
           [randomUUID(), opening.rows[0].d, SYSTEM_ACTOR_ID],
         );
       }

@@ -272,7 +272,7 @@ describe('what leaves, and what a model may be told to do (AC-ASSIST-05, 06, 09)
   it('masks the names, amounts and numbers of the question before the model sees it', async () => {
     const provider = scripted([], () => 'Noté.');
     await runTurn(deps(provider), users.office, {
-      question: `Encaisse le chèque 8451237 de 45 000 dh de ${planClient.name}, tel 06 61 23 45 67`,
+      question: `Encaisse le chèque 8451237 de 45 000 dh de ${planClient.name}, tel 05 00 00 00 67`,
     });
     const sentText = JSON.stringify(provider.requests);
     expect(sentText).not.toMatch(/8451237|45 000|0661|dl[a-z]/);

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { E2E_MD, goNav, loginAndEnrol, loginOwner, logout } from './fixtures';
 
-// ledger L33: the opening state. The owner enters the date once and what a client owes; support reads; office has no page.
+// ledger L33: the opening state. The owner enters the date once and what a client owes; the accountant reads; office has no page.
 test.describe.configure({ mode: 'serial' });
 
 test('the owner enters the opening date once and a client balance', async ({ page }) => {

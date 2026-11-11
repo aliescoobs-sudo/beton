@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { E2E_MD, goNav, loginAndEnrol, loginOwner, logout } from './fixtures';
 
-// ledger L8: caisse and bank accounts. Owner writes; support reads; office and partner have neither the link nor the page.
+// ledger L8: caisse and bank accounts. Owner writes; the accountant reads; office and app_admin have neither the link nor the page.
 test.describe.configure({ mode: 'serial' });
 
 const suffix = Math.random().toString(36).slice(2, 7).toUpperCase();

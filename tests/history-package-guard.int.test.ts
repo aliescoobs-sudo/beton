@@ -35,7 +35,7 @@ afterAll(async () => {
 });
 
 const mapping = (): HistoryMapping => ({
-  ...(twinMappings()['deliveries-belgo.json'] as HistoryMapping),
+  ...(twinMappings()['deliveries-tetouan.json'] as HistoryMapping),
   plantCode,
 });
 const twinFile = () =>

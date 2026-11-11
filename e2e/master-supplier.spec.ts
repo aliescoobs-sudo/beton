@@ -5,7 +5,7 @@ test.describe.configure({ mode: 'serial' });
 
 const name = `Fournisseur E2E ${Date.now()}`;
 
-test('office creates a supplier but has no archive button; a partner archives it', async ({
+test('office creates a supplier but has no archive button; an app_admin archives it', async ({
   page,
   browser,
 }) => {
@@ -21,10 +21,10 @@ test('office creates a supplier but has no archive button; a partner archives it
   await expect(page.getByTestId(`supplier-${name}`)).toContainText('FRN-');
   await expect(page.getByTestId('supplier-archive')).toHaveCount(0);
 
-  const partner = await browser.newPage();
-  await loginAndEnrol(partner, 'fr', E2E_MD.supplierPartner.email);
-  await goNav(partner, 'suppliers-link');
-  await partner.getByTestId(`supplier-${name}`).getByTestId('supplier-archive').click();
-  await expect(partner.getByTestId(`supplier-${name}`).getByTestId('supplier-archived')).toBeVisible();
-  await partner.close();
+  const app_admin = await browser.newPage();
+  await loginAndEnrol(app_admin, 'fr', E2E_MD.supplierAdmin.email);
+  await goNav(app_admin, 'suppliers-link');
+  await app_admin.getByTestId(`supplier-${name}`).getByTestId('supplier-archive').click();
+  await expect(app_admin.getByTestId(`supplier-${name}`).getByTestId('supplier-archived')).toBeVisible();
+  await app_admin.close();
 });

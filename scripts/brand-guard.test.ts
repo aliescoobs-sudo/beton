@@ -113,8 +113,28 @@ describe('tier 1: the user-visible surface never says BELGOBETON', () => {
   });
 });
 
+/** The only files in which the bare plant tag BELGO may appear (exact paths; a new file needs an entry here, with the reason above). */
+const BELGO_PLANT_TAG_FILES = [
+  'src/modules/importer/history/domain/mapping.ts',
+  'src/modules/importer/history/twin.ts',
+  'tests/history-import.int.test.ts',
+  'tests/history-cli.int.test.ts',
+  'tests/history-staging-rules.int.test.ts',
+] as const;
+
+/** What is left of a line after the allowed leftovers of THAT file are removed. */
+export function remainsOfOldName(file: string, line: string): string {
+  let rest = line;
+  for (const a of ALLOWED) if (!a.files || a.files.includes(file)) rest = rest.replace(a.pattern, ' ');
+  return rest;
+}
+
 /** Allowed leftovers of the old name, each with its reason. A line is clean when nothing is left after removing these. */
-const ALLOWED: { reason: string; pattern: RegExp }[] = [
+const ALLOWED: {
+  reason: string;
+  pattern: RegExp;
+  /** Exact paths: when present the entry applies to these files ONLY. */ files?: readonly string[];
+}[] = [
   {
     reason:
       'the pre-rebrand training compose project, quoted as such in the training checkpoints (history of an existing deployment)',
@@ -143,7 +163,7 @@ const ALLOWED: { reason: string; pattern: RegExp }[] = [
     reason:
       'local folder names (~/BELGOBETON, ~/BELGOBETON-finance, -data, -training-private, ~/belgobeton) are out of scope in Phase 1',
     pattern:
-      /(?:~|\$HOME|\/Users\/[a-z]+)?\/?BELGOBETON(?:-finance|-data|-training-private)?\b|~\/belgobeton\b|\$HOME\/belgobeton\b/g,
+      /(?:~|\$HOME|\/Users\/[a-z]+)\/BELGOBETON(?:-finance|-data|-training-private)?\b|~\/belgobeton\b|\$HOME\/belgobeton\b/g,
   },
   {
     reason: "the finance worktree's compose project and volume (local, out of scope)",
@@ -164,8 +184,20 @@ const ALLOWED: { reason: string; pattern: RegExp }[] = [
   },
   {
     reason:
-      'BELGO is how the company\'s monthly files tag the Tétouan plant ("BETON BELGO MM.2026"): a plant tag the history importer maps by configuration, not the product name (T11, decision 210)',
-    pattern: /\bBELGO\b(?!BETON)/gi,
+      'BELGO is how the company\'s monthly files tag the Tétouan plant ("BETON BELGO MM.2026"): a plant tag the history importer maps by configuration, not the product name (T11, decision 210). R18 4D: ONLY the files that must carry the tag, by exact path: the plant-tag mapping, the twin generator, and the tests of the importer that build a mapping for that plant',
+    pattern: /\bBELGO\b(?![\s_-]*b[eé]ton)/g, // the capitalized tag only; never when the product name follows
+    files: BELGO_PLANT_TAG_FILES,
+  },
+  {
+    reason:
+      'a test asserts that the import documentation no longer names the former data folder (R18 4D: this file only)',
+    pattern: /BELGOBETON-data/g,
+    files: ['scripts/import-docs.test.ts'],
+  },
+  {
+    reason: 'the legacy browser storage test names the former product in its title (R18 4D: this file only)',
+    pattern: /\(BELGOBETON-named\)/g,
+    files: ['src/modules/field/ui/legacy-storage.test.ts'],
   },
   {
     reason: 'the former name quoted on purpose ("formerly BELGOBETON")',
@@ -200,8 +232,7 @@ describe('tier 2: the rest of the repository keeps the old name only where the a
         continue;
       }
       for (const [i, line] of content.split('\n').entries()) {
-        let rest = line;
-        for (const a of ALLOWED) rest = rest.replace(a.pattern, ' ');
+        const rest = remainsOfOldName(f, line);
         if (OLD.test(rest)) stray.push(`${f}:${i + 1}: ${line.trim().slice(0, 120)}`);
         OLD.lastIndex = 0;
       }
@@ -209,3 +240,51 @@ describe('tier 2: the rest of the repository keeps the old name only where the a
     expect(stray).toEqual([]);
   });
 });
+
+describe('R18 4D: the BELGO plant-tag allowance is as narrow as it can be', () => {
+  const stray = (file: string, line: string) => {
+    OLD.lastIndex = 0;
+    const r = OLD.test(remainsOfOldName(file, line));
+    OLD.lastIndex = 0;
+    return r;
+  };
+  it('lists exact paths that exist and really carry the tag (no stale entry, no wildcard)', () => {
+    for (const f of BELGO_PLANT_TAG_FILES) {
+      expect(tracked.includes(f) || existsSyncSafe(f), f).toBe(true);
+      expect(f).not.toMatch(/[*?]/);
+      expect(/\bBELGO\b(?![\s_-]*b[eé]ton)/.test(text(f)), `${f} no longer needs the allowance`).toBe(true);
+    }
+  });
+  it('the tag is clean in those files only', () => {
+    for (const f of BELGO_PLANT_TAG_FILES) expect(stray(f, "plant: 'BELGO',"), f).toBe(false);
+    for (const f of [
+      'src/app/page.tsx',
+      'messages/fr.json',
+      'scripts/seed-training.ts',
+      'docs/RUNBOOK.md',
+      'src/modules/importer/history/service/read-set.ts',
+      'tests/import.int.test.ts',
+    ])
+      expect(stray(f, "plant: 'BELGO',"), f).toBe(true);
+  });
+  it('the old PRODUCT name stays refused even in the files that may carry the tag', () => {
+    for (const f of BELGO_PLANT_TAG_FILES)
+      for (const line of [
+        'BELGOBETON',
+        'Belgobeton',
+        'belgo beton',
+        'Belgo-Béton',
+        'belgo_beton',
+        "const name = 'BELGOBETON'; // BELGO",
+      ])
+        expect(stray(f, line), `${f}: ${line}`).toBe(true);
+  });
+});
+function existsSyncSafe(f: string): boolean {
+  try {
+    readFileSync(f);
+    return true;
+  } catch {
+    return false;
+  }
+}

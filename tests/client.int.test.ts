@@ -136,20 +136,20 @@ describe('phone is sealed (AC-MD-01 data part)', () => {
     const client = await create(users.office, {
       name: uniqueName(),
       kind: 'person',
-      phone: '+212 600-123456',
+      phone: '+212 500-000456',
     });
-    expect(client.phone).toBe('+212 600-123456');
+    expect(client.phone).toBe('+212 500-000456');
     const { rows } = await inCtx(users.office, (tx) =>
       tx.query<{ phone_enc: string }>('select phone_enc from client where id = $1', [client.id]),
     );
     expect(rows[0]!.phone_enc).toMatch(/^f1\./);
     expect(rows[0]!.phone_enc).not.toContain('600');
     const listed = (await listClients(app, users.office, deps)).find((c) => c.id === client.id);
-    expect(listed?.phone).toBe('+212 600-123456');
+    expect(listed?.phone).toBe('+212 500-000456');
   });
 
   it('an edit that does not touch the phone leaves its ciphertext as it was', async () => {
-    const client = await create(users.office, { name: uniqueName(), kind: 'person', phone: '0600123456' });
+    const client = await create(users.office, { name: uniqueName(), kind: 'person', phone: '0500000456' });
     const sealed = () =>
       inCtx(users.owner, (tx) =>
         tx.query<{ phone_enc: string }>('select phone_enc from client where id = $1', [client.id]),
@@ -159,14 +159,14 @@ describe('phone is sealed (AC-MD-01 data part)', () => {
       app,
       users.office,
       client.id,
-      { name: client.name, kind: 'person', phone: '0600123456', notes: 'x' },
+      { name: client.name, kind: 'person', phone: '0500000456', notes: 'x' },
       deps,
     );
     expect(await sealed()).toBe(before);
   });
 
   it('crypto:rotate moves it to a new key as the system actor', async () => {
-    const client = await create(users.office, { name: uniqueName(), kind: 'person', phone: '0611000000' });
+    const client = await create(users.office, { name: uniqueName(), kind: 'person', phone: '0500000011' });
     const spec = ENCRYPTED_COLUMNS.find((c) => c.table === 'client' && c.column === 'phone_enc')!;
     expect(spec.pool).toBe('system');
     const k9 = `k9:${Buffer.alloc(32, 9).toString('base64')}`;
@@ -180,7 +180,7 @@ describe('phone is sealed (AC-MD-01 data part)', () => {
         tx.query<{ phone_enc: string }>('select phone_enc from client where id = $1', [client.id]),
       );
       expect(rows[0]!.phone_enc).toMatch(/^f1\.k9\./);
-      expect(next.decrypt(rows[0]!.phone_enc)).toBe('0611000000');
+      expect(next.decrypt(rows[0]!.phone_enc)).toBe('0500000011');
     } finally {
       // Put every row back on the configured key (k9 stays decryptable) so the other tests read their phones.
       await rotateColumn(queryable, spec, parseKeyring(`${env.FIELD_ENCRYPTION_KEYS},${k9}`));

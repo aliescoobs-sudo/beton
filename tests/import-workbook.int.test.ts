@@ -80,7 +80,7 @@ const sheets = (over: Partial<Record<string, (string | number)[][]>> = {}) =>
       name: 'Clients',
       rows: [
         ['Nom', 'Type', 'ICE', 'Téléphone'],
-        [CLIENT, 'company', CLIENT_ICE, '0600000000'],
+        [CLIENT, 'company', CLIENT_ICE, '0500000000'],
       ],
     },
     {
@@ -326,7 +326,7 @@ describe('the real run', () => {
     expect(events.rows[0]?.actor_user_id).toBe(owner.id);
     expect(events.rows[0]?.after).toMatchObject({ sha256: first.sha256, size_bytes: buf.length });
     const text = JSON.stringify(events.rows[0]?.after);
-    for (const secret of [CLIENT, 'Banque Fictive', `FAKE${tag}1`, '0600000000'])
+    for (const secret of [CLIENT, 'Banque Fictive', `FAKE${tag}1`, '0500000000'])
       expect(text).not.toContain(secret);
     // every row of the run is findable by the run's tag (what the rollback reads)
     expect(

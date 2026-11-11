@@ -93,9 +93,20 @@ export async function assertReservedAccountsOrExit(): Promise<void> {
   try {
     const { assertNoUsableReservedAccounts, assertReservedBoundaryOn } =
       await import('./service/reserved-admission');
+    const { AdmissionUnavailableError } = await import('./service/reserved-admission');
     (globalThis as { __kayasAdmission?: string }).__kayasAdmission = 'pending'; // the readiness probe says "not ready" until this passes
-    await assertNoUsableReservedAccounts(getPool('system'));
-    await assertReservedBoundaryOn(getPool('system'));
+    // Like the training marker (readTrainingMarker): the database may still be being migrated (the e2e run starts the server while its database is
+    // created). A database WITHOUT the admission functions is retried for up to a minute and then the server does not start; it is never admitted.
+    for (let attempt = 1; ; attempt++) {
+      try {
+        await assertNoUsableReservedAccounts(getPool('system'));
+        await assertReservedBoundaryOn(getPool('system'));
+        break;
+      } catch (error) {
+        if (!(error instanceof AdmissionUnavailableError) || attempt >= 60) throw error;
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+    }
     (globalThis as { __kayasAdmission?: string }).__kayasAdmission = 'done';
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));

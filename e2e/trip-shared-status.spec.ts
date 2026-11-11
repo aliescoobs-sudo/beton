@@ -99,7 +99,7 @@ test.beforeAll(async () => {
   const plantId = plant.value.id;
   plantRowId = plantId;
   plantCode = plant.value.code;
-  const phoneSet = await setPlantPhone(app, owner, plantId, '0539222222');
+  const phoneSet = await setPlantPhone(app, owner, plantId, '0500000222');
   if (!phoneSet.ok) throw new Error(phoneSet.error);
   await createUser(
     createAuth({ authPool: auth, env: { ...env, APP_BASE_URL: E2E_BASE_URL }, log: () => undefined }),
@@ -189,7 +189,7 @@ test('the plant records "loaded": the driver\'s screen shows it, done by the Cen
   await phone(driver);
   await expect(stage(driver, orderA, 'loaded')).toHaveAttribute('data-done', 'false');
   // the plant's number is a tel: link on the rotation of that plant (the owner set it)
-  await expect(driver.getByTestId(`call-plant-${orderA}`)).toHaveAttribute('href', 'tel:0539222222');
+  await expect(driver.getByTestId(`call-plant-${orderA}`)).toHaveAttribute('href', 'tel:0500000222');
   // the first tap is offered at once; there is no "waiting for the plant" block any more
   await expect(driver.getByTestId(`trip-wait-${orderA}`)).toHaveCount(0);
 
@@ -537,7 +537,7 @@ test('T9b addendum: the owner sets the plant number (audited), the plant manager
   const owner = await ownerCtx.newPage();
   await loginOwner(owner, 'fr');
   await owner.goto('/fr/master-data/plants');
-  await owner.getByTestId(`plant-phone-${plantCode}`).fill('+212 5 39 33 33 33');
+  await owner.getByTestId(`plant-phone-${plantCode}`).fill('+212 5 00 00 33 33');
   await owner.getByTestId(`plant-phone-save-${plantCode}`).click();
   await expect(owner.getByTestId('plant-message')).toBeVisible();
   await expect
@@ -546,9 +546,9 @@ test('T9b addendum: the owner sets the plant number (audited), the plant manager
         (await migrator.query<{ phone: string }>('select phone from plant where id = $1', [plantRowId]))
           .rows[0]!.phone,
     )
-    .toBe('+212 5 39 33 33 33');
+    .toBe('+212 5 00 00 33 33');
   const audit = await migrator.query(
-    `select 1 from audit_event where table_name = 'plant' and action = 'update' and row_id = $1 and after->>'phone' = '+212 5 39 33 33 33'`,
+    `select 1 from audit_event where table_name = 'plant' and action = 'update' and row_id = $1 and after->>'phone' = '+212 5 00 00 33 33'`,
     [plantRowId],
   );
   expect(audit.rowCount).toBeGreaterThan(0);
@@ -563,7 +563,7 @@ test('T9b addendum: the owner sets the plant number (audited), the plant manager
   const driverCtx = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const driver = await driverCtx.newPage();
   await phone(driver);
-  await expect(driver.getByTestId(`call-plant-${orderA}`)).toHaveAttribute('href', 'tel:+212 5 39 33 33 33');
+  await expect(driver.getByTestId(`call-plant-${orderA}`)).toHaveAttribute('href', 'tel:+212 5 00 00 33 33');
   await driverCtx.close();
 });
 

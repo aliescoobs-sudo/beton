@@ -408,33 +408,33 @@ describe('T9b addendum: the phone number of a plant', () => {
     (await superRows<{ phone: string | null }>(`select phone from plant where id = $1`, [plant]))[0]!.phone;
 
   it('only the owner and app_admin set it (audited); everybody else is refused; an empty text clears it', async () => {
-    expect(await setPlantPhone(app, owner, plantA, '+212 5 39 00 00 01')).toEqual({ ok: true, value: true });
-    expect(await phoneOf(plantA)).toBe('+212 5 39 00 00 01');
-    expect(await setPlantPhone(app, appAdmin, plantB, '0539000002')).toEqual({ ok: true, value: true });
+    expect(await setPlantPhone(app, owner, plantA, '+212 5 00 00 00 01')).toEqual({ ok: true, value: true });
+    expect(await phoneOf(plantA)).toBe('+212 5 00 00 00 01');
+    expect(await setPlantPhone(app, appAdmin, plantB, '0500000002')).toEqual({ ok: true, value: true });
     for (const u of [pmA, pmB, sales, purchases, accountant, driver1, pumpOp, partner, support]) {
-      await expect(setPlantPhone(app, u, plantA, '0600000000'), u.role).rejects.toBeInstanceOf(
+      await expect(setPlantPhone(app, u, plantA, '0500000000'), u.role).rejects.toBeInstanceOf(
         ForbiddenError,
       );
       expect(
         await denied(
-          asRole(u, (tx) => tx.query('select public.set_plant_phone($1, $2)', [plantA, '0600000000'])),
+          asRole(u, (tx) => tx.query('select public.set_plant_phone($1, $2)', [plantA, '0500000000'])),
         ),
         u.role,
       ).toBe(true);
     }
-    expect(await phoneOf(plantA)).toBe('+212 5 39 00 00 01');
+    expect(await phoneOf(plantA)).toBe('+212 5 00 00 00 01');
     expect(await setPlantPhone(app, owner, plantA, 'appelez-moi')).toEqual({ ok: false, error: 'INVALID' });
     const audit = await superRows<{ actor_user_id: string; after: { phone?: string } }>(
       `select actor_user_id, after from audit_event where table_name = 'plant' and action = 'update' and row_id = $1 order by id desc limit 2`,
       [plantB],
     );
-    expect(audit[0]).toMatchObject({ actor_user_id: appAdmin.id, after: { phone: '0539000002' } });
+    expect(audit[0]).toMatchObject({ actor_user_id: appAdmin.id, after: { phone: '0500000002' } });
     expect(await setPlantPhone(app, owner, plantB, '')).toEqual({ ok: true, value: true });
     expect(await phoneOf(plantB)).toBeNull();
   });
 
   it('a driver reads the phone of the plant of his own rotations, and nothing else of any plant; none when unset', async () => {
-    await setPlantPhone(app, owner, plantA, '0539111111');
+    await setPlantPhone(app, owner, plantA, '0500000111');
     const a = await newTrip(plantA, truckA, driverRow1);
     const b = await newTrip(plantB, truckB, driverRow1); // plant B has no phone
     const other = await newTrip(plantA, truckA, driverRow2);
@@ -448,7 +448,7 @@ describe('T9b addendum: the phone number of a plant', () => {
         ).rows,
     );
     const ids = new Map(mine.map((r) => [r.trip_id, r.phone]));
-    expect(ids.get(a)).toBe('0539111111');
+    expect(ids.get(a)).toBe('0500000111');
     expect(ids.has(b)).toBe(false);
     expect(ids.has(other)).toBe(false);
     for (const u of [pmA, owner, sales])

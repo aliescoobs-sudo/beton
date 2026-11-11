@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { E2E_MD, goNav, loginAndEnrol, loginOwner, logout } from './fixtures';
 
-// ledger L16: encaissé vs total. Owner and support read; office has neither the link nor the page (AC-SEC-05).
+// ledger L16: encaissé vs total. Owner and accountant read; office has neither the link nor the page (AC-SEC-05).
 test.describe.configure({ mode: 'serial' });
 
 const suffix = Math.random().toString(36).slice(2, 7).toUpperCase();

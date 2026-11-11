@@ -3,8 +3,8 @@ import { E2E_MD, loginAndEnrol, goNav } from './fixtures';
 
 test.describe.configure({ mode: 'serial' });
 
-test('a partner adds a component with both names and a purchase unit in French', async ({ page }) => {
-  await loginAndEnrol(page, 'fr', E2E_MD.componentPartnerFr.email);
+test('an app_admin adds a component with both names and a purchase unit in French', async ({ page }) => {
+  await loginAndEnrol(page, 'fr', E2E_MD.componentAdminFr.email);
   await goNav(page, 'components-link');
   await expect(page).toHaveURL('/fr/master-data/components');
   await expect(page.getByTestId('component-CMP-01')).toContainText('Ciment');
@@ -35,7 +35,7 @@ test('plant reads components with no edit control', async ({ page }) => {
 });
 
 test('the components screen renders right-to-left in Arabic with Arabic names', async ({ page }) => {
-  await loginAndEnrol(page, 'ar', E2E_MD.componentPartnerAr.email);
+  await loginAndEnrol(page, 'ar', E2E_MD.componentAdminAr.email);
   await goNav(page, 'components-link');
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
   await expect(page.getByTestId('component-CMP-01').getByTestId('component-name')).toHaveText('إسمنت');

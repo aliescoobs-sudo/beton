@@ -25,7 +25,7 @@ describe('the question is masked before any model sees it (AC-ASSIST-05)', () =>
   it('hides amounts, phones, ICE and long numbers and keeps them for a draft', () => {
     const ps = new Pseudonymizer(entities);
     const masked = ps.maskQuestion(
-      'encaisse le chèque 8451237 de 45 000,50 dh, tel 06 61 23 45 67, ICE 001234567000089, 20 m³ B25',
+      'encaisse le chèque 8451237 de 45 000,50 dh, tel 05 00 00 00 67, ICE 001234567000089, 20 m³ B25',
     );
     expect(masked).not.toMatch(/8451237|45 000|0661|001234567000089/);
     expect(masked).toContain('20 m³ B25');

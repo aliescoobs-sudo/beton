@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { E2E_MD, goNav, loginAndEnrol, loginOwner, logout } from './fixtures';
 
-// ledger L28: account statements. Owner and support read them and export a CSV; office has neither link nor page.
+// ledger L28: account statements. Owner and accountant read them and export a CSV; office has neither link nor page.
 test.describe.configure({ mode: 'serial' });
 
 const reference = `STM${Math.random().toString(36).slice(2, 7).toUpperCase()}`;

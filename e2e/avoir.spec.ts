@@ -11,7 +11,7 @@ import { checkScreen, watch } from './screen-check';
 import { E2E_MD, goNav, loginAndEnrol, loginOwner, logout } from './fixtures';
 
 // integration I1.6: the avoir of refused concrete. The owner issues it (a reason; a fresh second factor), it shows on the
-// client statement; support reads; office and plant have nothing (AC-INT-12, AC-INT-24).
+// client statement; the accountant reads; office and plant have nothing (AC-INT-12, AC-INT-24).
 test.describe.configure({ mode: 'serial' });
 
 const env = testEnv(E2E_DATABASE);

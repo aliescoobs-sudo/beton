@@ -3,9 +3,9 @@
 Données **entièrement fictives** (tous les noms portent « FICTIF », chaque fichier est signé « synthétique »). À faire sur la version de **formation**, jamais sur une base de production. Les vrais fichiers de l'entreprise ne servent qu'à l'import réel (RUNBOOK §4b, décision 210).
 
 ## 1. Préparer le jumeau (propriétaire ou administrateur)
-1. `corepack pnpm import:twin ./jumeau` : écrit `belgo/` (8 fichiers, pas de février), `chaoun/` (9 fichiers), `charges/` (9 fichiers) et `mapping/` (3 fichiers de correspondance). Environ 1 200 lignes Tétouan, 800 Chefchaouen, ~160 et ~50 clients avec des quasi-doublons, des lignes sans date ou sans m³, des BL en double, des trous et des valeurs absurdes (Chefchaouen janvier-février), des lignes du mois suivant, des litres dans le texte des dépenses.
+1. `corepack pnpm import:twin ./jumeau` : écrit `tetouan/` (8 fichiers, pas de février), `chaoun/` (9 fichiers), `charges/` (9 fichiers) et `mapping/` (3 fichiers de correspondance). Environ 1 200 lignes Tétouan, 800 Chefchaouen, ~160 et ~50 clients avec des quasi-doublons, des lignes sans date ou sans m³, des BL en double, des trous et des valeurs absurdes (Chefchaouen janvier-février), des lignes du mois suivant, des litres dans le texte des dépenses.
 2. Lancer l'import (compte propriétaire, version de formation, `TRAINING_MODE=true`) :
-   `corepack pnpm import:history --dry-run ./jumeau/belgo --mapping ./jumeau/mapping/deliveries-belgo.json` puis `--stage`, de même pour `chaoun` (`deliveries-chaoun.json`) et `charges` (`expenses.json`).
+   `corepack pnpm import:history --dry-run ./jumeau/tetouan --mapping ./jumeau/mapping/deliveries-tetouan.json` puis `--stage`, de même pour `chaoun` (`deliveries-chaoun.json`) et `charges` (`expenses.json`).
 3. Écran **Import historique : décisions** (menu Administration), onglet par onglet : clients (relier un libellé à une fiche, créer, ou garder le libellé ; les groupes proches sont des suggestions), camions, chauffeurs, types de béton (`BB25`, `B25HYD`…), pompe/goulotte (`P SITRAD`), catégories de dépenses, lignes en quarantaine (corriger la date ou les m³, ou écarter).
 4. Onglet **Rapprochement** : par centrale et par mois, lignes lues / importées / en quarantaine et somme des m³ lus / importés (à comparer au total de chaque Excel). Le mois `0000-00` regroupe les lignes sans date tant qu'elles ne sont pas corrigées.
 5. `--apply` (phrase à taper + code de l'authentificateur). Le retour arrière est `--rollback <identifiant du lot>`.
@@ -27,3 +27,5 @@ Données **entièrement fictives** (tous les noms portent « FICTIF », chaque f
 - Relancer le même `--apply` : « déjà appliqué », rien n'est écrit.
 - `--rollback` : l'historique disparaît de tous les écrans à la fois ; les clients créés par le lot sont archivés ; les décisions restent.
 - Charger le jumeau sur une base de production, ou un vrai fichier sur la formation : refusé avec un message clair.
+
+Un lot seulement *préparé* (`--stage`) peut être annulé avec `corepack pnpm import:history --rollback <identifiant du lot> --account <email>` (même phrase à taper et même code qu'un lot appliqué) : le lot est marqué annulé, ses lignes en quarantaine sont écartées par le lot (un nouveau `--stage` des mêmes fichiers les rouvre), rien n'est supprimé.

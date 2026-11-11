@@ -10,7 +10,7 @@ import { E2E_MD, loginAndEnrol, loginOwner } from './fixtures';
 import { checkScreen, watch } from './screen-check';
 
 // operations O15 (AC-OPS-24): m³ delivered per period and type, client or zone; the amounts for the owner only, none for
-// the partner, no page for the plant.
+// the app_admin, no page for the plant.
 test.describe.configure({ mode: 'serial' });
 
 const env = testEnv(E2E_DATABASE);

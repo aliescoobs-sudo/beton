@@ -217,13 +217,17 @@ async function insertMany(
   table: string,
   columns: string[],
   rows: unknown[][],
+  suffix = '',
 ): Promise<void> {
   const size = Math.max(1, Math.floor(30000 / columns.length));
   for (let i = 0; i < rows.length; i += size) {
     const chunk = rows.slice(i, i + size);
     const params: unknown[] = [];
     const values = chunk.map((r) => `(${r.map((v) => (params.push(v), `$${params.length}`)).join(',')})`);
-    await tx.query(`insert into ${table} (${columns.join(',')}) values ${values.join(',')}`, params);
+    await tx.query(
+      `insert into ${table} (${columns.join(',')}) values ${values.join(',')} ${suffix}`,
+      params,
+    );
   }
 }
 
@@ -377,6 +381,12 @@ export async function runHistory(opts: HistoryOptions): Promise<HistoryReport> {
               ];
             }),
           );
+          // the same files staged again after their batch was discarded: the rows that batch discarded come back as open, the others are untouched
+          await tx.query(
+            `update history.quarantine set status = 'open', batch_discarded = false, fixed = null, decided_by = null, decided_at = null
+              where set_sha = $1 and kind = $2 and batch_discarded`,
+            [read.setSha, mapping.kind],
+          );
           await insertMany(
             tx,
             'history.quarantine',
@@ -392,6 +402,7 @@ export async function runHistory(opts: HistoryOptions): Promise<HistoryReport> {
               q.reason,
               JSON.stringify(q.raw),
             ]),
+            'on conflict (set_sha, kind, file_ord, sheet_pos, row_no) do nothing',
           );
           await recordAuditEvent(tx, {
             action: 'import',
@@ -650,6 +661,33 @@ export async function rollbackHistory(opts: {
       ).rows[0];
       if (!b) return void report.blocked.push('NO_SUCH_BATCH');
       if (b.status === 'rolled_back') return void (report.alreadyRolledBack = true);
+      if (b.status === 'staged') {
+        // R18 4B: a batch that was only STAGED is reversed too: nothing was applied, so no client was created and no row exists; the quarantined rows of the
+        // set are marked discarded BY THE BATCH (staging the same files again reopens them); nothing is deleted
+        const set = (
+          await tx.query<{ set_sha: string; kind: string }>(
+            `select set_sha, kind from history.batch where id = $1`,
+            [opts.batchId],
+          )
+        ).rows[0]!;
+        await tx.query(
+          `update history.quarantine set status = 'discarded', batch_discarded = true, decided_by = $3, decided_at = clock_timestamp()
+            where set_sha = $1 and kind = $2 and status in ('open', 'fixed')`,
+          [set.set_sha, set.kind, opts.actor.id],
+        );
+        await tx.query(
+          `update history.batch set status = 'rolled_back', rolled_back_by = $2, rolled_back_at = clock_timestamp() where id = $1`,
+          [opts.batchId, opts.actor.id],
+        );
+        await recordAuditEvent(tx, {
+          action: 'reverse',
+          table: 'history_import',
+          rowId: opts.batchId,
+          after: { batch_id: opts.batchId, staged_only: true },
+          reason: 'history staging discarded',
+        });
+        return;
+      }
       if (b.status !== 'applied') return void report.blocked.push('NOT_APPLIED');
       const made = await tx.query<{ row_id: string }>(
         `select row_id from audit_event where action = 'insert' and table_name = 'client' and request_id like $1`,

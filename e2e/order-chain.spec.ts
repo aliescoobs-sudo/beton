@@ -17,7 +17,7 @@ import { checkScreen, watch } from './screen-check';
 import { E2E_MD, goNav, loginAndEnrol, loginOwner, logout } from './fixtures';
 
 // integration I3.1: the order chain. Every role reads quantities and stages; the paid stage and every amount are for the owner
-// and support only (AC-INT-16, AC-INT-24).
+// and accountant only (AC-INT-16, AC-INT-24).
 test.describe.configure({ mode: 'serial' });
 
 const env = testEnv(E2E_DATABASE);

@@ -43,7 +43,7 @@ const order: SampleOrder = {
   zone: 'Fnideq',
   unitPriceHtCentimes: 78_000,
   totalTtcCentimes: 11_232_000,
-  clientPhone: '+212600000017',
+  clientPhone: '+212500000017',
 };
 const delivery: SampleDelivery = {
   blNo: 'BL-2026-00001',

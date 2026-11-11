@@ -1,16 +1,16 @@
 import { expect, test } from '@playwright/test';
 import { E2E_MD, loginAndEnrol, goNav } from './fixtures';
 
-// Serial: the office test reads the clients the partner test creates.
+// Serial: the office test reads the clients the app_admin test creates.
 test.describe.configure({ mode: 'serial' });
 
 const ice = `0${Date.now()}`.slice(0, 15).padEnd(15, '7');
 const name = `Client E2E ${Date.now()}`;
 
-test('a partner creates a client from a name alone, is blocked on a duplicate ICE and overrides with a reason', async ({
+test('an app_admin creates a client from a name alone, is blocked on a duplicate ICE and overrides with a reason', async ({
   page,
 }) => {
-  await loginAndEnrol(page, 'fr', E2E_MD.clientPartnerFr.email);
+  await loginAndEnrol(page, 'fr', E2E_MD.clientAdminFr.email);
   await goNav(page, 'clients-link');
   await expect(page).toHaveURL('/fr/master-data/clients');
 
@@ -28,7 +28,7 @@ test('a partner creates a client from a name alone, is blocked on a duplicate IC
   await edit.locator('button[type=submit]').click();
   await expect(edit.getByTestId('client-message')).toHaveText('Enregistré.');
 
-  // A second client on the same ICE is blocked and points at the first; the partner can override with a reason.
+  // A second client on the same ICE is blocked and points at the first; the app_admin can override with a reason.
   await page.goto('/fr/master-data/clients');
   const second = `${name} bis`;
   await form.locator('input[name=name]').fill(second);
@@ -91,10 +91,10 @@ test('plant has no clients page (404)', async ({ page }) => {
   expect(response?.status()).toBe(404);
 });
 
-test('the clients screen renders right-to-left in Arabic and a partner can create a client', async ({
+test('the clients screen renders right-to-left in Arabic and an app_admin can create a client', async ({
   page,
 }) => {
-  await loginAndEnrol(page, 'ar', E2E_MD.clientPartnerAr.email);
+  await loginAndEnrol(page, 'ar', E2E_MD.clientAdminAr.email);
   await goNav(page, 'clients-link');
   await expect(page).toHaveURL('/ar/master-data/clients');
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');

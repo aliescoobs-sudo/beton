@@ -77,7 +77,7 @@ test.beforeAll(async () => {
   const twin = buildTwin({ seed: 7, belgoRows: 64, chaounRows: 36, belgoClients: 10, chaounClients: 5 });
   const maps = twinMappings();
   for (const [dir, key, plantCode] of [
-    ['belgo', 'deliveries-belgo.json', plantA.code],
+    ['tetouan', 'deliveries-tetouan.json', plantA.code],
     ['chaoun', 'deliveries-chaoun.json', plantB.code],
     ['charges', 'expenses.json', null],
   ] as const) {

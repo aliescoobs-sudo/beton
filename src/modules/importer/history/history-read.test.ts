@@ -7,7 +7,7 @@ import { labelUsage, readSet } from './service/read-set';
 import { buildTwin, twinMappings } from './twin';
 
 const mappings = twinMappings();
-const belgo = mappings['deliveries-belgo.json'] as HistoryMapping;
+const tetouan = mappings['deliveries-tetouan.json'] as HistoryMapping;
 const chaoun = mappings['deliveries-chaoun.json'] as HistoryMapping;
 const expenses = mappings['expenses.json'] as HistoryMapping;
 const BELGO_HEAD = [
@@ -80,7 +80,7 @@ describe('the history reader works by header NAME, not by position', () => {
           ),
         },
       ],
-      belgo,
+      tetouan,
     );
     const c = readSet(
       [
@@ -137,7 +137,7 @@ describe('the history reader works by header NAME, not by position', () => {
       BELGO_HEAD,
       { formattedColumns: 257, autoFilterRef: 'A2:IV' },
     );
-    const r = readSet([{ ord: 1, buf }], belgo);
+    const r = readSet([{ ord: 1, buf }], tetouan);
     expect(r.problems).toEqual([]);
     expect(r.deliveries).toHaveLength(1);
     const stats = r.files[0]?.read[0]?.stats;
@@ -161,7 +161,7 @@ describe('the history reader works by header NAME, not by position', () => {
           ),
         },
       ],
-      belgo,
+      tetouan,
     );
     expect(r.deliveries).toHaveLength(0);
     expect(r.quarantine.map((q) => q.reason)).toEqual(['NO_DATE', 'NO_VOLUME', 'BAD_VOLUME']);
@@ -179,7 +179,7 @@ describe('the history reader works by header NAME, not by position', () => {
       bl,
       'P',
     ]);
-    const r = readSet([{ ord: 1, buf: file(rows, BELGO_HEAD) }], belgo);
+    const r = readSet([{ ord: 1, buf: file(rows, BELGO_HEAD) }], tetouan);
     const s = r.files[0]?.read[0]?.stats;
     expect(s?.blDuplicateRows).toEqual([4, 5]);
     expect(s?.blGaps).toBe(2);
@@ -206,18 +206,18 @@ describe('the history reader works by header NAME, not by position', () => {
 
   it('refuses the 1904 date system and reads a file with an autofilter a strict parser rejects', () => {
     const base = [{ name: 'LIVRAISON 1', rows: [[''], BELGO_HEAD, [D, 'KARI FICTIF', 'C', 8]] }];
-    const refused = readSet([{ ord: 1, buf: buildWorkbook(base, false, { date1904: true }) }], belgo);
+    const refused = readSet([{ ord: 1, buf: buildWorkbook(base, false, { date1904: true }) }], tetouan);
     expect(refused.files[0]?.problems.join(' ')).toMatch(/1904/);
     expect(refused.deliveries).toHaveLength(0);
     const ok = readSet(
       [{ ord: 1, buf: buildWorkbook([{ ...base[0]!, autoFilterRef: 'A2:' }], false) }],
-      belgo,
+      tetouan,
     );
     expect(ok.deliveries).toHaveLength(1);
   });
 
   it('a missing required header makes the sheet unreadable (a fixed phrase), not an empty import', () => {
-    const r = readSet([{ ord: 1, buf: file([[D, 'KARI FICTIF']], ['DATE', 'CLIENTS']) }], belgo);
+    const r = readSet([{ ord: 1, buf: file([[D, 'KARI FICTIF']], ['DATE', 'CLIENTS']) }], tetouan);
     expect(r.files[0]?.problems).toContain('HEADER_MISSING: m3');
   });
 });
@@ -273,11 +273,11 @@ describe('the twin', () => {
   const twin = buildTwin();
   const group = (dir: string) =>
     twin.filter((f) => f.path.startsWith(`${dir}/`)).map((f, i) => ({ ord: i + 1, buf: f.buf }));
-  const tet = readSet(group('belgo'), belgo);
+  const tet = readSet(group('tetouan'), tetouan);
   const che = readSet(group('chaoun'), chaoun);
 
   it('has no February file for the Tétouan plant and nine for Chefchaouen; the three mapping files go with it', () => {
-    expect(group('belgo')).toHaveLength(8);
+    expect(group('tetouan')).toHaveLength(8);
     expect(group('chaoun')).toHaveLength(9);
     expect(group('charges')).toHaveLength(9);
     expect(Object.keys(twinMappings())).toHaveLength(3);

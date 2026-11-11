@@ -3,7 +3,7 @@
 //   corepack pnpm import:history --dry-run <folder> --mapping <file>              (reads and reports; writes nothing; needs the database)
 //   corepack pnpm import:history --stage   <folder> --mapping <file> --account <email>   (writes the staging: labels to decide, rows in quarantine)
 //   corepack pnpm import:history --apply   <folder> --mapping <file> --account <email>   (typed phrase + authenticator code; blocked while mappings are open)
-//   corepack pnpm import:history --rollback <batch id> --account <email>          (typed phrase + authenticator code; marks the batch, deletes nothing)
+//   corepack pnpm import:history --rollback <batch id> --account <email>          (typed phrase + authenticator code; marks the batch, deletes nothing; a batch that was only STAGED can be rolled back too)
 // One folder = the monthly files of ONE plant and ONE kind (the mapping names both). Files are numbered by their sorted position; the row date
 // is the truth, never the file name. History never touches live stock, invoices, the ledger, trips or dispatch (decision 211).
 // Production mode: real files only (REAL_DATA=true), refuses twin files. TRAINING_MODE=true: only the fictitious twin (pnpm import:twin).

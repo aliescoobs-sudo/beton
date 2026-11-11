@@ -32,7 +32,7 @@ beforeAll(async () => {
 
 describe('the leak index', () => {
   it('holds every name, number, plate and sealed phone we have, and finds each in a payload', async () => {
-    const phone = '0661234567';
+    const phone = '0500000067';
     await withRlsContext(app, { userId: users.owner.id, role: 'owner', requestId: marker }, async (tx) => {
       await tx.query(
         `insert into client (id, code, name, kind, ice, contact_name, phone_enc)
@@ -45,7 +45,7 @@ describe('the leak index', () => {
       `chez Société ${marker}`,
       `appeler Contact ${marker}`,
       'ICE 001234567000089',
-      'tel 06 61 23 45 67',
+      'tel 05 00 00 00 67',
     ])
       expect(scanForLeaks(payload, index).length, payload).toBeGreaterThan(0);
     // A truck plate, a driver and a user of the pilot seed are in it too.

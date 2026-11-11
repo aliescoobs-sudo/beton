@@ -3,7 +3,7 @@ import { scanForLeaks } from './leak-scan';
 
 const index = {
   names: ['Béton Atlas Sud', 'شركة النور', 'Ahmed Bennani', 'Attijariwafa bank', '12345-A-6'],
-  numbers: ['0661234567', '001234567000089', '8451237'],
+  numbers: ['0500000067', '001234567000089', '8451237'],
 };
 
 describe('the leak scan (AC-ASSIST-05, 06)', () => {
@@ -27,13 +27,13 @@ describe('the leak scan (AC-ASSIST-05, 06)', () => {
 
   it('finds a plate, a phone, an ICE and an instrument number whatever the separators', () => {
     expect(scanForLeaks('camion 12345-A-6', index)).toEqual([{ kind: 'name' }]);
-    expect(scanForLeaks('tel 06 61 23 45 67', index).map((h) => h.kind)).toContain('number');
+    expect(scanForLeaks('tel 05 00 00 00 67', index).map((h) => h.kind)).toContain('number');
     expect(scanForLeaks('ICE 001234567000089', index).map((h) => h.kind)).toContain('number');
     expect(scanForLeaks('chèque 845-1237', index).map((h) => h.kind)).toContain('number');
   });
 
   it('finds the shape of a phone, an ICE, a long number and an amount even when unknown', () => {
-    expect(scanForLeaks('+212 6 12 34 56 78', { names: [], numbers: [] }).map((h) => h.kind)).toContain(
+    expect(scanForLeaks('+212 5 00 00 00 78', { names: [], numbers: [] }).map((h) => h.kind)).toContain(
       'phone_shape',
     );
     expect(scanForLeaks('999888777666555', { names: [], numbers: [] }).map((h) => h.kind)).toContain(

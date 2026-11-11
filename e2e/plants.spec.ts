@@ -8,8 +8,10 @@ test.describe.configure({ mode: 'serial' });
 const letters = (n: number) =>
   Array.from({ length: n }, () => String.fromCharCode(65 + Math.floor(Math.random() * 26))).join('');
 
-test('a partner adds a plant, sees it on the stock screen, then archives it (French)', async ({ page }) => {
-  await loginAndEnrol(page, 'fr', E2E_MD.plantsPartnerFr.email);
+test('an app_admin adds a plant, sees it on the stock screen, then archives it (French)', async ({
+  page,
+}) => {
+  await loginAndEnrol(page, 'fr', E2E_MD.plantsAdminFr.email);
   await goNav(page, 'plants-link');
   await expect(page).toHaveURL('/fr/master-data/plants');
 
@@ -51,7 +53,7 @@ test('an office user reads the plants with no edit control', async ({ page }) =>
 test('the plants screen renders right-to-left in Arabic without overflow at phone width', async ({
   page,
 }) => {
-  await loginAndEnrol(page, 'ar', E2E_MD.plantsPartnerAr.email);
+  await loginAndEnrol(page, 'ar', E2E_MD.plantsAdminAr.email);
   await goNav(page, 'plants-link');
   await expect(page).toHaveURL('/ar/master-data/plants');
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');

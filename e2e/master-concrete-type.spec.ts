@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test';
 import { E2E_MD, loginAndEnrol, goNav } from './fixtures';
 
-test('a partner reads the seeded types and adds one in French', async ({ page }) => {
-  await loginAndEnrol(page, 'fr', E2E_MD.typePartnerFr.email);
+test('an app_admin reads the seeded types and adds one in French', async ({ page }) => {
+  await loginAndEnrol(page, 'fr', E2E_MD.typeAdminFr.email);
   await goNav(page, 'concrete-types-link');
   await expect(page).toHaveURL('/fr/master-data/concrete-types');
   await expect(page.getByTestId('type-B25')).toBeVisible();
@@ -23,7 +23,7 @@ test('plant reads the types with no edit control', async ({ page }) => {
 });
 
 test('the types screen renders right-to-left in Arabic', async ({ page }) => {
-  await loginAndEnrol(page, 'ar', E2E_MD.typePartnerAr.email);
+  await loginAndEnrol(page, 'ar', E2E_MD.typeAdminAr.email);
   await goNav(page, 'concrete-types-link');
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('أنواع الخرسانة');
