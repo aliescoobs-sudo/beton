@@ -113,7 +113,7 @@ describe('R18-05: the session is fenced at every transaction of a batch', () => 
     expect(await recorded(trips[2]!)).toBe(0);
   });
 
-  it('a newer sign-in of the same phone, a released phone and a disabled account each end an old session user at its next transaction', async () => {
+  it('a newer sign-in of the same phone and a disabled account each end an old session user at its next transaction', async () => {
     for (const how of ['relogin', 'disabled'] as const) {
       const dev = `phone-${randomUUID()}`;
       const { user } = await signedInDriver(undefined).then(async (first) => {
@@ -133,5 +133,23 @@ describe('R18-05: the session is fenced at every transaction of a batch', () => 
       expect(await recorded(t), how).toBe(0);
       await migrator.query(`update "user" set status = 'active' where id = $1`, [w.driverUserA.id]);
     }
+  });
+
+  it('R19-G5: a RELEASED phone (the office releases the device) ends the old session user at its next transaction, and a newly bound phone does not revive it', async () => {
+    const { user } = await signedInDriver();
+    const t = (await w.newTrip(w.plantA, w.truckA, w.driverA, { day: '2097-04-10' })).trip;
+    await revokeDriverDevice(deps(), w.owner, w.driverA); // the release
+    expect(await syncActions(app, user, [loaded(t)], { now: new Date() })).toEqual({
+      ok: false,
+      error: 'SESSION_ENDED',
+    });
+    expect(await recorded(t)).toBe(0);
+    // the same driver binds a NEW phone: the old session user (same driver, an older device row) is still refused
+    await signedInDriver(`phone-${randomUUID()}`);
+    expect(await syncActions(app, user, [loaded(t)], { now: new Date() })).toEqual({
+      ok: false,
+      error: 'SESSION_ENDED',
+    });
+    expect(await recorded(t)).toBe(0);
   });
 });

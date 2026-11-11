@@ -164,6 +164,7 @@ describe('B2-B6: a stage by an owner', () => {
   it('writes staging only, audits every write without any cell, hides it from every other role, and changes no live table or report', async () => {
     const live0 = await live();
     const delivered0 = await count('history.delivery'); // other suites leave applied history in the shared database: compare, do not assume zero
+    const volume0 = await historyVolume(app, A.owner, { from: '2026-01-01', to: '2026-12-31' });
     const asAdmin = A.session('app_admin') as never;
     const r = await stage(asAdmin);
     expect(r.staged).toBe(true);
@@ -171,11 +172,10 @@ describe('B2-B6: a stage by an owner', () => {
     // --- B6: nothing reached the live tables, and the reports read applied batches only
     expect(await live()).toEqual(live0);
     expect(await count('history.delivery')).toBe(delivered0);
-    expect(await historyVolume(app, A.owner, { from: '2026-01-01', to: '2026-12-31' })).toEqual(
-      expect.objectContaining({}),
-    );
+    // the reports read APPLIED batches only: the figures are exactly what they were before this stage, and no staged cell of any kind appears in them
     const volume = await historyVolume(app, A.owner, { from: '2026-01-01', to: '2026-12-31' });
-    expect(JSON.stringify(volume)).not.toContain(CELLS.client);
+    expect(volume).toEqual(volume0);
+    for (const cell of Object.values(CELLS)) expect(JSON.stringify(volume)).not.toContain(cell);
     // --- B2: every staging write is audited, and the audit log holds no cell
     const staged = {
       batch: await count(`history.batch where id = '${batch}'`),

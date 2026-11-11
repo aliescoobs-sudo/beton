@@ -276,7 +276,7 @@ describe('R18-02: a missing role is refused FIRST, before any lookup, with one a
 });
 
 describe('R18-02 (found by the catalogue with real ids): the same NULL trap in the transfer/fuel predicate', () => {
-  it('set_fuel_tank_opening and the three transfer doors write nothing for a request with a user but no role, on a real plant', async () => {
+  it('set_fuel_tank_opening writes nothing for a request with a user but no role, on a real plant (the transfer doors are called for real in the next test)', async () => {
     const before = [
       await w.count('select 1 from fuel_tank_opening'),
       await w.count('select 1 from audit_event'),
@@ -317,5 +317,71 @@ describe('R18-02 (found by the catalogue with real ids): the same NULL trap in t
           ).rows[0]!.r,
       ),
     ).toBe(true);
+  });
+
+  it('the three transfer doors (send, pickup, receive) are CALLED on a real fuel transfer: no role / empty role / the wrong plant manager are refused and write nothing; the right actors move it', async () => {
+    // a real fuel transfer from plant A to plant B, sent by the owner (a fuel transfer moves no stock)
+    const id = await w.as(
+      w.owner,
+      async (tx) =>
+        (
+          await tx.query<{ id: string }>(
+            `select public.transfer_send('fuel', $1, $2, null, 1000, current_date, 'r18-02') as id`,
+            [w.plantA, w.plantB],
+          )
+        ).rows[0]!.id,
+    );
+    const snapshot = async () => [
+      await w.count(`select 1 from plant_transfer_step where transfer_id = '${id}'`),
+      await w.count(`select 1 from plant_transfer where id = '${id}' and status = 'sent'`),
+      await w.count('select 1 from plant_transfer'),
+      await w.count('select 1 from audit_event'),
+    ];
+    const before = await snapshot();
+    expect(before.slice(0, 2)).toEqual([1, 1]);
+    const doors: [string, string, unknown[]][] = [
+      [
+        'send',
+        `select public.transfer_send('fuel', $1, $2, null, 500, current_date, null)`,
+        [w.plantA, w.plantB],
+      ],
+      ['pickup', `select public.transfer_pickup($1, null)`, [id]],
+      ['receive', `select public.transfer_receive($1, 1000, current_date, null)`, [id]],
+    ];
+    for (const ctx of [
+      { user: w.pmA.id, role: null },
+      { user: w.pmA.id, role: '' },
+    ])
+      for (const [door, sql, args] of doors) {
+        const err = await w.failure(ctx, sql, args);
+        expect(err?.code, `${door} as ${JSON.stringify(ctx.role)}`).toBe('42501');
+        if (door !== 'send')
+          expect(err?.message, door).toBe(
+            `${door === 'pickup' ? 'transfer_pickup' : 'transfer_receive'}: not an admitted actor`,
+          );
+      }
+    // the receiving plant's manager cannot hand it to the carrier (the sender's job)
+    expect(
+      (await w.failure({ user: w.pmB.id, role: 'plant_manager' }, doors[1]![1], doors[1]![2]))?.code,
+    ).toBe('42501');
+    expect(await snapshot()).toEqual(before);
+    // the sender hands it over (positive control); now in transit, the doors are asked again with no role, and the SENDING plant's manager cannot receive it
+    await w.as(w.pmA, (tx) => tx.query(`select public.transfer_pickup($1, null)`, [id]));
+    const inTransit = await snapshot();
+    for (const ctx of [
+      { user: w.pmA.id, role: null },
+      { user: w.pmA.id, role: '' },
+    ]) {
+      const err = await w.failure(ctx, doors[2]![1], doors[2]![2]);
+      expect(err?.code).toBe('42501');
+      expect(err?.message).toBe('transfer_receive: not an admitted actor');
+    }
+    expect(
+      (await w.failure({ user: w.pmA.id, role: 'plant_manager' }, doors[2]![1], doors[2]![2]))?.code,
+    ).toBe('42501');
+    expect(await snapshot()).toEqual(inTransit);
+    // the receiver receives it
+    await w.as(w.pmB, (tx) => tx.query(`select public.transfer_receive($1, 1000, current_date, null)`, [id]));
+    expect(await w.count(`select 1 from plant_transfer where id = '${id}' and status = 'received'`)).toBe(1);
   });
 });

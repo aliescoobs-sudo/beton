@@ -16,7 +16,7 @@ import { describe, expect, it } from 'vitest';
 // starting a second stack. Stub docker: no docker, no network.
 const GOOD = `ghcr.io/aliescoobs-sudo/kayas@sha256:${'a'.repeat(64)}`;
 
-function run(docker: string, cfgPort = '3000') {
+function run(docker: string, cfgPort = '3000', config: 'ok' | 'fails' | 'no-port' = 'ok') {
   const root = mkdtempSync(path.join(tmpdir(), 'bb-precheck-'));
   mkdirSync(path.join(root, 'scripts/training'), { recursive: true });
   copyFileSync('scripts/training-up.sh', path.join(root, 'scripts/training-up.sh'));
@@ -25,9 +25,13 @@ function run(docker: string, cfgPort = '3000') {
     writeFileSync(path.join(root, 'scripts/training', name), `#!/usr/bin/env bash\n${body}\n`, {
       mode: 0o755,
     });
+  const goodConfig = `printf 'name: kayas-training\\nservices:\\n  db:\\n    image: x\\n  app:\\n    ports:\\n      - mode: ingress\\n        host_ip: 127.0.0.1\\n        target: 3000\\n        published: "${cfgPort}"\\n        protocol: tcp\\n    environment:\\n      SECRET: must-never-be-printed\\n'`;
+  const noPortConfig = `printf 'name: kayas-training\\nservices:\\n  app:\\n    environment:\\n      SECRET: must-never-be-printed\\n'`;
+  // R19: `config` is the one call whose answer the script parses; the three stubs are a readable answer, a failing command and an answer with no published port
+  const configAnswer = config === 'fails' ? 'exit 1' : config === 'no-port' ? noPortConfig : goodConfig;
   stub(
     'dc.sh',
-    `echo "$*" >> "${root}/dc.called"\ncase "$*" in *"exec -T app wget"*) echo '{"status":"ready"}';; config) printf 'name: kayas-training\\nservices:\\n  db:\\n    image: x\\n  app:\\n    ports:\\n      - mode: ingress\\n        host_ip: 127.0.0.1\\n        target: 3000\\n        published: "${cfgPort}"\\n        protocol: tcp\\n    environment:\\n      SECRET: must-never-be-printed\\n';; esac`,
+    `echo "$*" >> "${root}/dc.called"\ncase "$*" in *"exec -T app wget"*) echo '{"status":"ready"}';; config) ${configAnswer};; esac`,
   );
   stub('ops.sh', 'exit 0');
   writeFileSync(path.join(root, '.env.training'), `APP_IMAGE=${GOOD}\n`, { mode: 0o600 });
@@ -117,8 +121,25 @@ describe('R17-10: the effective configuration, and a docker that does not answer
     expect(r.status).toBe(1);
     expect(r.stderr).toMatch(/devserver/);
   });
-  it('a configuration that cannot be read stops the start', () => {
-    const root = run('exit 0'); // control: a normal start reads it
-    expect(root.r.status).toBe(0);
+  it('control: with a readable configuration the start goes on (so the refusals below are about the configuration)', () => {
+    const ok = run('exit 0');
+    expect(ok.r.status, ok.r.stderr).toBe(0);
+    expect(ok.started).toBe(true);
+  });
+  it('a configuration that cannot be read (the command fails) stops the start, and nothing is started', () => {
+    const { r, started } = run('exit 0', '3000', 'fails');
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/could not read the effective compose configuration; nothing was started/);
+    expect(started).toBe(false);
+    expect(r.stdout + r.stderr).not.toContain('must-never-be-printed');
+  });
+  it('a configuration with no published port stops the start, and nothing is started', () => {
+    const { r, started } = run('exit 0', '3000', 'no-port');
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(
+      /could not read the published port of the app from the compose configuration; nothing was started/,
+    );
+    expect(started).toBe(false);
+    expect(r.stdout + r.stderr).not.toContain('must-never-be-printed');
   });
 });
