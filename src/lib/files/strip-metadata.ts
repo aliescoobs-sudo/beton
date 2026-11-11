@@ -73,22 +73,32 @@ function orientationSegment(orientation: number): Uint8Array {
   return Uint8Array.from([0xff, 0xe1, length >> 8, length & 0xff, ...body]);
 }
 
+/**
+ * R18-12: the whole JPEG is walked MARKER BY MARKER through the end-of-image marker, not just up to the first scan. A progressive or
+ * multi-scan file has segments (APPn, COM, anything unknown) between its scans: they are dropped like the ones before the first scan. The
+ * entropy-coded data of a scan is copied byte for byte up to the next real marker (an `FF 00` is a stuffed data byte and `FF D0..D7` a
+ * restart marker, both part of the data). The file ends at its first EOI: every byte after it (a payload appended to the picture) is dropped.
+ * A file with no EOI, no scan, or a marker structure that does not parse is refused.
+ */
 export function stripJpeg(input: Uint8Array): Uint8Array {
   if (input[0] !== 0xff || input[1] !== 0xd8) throw new CorruptFileError('not a JPEG');
   const out: Uint8Array[] = [input.subarray(0, 2)];
   let orientation: number | null = null;
   let at = 2;
-  let sawScan = false;
+  let scans = 0;
+  let ended = false;
   while (at < input.length) {
     if (input[at] !== 0xff) throw new CorruptFileError('bad marker');
     while (input[at] === 0xff && at < input.length) at += 1; // fill bytes
     const marker = input[at]!;
     at += 1;
+    if (marker === 0x00) throw new CorruptFileError('bad marker');
     if (marker === 0xd9) {
       out.push(Uint8Array.from([0xff, 0xd9]));
-      at = input.length;
-      break;
+      ended = true;
+      break; // everything after the end of image is dropped
     }
+    if (marker === 0xd8) throw new CorruptFileError('a second start of image');
     if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) {
       out.push(Uint8Array.from([0xff, marker]));
       continue;
@@ -99,25 +109,44 @@ export function stripJpeg(input: Uint8Array): Uint8Array {
     const segment = input.subarray(at - 2, at + length);
     const payload = input.subarray(at + 2, at + length);
     if (marker === 0xda) {
-      // Scan header, then the entropy-coded data (and any later markers) are copied as they are.
-      out.push(input.subarray(at - 2));
-      sawScan = true;
-      at = input.length;
-      break;
+      // The scan header is kept; the entropy-coded data after it runs to the next marker that is not a stuffed byte or a restart marker.
+      out.push(segment);
+      scans += 1;
+      let end = at + length;
+      for (;;) {
+        if (end >= input.length) throw new CorruptFileError('truncated scan');
+        if (input[end] !== 0xff) {
+          end += 1;
+          continue;
+        }
+        let next = end + 1;
+        while (input[next] === 0xff) next += 1; // fill bytes before a marker
+        const m = input[next];
+        if (m === undefined) throw new CorruptFileError('truncated scan');
+        if (m === 0x00 || (m >= 0xd0 && m <= 0xd7)) {
+          end = next + 1; // stuffed data byte or restart marker: still the scan
+          continue;
+        }
+        break;
+      }
+      out.push(input.subarray(at + length, end));
+      at = end;
+      continue;
     }
-    if (marker === 0xe1 && tag(payload, 0) === 'Exif') {
+    if (marker === 0xe1 && scans === 0 && tag(payload, 0) === 'Exif') {
       orientation ??= exifOrientation(payload.subarray(6));
     } else if (marker === 0xe0 || marker === 0xdb || marker === 0xc4 || marker === 0xdd || marker === 0xee) {
       out.push(segment); // JFIF, quantization, Huffman, restart interval, Adobe colour
     } else if (marker === 0xe2 && ascii12(payload) === 'ICC_PROFILE\0') {
       out.push(segment);
     } else if ((marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8) || marker === 0xdc) {
-      out.push(segment); // frame headers
+      out.push(segment); // frame headers (and the number-of-lines definition)
     }
-    // every other APPn, COM and unknown segment is dropped
+    // every other APPn (an Exif after the first scan included), COM and unknown segment is dropped
     at += length;
   }
-  if (!sawScan) throw new CorruptFileError('no image data');
+  if (scans === 0) throw new CorruptFileError('no image data');
+  if (!ended) throw new CorruptFileError('no end of image');
   if (orientation !== null && orientation !== 1) {
     // After the JFIF/first segments is fine for readers; put it right after SOI.
     out.splice(1, 0, orientationSegment(orientation));

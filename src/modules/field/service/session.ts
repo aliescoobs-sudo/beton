@@ -10,6 +10,8 @@ export const FIELD_SESSION_DAYS = 14;
 export interface FieldToken {
   driverId: string;
   deviceHash: string;
+  /** R18-04: the immutable id of the bound phone's device row. A release and a new binding make a NEW row, so a token of the old one never matches. */
+  deviceRowId: string;
   /** The generation of the phone's session on the server (T10c): a logout or a newer login moves it and this token stops working. */
   gen: number;
   /** Expiry, seconds since the epoch. */
@@ -42,6 +44,8 @@ export function verifyFieldToken(
     if (
       typeof t.driverId !== 'string' ||
       typeof t.deviceHash !== 'string' ||
+      typeof t.deviceRowId !== 'string' ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(t.deviceRowId) ||
       typeof t.exp !== 'number' ||
       typeof t.gen !== 'number' ||
       !Number.isInteger(t.gen)

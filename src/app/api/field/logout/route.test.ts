@@ -5,7 +5,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const jar = { value: undefined as string | undefined, deleted: 0 };
 const closed: unknown[] = [];
 let closeFails = false;
-let verified: unknown = { driverId: 'd', deviceHash: 'h', gen: 4, exp: 9e9 };
+let verified: unknown = {
+  driverId: 'd',
+  deviceHash: 'h',
+  deviceRowId: '0194a8a0-0000-7000-8000-0000000000aa',
+  gen: 4,
+  exp: 9e9,
+};
 vi.mock('next/headers', () => ({
   cookies: async () => ({
     get: (name: string) => (name === 'bb_field' && jar.value ? { name, value: jar.value } : undefined),
@@ -37,7 +43,13 @@ beforeEach(() => {
   jar.deleted = 0;
   closed.length = 0;
   closeFails = false;
-  verified = { driverId: 'd', deviceHash: 'h', gen: 4, exp: 9e9 };
+  verified = {
+    driverId: 'd',
+    deviceHash: 'h',
+    deviceRowId: '0194a8a0-0000-7000-8000-0000000000aa',
+    gen: 4,
+    exp: 9e9,
+  };
 });
 const post = () => POST(new Request('http://x/api/field/logout', { method: 'POST' }));
 
@@ -46,7 +58,15 @@ describe('POST /api/field/logout', () => {
     jar.value = 'token-a';
     const res = await post();
     expect(res.status).toBe(200);
-    expect(closed).toEqual([{ driverId: 'd', deviceHash: 'h', gen: 4, exp: 9e9 }]);
+    expect(closed).toEqual([
+      {
+        driverId: 'd',
+        deviceHash: 'h',
+        deviceRowId: '0194a8a0-0000-7000-8000-0000000000aa',
+        gen: 4,
+        exp: 9e9,
+      },
+    ]);
     expect(jar.deleted).toBe(1);
   });
 

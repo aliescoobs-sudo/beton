@@ -7,6 +7,7 @@ import {
   closeFieldSession,
   createFieldAccount,
   loginDriver,
+  revokeDriverDevice,
   sessionOfToken,
   setDriverPin,
   verifyFieldToken,
@@ -104,6 +105,42 @@ describe('server-side revocation of the phone session', () => {
     );
     expect(await sessionOfToken({ authPool: kit.authPool }, ta)).not.toBeNull();
     expect(await sessionOfToken({ authPool: kit.authPool }, tb)).not.toBeNull();
+  });
+
+  it('R18-04: a token of a released phone stays dead after the SAME phone is bound again (new device row, generation back to the old value)', async () => {
+    const d = await driver();
+    const dev = `phone-${randomUUID()}`;
+    const old = await signIn(d, dev);
+    expect(await sessionOfToken({ authPool: kit.authPool }, old.token)).not.toBeNull();
+    // the owner releases the phone; the same phone signs in again: a NEW device row with the same hash
+    expect(await revokeDriverDevice(deps(), owner, d.id)).toBe(true);
+    expect(await sessionOfToken({ authPool: kit.authPool }, old.token)).toBeNull();
+    const fresh = await signIn(d, dev);
+    expect(fresh.token.deviceRowId).not.toBe(old.token.deviceRowId);
+    // bring the new row's generation to the value the stolen token carries: before the fix this made the old cookie live again
+    const rows = await kit.migrator.query<{ session_gen: number }>(
+      'select session_gen from driver_device where id = $1',
+      [fresh.token.deviceRowId],
+    );
+    expect(rows.rows[0]!.session_gen).toBeGreaterThan(0);
+    await kit.migrator.query('update driver_device set session_gen = $2 where id = $1', [
+      fresh.token.deviceRowId,
+      old.token.gen,
+    ]);
+    // the stolen token can neither read the day nor close or revoke the replacement session
+    expect(await sessionOfToken({ authPool: kit.authPool }, old.token)).toBeNull();
+    expect(await closeFieldSession({ authPool: kit.authPool }, old.token)).toBe(false);
+    // the replacement is untouched by the attempt (its own generation was set to the old value only to prove the point)
+    const same = await kit.migrator.query<{ session_gen: number; revoked_at: Date | null }>(
+      'select session_gen, revoked_at from driver_device where id = $1',
+      [fresh.token.deviceRowId],
+    );
+    expect(same.rows[0]).toMatchObject({ session_gen: old.token.gen, revoked_at: null });
+    await kit.migrator.query('update driver_device set session_gen = $2 where id = $1', [
+      fresh.token.deviceRowId,
+      fresh.token.gen,
+    ]);
+    expect(await sessionOfToken({ authPool: kit.authPool }, fresh.token)).not.toBeNull();
   });
 
   it('the session functions are executable by the auth login only', async () => {

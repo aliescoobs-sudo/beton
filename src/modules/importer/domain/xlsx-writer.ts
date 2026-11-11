@@ -1,9 +1,15 @@
 import { deflateRawSync } from 'node:zlib';
 
 /** A minimal .xlsx for tests: one sheet, shared strings or inline strings, numbers as numbers. Stored or deflated zip entries. */
+const R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+const PACKAGE_RELS = `<?xml version="1.0"?><Relationships><Relationship Id="rId1" Type="${R}/officeDocument" Target="xl/workbook.xml"/></Relationships>`;
+
+/** R18-09 tests: rewrite the package's entries (name, content) before it is zipped — relocate, drop, empty, corrupt or repeat a part. */
+export type PackageEdit = (entries: [string, string][]) => [string, string][];
+
 export function buildXlsx(
   rows: (string | number)[][],
-  opts: { deflate?: boolean; inline?: boolean } = {},
+  opts: { deflate?: boolean; inline?: boolean; edit?: PackageEdit } = {},
 ): Buffer {
   const strings: string[] = [];
   const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -24,7 +30,10 @@ export function buildXlsx(
     .join('');
   const files: Record<string, string> = {
     '[Content_Types].xml': '<?xml version="1.0"?><Types/>',
-    'xl/workbook.xml': '<?xml version="1.0"?><workbook/>',
+    '_rels/.rels': PACKAGE_RELS,
+    'xl/workbook.xml':
+      '<?xml version="1.0"?><workbook xmlns:r="r"><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets></workbook>',
+    'xl/_rels/workbook.xml.rels': `<?xml version="1.0"?><Relationships><Relationship Id="rId1" Type="${R}/worksheet" Target="worksheets/sheet1.xml"/></Relationships>`,
     'xl/worksheets/sheet1.xml': `<?xml version="1.0"?><worksheet><sheetData>${sheetRows}</sheetData></worksheet>`,
     ...(opts.inline
       ? {}
@@ -32,14 +41,20 @@ export function buildXlsx(
           'xl/sharedStrings.xml': `<?xml version="1.0"?><sst>${strings.map((s) => `<si><t>${esc(s)}</t></si>`).join('')}</sst>`,
         }),
   };
-  return zipFiles(files, opts.deflate);
+  return zipFiles(files, opts.deflate, opts.edit);
 }
 
-function zipFiles(files: Record<string, string>, deflate: boolean | undefined): Buffer {
+/** Test support (R18-09): the same package with its parts rewritten (relocate, drop, empty, corrupt or repeat a part). */
+export function rewritePackage(parts: [string, string][], edit: PackageEdit, deflate = false): Buffer {
+  return zipFiles(Object.fromEntries(parts), deflate, edit);
+}
+
+function zipFiles(files: Record<string, string>, deflate: boolean | undefined, edit?: PackageEdit): Buffer {
+  const list = edit ? edit(Object.entries(files)) : Object.entries(files);
   const locals: Buffer[] = [];
   const central: Buffer[] = [];
   let offset = 0;
-  for (const [name, content] of Object.entries(files)) {
+  for (const [name, content] of list) {
     const raw = Buffer.from(content);
     const data = deflate ? deflateRawSync(raw) : raw;
     const nameBuf = Buffer.from(name);
@@ -66,8 +81,8 @@ function zipFiles(files: Record<string, string>, deflate: boolean | undefined): 
   const dir = Buffer.concat(central);
   const eocd = Buffer.alloc(22);
   eocd.writeUInt32LE(0x06054b50, 0);
-  eocd.writeUInt16LE(Object.keys(files).length, 8);
-  eocd.writeUInt16LE(Object.keys(files).length, 10);
+  eocd.writeUInt16LE(list.length, 8);
+  eocd.writeUInt16LE(list.length, 10);
   eocd.writeUInt32LE(dir.length, 12);
   eocd.writeUInt32LE(offset, 16);
   return Buffer.concat([...locals, dir, eocd]);
@@ -98,16 +113,22 @@ export function buildWorkbook(
   /** `date1904`: write the 1904 date system into the workbook (a fixture for the refusal). */
   opts: {
     date1904?: boolean;
+    /** R18-09 tests: edit the package's parts before zipping. */
+    edit?: PackageEdit;
     /** The raw `workbookPr` element, to write other XML spellings of the same flag. */ workbookPr?: string;
   } = {},
 ): Buffer {
   const files: Record<string, string> = {
     '[Content_Types].xml': '<?xml version="1.0"?><Types/>',
+    '_rels/.rels': PACKAGE_RELS,
     'xl/workbook.xml': `<?xml version="1.0"?><workbook xmlns:r="r">${opts.workbookPr ?? (opts.date1904 ? '<workbookPr date1904="1"/>' : '')}<sheets>${sheets
       .map((s, i) => `<sheet name="${escXml(s.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`)
       .join('')}</sheets></workbook>`,
     'xl/_rels/workbook.xml.rels': `<?xml version="1.0"?><Relationships>${sheets
-      .map((_s, i) => `<Relationship Id="rId${i + 1}" Target="worksheets/sheet${i + 1}.xml"/>`)
+      .map(
+        (_s, i) =>
+          `<Relationship Id="rId${i + 1}" Type="${R}/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`,
+      )
       .join('')}</Relationships>`,
   };
   sheets.forEach((s, si) => {
@@ -133,5 +154,5 @@ export function buildWorkbook(
     files[`xl/worksheets/sheet${si + 1}.xml`] =
       `<?xml version="1.0"?><worksheet><sheetData>${rows}</sheetData>${s.autoFilterRef ? `<autoFilter ref="${escXml(s.autoFilterRef)}"/>` : ''}</worksheet>`;
   });
-  return zipFiles(files, deflate);
+  return zipFiles(files, deflate, opts.edit);
 }

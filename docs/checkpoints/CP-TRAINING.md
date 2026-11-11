@@ -137,7 +137,7 @@ the compose file (loopback only, no maintenance login in the app), the scripts (
 
 ## December: the same files on a VPS (outside the current policy)
 This is NOT part of the local-only policy above and needs its own review before anything is published. Nothing changes in `docker-compose.training.yml`. On the VPS: install Docker, `docker login ghcr.io` the same way, clone, run `init-env.sh` with
-`APP_BASE_URL=https://<domain>`, put `APP_DOMAIN=<domain>` in `.env.training`, start with `./scripts/training/dc.sh --profile public up -d` (Caddy takes ports 80 and 443
+`APP_BASE_URL=https://<domain>`, put `APP_DOMAIN=<domain>` in `.env.training`, start with `./scripts/training/dc.sh up-public` (Caddy takes ports 80 and 443
 and gets the certificate; the app stays on 127.0.0.1), and point the domain's A and AAAA records at the VPS.
 **The VPS starts with a fresh training seed, and what the trainees entered on the iMac is discarded.** There is no "restore last night's dump on the VPS"
 promise: the dump holds the database only, while attachments (photos of signed BLs, supplier files) are in the separate `filestore` volume and every

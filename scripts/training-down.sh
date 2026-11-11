@@ -2,7 +2,7 @@
 # Stops the training instance (the data stay in the Docker volumes). Local only (R15A-06): there is no public address to close.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-./scripts/training/dc.sh --profile public --profile ops stop
+./scripts/training/dc.sh stop-all
 cat <<'NEXT'
 
 Stopped. The data are kept.

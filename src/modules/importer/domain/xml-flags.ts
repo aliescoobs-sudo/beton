@@ -15,11 +15,18 @@ const MAX_TAGS = 200_000;
 const NAME = /^[A-Za-z_][\w.-]*(?::[A-Za-z_][\w.-]*)?/;
 
 /** Thrown for a part that cannot be read with certainty; the sheet reader turns it into its own error. */
-export class XmlFlagsError extends Error {}
+export class XmlFlagsError extends Error {
+  readonly reason: string;
+  constructor(message: string, reason = '') {
+    super(message);
+    this.reason = reason;
+  }
+}
 
 const fail = (why: string): never => {
   throw new XmlFlagsError(
     `the workbook's date system could not be determined (${why}); open it in Excel, make sure "Use 1904 date system" is unticked and save it again`,
+    why,
   );
 };
 
@@ -39,21 +46,44 @@ export function decodeXmlValue(v: string): string {
   });
 }
 
-interface StartTag {
+export interface StartTag {
   name: string;
   attrs: Map<string, string>;
+  /** Nesting depth (0 = the root element). Filled in strict mode only. */
+  depth: number;
 }
 
-/** Every start tag of the document, in order. */
-function startTags(xml: string): StartTag[] {
+/**
+ * Every start tag of the document, in order. STRICT mode (R18-09) also verifies the structure: a non-empty part, exactly one root element,
+ * every end tag matching the open start tag, nothing left open, and no text outside the root.
+ */
+function startTags(xml: string, strict = false): StartTag[] {
   if (xml.length > MAX_WORKBOOK_XML) fail('the part is too large');
   if (xml.includes('\u0000')) fail('a NUL character');
+  if (strict && xml.replace(/^\uFEFF/, '').trim() === '') fail('an empty part');
   const tags: StartTag[] = [];
+  const stack: string[] = [];
+  let roots = 0;
+  const textBetween = (from: number, to: number) => {
+    if (
+      strict &&
+      stack.length === 0 &&
+      xml
+        .slice(from, to)
+        .replace(/^\uFEFF/, '')
+        .trim() !== ''
+    )
+      fail('text outside the root element');
+  };
   let i = 0;
   const n = xml.length;
   while (i < n) {
     const lt = xml.indexOf('<', i);
-    if (lt < 0) break;
+    if (lt < 0) {
+      textBetween(i, n);
+      break;
+    }
+    textBetween(i, lt);
     i = lt;
     if (xml.startsWith('<!--', i)) {
       const end = xml.indexOf('-->', i + 4);
@@ -72,14 +102,21 @@ function startTags(xml: string): StartTag[] {
     } else if (xml.startsWith('</', i)) {
       const end = xml.indexOf('>', i + 2);
       if (end < 0) fail('an unterminated end tag');
+      if (strict) {
+        const closing = xml.slice(i + 2, end).trim();
+        if (stack.length === 0 || stack.pop() !== closing)
+          fail('an end tag that does not match its start tag');
+      }
       i = end + 1;
     } else {
       if (tags.length >= MAX_TAGS) fail('too many elements');
+      if (strict && stack.length === 0 && ++roots > 1) fail('more than one root element');
       i += 1;
       const name = NAME.exec(xml.slice(i, i + 256))?.[0];
       if (!name) return fail('a malformed element name');
       i += name.length;
       const attrs = new Map<string, string>();
+      let selfClosed = false;
       for (;;) {
         const ws = /^[ \t\r\n]*/.exec(xml.slice(i, i + 64))?.[0].length ?? 0;
         i += ws;
@@ -92,6 +129,7 @@ function startTags(xml: string): StartTag[] {
         if (c === '/') {
           if (xml[i + 1] !== '>') return fail('a malformed empty-element tag');
           i += 2;
+          selfClosed = true;
           break;
         }
         if (ws === 0) return fail('attributes without a separator');
@@ -112,8 +150,13 @@ function startTags(xml: string): StartTag[] {
         attrs.set(an, decodeXmlValue(raw));
         i = close + 1;
       }
-      tags.push({ name, attrs });
+      tags.push({ name, attrs, depth: stack.length });
+      if (strict && !selfClosed) stack.push(name);
     }
+  }
+  if (strict) {
+    if (stack.length > 0) fail('an element that is never closed');
+    if (roots !== 1) fail('no root element');
   }
   return tags;
 }
@@ -136,3 +179,15 @@ export function workbookUses1904(xml: string): boolean {
   }
   return refused;
 }
+
+/**
+ * R18-09: the start tags of a part that must be a COMPLETE, well-formed document (one root, matching end tags, nothing open, no text outside
+ * the root). An empty, truncated or mis-nested part throws an XmlFlagsError. Used for the package relationships and the workbook part, whose
+ * content decides which calendar and which sheets are read.
+ */
+export function parseXmlDocument(xml: string): StartTag[] {
+  return startTags(xml, true);
+}
+
+/** The local name of an element or attribute (the prefix removed). */
+export const localName = local;

@@ -1,5 +1,5 @@
 import { inflateRawSync } from 'node:zlib';
-import { workbookUses1904, XmlFlagsError } from './xml-flags';
+import { localName, parseXmlDocument, workbookUses1904, XmlFlagsError } from './xml-flags';
 
 // A small, read-only reader for the spreadsheets the office sends (.xlsx) and for CSV. No dependency: an .xlsx is a zip of XML
 // files, and only the cells are read (no formula is evaluated, no macro or external link is followed). Limits keep a hostile or
@@ -34,6 +34,7 @@ function zipEntries(buf: Buffer): Map<string, ZipEntry> {
   let p = buf.readUInt32LE(eocd + 16);
   if (count > MAX_ENTRIES || count === 0xffff) throw new SheetError('too many parts in the file');
   const out = new Map<string, ZipEntry>();
+  const seen = new Set<string>();
   for (let n = 0; n < count; n++) {
     if (p + 46 > buf.length || buf.readUInt32LE(p) !== 0x02014b50)
       throw new SheetError('damaged zip directory');
@@ -43,6 +44,10 @@ function zipEntries(buf: Buffer): Map<string, ZipEntry> {
     const extraLen = buf.readUInt16LE(p + 30);
     const commentLen = buf.readUInt16LE(p + 32);
     const name = buf.toString('utf8', p + 46, p + 46 + nameLen);
+    // R18-09: two entries of one name would let the later silently replace the earlier (the part read is not the part checked)
+    if (seen.has(name.toLowerCase().replace(/^\/+/, '')))
+      throw new SheetError(`the file holds the part "${name}" more than once`);
+    seen.add(name.toLowerCase().replace(/^\/+/, ''));
     out.set(name, {
       name,
       method: buf.readUInt16LE(p + 10),
@@ -113,42 +118,139 @@ export interface ReadOptions {
   exactRows?: boolean;
 }
 
-/** The sheet names in workbook order with the part that holds each, from workbook.xml and its relationships. */
-function sheetParts(buf: Buffer, zip: Map<string, ZipEntry>): { name: string; part: string }[] {
-  const byFile = [...zip.keys()]
-    .filter((k) => /^xl\/worksheets\/sheet\d+\.xml$/.test(k))
-    .sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
-  const wb = zip.get('xl/workbook.xml');
-  const rels = zip.get('xl/_rels/workbook.xml.rels');
-  const named: { name: string; part: string }[] = [];
-  if (wb && rels) {
-    const targets = new Map<string, string>();
-    for (const m of readEntry(buf, rels).matchAll(/<Relationship\b([^>]*?)\/?>/g)) {
-      const id = /\bId="([^"]*)"/.exec(m[1] ?? '')?.[1];
-      const target = /\bTarget="([^"]*)"/.exec(m[1] ?? '')?.[1];
-      if (id && target) targets.set(id, target.startsWith('/') ? target.slice(1) : `xl/${target}`);
+const MAIN_PART = 'the main workbook part';
+const REL_OFFICE_DOCUMENT = /\/officeDocument$/;
+
+const refuse = (why: string): never => {
+  throw new SheetError(
+    `this file is not a readable workbook (${why}); open it in Excel and save it again as .xlsx`,
+  );
+};
+
+/** Reads a part that must be a complete, well-formed XML document; any failure is a SheetError. */
+function strictPart(buf: Buffer, entry: ZipEntry, what: string) {
+  try {
+    return parseXmlDocument(readEntry(buf, entry));
+  } catch (e) {
+    // the main part keeps the calendar wording (the operator's way out is the same: save it again in Excel)
+    if (e instanceof XmlFlagsError) {
+      if (what === MAIN_PART) throw new SheetError(e.message);
+      return refuse(`${what}: ${e.reason}`);
     }
-    for (const m of readEntry(buf, wb).matchAll(/<sheet\b([^>]*?)\/?>/g)) {
-      const attrs = m[1] ?? '';
-      const name = decode(/\bname="([^"]*)"/.exec(attrs)?.[1] ?? '');
-      const rid = /\br:id="([^"]*)"/.exec(attrs)?.[1];
-      const part = rid ? targets.get(rid) : undefined;
-      if (name && part && zip.has(part)) named.push({ name, part });
-    }
+    throw e;
   }
-  // A workbook without usable names (a writer that leaves them out) is read in file order as Sheet1, Sheet2...
-  return named.length ? named : byFile.map((part, i) => ({ name: `Sheet${i + 1}`, part }));
+}
+
+/** A target of a relationship, resolved against the folder of the part that owns the relationships ("/x" is from the package root). */
+function resolveTarget(baseDir: string, target: string): string {
+  const joined = target.startsWith('/') ? target.slice(1) : `${baseDir}${target}`;
+  const out: string[] = [];
+  for (const seg of joined.split('/')) {
+    if (seg === '' || seg === '.') continue;
+    if (seg === '..') {
+      if (!out.pop()) return refuse('a relationship leaves the package');
+    } else out.push(seg);
+  }
+  return out.join('/');
+}
+
+interface Relationship {
+  id: string;
+  type: string;
+  target: string;
+  external: boolean;
+}
+
+function relationships(buf: Buffer, entry: ZipEntry, what: string): Relationship[] {
+  const out: Relationship[] = [];
+  const ids = new Set<string>();
+  for (const t of strictPart(buf, entry, what)) {
+    if (localName(t.name) !== 'Relationship') continue;
+    const id = t.attrs.get('Id');
+    const target = t.attrs.get('Target');
+    if (!id || !target) return refuse(`${what} holds a relationship without an Id or a Target`);
+    if (ids.has(id)) return refuse(`${what} holds the relationship ${id} twice`);
+    ids.add(id);
+    out.push({
+      id,
+      type: t.attrs.get('Type') ?? '',
+      target,
+      external: (t.attrs.get('TargetMode') ?? '').toLowerCase() === 'external',
+    });
+  }
+  return out;
+}
+
+/**
+ * R18-09: the AUTHORITATIVE workbook part and its sheets, found the way a spreadsheet program finds them: the package relationships
+ * (`_rels/.rels`) must hold exactly one officeDocument relationship, whose target is the main part; that part must exist, be non-empty and
+ * well-formed, with a `workbook` root; the sheets are the ones its own relationships name. Nothing falls back to a file NAME: a package whose
+ * main part is somewhere else, missing, empty, malformed or doubled is refused here, before the calendar is read and before any worksheet is parsed.
+ */
+function workbookPackage(
+  buf: Buffer,
+  zip: Map<string, ZipEntry>,
+): { main: ZipEntry; mainXml: string; sheets: { name: string; part: string }[] } {
+  const rootRels = zip.get('_rels/.rels');
+  if (!rootRels) return refuse('the package has no _rels/.rels');
+  const office = relationships(buf, rootRels, 'the package relationships').filter(
+    (r) => REL_OFFICE_DOCUMENT.test(r.type) && !r.external,
+  );
+  if (office.length !== 1)
+    return refuse(
+      office.length === 0
+        ? 'the package names no main workbook part'
+        : 'the package names more than one main workbook part',
+    );
+  const mainName = resolveTarget('', office[0]!.target);
+  const main = zip.get(mainName);
+  if (!main) return refuse(`the main workbook part "${mainName}" is missing`);
+  const mainDoc = strictPart(buf, main, MAIN_PART);
+  const root = mainDoc[0];
+  if (!root || localName(root.name) !== 'workbook') return refuse('the main part is not a workbook');
+  const mainXml = readEntry(buf, main);
+  const slash = mainName.lastIndexOf('/');
+  const baseDir = slash < 0 ? '' : mainName.slice(0, slash + 1);
+  const relsName = `${baseDir}_rels/${mainName.slice(slash + 1)}.rels`;
+  const relsEntry = zip.get(relsName);
+  if (!relsEntry) return refuse('the main workbook part has no relationships');
+  const targets = new Map(
+    relationships(buf, relsEntry, 'the workbook relationships').map((r) => [r.id, r] as const),
+  );
+  const sheets: { name: string; part: string }[] = [];
+  const parts = new Set<string>();
+  for (const t of mainDoc) {
+    if (localName(t.name) !== 'sheet') continue;
+    const name = t.attrs.get('name');
+    const rid = [...t.attrs].find(([k]) => localName(k) === 'id' && k.includes(':'))?.[1];
+    const rel = rid ? targets.get(rid) : undefined;
+    if (!name || !rel || rel.external) return refuse('a sheet of the workbook has no usable relationship');
+    const part = resolveTarget(baseDir, rel.target);
+    if (!zip.has(part)) return refuse(`the part of the sheet "${name}" is missing`);
+    if (parts.has(part)) return refuse('two sheets share one part');
+    parts.add(part);
+    sheets.push({ name, part });
+  }
+  if (sheets.length === 0) return refuse('the workbook lists no sheet');
+  return { main, mainXml, sheets };
+}
+
+/** Test support (R18-09): the parts of a package as (name, text), in directory order. Refuses what the reader refuses (a repeated name). */
+export function readPackageParts(buf: Buffer): [string, string][] {
+  const zip = zipEntries(buf);
+  return [...zip.values()].map((e): [string, string] => [e.name, readEntry(buf, e)]);
 }
 
 /** Every sheet of a workbook with its name, in workbook order. Empty cells are ''. A date cell comes as its serial number. */
 export function readXlsxSheets(buf: Buffer, opts: ReadOptions = {}): NamedSheet[] {
   const zip = zipEntries(buf);
+  // R18-09: the authoritative main part first (relationships, structure), all of it before any worksheet is looked at.
+  const pkg = workbookPackage(buf, zip);
   // R14-04: the workbook's date system. A date cell is a number of days from an origin that depends on it (1899-12-30, or 1904-01-01,
   // 1462 days later). This reader only knows the first, so a 1904 workbook is refused, never read with the wrong origin.
-  const wbXml = zip.get('xl/workbook.xml') ? readEntry(buf, zip.get('xl/workbook.xml') as ZipEntry) : '';
   // R17-05: read by a bounded XML tokenizer (not a regular expression over the text), failing closed on anything it cannot parse.
   try {
-    if (workbookUses1904(wbXml))
+    if (workbookUses1904(pkg.mainXml))
       throw new SheetError(
         'this workbook uses the 1904 date system, which is not supported: in Excel, untick "Use 1904 date system" (File > Options > Advanced) and save it again',
       );
@@ -162,7 +264,7 @@ export function readXlsxSheets(buf: Buffer, opts: ReadOptions = {}): NamedSheet[
     : [];
   let cells = 0;
   let emptyCells = 0;
-  return sheetParts(buf, zip).map(({ name, part }, sheetIndex) => {
+  return pkg.sheets.map(({ name, part }, sheetIndex) => {
     if (opts.include && !opts.include(name, sheetIndex))
       return { name, rows: [], formulaCells: 0, formulaRows: [], skipped: true };
     const xml = readEntry(buf, zip.get(part) as ZipEntry);

@@ -14,6 +14,8 @@ import type { SessionUser } from '../src/modules/platform-security/auth/session-
 import { testEnv } from './db-env';
 import { realSessionUser } from './helpers/actors';
 import { buildWorkbook } from './helpers/xlsx-writer';
+import { readPackageParts } from '../src/modules/importer/domain/sheet';
+import { rewritePackage } from '../src/modules/importer/domain/xlsx-writer';
 
 // T2: a whole workbook in one transaction. Synthetic data only (obviously fake names, ICE, phones).
 const env = testEnv();
@@ -159,6 +161,77 @@ describe('refusals before anything is read', () => {
     );
     expect(await count('client', `name = '${CLIENT}'`)).toBe(0);
   });
+});
+
+describe('R18-09: a package whose main workbook part is not the trusted one is refused, and an apply writes nothing', () => {
+  const tables = [
+    'client',
+    'concrete_type',
+    'selling_price',
+    'audit_event',
+    'stock_movement',
+    'payment_instrument',
+  ];
+  const snapshot = async () => Promise.all(tables.map((t) => count(t)));
+  const moved = (buf: Buffer) =>
+    rewritePackage(readPackageParts(buf), (e) => [
+      ...e.map(([n, c]): [string, string] => [
+        n,
+        n === '_rels/.rels' ? c.replace('xl/workbook.xml', 'xl/moved/main.xml') : c,
+      ]),
+      // the relocated main part declares 1904; the part at the canonical name (a decoy) declares nothing
+      [
+        'xl/moved/main.xml',
+        e
+          .find(([n]) => n === 'xl/workbook.xml')![1]
+          .replace('<sheets>', '<workbookPr date1904="1"/><sheets>'),
+      ],
+      [
+        'xl/moved/_rels/main.xml.rels',
+        e
+          .find(([n]) => n === 'xl/_rels/workbook.xml.rels')![1]
+          .replace(/Target="worksheets\//g, 'Target="../worksheets/'),
+      ],
+    ]);
+  const damaged: [string, (b: Buffer) => Buffer][] = [
+    ['a relocated 1904 main part', moved],
+    [
+      'an empty main part',
+      (b) =>
+        rewritePackage(readPackageParts(b), (e) => e.map(([n, c]) => [n, n === 'xl/workbook.xml' ? '' : c])),
+    ],
+    [
+      'a malformed main part',
+      (b) =>
+        rewritePackage(readPackageParts(b), (e) =>
+          e.map(([n, c]) => [n, n === 'xl/workbook.xml' ? '<workbook><sheets></workbook>' : c]),
+        ),
+    ],
+    [
+      'a duplicate main part',
+      (b) => rewritePackage(readPackageParts(b), (e) => [...e, ['xl/workbook.xml', '<workbook/>']]),
+    ],
+    [
+      'a missing main part',
+      (b) => rewritePackage(readPackageParts(b), (e) => e.filter(([n]) => n !== 'xl/workbook.xml')),
+    ],
+  ];
+  it('control: the valid 1900 package applies', async () => {
+    const r = await run(file(), 'dry-run');
+    expect(r.fileProblems).toEqual([]);
+  });
+  for (const [title, make] of damaged)
+    it(`${title}: both the dry run and the apply report an unreadable file and write nothing`, async () => {
+      const before = await snapshot();
+      const bad = make(file());
+      for (const mode of ['dry-run', 'apply'] as const) {
+        const r = await run(bad, mode);
+        expect(r.applied).toBe(false);
+        expect(r.fileProblems.join(' ')).toMatch(/readable workbook|date system|1904|more than once/);
+      }
+      expect(await snapshot()).toEqual(before);
+      expect(await count('client', `name = '${CLIENT}'`)).toBe(0);
+    });
 });
 
 describe('the dry run', () => {

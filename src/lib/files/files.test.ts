@@ -8,6 +8,7 @@ import { sniffFileType } from './file-types';
 import { exifOrientation, stripJpeg, stripPng, stripWebp } from './strip-metadata';
 import { createDiskStore } from './store';
 import { validateUpload } from './validate-upload';
+import { JPEG_CANARIES, jpegMultiScan } from '../../../tests/helpers/file-fixtures';
 
 const seg = (marker: number, payload: Buffer) =>
   Buffer.concat([
@@ -107,6 +108,71 @@ describe('sniffFileType', () => {
     ['zip', 'PK\u0003\u0004'],
     ['empty', ''],
   ])('refuses %s', (_n, text) => expect(sniffFileType(Buffer.from(text))).toBeNull());
+});
+
+describe('R18-12: a JPEG is sanitized through its END, not just up to the first scan', () => {
+  const scansOf = (b: Buffer) => {
+    // a structural reading of the result: the markers in order, scan data skipped
+    const markers: number[] = [];
+    let at = 2;
+    while (at < b.length) {
+      expect(b[at]).toBe(0xff);
+      const m = b[at + 1]!;
+      markers.push(m);
+      if (m === 0xd9) return { markers, end: at + 2 };
+      const len = b.readUInt16BE(at + 2);
+      at += 2 + len;
+      if (m === 0xda) {
+        while (!(b[at] === 0xff && b[at + 1] !== 0x00 && !(b[at + 1]! >= 0xd0 && b[at + 1]! <= 0xd7)))
+          at += 1;
+      }
+    }
+    throw new Error('no EOI');
+  };
+
+  it('drops the metadata between and after the scans and every byte after the end-of-image marker, and keeps both scans and the entropy data', () => {
+    const input = jpegMultiScan({ trailing: true });
+    for (const canary of JPEG_CANARIES) expect(input.includes(canary), canary).toBe(true);
+    const out = Buffer.from(stripJpeg(input));
+    for (const canary of JPEG_CANARIES) expect(out.includes(canary), canary).toBe(false);
+    const { markers, end } = scansOf(out);
+    expect(end).toBe(out.length); // the file ends at its first EOI
+    expect(markers.filter((m) => m === 0xda)).toHaveLength(2); // both scans survive
+    expect(markers.some((m) => m === 0xe1 || m === 0xfe || m === 0xed)).toBe(false);
+    // the entropy data, with its stuffed byte and restart marker, is byte for byte
+    expect(out.includes(Buffer.from([0x12, 0xff, 0x00, 0x34, 0xff, 0xd0, 0x56]))).toBe(true);
+    expect(out.includes(Buffer.from([0x78, 0x9a, 0xbc]))).toBe(true);
+    // the tables and frame header between the scans are kept (the second scan still decodes)
+    expect(markers).toEqual([0xe0, 0xdb, 0xc2, 0xc4, 0xda, 0xc4, 0xda, 0xd9]);
+    expect(Buffer.from(stripJpeg(out)).equals(out)).toBe(true); // idempotent: nothing more to remove
+  });
+
+  it('an EXIF after the first scan cannot set the orientation; one before it still does', () => {
+    const late = Buffer.from(stripJpeg(jpegMultiScan({ lateOrientation: 6 })));
+    expect(late.includes(Buffer.from('Exif'))).toBe(false);
+    const early = Buffer.from(stripJpeg(jpeg({ orientation: 6 })));
+    const at = early.indexOf(Buffer.from('Exif\0\0', 'latin1'));
+    expect(exifOrientation(early.subarray(at + 6, at + 6 + 26))).toBe(6);
+  });
+
+  it('a file with no end-of-image marker, a scan cut short or a second start of image is refused', () => {
+    const whole = jpegMultiScan();
+    expect(() => stripJpeg(whole.subarray(0, whole.length - 2))).toThrow(/truncated scan|no end of image/);
+    expect(() => stripJpeg(Buffer.concat([Buffer.from([0xff, 0xd8]), whole.subarray(0, 40)]))).toThrow();
+    const twice = Buffer.concat([whole.subarray(0, 2), Buffer.from([0xff, 0xd8]), whole.subarray(2)]);
+    expect(() => stripJpeg(twice)).toThrow(/second start of image/);
+  });
+
+  it('validateUpload (the path of every upload) applies it', () => {
+    const r = validateUpload({
+      declaredType: 'image/jpeg',
+      bytes: jpegMultiScan({ trailing: true }),
+      maxBytes: 1 << 20,
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok)
+      for (const canary of JPEG_CANARIES) expect(Buffer.from(r.value.bytes).includes(canary)).toBe(false);
+  });
 });
 
 describe('metadata stripping (AC-INT-03)', () => {

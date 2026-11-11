@@ -974,6 +974,13 @@
       "when": 1793805787023,
       "tag": "0215_history_import",
       "breakpoints": true
+    },
+    {
+      "idx": 216,
+      "version": "7",
+      "when": 1793805847023,
+      "tag": "0216_field_session_device_row",
+      "breakpoints": true
     }
   ]
 }

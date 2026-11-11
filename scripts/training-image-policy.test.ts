@@ -100,7 +100,7 @@ describe('every entry point refuses a refused image before doing anything', () =
     mkdirSync(bin);
     writeFileSync(
       path.join(bin, 'docker'),
-      `#!/usr/bin/env bash\necho "$*" >> "${root}/docker.called"\nexit 0\n`,
+      `#!/usr/bin/env bash\necho "$*" >> "${root}/docker.called"\ncase "$*" in *" config") printf 'services:\\n  app:\\n    image: ${image ?? ''}\\n  ops:\\n    image: ${image ?? ''}\\n';; esac\nexit 0\n`,
     );
     chmodSync(path.join(bin, 'docker'), 0o755);
     return { root, bin };
