@@ -30,3 +30,4 @@ generated_images/
 
 # Evidence of the training instance's maintenance runs (R18-11): local, never committed
 .training-evidence/
+.training-lan-relay.pid

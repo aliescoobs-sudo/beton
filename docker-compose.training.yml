@@ -78,8 +78,9 @@ services:
     depends_on: [app]
     networks: [edge]
 
-  # LOCAL NETWORK (profile `lan`, T11b): TLS on ONE private address for a phone on the same Wi-Fi. Never started by `up`; only scripts/training/lan-up.sh
-  # starts it. Bound to LAN_BIND_IP (a private address chosen by lan-up.sh; loopback when unset), never to every interface.
+  # LOCAL NETWORK (profile `lan`, T11b): TLS for ONE private address, for a phone on the same Wi-Fi. Never started by `up`; only scripts/training/lan-up.sh
+  # starts it. It is published on the Mac's LOOPBACK only (127.0.0.1:8443); scripts/training/lan-relay.mjs, started by lan-up.sh, forwards one private
+  # address of the Mac to it. LAN_BIND_IP is that address: it goes into the certificate, not into a port binding (Colima's VM does not own it).
   lan-proxy:
     image: caddy:2-alpine
     restart: unless-stopped
@@ -87,7 +88,7 @@ services:
     environment:
       LAN_IP: ${LAN_BIND_IP:-127.0.0.1}
     ports:
-      - '${LAN_BIND_IP:-127.0.0.1}:8443:8443'
+      - '127.0.0.1:8443:8443'
     volumes:
       - ./Caddyfile.lan:/etc/caddy/Caddyfile:ro
       - lan_caddy_data:/data

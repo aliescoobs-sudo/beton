@@ -71,11 +71,11 @@ describe('the training stack (T1)', () => {
     expect(block('proxy')).toMatch(/profiles: \[public\]/);
     expect(block('ops')).not.toMatch(/ports:/);
   });
-  it('T11b: the local-network proxy is a profile that is off by default, bound to one chosen address (loopback when unset), never to every interface', () => {
+  it('T11b: the local-network proxy is a profile that is off by default, published on the loopback only (the relay carries one private address to it)', () => {
     const lan = block('lan-proxy');
     expect(lan).toMatch(/profiles: \[lan\]/);
-    expect(lan).toMatch(/- '\$\{LAN_BIND_IP:-127\.0\.0\.1\}:8443:8443'/);
-    expect(lan).not.toMatch(/0\.0\.0\.0|- '8443|- '\d+:\d+'/);
+    expect(lan).toMatch(/- '127\.0\.0\.1:8443:8443'/);
+    expect(lan).not.toMatch(/0\.0\.0\.0|- '8443|- '\d+:\d+'|\$\{LAN_BIND_IP[^}]*\}:8443/);
     expect(lan).not.toMatch(/env_file|DATABASE_URL|AUTH_SECRET/); // the proxy holds no application secret
     expect(readFileSync('Caddyfile.lan', 'utf8')).toMatch(/tls internal/);
     expect(readFileSync('Caddyfile.lan', 'utf8')).toMatch(/https:\/\/\{\$LAN_IP\}:8443/);
@@ -97,6 +97,16 @@ describe('the training stack (T1)', () => {
       });
       expect(r.status, ip).toBe(2);
       expect(r.stderr, ip).toMatch(/private address|not an address/);
+    }
+  });
+  it('T11b: the relay refuses to listen on a public, wildcard or loopback-named address', () => {
+    for (const ip of ['0.0.0.0', '8.8.8.8', '127.0.0.1', '172.32.0.1', '192.168.1.300', '', 'localhost']) {
+      const r = spawnSync(process.execPath, ['scripts/training/lan-relay.mjs', ip], {
+        encoding: 'utf8',
+        timeout: 10_000,
+      });
+      expect(r.status, ip).toBe(2);
+      expect(r.stderr, ip).toMatch(/private IPv4/);
     }
   });
   it('is the same file for the iMac and for a VPS: no host name, no domain and no path of the iMac in it', () => {

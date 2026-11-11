@@ -2,8 +2,9 @@
 # Opens the TRAINING instance on the LOCAL NETWORK, for a phone on the same Wi-Fi (T11b). Fictitious data only; the instance stays in training mode.
 #   ./scripts/training/lan-up.sh [<private IPv4 of this Mac>]      (default: the address of en0)
 # What it does, and nothing else: writes LAN_BIND_IP and APP_BASE_URL=https://<ip>:8443 into .env.training (atomically, mode 0600), starts the
-# `lan-proxy` service (Caddy, TLS from its own internal CA, published on <ip>:8443 only: not on every interface, not on the internet) and restarts
-# the app so that it accepts requests from that one origin. The phone must trust the CA once: docs/training/RESEAU-LOCAL.fr.md.
+# `lan-proxy` service (Caddy, TLS from its own internal CA, published on the Mac's LOOPBACK 127.0.0.1:8443), starts scripts/training/lan-relay.mjs (a
+# plain TCP relay listening on <ip>:8443 only: not on every interface, not on the internet; Colima's VM does not own the Wi-Fi address, so Docker
+# cannot bind it) and restarts the app so that it accepts requests from that one origin. The phone must trust the CA once: docs/training/RESEAU-LOCAL.fr.md.
 # Only a private address (10.x, 172.16-31.x, 192.168.x) is accepted. It is the operator's job to be on a Wi-Fi they trust, with no port forward
 # on the router. Close it again with  ./scripts/training/lan-down.sh
 set -euo pipefail
@@ -25,6 +26,18 @@ mv -f "$tmp" .env.training
 trap - EXIT
 ./scripts/training/dc.sh up -d app
 ./scripts/training/dc.sh up-lan
+# the relay: one private address, one port; a previous one (same pid file) is stopped first
+pidfile=.training-lan-relay.pid
+if [ -f "$pidfile" ]; then
+  old=$(cat "$pidfile")
+  case "$(ps -p "$old" -o command= 2>/dev/null)" in *lan-relay.mjs*) kill "$old" 2>/dev/null || true ;; esac
+  : > "$pidfile"
+fi
+mkdir -p .logs
+nohup node scripts/training/lan-relay.mjs "$ip" 8443 8443 > .logs/lan-relay.log 2>&1 &
+echo $! > "$pidfile"
+sleep 1
+kill -0 "$(cat "$pidfile")" 2>/dev/null || { echo "lan-up.sh: the relay did not start: see .logs/lan-relay.log" >&2; cat .logs/lan-relay.log >&2; exit 1; }
 ok=no
 for _ in $(seq 1 "${READY_TRIES:-20}"); do
   if curl -ksS --max-time 5 -o /dev/null -w '%{http_code}' "https://$ip:8443/fr/login" 2>/dev/null | grep -q '^2'; then ok=yes; break; fi

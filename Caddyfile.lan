@@ -4,6 +4,8 @@
 # 0.0.0.0. Started and stopped only by scripts/training/lan-up.sh and lan-down.sh. Fictitious data only.
 {
 	local_certs
+	# a client that connects to an IP address sends no server name: serve the certificate of that address
+	default_sni {$LAN_IP}
 	skip_install_trust
 	auto_https disable_redirects
 }
@@ -13,8 +15,7 @@ https://{$LAN_IP}:8443 {
 	# Never expose the health surface to the network.
 	@internal path /api/health/*
 	respond @internal 404
-	reverse_proxy app:3000 {
-		# the app counts one hop of X-Forwarded-For (TRUSTED_PROXY_HOPS=1): each phone has its own login counter
-		header_up X-Forwarded-For {remote_host}
-	}
+	# Caddy appends the address it sees to X-Forwarded-For (the app counts exactly one hop, TRUSTED_PROXY_HOPS=1). Behind the Mac-side relay that
+	# address is the relay's: every phone shares one per-address counter (docs/training/RESEAU-LOCAL.fr.md).
+	reverse_proxy app:3000
 }
