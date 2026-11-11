@@ -324,6 +324,7 @@ describe('the real step-up path of import:history (production mode, real-shaped 
     expect(refused).not.toBe(true);
     expect(await written(migrator)).toEqual(before);
     // apply set A properly through the command, then try to roll it back with the apply's proof
+    await inFreshStep(28_000); // the apply below spends the step that the replay further down expects to be spent
     const ok = applyAs(op.email, a.folder, `${historyConfirmation(a.set).phrase}\n${await code(op.id, 0)}\n`);
     expect(ok.code, ok.out).toBe(0);
     const batch = (
@@ -343,7 +344,6 @@ describe('the real step-up path of import:history (production mode, real-shaped 
     );
     expect(rb).toMatch(/^refused/);
     expect(await count(migrator, `history.batch where id = '${batch}' and status = 'applied'`)).toBe(1);
-    await inFreshStep();
     // the command: a wrong typed phrase, then a replayed code, leave it applied; the next step's code rolls it back
     const phrase = historyRollbackConfirmation(batch).phrase;
     const back = (input: string) => cli(env, ['--rollback', batch, '--account', op.email], PROD, input);
