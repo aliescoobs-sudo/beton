@@ -75,7 +75,7 @@ describe('R18-08: the count runs its own query', () => {
     for (let i = 0; i < 3; i++)
       await w.sup(
         `insert into delivery (id, bl_no, order_id, truck_id, volume_l, load_date, loaded_at, recette_id, plant_id, created_by)
-         values (gen_random_uuid(), $5, $1, $2, 1000000000, '2026-06-01', now(), $3, $6, $4)`,
+         values (gen_random_uuid(), $5, $1, $2, 1000000000, '2001-01-01', '2001-01-01T08:00:00Z', $3, $6, $4)`,
         [
           gated.order,
           w.truckA,

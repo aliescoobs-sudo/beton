@@ -163,13 +163,14 @@ describe('B1: who can stage', () => {
 describe('B2-B6: a stage by an owner', () => {
   it('writes staging only, audits every write without any cell, hides it from every other role, and changes no live table or report', async () => {
     const live0 = await live();
+    const delivered0 = await count('history.delivery'); // other suites leave applied history in the shared database: compare, do not assume zero
     const asAdmin = A.session('app_admin') as never;
     const r = await stage(asAdmin);
     expect(r.staged).toBe(true);
     const batch = r.batchId!;
     // --- B6: nothing reached the live tables, and the reports read applied batches only
     expect(await live()).toEqual(live0);
-    expect(await count('history.delivery')).toBe(0);
+    expect(await count('history.delivery')).toBe(delivered0);
     expect(await historyVolume(app, A.owner, { from: '2026-01-01', to: '2026-12-31' })).toEqual(
       expect.objectContaining({}),
     );

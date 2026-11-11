@@ -118,6 +118,7 @@ describe('functions the application role can execute', () => {
     'public.trip_stage_estimate(p_plant uuid, p_zone uuid, p_stage text)', // T5: the estimate of a stage, same roles (checked inside)
     'public.trip_timing(p_date date)', // T5: the timing inputs of the rotations the caller may see (checked inside, scoped)
     'public.mark_load_delivered(p_delivery uuid, p_now timestamp with time zone)', // R18-07: the by-hand door of the billing gate (owner, app_admin, plant manager of the load's plant; checked inside)
+    'public.field_session_fence(p_driver uuid, p_device_id uuid, p_gen integer)', // R18-05: the per-transaction fence of the phone session; raises or returns nothing, reveals nothing
     'public.attach_trip_load(p_trip uuid, p_delivery uuid)', // T9: the plant's load linked once to a declared loaded stage (role and plant checked inside)
     'public.confirm_trip_delivered(p_trip uuid)', // T9: the plant confirms a delivery the driver declared (role and plant checked inside)
     'public.correct_trip_stage(p_trip uuid, p_stage text, p_time timestamp with time zone, p_reason text)', // T9: a correction with a reason (plant manager of the plant, owner, app_admin)
