@@ -282,6 +282,16 @@ describe('B2-B6: a stage by an owner', () => {
       ),
     ).toBe(1);
     expect(await count('history.quarantine')).toBe(rows0[1]!); // no duplicate row
+    // leave the shared database as it was found: the second stage is reversed too, so no OPEN quarantined row or staged batch of this test stays for the other suites
+    const cleanup = await rollbackHistory({
+      appPool: app,
+      actor: owner,
+      batchId: again.batchId!,
+      environment: PROD,
+      stepUp: { userId: A.owner.id, operation: historyRollbackConfirmation(again.batchId!).operation },
+    });
+    expect(cleanup.blocked).toEqual([]);
+    expect(await count(`history.quarantine where set_sha = '${r.setSha}' and status = 'open'`)).toBe(0);
   });
 });
 

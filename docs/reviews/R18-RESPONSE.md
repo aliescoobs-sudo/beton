@@ -50,6 +50,24 @@ Each finding was re-checked against the CURRENT tree (T11 had landed: migration 
 3. The broad `BELGOBETON` allowance in the brand guard (see D).
 4. The e2e server started before its database was migrated: the new hard admission failure exposed the race. The server now retries a database WITHOUT the admission functions for up to a minute and then does not start (never admits it).
 5. A malformed `Next-Router-State-Tree` header on the invoice-queue page made Next answer 500 in an e2e probe (not investigated; the probe now sends `RSC: 1` only).
-6. Not fixed, not in R18: other functions that join across plants (`trip_stages`, `driver_trips`, `trip_delivery_exceptions`) were not re-audited for historical mismatches.
+6. **A defect I introduced, caught by the full e2e run**: the first version of `plant_fill` (0218) named `NEW.driver_id` while checking a LOAD, which has no such field, so every load made by a plant manager failed (`record "new" has no field "driver_id"`). The integration test for loads had accepted any error and so passed; the e2e `trip-shared-status` spec caught it. Fixed in place in 0218 (the migration had not been applied anywhere but throw-away test databases; the training instance was not touched), and the test now asserts the exact refusal text and has a positive control through the real service the plant screen calls.
+7. Not fixed, not in R18: other functions that join across plants (`trip_stages`, `driver_trips`, `trip_delivery_exceptions`) were not re-audited for historical mismatches.
 
 ## Run on the final tree
+
+One complete run on the tree of commit `0c735c0` (logs under `.logs/`, kept out of git), after killing stale `next` processes, under `caffeinate`:
+
+| Step | Result |
+| --- | --- |
+| `pnpm lint` (eslint + prettier) | 0 errors, 25 warnings (all in files not touched by T10e or pre-existing unused-variable warnings); formatting clean |
+| `pnpm typecheck` | clean |
+| unit (`vitest --project unit`) | 186 files, 2 702 tests, all passed |
+| integration (`vitest --project integration`) | 162 files, 2 739 tests, all passed (the second of two runs; see below) |
+| e2e (`next build` with `NEXT_DIST_DIR=.next-e2e`, then the FULL `playwright test`) | 212 tests: 206 passed, 6 skipped (skips that were already there), 0 failed, 37.0 min |
+
+How the run actually went, so it is not read as smoother than it was:
+
+- A first attempt at the full run overlapped with a second copy of the same script (my shell was killed by a `pkill` pattern that matched its own command line, and the script was started twice). Its integration result was discarded as invalid; the run was restarted alone.
+- The first clean e2e pass found four failures, all real: my own `plant_fill` defect (item 6 above, which the integration test had not caught), a second spec that enrolled the same user as the new banner spec (a fixture of its own was added), an expectation the R18-06 change legitimately moves (the sign-out confirmation now says "at least 2", one photo seen plus one for the unreadable former database), and a spec whose seed relied on a plantless order being visible to a plant manager (decision 207). All four were fixed and the WHOLE pipeline was run again: unit and the e2e above are from that second pass.
+- In that second pass the integration step had five failures: three were shared-state pollution from my new staging test (an open quarantined row left in the shared database; fixed by reversing its own second stage) and two were 5-second timeouts of existing tests under load (`assistant-endpoints`, `plant-views`). Integration was rerun on the final tree (test-only edit since the e2e pass) and passed in full, the two timeouts included. Because that last edit touched an integration test only, unit and e2e were not repeated; the application code and the e2e specs are those of the passing e2e run.
+- Earlier in the work a new integration test file had left a 1-billion-litre fixture that tripped the assistant's leak scan in a different suite; its fixture is now dated outside every window (found by the first full integration run).
