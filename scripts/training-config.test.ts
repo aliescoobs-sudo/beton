@@ -71,6 +71,34 @@ describe('the training stack (T1)', () => {
     expect(block('proxy')).toMatch(/profiles: \[public\]/);
     expect(block('ops')).not.toMatch(/ports:/);
   });
+  it('T11b: the local-network proxy is a profile that is off by default, bound to one chosen address (loopback when unset), never to every interface', () => {
+    const lan = block('lan-proxy');
+    expect(lan).toMatch(/profiles: \[lan\]/);
+    expect(lan).toMatch(/- '\$\{LAN_BIND_IP:-127\.0\.0\.1\}:8443:8443'/);
+    expect(lan).not.toMatch(/0\.0\.0\.0|- '8443|- '\d+:\d+'/);
+    expect(lan).not.toMatch(/env_file|DATABASE_URL|AUTH_SECRET/); // the proxy holds no application secret
+    expect(readFileSync('Caddyfile.lan', 'utf8')).toMatch(/tls internal/);
+    expect(readFileSync('Caddyfile.lan', 'utf8')).toMatch(/https:\/\/\{\$LAN_IP\}:8443/);
+  });
+  it('T11b: lan-up.sh refuses a public, malformed or empty address before it touches anything', () => {
+    for (const ip of [
+      '8.8.8.8',
+      '0.0.0.0',
+      '127.0.0.1',
+      '172.32.0.1',
+      '192.168.1.999',
+      '192.168.1',
+      'localhost',
+      '169.254.1.1',
+    ]) {
+      const r = spawnSync('bash', ['scripts/training/lan-up.sh', ip], {
+        encoding: 'utf8',
+        env: { ...process.env, PATH: '/usr/bin:/bin' },
+      });
+      expect(r.status, ip).toBe(2);
+      expect(r.stderr, ip).toMatch(/private address|not an address/);
+    }
+  });
   it('is the same file for the iMac and for a VPS: no host name, no domain and no path of the iMac in it', () => {
     expect(compose).not.toMatch(/aliobsil|\/Users\/|\.ts\.net/i);
     expect(compose).toMatch(/APP_DOMAIN: \$\{APP_DOMAIN:-\}/);

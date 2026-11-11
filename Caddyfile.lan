@@ -1,0 +1,20 @@
+# TRAINING ON THE LOCAL NETWORK (T11b, profile `lan`): TLS for ONE private address, so that a phone on the same Wi-Fi can sign in (the session
+# cookie is Secure and __Host-: a browser only keeps it over https). The certificate is signed by Caddy's own internal CA, which the phone must be
+# told to trust once (docs/training/RESEAU-LOCAL.fr.md). The listener is bound by docker-compose.training.yml to LAN_BIND_IP:8443 only, never
+# 0.0.0.0. Started and stopped only by scripts/training/lan-up.sh and lan-down.sh. Fictitious data only.
+{
+	local_certs
+	skip_install_trust
+	auto_https disable_redirects
+}
+https://{$LAN_IP}:8443 {
+	tls internal
+	encode zstd gzip
+	# Never expose the health surface to the network.
+	@internal path /api/health/*
+	respond @internal 404
+	reverse_proxy app:3000 {
+		# the app counts one hop of X-Forwarded-For (TRUSTED_PROXY_HOPS=1): each phone has its own login counter
+		header_up X-Forwarded-For {remote_host}
+	}
+}

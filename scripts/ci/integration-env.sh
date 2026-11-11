@@ -6,11 +6,10 @@ set -euo pipefail
 host="${1:-localhost}" port="${2:-5432}"
 : "${PGSUPER:?PGSUPER must hold the superuser password of the service database}"
 rnd() { openssl rand -hex 24; }
-db=belgobeton
 echo "NODE_ENV=test"
 echo "POSTGRES_SUPERUSER_PASSWORD=$PGSUPER"
-for r in app auth system migrator backup seed; do
-  echo "DATABASE_URL_$(printf %s "$r" | tr a-z A-Z)=postgres://belgobeton_${r}:$(rnd)@${host}:${port}/${db}"
+for role in belgobeton_app belgobeton_auth belgobeton_system belgobeton_migrator belgobeton_backup belgobeton_seed; do
+  echo "DATABASE_URL_$(printf %s "${role#*_}" | tr a-z A-Z)=postgres://${role}:$(rnd)@${host}:${port}/belgobeton"
 done
 echo "AUTH_SECRET=$(openssl rand -base64 48 | tr -d '\n')"
 echo "FIELD_ENCRYPTION_KEYS=k1:$(openssl rand -base64 32)"

@@ -165,10 +165,27 @@ describe('R17-01: a good file and a bad exported value', () => {
   it('R18-10: stop-all and up-public are the composed commands; the profiles are added by the script, never by the caller', () => {
     const s = sandbox();
     expect(run(s, 'scripts/training/dc.sh', ['stop-all']).status).toBe(0);
-    expect(calls(s).trim().split('\n').at(-1)).toMatch(/--profile public --profile ops stop \|/);
+    expect(calls(s).trim().split('\n').at(-1)).toMatch(
+      /--profile public --profile ops --profile lan stop \|/,
+    );
     const t = sandbox();
     expect(run(t, 'scripts/training/dc.sh', ['up-public']).status).toBe(0);
     expect(calls(t).trim().split('\n').at(-1)).toMatch(/--profile public up -d \|/);
+  });
+
+  it('T11b: the local-network proxy is started, stopped and asked for its certificate only by three fixed commands, and takes no argument', () => {
+    for (const [sub, tail] of [
+      ['up-lan', /--profile lan up -d lan-proxy \|/],
+      ['down-lan', /--profile lan stop lan-proxy \|/],
+      ['lan-ca', /--profile lan exec -T lan-proxy cat \/data\/caddy\/pki\/authorities\/local\/root\.crt \|/],
+    ] as const) {
+      const s = sandbox({ resolved: [...DEFAULT_RESOLVED, ['lan-proxy', 'caddy:2-alpine']] });
+      expect(run(s, 'scripts/training/dc.sh', [sub, '--publish', '0.0.0.0:80:80']).status, sub).toBe(0);
+      expect(calls(s).trim().split('\n').at(-1), sub).toMatch(tail);
+      expect(calls(s), sub).not.toMatch(/0\.0\.0\.0/);
+    }
+    const bad = sandbox({ resolved: [...DEFAULT_RESOLVED, ['lan-proxy', 'evil/proxy:1']] });
+    expect(run(bad, 'scripts/training/dc.sh', ['up-lan']).status).toBe(1);
   });
 
   it('what follows the subcommand belongs to the command (a script argument -f is not a compose option)', () => {
@@ -190,7 +207,7 @@ describe('R17-01: a good file and a bad exported value', () => {
     // the SAME files and env files for the check and for the command
     const prefix =
       'compose -f docker-compose.training.yml --env-file .env.training --env-file .env.training.ops';
-    expect(log[0]).toContain(`${prefix} --profile public --profile ops config`);
+    expect(log[0]).toContain(`${prefix} --profile public --profile ops --profile lan config`);
     expect(log[1]).toContain(`${prefix} pull`);
   });
 

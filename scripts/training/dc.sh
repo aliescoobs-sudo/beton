@@ -27,14 +27,18 @@ fi
 # configuration (files, env files, project, profiles) is built only below. `stop-all` and `up-public` are the two composed commands (stop the profiled services too; start with the public proxy).
 sub="${1:-}"
 case "$sub" in
-  config|pull|run|up|stop|exec|ps|logs|stop-all|up-public) ;;
-  '') echo "training dc.sh: a sub-command is required (config, pull, run, up, stop, exec, ps, logs, stop-all, up-public)." >&2; exit 1 ;;
-  *) echo "training dc.sh: '${sub%%=*}' is not an allowed first argument: only config, pull, run, up, stop, exec, ps, logs, stop-all and up-public, and no compose option before the sub-command (the configuration is fixed by this script)." >&2; exit 1 ;;
+  config|pull|run|up|stop|exec|ps|logs|stop-all|up-public|up-lan|down-lan|lan-ca) ;;
+  '') echo "training dc.sh: a sub-command is required (config, pull, run, up, stop, exec, ps, logs, stop-all, up-public, up-lan, down-lan, lan-ca)." >&2; exit 1 ;;
+  *) echo "training dc.sh: '${sub%%=*}' is not an allowed first argument: only config, pull, run, up, stop, exec, ps, logs, stop-all, up-public, up-lan, down-lan and lan-ca, and no compose option before the sub-command (the configuration is fixed by this script)." >&2; exit 1 ;;
 esac
 shift
 args=("$sub" "$@")
-if [ "$sub" = stop-all ]; then args=(--profile public --profile ops stop "$@"); fi
+if [ "$sub" = stop-all ]; then args=(--profile public --profile ops --profile lan stop "$@"); fi
 if [ "$sub" = up-public ]; then args=(--profile public up -d "$@"); fi
+# T11b: the local-network proxy (profile `lan`): started, stopped and asked for its root certificate only through these three fixed commands
+if [ "$sub" = up-lan ]; then args=(--profile lan up -d lan-proxy); fi
+if [ "$sub" = down-lan ]; then args=(--profile lan stop lan-proxy); fi
+if [ "$sub" = lan-ca ]; then args=(--profile lan exec -T lan-proxy cat /data/caddy/pki/authorities/local/root.crt); fi
 
 # 2. the value
 image="$(sed -n 's/^APP_IMAGE=//p' .env.training)"
@@ -47,7 +51,7 @@ base=(env -u COMPOSE_FILE -u COMPOSE_ENV_FILES -u COMPOSE_PROJECT_NAME -u COMPOS
 # 4. what compose RESOLVED, service by service, with every profile enabled (so ops and the proxy are in it): the application and ops images are
 # exactly the validated one and BOTH must be present; the database and the proxy are the pinned third-party images; any other service is refused.
 # Only the service names and their image lines are kept; the configuration (it holds secrets) is never printed.
-resolved="$("${base[@]}" --profile public --profile ops config)" || { echo "training dc.sh: could not resolve the compose configuration; nothing was run." >&2; exit 1; }
+resolved="$("${base[@]}" --profile public --profile ops --profile lan config)" || { echo "training dc.sh: could not resolve the compose configuration; nothing was run." >&2; exit 1; }
 pairs="$(printf '%s\n' "$resolved" | awk '/^services:/{s=1;next} /^[^ ]/{s=0} s && /^  [A-Za-z0-9_-]+:/{svc=$1; sub(/:$/,"",svc); seen[svc]=1; order[++n]=svc} s && /^    image:/{img=$2; gsub(/"/,"",img); image[svc]=img} END{for(i=1;i<=n;i++) print order[i] "=" image[order[i]]}')"
 unset resolved
 have_app=no; have_ops=no
@@ -58,7 +62,7 @@ while IFS= read -r line; do
     app) have_app=yes; [ "$img" = "$image" ] || { echo "training dc.sh: compose resolved an application image for 'app' that is not the validated one. Refused." >&2; exit 1; } ;;
     ops) have_ops=yes; [ "$img" = "$image" ] || { echo "training dc.sh: compose resolved an image for 'ops' (maintenance credentials) that is not the validated one. Refused." >&2; exit 1; } ;;
     db) case "$img" in postgres:*@sha256:*) ;; *) echo "training dc.sh: compose resolved an unexpected image for 'db'. Refused." >&2; exit 1 ;; esac ;;
-    proxy) [ "$img" = "caddy:2-alpine" ] || { echo "training dc.sh: compose resolved an unexpected image for 'proxy'. Refused." >&2; exit 1; } ;;
+    proxy|lan-proxy) [ "$img" = "caddy:2-alpine" ] || { echo "training dc.sh: compose resolved an unexpected image for 'proxy'. Refused." >&2; exit 1; } ;;
     *) echo "training dc.sh: compose resolved an unexpected service '$svc'. Refused." >&2; exit 1 ;;
   esac
 done <<<"$pairs"
