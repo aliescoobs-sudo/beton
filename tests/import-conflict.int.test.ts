@@ -50,7 +50,7 @@ const run = (
     environment: PROD,
     requireEveryMappedSheet: false,
   });
-const clientsFile = (name: string, ice: string, phone = '0600000000') =>
+const clientsFile = (name: string, ice: string, phone = '0000 00 0000') =>
   buildWorkbook([
     {
       name: 'Clients',
@@ -100,16 +100,16 @@ describe('"already there" means the same payload (R14-08)', () => {
     const name = `Client Fictif Meme ${tag}`;
     const ice = fakeIce();
     expect((await run(clientsFile(name, ice), 'apply', 'clients', 'Clients')).applied).toBe(true);
-    const same = await run(clientsFile(name, ice, '0600000000 '), 'dry-run', 'clients', 'Clients'); // other bytes? no: same values
+    const same = await run(clientsFile(name, ice, '0000 00 0000 '), 'dry-run', 'clients', 'Clients'); // other bytes? no: same values
     expect(same.totals.exists).toBe(1);
-    const phone = await run(clientsFile(name, ice, '0611111111'), 'dry-run', 'clients', 'Clients');
+    const phone = await run(clientsFile(name, ice, '0000 00 1111'), 'dry-run', 'clients', 'Clients');
     expect(phone.totals.error).toBe(1);
     expect(phone.totals.exists).toBe(0);
     expect(phone.sheets[0]?.report.rows[0]?.message).toMatch(/differs in: phone/);
     const otherIce = await run(clientsFile(name, fakeIce()), 'dry-run', 'clients', 'Clients');
     expect(otherIce.totals.error).toBe(1);
     // the message names fields, never a value
-    expect(JSON.stringify(phone.sheets[0]?.report.rows)).not.toContain('0611111111');
+    expect(JSON.stringify(phone.sheets[0]?.report.rows)).not.toContain('0000 00 1111');
   });
 
   it('a concrete type at an existing code with another label is a conflict', async () => {

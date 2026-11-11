@@ -38,7 +38,7 @@ const workbook = (name: string) =>
       name: 'Clients',
       rows: [
         ['Nom', 'Type', 'ICE', 'Téléphone'],
-        [name, 'company', fakeIce(), '0600000000'],
+        [name, 'company', fakeIce(), '0000 00 0000'],
       ],
     },
   ]);

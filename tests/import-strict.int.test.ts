@@ -40,7 +40,7 @@ const dry = (file: Buffer, m = mapping()) =>
     requireEveryMappedSheet: false,
   });
 const head = ['Nom', 'Type', 'ICE', 'Téléphone'];
-const row = ['Client Fictif Strict', 'company', '123456789012345', '0600000000'];
+const row = ['Client Fictif Strict', 'company', '123456789012345', '0000 00 0000'];
 
 describe('strict reading reaches the report (R14-04)', () => {
   it('a clean sheet is accepted (control)', async () => {
@@ -80,7 +80,7 @@ describe('strict reading reaches the report (R14-04)', () => {
             { f: '"Client "&"Fictif Formule"', v: 'Client Fictif Formule' },
             'company',
             '123456789012345',
-            '0600000000',
+            '0000 00 0000',
           ],
         ],
       },

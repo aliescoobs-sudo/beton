@@ -50,8 +50,8 @@ const count = async (table: string, where = 'true') =>
 describe('clients', () => {
   const rows = [
     ['Nom', 'Type', 'ICE', 'Téléphone', 'Délai de paiement'],
-    [`Atlas Bâtiment ${tag}`, 'société', ICE_A, '0661123456', 45],
-    [`M. Particulier ${tag}`, 'particulier', '', '0662000000', ''],
+    [`Atlas Bâtiment ${tag}`, 'société', ICE_A, '0000 00 3456', 45],
+    [`M. Particulier ${tag}`, 'particulier', '', '0000 00 0000', ''],
   ];
   it('a dry run says what it would do and writes nothing; the real run writes it; a second run skips it', async () => {
     const before = await count('client', `name like '%${tag}'`);

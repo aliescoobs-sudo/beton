@@ -53,14 +53,14 @@ function sheets(o: Required<SyntheticOptions>): Record<string, Rows> {
     ],
     Clients: [
       ['Nom', 'Type', 'ICE', 'Téléphone', 'Délai de paiement'],
-      [`CLIENT FICTIF 001 SARL ${o.prefix}`, 'société', ice(o.prefix, 1), '0600000001', 60],
-      [`CLIENT FICTIF 002 ${o.prefix}`, 'particulier', '', '0600000002', ''],
-      [`CLIENT FICTIF 003 SA ${o.prefix}`, 'société', ice(o.prefix, 3), '0600000003', 90],
+      [`CLIENT FICTIF 001 SARL ${o.prefix}`, 'société', ice(o.prefix, 1), '0000 00 0001', 60],
+      [`CLIENT FICTIF 002 ${o.prefix}`, 'particulier', '', '0000 00 0002', ''],
+      [`CLIENT FICTIF 003 SA ${o.prefix}`, 'société', ice(o.prefix, 3), '0000 00 0003', 90],
     ],
     Fournisseurs: [
       ['Nom', 'Catégorie', 'ICE', 'Téléphone'],
-      [`FOURNISSEUR FICTIF CIMENT ${o.prefix}`, 'cement', ice(o.prefix, 11), '0600000011'],
-      [`FOURNISSEUR FICTIF SABLE ${o.prefix}`, 'aggregates', ice(o.prefix, 12), '0600000012'],
+      [`FOURNISSEUR FICTIF CIMENT ${o.prefix}`, 'cement', ice(o.prefix, 11), '0000 00 0011'],
+      [`FOURNISSEUR FICTIF SABLE ${o.prefix}`, 'aggregates', ice(o.prefix, 12), '0000 00 0012'],
     ],
     Camions: [
       ['Code', 'Immatriculation', 'Capacité', 'Type', 'Centrale'],
@@ -130,9 +130,9 @@ function problemSheets(o: Required<SyntheticOptions>): Record<string, Rows> {
     ...ok,
     Clients: [
       ['Nom', 'Type', 'ICE', 'Téléphone'],
-      [`CLIENT FICTIF 001 SARL ${o.prefix}`, 'société', ice(o.prefix, 1), '0600000001'],
-      [`CLIENT FICTIF 004 SARL ${o.prefix}`, 'société', '123', '0600000004'],
-      [`CLIENT FICTIF 001 SARL ${o.prefix}`, 'société', ice(o.prefix, 5), '0600000005'],
+      [`CLIENT FICTIF 001 SARL ${o.prefix}`, 'société', ice(o.prefix, 1), '0000 00 0001'],
+      [`CLIENT FICTIF 004 SARL ${o.prefix}`, 'société', '123', '0000 00 0004'],
+      [`CLIENT FICTIF 001 SARL ${o.prefix}`, 'société', ice(o.prefix, 5), '0000 00 0005'],
     ],
     Camions: [
       ['Code', 'Immatriculation', 'Capacité', 'Type'],

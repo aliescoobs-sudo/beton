@@ -79,7 +79,7 @@ beforeAll(async () => {
         name: 'Clients',
         rows: [
           ['Nom', 'Type', 'ICE', 'Téléphone'],
-          [CLIENT, 'company', String(Math.floor(Math.random() * 9e14) + 1e14), '0600000000'],
+          [CLIENT, 'company', String(Math.floor(Math.random() * 9e14) + 1e14), '0000 00 0000'],
         ],
       },
       {
