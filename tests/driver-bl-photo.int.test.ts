@@ -57,14 +57,23 @@ const reportUnloaded = (tripId: string, driverId: string) =>
   );
 
 async function driverSession() {
-  const no = n++;
-  const row = await asOwner((tx) =>
-    tx.query<{ id: string; code: string }>(
-      `insert into driver (id, code, name, created_by, kind) values (gen_random_uuid(), $1, $2, $3, 'driver') returning id, code`,
-      [`CH-${no}`, `${marker} ${no}`, owner.id],
-    ),
-  );
-  const d = row.rows[0]!;
+  // other suites draw random CH- codes from the same table: take the next free one instead of failing on a collision
+  let d: { id: string; code: string } | undefined;
+  for (let i = 0; i < 50 && !d; i++) {
+    const no = n++;
+    try {
+      const row = await asOwner((tx) =>
+        tx.query<{ id: string; code: string }>(
+          `insert into driver (id, code, name, created_by, kind) values (gen_random_uuid(), $1, $2, $3, 'driver') returning id, code`,
+          [`CH-${no}`, `${marker} ${no}`, owner.id],
+        ),
+      );
+      d = row.rows[0]!;
+    } catch (e) {
+      if ((e as { code?: string }).code !== '23505') throw e;
+    }
+  }
+  if (!d) throw new Error('no free driver code');
   const acct = await createFieldAccount(deps(), owner, d.id);
   if (!acct.ok) throw new Error(acct.error);
   await setDriverPin(deps(), owner, { driverId: d.id, pin: '482913' });
