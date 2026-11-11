@@ -270,7 +270,8 @@ export function readXlsxSheets(buf: Buffer, opts: ReadOptions = {}): NamedSheet[
   const shared = pkg.sharedPart ? zip.get(pkg.sharedPart) : undefined;
   if (shared) {
     const root = strictPart(buf, shared, 'the shared strings')[0];
-    if (!root || localName(root.name) !== 'sst') return refuse('the shared strings part is not a string table');
+    if (!root || localName(root.name) !== 'sst')
+      return refuse('the shared strings part is not a string table');
   }
   const strings = shared
     ? [...readEntry(buf, shared).matchAll(/<si>([\s\S]*?)<\/si>/g)].map((m) => textOf(m[1] ?? ''))
@@ -307,10 +308,10 @@ export function readXlsxSheets(buf: Buffer, opts: ReadOptions = {}): NamedSheet[
         if (type === 's') {
           // R19-09: a cell must point at a string the workbook's own table holds; an empty read would hide a layout the program does not share
           const at = strings[Number(/<v>(\d+)<\/v>/.exec(body)?.[1])];
-          if (at === undefined) throw new SheetError('a cell points at a shared string that the workbook does not hold');
+          if (at === undefined)
+            throw new SheetError('a cell points at a shared string that the workbook does not hold');
           value = at;
-        }
-        else if (type === 'inlineStr') value = textOf(body);
+        } else if (type === 'inlineStr') value = textOf(body);
         else value = decode(/<v>([\s\S]*?)<\/v>/.exec(body)?.[1] ?? '');
         const i = ref ? colIndex(ref) : line.length;
         while (line.length < i) line.push('');
