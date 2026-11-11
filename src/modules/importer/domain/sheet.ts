@@ -46,7 +46,7 @@ function zipEntries(buf: Buffer): Map<string, ZipEntry> {
     const name = buf.toString('utf8', p + 46, p + 46 + nameLen);
     // R18-09: two entries of one name would let the later silently replace the earlier (the part read is not the part checked)
     if (seen.has(name.toLowerCase().replace(/^\/+/, '')))
-      throw new SheetError(`the file holds the part "${name}" more than once`);
+      throw new SheetError('the file holds a part more than once');
     seen.add(name.toLowerCase().replace(/^\/+/, ''));
     out.set(name, {
       name,
@@ -169,7 +169,7 @@ function relationships(buf: Buffer, entry: ZipEntry, what: string): Relationship
     const id = t.attrs.get('Id');
     const target = t.attrs.get('Target');
     if (!id || !target) return refuse(`${what} holds a relationship without an Id or a Target`);
-    if (ids.has(id)) return refuse(`${what} holds the relationship ${id} twice`);
+    if (ids.has(id)) return refuse(`${what} holds a relationship twice`);
     ids.add(id);
     out.push({
       id,
@@ -190,7 +190,7 @@ function relationships(buf: Buffer, entry: ZipEntry, what: string): Relationship
 function workbookPackage(
   buf: Buffer,
   zip: Map<string, ZipEntry>,
-): { main: ZipEntry; mainXml: string; sheets: { name: string; part: string }[] } {
+): { main: ZipEntry; mainXml: string; sheets: { name: string; part: string }[]; sharedPart: string | null } {
   const rootRels = zip.get('_rels/.rels');
   if (!rootRels) return refuse('the package has no _rels/.rels');
   const office = relationships(buf, rootRels, 'the package relationships').filter(
@@ -204,7 +204,7 @@ function workbookPackage(
     );
   const mainName = resolveTarget('', office[0]!.target);
   const main = zip.get(mainName);
-  if (!main) return refuse(`the main workbook part "${mainName}" is missing`);
+  if (!main) return refuse('the main workbook part is missing');
   const mainDoc = strictPart(buf, main, MAIN_PART);
   const root = mainDoc[0];
   if (!root || localName(root.name) !== 'workbook') return refuse('the main part is not a workbook');
@@ -226,13 +226,22 @@ function workbookPackage(
     const rel = rid ? targets.get(rid) : undefined;
     if (!name || !rel || rel.external) return refuse('a sheet of the workbook has no usable relationship');
     const part = resolveTarget(baseDir, rel.target);
-    if (!zip.has(part)) return refuse(`the part of the sheet "${name}" is missing`);
+    if (!zip.has(part)) return refuse('the part of a sheet is missing');
     if (parts.has(part)) return refuse('two sheets share one part');
     parts.add(part);
     sheets.push({ name, part });
   }
   if (sheets.length === 0) return refuse('the workbook lists no sheet');
-  return { main, mainXml, sheets };
+  // R19-09: the shared strings come from the workbook's OWN relationship, never from a file name. At most one such relationship; the part it names must exist.
+  // A part that carries the usual name but is not named by the workbook is not read (a spreadsheet program ignores it too).
+  const sharedRels = [...targets.values()].filter((r) => /\/sharedStrings$/.test(r.type) && !r.external);
+  if (sharedRels.length > 1) return refuse('the workbook names more than one shared strings part');
+  let sharedPart: string | null = null;
+  if (sharedRels.length === 1) {
+    sharedPart = resolveTarget(baseDir, sharedRels[0]!.target);
+    if (!zip.has(sharedPart)) return refuse('the shared strings part named by the workbook is missing');
+  }
+  return { main, mainXml, sheets, sharedPart };
 }
 
 /** Test support (R18-09): the parts of a package as (name, text), in directory order. Refuses what the reader refuses (a repeated name). */
@@ -258,7 +267,11 @@ export function readXlsxSheets(buf: Buffer, opts: ReadOptions = {}): NamedSheet[
     if (e instanceof XmlFlagsError) throw new SheetError(e.message);
     throw e;
   }
-  const shared = zip.get('xl/sharedStrings.xml');
+  const shared = pkg.sharedPart ? zip.get(pkg.sharedPart) : undefined;
+  if (shared) {
+    const root = strictPart(buf, shared, 'the shared strings')[0];
+    if (!root || localName(root.name) !== 'sst') return refuse('the shared strings part is not a string table');
+  }
   const strings = shared
     ? [...readEntry(buf, shared).matchAll(/<si>([\s\S]*?)<\/si>/g)].map((m) => textOf(m[1] ?? ''))
     : [];
@@ -291,7 +304,12 @@ export function readXlsxSheets(buf: Buffer, opts: ReadOptions = {}): NamedSheet[
           if (formulaRows[formulaRows.length - 1] !== rowNo) formulaRows.push(rowNo);
         }
         let value = '';
-        if (type === 's') value = strings[Number(/<v>(\d+)<\/v>/.exec(body)?.[1])] ?? '';
+        if (type === 's') {
+          // R19-09: a cell must point at a string the workbook's own table holds; an empty read would hide a layout the program does not share
+          const at = strings[Number(/<v>(\d+)<\/v>/.exec(body)?.[1])];
+          if (at === undefined) throw new SheetError('a cell points at a shared string that the workbook does not hold');
+          value = at;
+        }
         else if (type === 'inlineStr') value = textOf(body);
         else value = decode(/<v>([\s\S]*?)<\/v>/.exec(body)?.[1] ?? '');
         const i = ref ? colIndex(ref) : line.length;

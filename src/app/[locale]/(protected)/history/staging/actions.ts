@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { getPool } from '@/lib/db/pools';
+import { getEnv } from '@/lib/server-env';
 import { decideLabel, decideQuarantine, type LabelKind } from '@/modules/importer';
 import { authorize } from '@/modules/platform-security';
 import { currentAuthState } from '@/modules/platform-security/next';
@@ -58,6 +59,9 @@ export async function decideQuarantineAction(formData: FormData): Promise<void> 
     if (v) values[f] = v;
   }
   if (action === 'discard') await decideQuarantine(getPool('app'), user, { id, action: 'discard' });
-  else if (action === 'fix') await decideQuarantine(getPool('app'), user, { id, action: 'fix', values });
+  else if (action === 'fix')
+    await decideQuarantine(getPool('app'), user, { id, action: 'fix', values }, undefined, {
+      trainingMode: getEnv().TRAINING_MODE,
+    });
   revalidatePath('/[locale]/history/staging', 'page');
 }

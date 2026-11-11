@@ -3,6 +3,7 @@ import { stableJson } from '../../domain/confirmation';
 import { type NamedSheet, readXlsxSheets, SheetError } from '../../domain/sheet';
 import { categoryKey, clientKey, driverKey, foldKey, pumpKey, truckKey, typeKey } from '../domain/normalise';
 import { type FileFacts, TWIN_MARKER_SHEET, TWIN_MARKER_TEXT } from '../domain/guard';
+import { deliveryContamination, expenseContamination, rawContamination } from '../domain/twin-content';
 import { columnsOf, type HistoryMapping } from '../domain/mapping';
 import {
   type DeliveryRow,
@@ -62,7 +63,7 @@ export function readSet(files: InputFile[], mapping: HistoryMapping): SetRead {
   };
   for (const f of files) {
     const report: FileReport = { file: f.ord, read: [], ignored: [], problems: [] };
-    const facts: FileFacts = { marked: false, names: [], expenseLabels: [] };
+    const facts: FileFacts = { marked: false, names: [], expenseLabels: [], contaminated: [] };
     let sheets: NamedSheet[];
     try {
       sheets = readXlsxSheets(f.buf, {
@@ -120,6 +121,8 @@ export function readSet(files: InputFile[], mapping: HistoryMapping): SetRead {
         out.deliveries.push(...r.rows);
         out.quarantine.push(...r.quarantine.map((q) => ({ ...q, kind: 'deliveries' as const })));
         report.read.push({ sheet: pos, stats: r.stats });
+        for (const row of r.rows) facts.contaminated!.push(...deliveryContamination(row));
+        for (const q of r.quarantine) facts.contaminated!.push(...rawContamination('deliveries', q.raw));
         for (const row of r.rows)
           facts.names.push(...[row.client, row.driver, row.site].filter((v) => v !== ''));
         for (const q of r.quarantine)
@@ -133,6 +136,8 @@ export function readSet(files: InputFile[], mapping: HistoryMapping): SetRead {
         out.expenses.push(...r.rows);
         out.quarantine.push(...r.quarantine.map((q) => ({ ...q, kind: 'expenses' as const })));
         report.read.push({ sheet: pos, stats: r.stats });
+        for (const row of r.rows) facts.contaminated!.push(...expenseContamination(row));
+        for (const q of r.quarantine) facts.contaminated!.push(...rawContamination('expenses', q.raw));
         facts.expenseLabels.push(
           ...r.rows.map((x) => x.label),
           ...r.quarantine.map((q) => q.raw.label ?? '').filter((v) => v !== ''),

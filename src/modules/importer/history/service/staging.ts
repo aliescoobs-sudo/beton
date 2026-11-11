@@ -4,6 +4,7 @@ import { err, ok, type Result } from '@/lib/result';
 import { realClock } from '@/modules/clock';
 import { inRequest, require, type SessionUser } from '@/modules/platform-security';
 import { CATEGORY_CODES, similarityGroups } from '../domain/normalise';
+import { rawContamination } from '../domain/twin-content';
 import { deliveryFromRaw, expenseFromRaw } from '../domain/parse';
 import type { HistoryMapping } from '../domain/mapping';
 
@@ -214,6 +215,8 @@ export async function decideQuarantine(
   actor: SessionUser,
   input: unknown,
   mapping?: Pick<HistoryMapping, 'dateFormat' | 'fileMonths'>,
+  /** R19-03: on the training instance a correction must be something the twin can write, checked when it is typed (and again when it is applied). */
+  options: { trainingMode?: boolean } = {},
 ): Promise<Result<true, HistoryError>> {
   await require(appPool, actor, 'history.admin');
   const parsed = fixInput.safeParse(input);
@@ -243,6 +246,8 @@ export async function decideQuarantine(
           ? deliveryFromRaw(raw, src, fmt)
           : expenseFromRaw(raw, src, fmt, mapping?.fileMonths[String(src.file)] ?? null);
       if (!('row' in built)) return err('INVALID' as const);
+      if (options.trainingMode && rawContamination(q.kind, d.values ?? {}).length > 0)
+        return err('INVALID' as const);
     }
     await tx.query(
       `update history.quarantine set status = $2, fixed = $3, decided_by = $4, decided_at = $5 where id = $1`,

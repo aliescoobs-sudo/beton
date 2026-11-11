@@ -35,6 +35,8 @@ export interface FileFacts {
   marked: boolean;
   names: string[];
   expenseLabels: string[];
+  /** R19-03: the FIELD NAMES (never a cell) in which a retained value is outside what the twin generator can write. */
+  contaminated?: string[];
 }
 
 /** The reason the environment forbids this history import, or null. `trainingSeeded` is the database's own answer. */
@@ -48,6 +50,8 @@ export function historyEnvironmentProblem(
     if (marked !== files.length)
       return 'On the training instance the history import accepts only the fictitious twin files (marker sheet missing in at least one file).';
     for (const f of files) {
+      if ((f.contaminated ?? []).length > 0)
+        return 'A retained field holds a value the twin generator cannot write: a marker alone is not proof that a file is synthetic, and it is refused on the training instance.';
       if (f.names.some((n) => !foldKey(n).includes(TWIN_NAME_MARK)))
         return 'A name outside the twin vocabulary is present: this is not a twin file, and it is refused on the training instance.';
       const known = new Set([...Object.keys(BUILTIN_CATEGORY_ALIASES), ...TWIN_EXPENSE_LABELS.map(foldKey)]);

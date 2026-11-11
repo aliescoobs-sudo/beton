@@ -33,7 +33,7 @@ export function buildXlsx(
     '_rels/.rels': PACKAGE_RELS,
     'xl/workbook.xml':
       '<?xml version="1.0"?><workbook xmlns:r="r"><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets></workbook>',
-    'xl/_rels/workbook.xml.rels': `<?xml version="1.0"?><Relationships><Relationship Id="rId1" Type="${R}/worksheet" Target="worksheets/sheet1.xml"/></Relationships>`,
+    'xl/_rels/workbook.xml.rels': `<?xml version="1.0"?><Relationships><Relationship Id="rId1" Type="${R}/worksheet" Target="worksheets/sheet1.xml"/>${opts.inline ? '' : `<Relationship Id="rId2" Type="${R}/sharedStrings" Target="sharedStrings.xml"/>`}</Relationships>`,
     'xl/worksheets/sheet1.xml': `<?xml version="1.0"?><worksheet><sheetData>${sheetRows}</sheetData></worksheet>`,
     ...(opts.inline
       ? {}

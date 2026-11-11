@@ -8,6 +8,7 @@ import { recordAuditEvent, type SessionUser } from '@/modules/platform-security'
 import { stableJson, type StepUpProof } from '../../domain/confirmation';
 import { RUN_TAG_PREFIX, singleTransactionPool } from '../../service/tx-pool';
 import { abandon, commitAndRelease, rollbackAndRelease } from '../../service/tx-end';
+import { deliveryContamination, expenseContamination } from '../domain/twin-content';
 import { assertActor, ImportRefused } from '../../service/workbook-import';
 import { type HistoryEnvironment, historyEnvironmentProblem } from '../domain/guard';
 import type { HistoryMapping } from '../domain/mapping';
@@ -324,6 +325,19 @@ export async function runHistory(opts: HistoryOptions): Promise<HistoryReport> {
       }
       return { plant, batch, fixed, effective, usage, known };
     });
+    // R19-03: on the training instance the EFFECTIVE values that will be written (the readable rows and the corrections the owner made after staging) are
+    // validated again against what the twin can write; a marker proved nothing at stage time and a correction is typed text.
+    if (opts.environment.trainingMode && opts.mode !== 'dry-run') {
+      const bad = [
+        ...state.effective.deliveries.flatMap(deliveryContamination),
+        ...state.effective.expenses.flatMap(expenseContamination),
+      ];
+      if (bad.length > 0)
+        throw new ImportRefused(
+          'ENVIRONMENT',
+          `A value to write is outside what the twin generator can write (fields: ${[...new Set(bad)].join(', ')}): refused on the training instance.`,
+        );
+    }
     if (mapping.plantCode && !state.plant)
       report.problems.push(`PLANT_UNKNOWN: no active plant has the configured code`);
     if (state.fixed.invalid) report.blocked.push(`FIXED_ROWS_INVALID: ${state.fixed.invalid}`);
