@@ -131,14 +131,6 @@ test('the owner reads it: amounts, the order and the receipt it is linked to', a
   await logout(page);
 });
 
-test('support reads it and cannot enter; the plant has nothing', async ({ page }) => {
-  await loginAndEnrol(page, 'fr', E2E_MD.siSupport.email);
-  await goNav(page, 'supplier-invoices-link');
-  await expect(page.getByTestId(`si-${code}`)).toBeVisible();
-  await expect(page.getByTestId('supplier-invoices-new-link')).toHaveCount(0);
-  expect((await page.goto('/fr/supplier-invoices/new'))?.status()).toBe(404);
-});
-
 test('the plant has no link and no page', async ({ page }) => {
   await loginAndEnrol(page, 'fr', E2E_MD.siPlant.email);
   await expect(page.getByTestId('supplier-invoices-link')).toHaveCount(0);

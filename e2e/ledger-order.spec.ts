@@ -96,11 +96,11 @@ test('the owner previews the amounts computed by the server', async ({ page }) =
   await expect(page.getByTestId('preview-ttc')).toContainText('9 840,00');
 });
 
-test('partner and plant have no order entry (404, no link); Arabic renders right-to-left', async ({
+test('the plant has no order entry (404, no link); Arabic renders right-to-left', async ({
   page,
   browser,
 }) => {
-  for (const user of [E2E_MD.orderPartner, E2E_MD.orderPlant]) {
+  for (const user of [E2E_MD.orderPlant]) {
     const other = await browser.newPage();
     await loginAndEnrol(other, 'fr', user.email);
     await expect(other.getByTestId('orders-new-link')).toHaveCount(0);

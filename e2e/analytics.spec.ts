@@ -55,16 +55,7 @@ test('the owner sees the m³ and the amount (8 m³ × 780,00 = 6 240,00 MAD HT)'
   expect(problems).toEqual([]);
 });
 
-test('the partner sees the m³ and no amount; the plant has no page and no link', async ({
-  page,
-  browser,
-}) => {
-  await loginAndEnrol(page, 'fr', E2E_MD.anPartner.email);
-  await page.goto(`/fr/analytics?${QUERY}`);
-  await expect(page.getByTestId(`analytics-${DAY}-${typeLabel}`)).toContainText('8 m³');
-  await expect(page.locator('th', { hasText: 'Montant' })).toHaveCount(0);
-  await expect(page.locator('body')).not.toContainText(MONEY);
-
+test('the plant has no page and no link to the analytics', async ({ browser }) => {
   const plant = await browser.newPage();
   await loginAndEnrol(plant, 'fr', E2E_MD.anPlant.email);
   await expect(plant.getByTestId('analytics-link')).toHaveCount(0);

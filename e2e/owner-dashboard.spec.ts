@@ -214,26 +214,10 @@ test('reclassifying needs a reason and is kept with the computed severity', asyn
   expect(ev.rows[0].override_severity).toBe('important');
 });
 
-test('support reads the same page and cannot confirm anything; its view is audited', async ({ page }) => {
-  await loginAndEnrol(page, 'fr', E2E_MD.dashSupport.email);
-  await expect(page.getByTestId('owner-today')).toBeVisible();
-  await expect(page.getByTestId('alerts-list')).toBeVisible();
-  await page.getByTestId('alerts-list').locator('a').first().click();
-  await expect(page.getByTestId('alert-report')).toBeVisible();
-  await expect(page.getByTestId('opt-1-prepare')).toHaveCount(0);
-  await expect(page.getByTestId('reclassify-open')).toHaveCount(0);
-  await expect(page.getByTestId('alert-report')).toContainText('Lecture seule');
-  const views = await migrator.query(
-    `select count(*)::int as n from audit_event where action = 'view' and table_name like 'screen:%'`,
-  );
-  expect(views.rows[0].n).toBeGreaterThan(0);
-  await logout(page);
-});
-
-test('office, plant and partner get a "today" with loads and stock and no money at all; the alert report is a 404 for them', async ({
+test('office and plant get a "today" with loads and stock and no money at all; the alert report is a 404 for them', async ({
   page,
 }) => {
-  for (const email of [E2E_MD.dashOffice.email, E2E_MD.dashPlant.email, E2E_MD.dashPartner.email]) {
+  for (const email of [E2E_MD.dashOffice.email, E2E_MD.dashPlant.email]) {
     await loginAndEnrol(page, 'fr', email);
     await expect(page.getByTestId('ops-today')).toBeVisible();
     await expect(page.getByTestId('owner-today')).toHaveCount(0);

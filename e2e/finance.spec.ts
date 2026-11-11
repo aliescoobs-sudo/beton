@@ -37,26 +37,6 @@ test('owner enables finance, records a fixed expense and downloads a real Excel 
   await page.screenshot({ path: '.logs/finance-fr-phone.png', fullPage: true });
   await logout(page);
 });
-test('support has no management page, export, navigation or write endpoint', async ({ page }) => {
-  await loginAndEnrol(page, 'fr', E2E_MD.finSupport.email);
-  await expect(page.getByTestId('finance-link')).toHaveCount(0);
-  expect((await page.goto('/fr/finance'))?.status()).toBe(404);
-  expect((await page.request.get('/fr/finance/export?from=2026-01-01&to=2026-12-31')).status()).toBe(404);
-  expect((await configure(page, true)).status()).toBe(404);
-  // the day close is open to support, but the cash per holder is not
-  expect((await page.goto('/fr/day-close'))?.status()).toBe(200);
-  await expect(page.getByTestId('dayclose-cash')).toHaveCount(0);
-  expect(
-    (
-      await page.request.post('/api/finance', {
-        headers: { origin: E2E_BASE_URL },
-        data: { action: 'entry' },
-      })
-    ).status(),
-  ).toBe(404);
-  await page.goto('/fr');
-  await logout(page);
-});
 test('Arabic phone layout and module-off behavior', async ({ page }) => {
   await loginOwner(page, 'ar');
   await page.goto('/ar/finance');

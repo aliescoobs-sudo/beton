@@ -41,17 +41,8 @@ test('the owner adds a caisse and a bank account and sets their opening balances
   await logout(page);
 });
 
-test('support reads the accounts without any form; office and partner have no link and no page', async ({
-  page,
-}) => {
-  await loginAndEnrol(page, 'fr', E2E_MD.acctSupport.email);
-  await goNav(page, 'accounts-link');
-  await expect(page.getByTestId(`account-Caisse ${suffix}`)).toContainText('2 500,00');
-  await expect(page.getByTestId('account-add')).toHaveCount(0);
-  await expect(page.getByTestId('account-set-opening')).toHaveCount(0);
-  await logout(page);
-
-  for (const user of [E2E_MD.acctOffice, E2E_MD.acctPartner]) {
+test('office has no link and no page', async ({ page }) => {
+  for (const user of [E2E_MD.acctOffice]) {
     await loginAndEnrol(page, 'fr', user.email);
     await expect(page.getByTestId('accounts-link')).toHaveCount(0);
     const response = await page.goto('/fr/accounts');

@@ -26,16 +26,8 @@ test('the owner publishes a list price for B25 in French; the same date is refus
   );
 });
 
-test('support reads the list prices with no form; partner, office and plant have no access (DECISIONS 81)', async ({
-  page,
-  browser,
-}) => {
-  await loginAndEnrol(page, 'fr', E2E_MD.sellSupport.email);
-  await goNav(page, 'selling-prices-link');
-  await expect(page.getByTestId('sell-B25')).toContainText('MAD HT / m³');
-  await expect(page.locator('button[type=submit]')).toHaveCount(0);
-
-  for (const user of [E2E_MD.sellPartnerFr, E2E_MD.sellOffice, E2E_MD.sellPlant]) {
+test('office and plant have no access (DECISIONS 81)', async ({ browser }) => {
+  for (const user of [E2E_MD.sellOffice, E2E_MD.sellPlant]) {
     const other = await browser.newPage();
     await loginAndEnrol(other, 'fr', user.email);
     await expect(other.getByTestId('selling-prices-link')).toHaveCount(0);

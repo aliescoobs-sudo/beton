@@ -25,6 +25,14 @@ Three columns are kept apart on purpose. **Source fixed**: the code or text chan
 - e2e: `e2e/global-setup.ts` refuses a non-e2e target (`e2e/admission.ts`); `e2e/`, `tests/` and every test source are excluded from the runtime image, and the built image was checked to not contain them.
 - Server-side logout (migration 0213): a copy of the phone cookie dies with the logout; tokens issued before it are refused once.
 
+## Addendum items
+- **Held-delivery count** (migration 0214): `trip_delivery_held_count` returns a number only (declared with no plant load, or unconfirmed) to office_sales/office (all plants, plant-less rotations included), owner, app_admin and the plant side (scoped as the details). The details (`trip_delivery_exceptions`) stay closed to the office. Tested both sides in `tests/trip-delivery-gate.int.test.ts`; the invoice queue page shows the count to the office roles.
+- **Determinism**: `field-ip-throttle` (counter addresses instead of a 1-in-250 random draw that collided with a full bucket; the in-flight test now holds two requests inside the guard with a gate instead of racing) and `trip-timing` (a fixed business day and a fixed server instant for the taps, so the 48-hour window no longer depends on the hour or the length of the run). 20 isolated runs each: 20/20 and 20/20.
+- **Not done, as asked**: no screen for office_sales corrections (service/DB doors only).
+
+## e2e after T10a
+The e2e fixtures that were `partner`/`support` accounts are now `app_admin`/`accountant` (reserved roles cannot sign in, and the server refuses to start while one is active). The specs whose whole subject was a partner or support view were removed or reduced to their office/plant halves (analytics, assistant, avoir, dispatch, finance, fuel, invoice-queue, ledger-accounts/cash/opening/order/payments/statements, master-price-override/purchase-price/selling-price, owner-dashboard, supplier-invoice); the refusal itself is covered by `tests/t10a-roles.int.test.ts`. `trip-shared-status` needed its first rotation on an order made in the plant (decision 207). Last full run on the final build: 182 passed, 6 skipped, 3 failed (two reserved-role tests, one decision-207 fixture); those three were fixed and the three spec files re-run green (19 passed, then 6 passed). The full run was not repeated end to end after those test-only edits.
+
 ## New findings
 1. The runtime image still contained untracked `brand-incoming/` and the ignored `generated_images/` (the build copies the whole tree). Both are now in `.dockerignore`. The image still carries `docs/`, `SPEC-*.md`, `scripts/` and `db/` (the ops container needs the last two).
 2. `field-ip-throttle.int.test.ts` is timing-sensitive: it failed once under load and passed on rerun, with or without these changes.

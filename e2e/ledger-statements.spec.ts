@@ -64,16 +64,7 @@ test('the owner opens the statement of a client after a payment, filters it and 
   await logout(page);
 });
 
-test('support reads the statement; office has no link, no page and no export', async ({ page }) => {
-  await loginAndEnrol(page, 'fr', E2E_MD.stmSupport.email);
-  await goNav(page, 'statements-link');
-  await page
-    .locator('[data-testid^="account-row-"]', { hasText: 'Atlas' })
-    .getByTestId('account-open')
-    .click();
-  await expect(page.getByTestId('section-financial')).toContainText(reference);
-  await logout(page);
-
+test('office has no link, no page and no export', async ({ page }) => {
   await loginAndEnrol(page, 'fr', E2E_MD.stmOffice.email);
   await expect(page.getByTestId('statements-link')).toHaveCount(0);
   expect((await page.goto('/fr/statements'))?.status()).toBe(404);

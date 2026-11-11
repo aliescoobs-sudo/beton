@@ -35,12 +35,7 @@ test('the owner sees real cash and the total, with a new account at its opening 
   await logout(page);
 });
 
-test('support reads the position; office has no link and no page', async ({ page }) => {
-  await loginAndEnrol(page, 'fr', E2E_MD.cashSupport.email);
-  await goNav(page, 'cash-link');
-  await expect(page.getByTestId(`cash-account-Trésor ${suffix}`)).toBeVisible();
-  await logout(page);
-
+test('office has no link and no page', async ({ page }) => {
   await loginAndEnrol(page, 'fr', E2E_MD.cashOffice.email);
   await expect(page.getByTestId('cash-link')).toHaveCount(0);
   const response = await page.goto('/fr/cash');

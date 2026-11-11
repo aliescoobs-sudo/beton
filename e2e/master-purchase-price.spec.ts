@@ -43,17 +43,8 @@ test('the owner publishes a purchase price for cement in French, and the cost pe
   await expect(page.getByTestId('cost-per-m3')).toBeVisible();
 });
 
-test('support reads the prices and the cost with no form; partner, office and plant have no access (DECISIONS 81)', async ({
-  page,
-  browser,
-}) => {
-  await loginAndEnrol(page, 'fr', E2E_MD.priceSupport.email);
-  await goNav(page, 'purchase-prices-link');
-  await expect(page.getByTestId('price-Ciment')).toContainText('MAD HT');
-  await expect(page.getByTestId('cost-per-m3')).toBeVisible();
-  await expect(page.locator('button[type=submit]')).toHaveCount(0);
-
-  for (const user of [E2E_MD.pricePartnerFr, E2E_MD.priceOffice, E2E_MD.pricePlant]) {
+test('office and plant have no access (DECISIONS 81)', async ({ browser }) => {
+  for (const user of [E2E_MD.priceOffice, E2E_MD.pricePlant]) {
     const other = await browser.newPage();
     await loginAndEnrol(other, 'fr', user.email);
     await expect(other.getByTestId('purchase-prices-link')).toHaveCount(0);

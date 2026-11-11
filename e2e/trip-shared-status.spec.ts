@@ -40,6 +40,7 @@ const PIN = '482913';
 const DEVICE = 'e2e-t9-phone-0123456789abcdef01234567';
 const SHOTS = '.logs/visual-checks';
 let orderA = '';
+let orderAId = '';
 let orderB = '';
 let orderC = '';
 let orderD = '';
@@ -134,7 +135,10 @@ test.beforeAll(async () => {
             [today, orderId, scene.truckId, id, load, load + 10, load + 40, load + 80, load + 110, owner.id],
           )
         ).rows[0]!.id;
-      tripA = await trip(scene.orderId, 420);
+      // decision 207: the plant manager reads only orders of his plant: this order is made in the plant (the shared scene's order has no plant)
+      const o1 = await insertOrder(tx, owner.id, { ...master, clientId: scene.clientId }, today);
+      orderAId = o1.id;
+      tripA = await trip(o1.id, 420);
       tripB = await trip(o2.id, 480);
       const o3 = await insertOrder(tx, owner.id, { ...master, clientId: scene.clientId }, today);
       tripC = await trip(o3.id, 540);
@@ -144,9 +148,8 @@ test.beforeAll(async () => {
         .rows[0]!.code;
       orderC = (await tx.query<{ code: string }>('select code from sales_order where id = $1', [o3.id]))
         .rows[0]!.code;
-      orderA = (
-        await tx.query<{ code: string }>('select code from sales_order where id = $1', [scene.orderId])
-      ).rows[0]!.code;
+      orderA = (await tx.query<{ code: string }>('select code from sales_order where id = $1', [orderAId]))
+        .rows[0]!.code;
       orderB = (await tx.query<{ code: string }>('select code from sales_order where id = $1', [o2.id]))
         .rows[0]!.code;
       return id;

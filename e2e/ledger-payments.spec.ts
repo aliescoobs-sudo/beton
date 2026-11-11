@@ -95,7 +95,7 @@ test('office enters a cash payment and a post-dated cheque for an order, blind',
   expect(response?.status()).toBe(404);
 });
 
-test('the owner and support list the payments with their state and badges', async ({ page }) => {
+test('the owner lists the payments with their state and badges', async ({ page }) => {
   await loginOwner(page, 'fr');
   await goNav(page, 'instruments-link');
   await expect(page).toHaveURL('/fr/instruments');
@@ -103,11 +103,6 @@ test('the owner and support list the payments with their state and badges', asyn
   await expect(row).toContainText('2 000,00');
   await expect(row.getByTestId('instrument-state')).toContainText('Reçu');
   await expect(row.getByTestId('instrument-postdated')).toBeVisible();
-  await logout(page);
-
-  await loginAndEnrol(page, 'fr', E2E_MD.paySupport.email);
-  await goNav(page, 'instruments-link');
-  await expect(page.getByTestId(`instrument-${chequeNo}`)).toBeVisible();
   await logout(page);
 
   await loginAndEnrol(page, 'fr', E2E_MD.payPlant.email);

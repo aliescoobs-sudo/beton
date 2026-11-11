@@ -22,7 +22,6 @@ const secret = kit.env.AUTH_SECRET;
 const deps = () => ({ appPool: app, authPool: kit.authPool, auth: kit.auth, secret });
 const marker = `fr${randomUUID().replace(/-/g, '').slice(0, 10)}`;
 let owner: SessionUser;
-let n = 7000 + Math.floor(Math.random() * 900);
 void parseKeyring;
 
 beforeAll(async () => {
@@ -34,13 +33,22 @@ afterAll(async () => {
 });
 
 async function driver() {
-  const no = n++;
-  const d = await withRlsContext(app, { userId: owner.id, role: 'owner', requestId: marker }, (tx) =>
-    tx.query<{ id: string; code: string }>(
-      `insert into driver (id, code, name, created_by, kind) values (gen_random_uuid(), $1, $2, $3, 'driver') returning id, code`,
-      [`CH-${no}`, `${marker} ${no}`, owner.id],
-    ),
-  );
+  // a free code (other files take codes at random): retried on a clash
+  let d: { rows: { id: string; code: string }[] } | null = null;
+  for (let i = 0; i < 40 && !d; i++) {
+    const no = 1000 + Math.floor(Math.random() * 8999);
+    try {
+      d = await withRlsContext(app, { userId: owner.id, role: 'owner', requestId: marker }, (tx) =>
+        tx.query<{ id: string; code: string }>(
+          `insert into driver (id, code, name, created_by, kind) values (gen_random_uuid(), $1, $2, $3, 'driver') returning id, code`,
+          [`CH-${no}`, `${marker} ${no}`, owner.id],
+        ),
+      );
+    } catch (e) {
+      if ((e as { code?: string }).code !== '23505') throw e;
+    }
+  }
+  if (!d) throw new Error('no free driver code');
   const row = d.rows[0]!;
   expect((await createFieldAccount(deps(), owner, row.id)).ok).toBe(true);
   expect((await setDriverPin(deps(), owner, { driverId: row.id, pin: '482913' })).ok).toBe(true);

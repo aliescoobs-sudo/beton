@@ -25,7 +25,7 @@ CREATE FUNCTION public.trip_delivery_held_count(p_from date, p_to date) RETURNS 
 DECLARE v_role text := ctx.actor_role(); v_all boolean;
 BEGIN
   IF ctx.driver_id() IS NOT NULL OR v_role IS NULL
-     OR v_role NOT IN ('owner', 'app_admin', 'plant', 'plant_manager', 'office_sales', 'office') THEN
+     OR coalesce(v_role, '') NOT IN ('owner', 'app_admin', 'plant', 'plant_manager', 'office_sales', 'office') THEN
     RAISE EXCEPTION 'trip_delivery_held_count: role % may not read it', coalesce(v_role, '(none)') USING ERRCODE = 'insufficient_privilege';
   END IF;
   -- the office roles count every plant (and a rotation with no plant: the office dispatch roles see those, decision 207); the plant side is scoped as for the details

@@ -23,13 +23,7 @@ test('the owner enters the opening date once and a client balance', async ({ pag
   await logout(page);
 });
 
-test('support reads it without forms; office has no link and no page', async ({ page }) => {
-  await loginAndEnrol(page, 'fr', E2E_MD.openSupport.email);
-  await goNav(page, 'opening-link');
-  await expect(page.getByTestId('opening-date')).toBeVisible();
-  await expect(page.getByTestId('opening-party-form')).toHaveCount(0);
-  await logout(page);
-
+test('office has no link and no page', async ({ page }) => {
   await loginAndEnrol(page, 'fr', E2E_MD.openOffice.email);
   await expect(page.getByTestId('opening-link')).toHaveCount(0);
   expect((await page.goto('/fr/opening'))?.status()).toBe(404);

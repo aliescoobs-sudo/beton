@@ -54,16 +54,7 @@ test('the owner records the fuel bought and sees the average price and the cost 
   await expect(page.getByTestId(`fuel-${truckCode}`)).toContainText('MAD');
 });
 
-test('the partner reads the quantities and no money; Arabic renders right-to-left', async ({
-  page,
-  browser,
-}) => {
-  await loginAndEnrol(page, 'fr', E2E_MD.fuelPartner.email);
-  await page.goto('/fr/fuel');
-  await expect(page.getByTestId('fuel-table')).toBeVisible();
-  await expect(page.getByTestId('fuel-purchase-form')).toHaveCount(0);
-  await expect(page.locator('body')).not.toContainText(MONEY);
-
+test('Arabic renders right-to-left', async ({ browser }) => {
   const ar = await browser.newPage();
   const problems = watch(ar);
   await loginOwner(ar, 'ar');

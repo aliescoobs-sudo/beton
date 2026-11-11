@@ -242,27 +242,6 @@ test('office in Arabic: right to left, Darija understood, codes isolated, 375 an
   expect(problems).toEqual([]);
 });
 
-test('support reads and drafts nothing; partner has the operations questions', async ({ page }) => {
-  await loginAndEnrol(page, 'fr', E2E_MD.astSupport.email);
-  await page.getByTestId('assistant-open').click();
-  await expect(page.locator('[data-testid^=assistant-suggestion-]')).toHaveCount(3);
-  const block = await ask(page, `Facture ces BL ${officeClient.blNos.join(' ')} pour ${officeClient.code}`);
-  await expect(block.getByTestId('draft-confirm')).toHaveCount(0);
-  await expect(page.locator('[data-testid^=draft-card-]')).toHaveCount(0);
-});
-
-test('partner (no account in V1, T8): the rotation questions are refused, no money, no draft', async ({
-  page,
-}) => {
-  await loginAndEnrol(page, 'fr', E2E_MD.astPartner.email);
-  await page.getByTestId('assistant-open').click();
-  await expect(page.locator('[data-testid^=assistant-suggestion-]')).toHaveCount(3);
-  const block = await ask(page, "Quels camions chargent aujourd'hui ?");
-  await expect(block.getByTestId('assistant-answer')).toContainText('avec vos droits');
-  await expect(block.getByTestId('assistant-answer')).not.toContainText('rotation');
-  expect(await page.getByTestId('assistant-panel').textContent()).not.toMatch(MONEY);
-});
-
 test.describe('with the flag off (AC-ASSIST-01)', () => {
   test.use({ baseURL: E2E_OFF_URL });
 

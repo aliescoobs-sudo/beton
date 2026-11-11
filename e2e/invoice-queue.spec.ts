@@ -70,16 +70,6 @@ test('the owner sees the client with the delivered load and what it comes to', a
   await logout(page);
 });
 
-test('support sees the amounts too', async ({ page }) => {
-  await loginAndEnrol(page, 'fr', E2E_MD.queueSupport.email);
-  await page.goto('/fr/invoices/queue');
-  await expect(page.getByTestId(`queue-row-${blNo}`)).toContainText('6 240,00');
-  // it reads, it never invoices: no box to tick
-  await expect(page.locator('[data-testid^="queue-pick-"]')).toHaveCount(0);
-  await expect(page.locator('[data-testid^="queue-invoice-"]')).toHaveCount(0);
-  await logout(page);
-});
-
 test('office sees the BL, the date, the product and the m³, and no amount at all', async ({ page }) => {
   await loginAndEnrol(page, 'fr', E2E_MD.queueOffice.email);
   await goNav(page, 'invoice-queue-link');

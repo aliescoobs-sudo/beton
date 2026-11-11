@@ -76,13 +76,7 @@ test('the owner sees the refused load waiting for its avoir, issues it with a re
   await logout(page);
 });
 
-test('support reads the avoirs and cannot issue; office has no link and no page', async ({ page }) => {
-  await loginAndEnrol(page, 'fr', E2E_MD.avoirSupport.email);
-  await goNav(page, 'avoirs-link');
-  await expect(page.getByTestId(`avoir-${avoirNumber}`)).toBeVisible();
-  await expect(page.locator('[data-testid="avoir-open"]')).toHaveCount(0);
-  await logout(page);
-
+test('office has no link and no page', async ({ page }) => {
   await loginAndEnrol(page, 'fr', E2E_MD.avoirOffice.email);
   await expect(page.getByTestId('avoirs-link')).toHaveCount(0);
   expect((await page.goto('/fr/avoirs'))?.status()).toBe(404);

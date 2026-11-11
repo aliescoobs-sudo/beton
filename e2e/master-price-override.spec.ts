@@ -32,17 +32,8 @@ test('the owner gives a client a price override with a reason, in French', async
   await expect(page.getByTestId('override-row')).toContainText('Accord cadre chantier Martil');
 });
 
-test('support sees the override but has no form; office and partner see no price panel (DECISIONS 81)', async ({
-  page,
-  browser,
-}) => {
-  await loginAndEnrol(page, 'fr', E2E_MD.ovSupport.email);
-  await goNav(page, 'clients-link');
-  await page.getByTestId(`client-${name}`).getByRole('link', { name }).click();
-  await expect(page.getByTestId('override-row')).toContainText('Accord cadre chantier Martil');
-  await expect(page.getByTestId('override-new')).toHaveCount(0);
-
-  for (const user of [E2E_MD.ovOffice, E2E_MD.ovPartnerFr]) {
+test('office sees no price panel (DECISIONS 81)', async ({ browser }) => {
+  for (const user of [E2E_MD.ovOffice]) {
     const other = await browser.newPage();
     await loginAndEnrol(other, 'fr', user.email);
     await goNav(other, 'clients-link');

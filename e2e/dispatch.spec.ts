@@ -177,9 +177,7 @@ test('an overdue order still to load is planned with the day and flagged by colo
   await logout(page);
 });
 
-test('the plant reads and plans the day; the partner (no account in V1, T8) is refused; no money', async ({
-  page,
-}) => {
+test('the plant reads and plans the day; no money', async ({ page }) => {
   await loginAndEnrol(page, 'fr', E2E_MD.dispPlant.email);
   await goNav(page, 'dispatch-link');
   await page.goto(`/fr/dispatch?date=${DAY}`);
@@ -191,12 +189,6 @@ test('the plant reads and plans the day; the partner (no account in V1, T8) is r
   await page.getByTestId('dispatch-save').click();
   await expect(page.getByTestId('dispatch-message')).toContainText('Plan enregistré');
   await logout(page);
-
-  await loginAndEnrol(page, 'fr', E2E_MD.dispPartner.email);
-  expect((await page.goto(`/fr/dispatch?date=${DAY}`))?.status()).toBe(404);
-  await expect(page.getByTestId('dispatch-board')).toHaveCount(0);
-  await expect(page.getByTestId('driver-form')).toHaveCount(0);
-  await expect(page.locator('body')).not.toContainText(MONEY);
 });
 
 test("office has no planning page and no link, but reads the day's rotations without any price (AC-INT-21)", async ({
