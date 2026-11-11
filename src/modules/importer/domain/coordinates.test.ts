@@ -17,14 +17,14 @@ const cell = (ref: string) => `<c r="${ref}" t="inlineStr"><is><t>x</t></is></c>
 const refused = (xml: string, exactRows: boolean, maxBytes = 2000) => {
   const buf = withSheet(xml);
   const heap0 = process.memoryUsage().heapUsed;
-  const t0 = performance.now();
+  const t0 = process.hrtime.bigint();
   let msg = '';
   try {
     readXlsxSheets(buf, { exactRows });
   } catch (e) {
     msg = (e as Error).message;
   }
-  expect(performance.now() - t0, 'bounded time').toBeLessThan(3000);
+  expect(Number(process.hrtime.bigint() - t0) / 1e6, 'bounded time').toBeLessThan(3000);
   expect(process.memoryUsage().heapUsed - heap0, 'bounded memory').toBeLessThan(150 * 1024 * 1024);
   expect(buf.length, 'a small package').toBeLessThan(maxBytes);
   return msg;
