@@ -328,6 +328,15 @@ export const PERMISSIONS = {
   // the amounts (m³ × the order's price) are money: owner and support only.
   'analytics.read': MANAGERS_READ,
   'analytics.money': MONEY_READ,
+  // T11 (decision 211): the imported HISTORY of deliveries and expenses, a separate flagged layer. The staging screens (labels to merge or map,
+  // quarantined rows, the reconciliation) are the owner's and the app_admin's. Quantities of the history are read by them and by the plant
+  // manager of the plant (the database scopes it; a row with no plant is not his). The expense history is money: owner, app_admin, accountant.
+  // Office roles, drivers and pump operators have none; partner and support have no accounts in V1.
+  'history.admin': ['owner', 'app_admin'],
+  'history.read': ['owner', 'app_admin', 'plant', 'plant_manager'],
+  // the page itself: the quantities for the roles above, the expense history for the money roles (each section checks its own right)
+  'history.view': ['owner', 'app_admin', 'plant', 'plant_manager', 'accountant'],
+  'history.money': ['owner', 'app_admin', 'accountant'],
   // Stock movements, physical count, plant import
   'stock.read': PLANT_READ,
   'stock.write': PLANT,

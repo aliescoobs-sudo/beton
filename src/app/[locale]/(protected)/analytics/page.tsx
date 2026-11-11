@@ -4,6 +4,7 @@ import { getPool } from '@/lib/db/pools';
 import { isRealDate } from '@/modules/ledger';
 import { type Dimension, getVolumeAnalytics, type ReportPeriod } from '@/modules/operations';
 import { formatM3 } from '@/modules/operations/ui/format';
+import { can } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/next';
 import { Button, EmptyState, Input, Money, PageHeader, Select, Table, Td, Th } from '@/ui';
 
@@ -29,6 +30,7 @@ export default async function AnalyticsPage({
   const dimension: Dimension = query.by === 'client' || query.by === 'zone' ? query.by : 'type';
   const result = await getVolumeAnalytics(getPool('app'), user, { from, to, period, dimension });
   const t = await getTranslations('operations.analytics');
+  const th = await getTranslations('historyImport');
   if (!result.ok) return <PageHeader title={t('title')} description={t('invalid')} />;
   const r = result.value;
   const amountOf = (period: string, key: string) =>
@@ -38,6 +40,13 @@ export default async function AnalyticsPage({
   return (
     <div className="space-y-8">
       <PageHeader title={t('title')} description={t('intro')} />
+      {can(user.role, 'history.read') && (
+        <p className="text-sm">
+          <a href={`/${locale}/history`} className="underline" data-testid="analytics-history-link">
+            {th('analyticsLink')}
+          </a>
+        </p>
+      )}
       <form method="get" className="flex flex-wrap items-end gap-3" data-testid="analytics-form">
         <label className="block">
           <span className="field-label">{t('from')}</span>

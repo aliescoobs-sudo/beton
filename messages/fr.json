@@ -3123,5 +3123,109 @@
     "none": "aucun plafond",
     "placeholder": "Montant en MAD",
     "save": "Enregistrer"
+  },
+  "historyImport": {
+    "analyticsLink": "Voir aussi l'historique importé (volumes par centrale, mois et type)",
+    "clientPanel": "Quantités du client par mois (historique importé)",
+    "link": "Historique importé",
+    "stagingLink": "Import historique : décisions",
+    "title": "Historique importé (lecture seule)",
+    "badge": "Historique (importé) : ces chiffres viennent des fichiers Excel mensuels. Ils n'affectent ni le stock, ni les factures, ni le grand livre.",
+    "none": "Rien à afficher.",
+    "byPlantMonth": "Volume par centrale et par mois",
+    "byType": "Volume par mois et par type de béton",
+    "type": "Type de béton",
+    "expensesByCategory": "Dépenses par catégorie (historique)",
+    "categoryTitle": "Catégorie",
+    "amount": "Montant",
+    "litres": "Quantité (litres)",
+    "staging": {
+      "title": "Import de l'historique : décisions du propriétaire",
+      "intro": "Rien n'est fusionné automatiquement. Choisissez pour chaque libellé : relier à une fiche existante, créer, ou garder tel quel. L'application est bloquée tant qu'un libellé ou une ligne en quarantaine reste ouvert."
+    },
+    "tabs": {
+      "clients": "Clients",
+      "trucks": "Camions",
+      "drivers": "Chauffeurs",
+      "types": "Types de béton",
+      "pumps": "Pompe / goulotte",
+      "categories": "Catégories de dépenses",
+      "quarantine": "Lignes en quarantaine",
+      "recon": "Rapprochement"
+    },
+    "showAll": "Tout afficher",
+    "onlyOpen": "Seulement les ouverts",
+    "label": "Libellé du fichier",
+    "uses": "Lignes",
+    "similar": "Groupe proche",
+    "status": {
+      "title": "État",
+      "pending": "À décider",
+      "mapped": "Relié",
+      "new": "À créer",
+      "label_only": "Libellé gardé",
+      "unknown": "Inconnu"
+    },
+    "decide": "Décision",
+    "choose": "Choisir…",
+    "mapTo": "Relier à {target}",
+    "createNew": "Créer un nouveau client",
+    "labelOnly": "Garder le libellé seulement",
+    "unknown": "Inconnu",
+    "save": "Enregistrer",
+    "pump": {
+      "pump": "Pompe",
+      "chute": "Goulotte",
+      "unknown": "Inconnu"
+    },
+    "category": {
+      "fuel": "Carburant",
+      "parts": "Pièces",
+      "tyres": "Pneus",
+      "wages_advance": "Avance sur salaire",
+      "office": "Bureau",
+      "other": "Autre"
+    },
+    "where": "Fichier / feuille / ligne",
+    "reason": "Motif",
+    "cells": "Cellules lues",
+    "reasons": {
+      "NO_DATE": "Date absente",
+      "BAD_DATE": "Date illisible",
+      "NO_VOLUME": "m³ vide",
+      "BAD_VOLUME": "m³ illisible",
+      "NO_AMOUNT": "Montant vide",
+      "BAD_AMOUNT": "Montant illisible",
+      "NO_LABEL": "Imputation vide"
+    },
+    "qstatus": {
+      "open": "Ouverte",
+      "fixed": "Corrigée",
+      "discarded": "Écartée"
+    },
+    "fix": {
+      "date": "Date",
+      "fix": "Corriger",
+      "discard": "Écarter"
+    },
+    "recon": {
+      "plant": "Centrale",
+      "kind": "Nature",
+      "month": "Mois",
+      "read": "Lignes lues",
+      "imported": "Lignes importées",
+      "quarantined": "En quarantaine",
+      "sumRead": "Somme lue",
+      "sumImported": "Somme importée"
+    },
+    "kinds": {
+      "deliveries": "Livraisons",
+      "expenses": "Dépenses"
+    },
+    "batch": {
+      "staged": "Préparé",
+      "applied": "Importé",
+      "rolled_back": "Annulé"
+    }
   }
 }

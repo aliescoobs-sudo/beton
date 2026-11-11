@@ -9,6 +9,7 @@ export type Sheet = string[][];
 const MAX_ENTRIES = 200;
 const MAX_UNCOMPRESSED = 25 * 1024 * 1024;
 const MAX_CELLS = 200_000;
+const MAX_EMPTY_CELLS = 4_000_000;
 
 export class SheetError extends Error {}
 
@@ -98,6 +99,18 @@ export interface NamedSheet {
    * cached values, and then lists the count in the report.
    */
   formulaCells: number;
+  /** T11: the 1-based row numbers that hold at least one formula cell (a totals row), so a history reader can skip them. */
+  formulaRows?: number[];
+  /** T11: the sheet was not read because the caller did not ask for it (a copied template); `rows` is empty. */
+  skipped?: boolean;
+}
+
+/** T11 options of the reader. Without them the behaviour is the one the T2 importer relies on. */
+export interface ReadOptions {
+  /** Read only the sheets this accepts (name, 0-based position); the others are listed but their cells are never parsed. */
+  include?: (name: string, index: number) => boolean;
+  /** Keep the sheet's own row numbers: a row the file leaves out becomes an empty row, so a reported row number is the one in Excel. */
+  exactRows?: boolean;
 }
 
 /** The sheet names in workbook order with the part that holds each, from workbook.xml and its relationships. */
@@ -128,7 +141,7 @@ function sheetParts(buf: Buffer, zip: Map<string, ZipEntry>): { name: string; pa
 }
 
 /** Every sheet of a workbook with its name, in workbook order. Empty cells are ''. A date cell comes as its serial number. */
-export function readXlsxSheets(buf: Buffer): NamedSheet[] {
+export function readXlsxSheets(buf: Buffer, opts: ReadOptions = {}): NamedSheet[] {
   const zip = zipEntries(buf);
   // R14-04: the workbook's date system. A date cell is a number of days from an origin that depends on it (1899-12-30, or 1904-01-01,
   // 1462 days later). This reader only knows the first, so a 1904 workbook is refused, never read with the wrong origin.
@@ -148,19 +161,33 @@ export function readXlsxSheets(buf: Buffer): NamedSheet[] {
     ? [...readEntry(buf, shared).matchAll(/<si>([\s\S]*?)<\/si>/g)].map((m) => textOf(m[1] ?? ''))
     : [];
   let cells = 0;
-  return sheetParts(buf, zip).map(({ name, part }) => {
+  let emptyCells = 0;
+  return sheetParts(buf, zip).map(({ name, part }, sheetIndex) => {
+    if (opts.include && !opts.include(name, sheetIndex))
+      return { name, rows: [], formulaCells: 0, formulaRows: [], skipped: true };
     const xml = readEntry(buf, zip.get(part) as ZipEntry);
     const rows: Sheet = [];
+    const formulaRows: number[] = [];
     let formulaCells = 0;
     for (const row of xml.matchAll(/<row\b[^>]*?(?:\/>|>([\s\S]*?)<\/row>)/g)) {
       const line: string[] = [];
+      const rowNo = Number(/^<row\b[^>]*?\br="(\d+)"/.exec(row[0])?.[1] ?? rows.length + 1);
+      if (opts.exactRows) while (rows.length < rowNo - 1) rows.push([]);
       for (const c of (row[1] ?? '').matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
+        // a formatted-but-empty cell (a spreadsheet may format 257 columns) is not data: it has its own, much larger, bound
+        if (c[2] === undefined || c[2] === '') {
+          if (++emptyCells > MAX_EMPTY_CELLS) throw new SheetError('too many cells');
+          continue;
+        }
         if (++cells > MAX_CELLS) throw new SheetError('too many cells');
         const attrs = c[1] ?? '';
         const ref = /\br="([A-Z]+)\d+"/.exec(attrs)?.[1];
         const type = /\bt="(\w+)"/.exec(attrs)?.[1];
         const body = c[2] ?? '';
-        if (/<f\b/.test(body)) formulaCells++;
+        if (/<f\b/.test(body)) {
+          formulaCells++;
+          if (formulaRows[formulaRows.length - 1] !== rowNo) formulaRows.push(rowNo);
+        }
         let value = '';
         if (type === 's') value = strings[Number(/<v>(\d+)<\/v>/.exec(body)?.[1])] ?? '';
         else if (type === 'inlineStr') value = textOf(body);
@@ -172,7 +199,7 @@ export function readXlsxSheets(buf: Buffer): NamedSheet[] {
       rows.push(line);
     }
     while (rows.length && rows[rows.length - 1]!.every((v) => v === '')) rows.pop();
-    return { name, rows, formulaCells };
+    return { name, rows, formulaCells, formulaRows };
   });
 }
 

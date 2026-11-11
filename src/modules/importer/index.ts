@@ -58,3 +58,47 @@ export {
   type SyntheticOptions,
 } from './fixtures';
 export { buildWorkbook } from './domain/xlsx-writer';
+// T11: the history importer (deliveries and expenses as a separate flagged layer), its fictitious twin and its guard.
+export {
+  historyEnvironmentProblem,
+  TWIN_MARKER_SHEET,
+  TWIN_MARKER_TEXT,
+  type HistoryEnvironment,
+} from './history/domain/guard';
+export {
+  exampleMappings,
+  parseHistoryMapping,
+  type HistoryKind,
+  type HistoryMapping,
+} from './history/domain/mapping';
+export {
+  assertHistoryEnvironment,
+  historyConfirmation,
+  historyRollbackConfirmation,
+  type HistoryOptions,
+  type HistoryReport,
+  type HistoryRollbackReport,
+  rollbackHistory,
+  runHistory,
+} from './history/service/history-import';
+export { formatHistoryReport, formatHistoryRollback } from './history/service/report';
+export { type InputFile, readSet } from './history/service/read-set';
+export { buildTwin, twinMappings, writeTwin, type TwinOptions } from './history/twin';
+export {
+  decideLabel,
+  decideQuarantine,
+  type ExpenseHistoryRow,
+  historyClientVolume,
+  historyExpenses,
+  historyVolume,
+  type HistoryError,
+  type LabelKind,
+  type LabelRow,
+  listLabels,
+  listQuarantine,
+  mappingTargets,
+  type QuarantineRow,
+  reconciliation,
+  type ReconRow,
+  type VolumeRow,
+} from './history/service/staging';

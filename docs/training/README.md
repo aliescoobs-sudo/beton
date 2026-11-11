@@ -18,4 +18,6 @@ Chaque matin, avant la séance : `./scripts/training-rearm.sh` (moins d'une minu
 | Propriétaire | [proprietaire.fr.md](proprietaire.fr.md) | [proprietaire.ar.md](proprietaire.ar.md) |
 | Administrateur | [admin.fr.md](admin.fr.md) | [admin.ar.md](admin.ar.md) |
 
+**Historique importé (jumeau fictif)** : la répétition rôle par rôle de l'import de l'historique (livraisons et dépenses) est dans [HISTORIQUE-REPETITION.fr.md](HISTORIQUE-REPETITION.fr.md).
+
 Les captures (téléphone, ×2) sont produites par `corepack pnpm training:screens` à partir d'une base de formation fictive.

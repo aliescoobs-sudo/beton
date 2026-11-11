@@ -154,6 +154,10 @@ export const E2E_MD = {
   astSupport: { email: 'e2e-as-support@kayas.test', name: 'Support Assistant' },
   astOff: { email: 'e2e-as-off@kayas.test', name: 'Support Assistant coupé' },
   astPartner: { email: 'e2e-as-partner@kayas.test', name: 'Associé Assistant' },
+  // T11 history import spec: a plant manager (bound to a plant by the spec), a sales office and an accountant, each enrolled once
+  histManager: { email: 'e2e-hi-manager@kayas.test', name: 'Chef de centrale Historique' },
+  histOffice: { email: 'e2e-hi-office@kayas.test', name: 'Bureau Historique' },
+  histAccountant: { email: 'e2e-hi-accountant@kayas.test', name: 'Comptable Historique' },
 } as const;
 export const E2E_CSP = { email: 'e2e-csp@kayas.test', name: 'CSP E2E' } as const;
 
@@ -221,6 +225,8 @@ const NAV_GROUP: Record<string, string> = {
   'checklist-link': 'administration',
   'company-link': 'administration',
   'history-link': 'administration',
+  'history-import-link': 'administration',
+  'history-import-staging-link': 'administration',
   'security-link': 'administration',
 };
 

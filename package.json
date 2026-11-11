@@ -24,6 +24,8 @@
     "db:seed": "node --import ./scripts/register-ts-paths.mjs scripts/seed-pilot.ts",
     "db:scenario": "node --import ./scripts/register-ts-paths.mjs scripts/seed-scenario.ts",
     "import:excel": "node --import ./scripts/register-ts-paths.mjs scripts/import-excel.ts",
+    "import:history": "node --import ./scripts/register-ts-paths.mjs scripts/import-history.ts",
+    "import:twin": "node --import ./scripts/register-ts-paths.mjs scripts/import-twin.ts",
     "import:fixtures": "node --import ./scripts/register-ts-paths.mjs scripts/import-fixtures.ts",
     "assistant:purge": "node --import ./scripts/register-ts-paths.mjs scripts/assistant-purge.ts",
     "db:migrate": "node --import ./scripts/register-ts-paths.mjs scripts/db-migrate.ts",

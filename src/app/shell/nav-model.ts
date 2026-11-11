@@ -367,6 +367,18 @@ const GROUPS: GroupDef[] = [
     id: 'administration',
     items: [
       {
+        path: '/history',
+        labelKey: 'historyImport.link',
+        testId: 'history-import-link',
+        allowed: 'history.view',
+      },
+      {
+        path: '/history/staging',
+        labelKey: 'historyImport.stagingLink',
+        testId: 'history-import-staging-link',
+        allowed: 'history.admin',
+      },
+      {
         path: '/admin/users',
         labelKey: 'admin.link',
         testId: 'admin-link',

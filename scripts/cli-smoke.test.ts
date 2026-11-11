@@ -11,6 +11,7 @@ const NOT_ENTRY_POINTS = new Set([
   'backup-lib.ts',
   'cli-help.ts',
   'import-excel-lib.ts',
+  'import-history-lib.ts',
   'prompt.ts',
   'training-birth.ts',
   'training-day.ts',

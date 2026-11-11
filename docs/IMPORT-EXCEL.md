@@ -85,3 +85,53 @@ Two mapping files may not name the same sheet. Unknown keys are refused.
 - **Correction procedure for what stays** (decided before real-data use): (1) the opening **date** is entered once and cannot be changed by a file: a wrong date is corrected by the owner through the application's own correction path, never by importing again (a second file with another `--opening-date` does NOT move it; this is tested); (2) a wrong opening **balance** is corrected with a reversing entry / a newer opening line from the screen of the books, by the owner, with its audit; (3) a wrong **price or recipe** is corrected with a NEWER version (the old one stays, as for any price change); (4) the invoice sequence only moves forward: a number issued by mistake is cancelled with an avoir, not reused; (5) if the whole load was wrong and nothing has been used yet, the cleaner way back is the backup taken just before the import. Write down which one was used (with the run id) in the go-live log.
 - After a rollback the same bytes can be imported again, but the archived rows still count as "already there": reactivate them from the screen, or use a changed file.
 - The cleanest way back **before go-live** is still the backup taken just before the import (RUNBOOK §5): take one, then import.
+
+## 7. The history importer (T11): deliveries and expenses of the monthly files
+Decisions 210 to 214. This is a **second importer**, separate from the master-data one above: it loads about nine months of **historical deliveries and expenses** from the company's monthly Excel files as a flagged layer (`source = 'history_import'`, `batch_id`). History **never** decrements live stock, creates an invoice or a ledger movement, or appears on the plant board, the driver screens or dispatch; it feeds reports, client statements (quantities only) and analytics. The company's real files stay in `~/KAYAS-real-data-private` (outside the repository) and are read only on a production-mode local stack (RUNBOOK §4b).
+
+### 7.1 Commands
+```
+corepack pnpm import:twin /path/to/new-folder [--seed N]                      # the fictitious twin of the files (training rehearsal)
+corepack pnpm import:history --init-mapping mapping/                          # example mapping files, never overwritten
+corepack pnpm import:history --dry-run <folder> --mapping <file>              # reads and reports; writes nothing
+corepack pnpm import:history --stage   <folder> --mapping <file> --account <owner email>
+corepack pnpm import:history --apply   <folder> --mapping <file> --account <owner email>
+corepack pnpm import:history --rollback <batch id> --account <owner email>
+```
+One folder = the monthly files of **one plant and one kind**; the mapping file names both. Files are numbered by their sorted position ("File 3"); a file name is never read as data (some files hold rows of the following month: the row date is the truth) and never printed. A missing month (the twin has no February for the Tétouan plant) is simply a file that is not there: nothing is invented.
+
+### 7.2 The flow
+1. **Dry run**: reads, reports counts, row numbers and open decisions; writes nothing.
+2. **Stage**: writes the batch, the labels to decide and the quarantined rows. The same files and mapping again change nothing.
+3. **Decide** on **Import historique : décisions** (owner and app_admin; fr, ar, ary): clients (similarity groups are a suggestion; merge a spelling into an existing client, create a new one, or keep the label only), trucks (record or unknown), drivers (record or historical label; **no account is ever created**), concrete types and pump modes (alias table), expense categories, and the quarantined rows (fix the date or the quantity, or discard). Nothing is merged automatically.
+4. **Compare** on the *Rapprochement* tab: per plant and month, rows read, imported, quarantined and SUM(m³) (or MAD) read against imported, to compare with the totals cell of each Excel.
+5. **Apply**: blocked while any required mapping or quarantined row is open. It asks for the typed phrase `HISTORY <set hash>` and a fresh authenticator code bound to the operation, then writes in one audited transaction under an advisory lock.
+6. **Rollback**: marks the batch rolled back (every report ignores it at once) and archives the clients it created. Rows are never deleted or changed; the staging decisions stay.
+
+### 7.3 The mapping file (one per plant and kind)
+```json
+{ "version": 1, "kind": "deliveries", "plant": "TET", "plantCode": "TETOUAN", "sheet": "LIVRAISON 1", "headerRow": 2,
+  "dateFormat": "dmy", "columns": { "driver": ["TRANSPORTEUR"], "truck": ["CAMION"], "bl": ["B,L"] },
+  "legacyColumns": ["COMERCIAL", "CODE CLIENT"], "blankHeaderField": null, "includeSheets": [], "fileMonths": {} }
+```
+`plant` is how the files call the plant, `plantCode` is the plant's code in the application (configuration, e.g. the files tagged TET are the Tétouan plant). Columns are found **by header name**, never by position (the two plants differ in order and in spelling). `legacyColumns` are kept as they are in the row's `legacy` JSON (never interpreted). `blankHeaderField` gives a header-less column a field when exactly one such column holds data. For expenses: `sheet` is the monthly journal, `includeSheets` lists other sheets that are read only if they have a DATE column, and `fileMonths` gives the month of a journal with no DATE column by file position (`{"1": "2026-01"}`). Every other sheet (copied templates, stale notes) is **ignored and listed by position**.
+
+### 7.4 What it does with the known problems
+| Problem | Behaviour |
+|---|---|
+| Totals row (a formula), blank rows, 257 formatted columns, an autofilter a strict parser rejects | ignored and counted; the reader never looks at the autofilter; the 1904 date system is still refused |
+| No date, empty or unreadable m³, no amount | the row is **quarantined** with a fixed reason; never imported silently |
+| Concrete type spellings (`B25 `, `B 25`, `BB25`, `B26`…) | one key per spelling; a spelling that equals an existing type code is decided; every other one waits for the owner |
+| Pump (`POMPE`, `P`, `GOULOTTE`, `G`, `P SITRAD`, empty) | the first four are built in; `P SITRAD` waits; empty is `unknown` |
+| Client names (first names alone, trailing digits, typos) | one key per spelling, similarity groups on the screen, owner merges or creates |
+| Trucks (spacing, case, an internal code vs a plate) | one key per spelling; the owner maps each to a truck or to unknown |
+| Delivery note (BL) | kept raw; duplicates (row numbers), gaps (a count) and absurd values (suspect) are reported, never rejected or fixed |
+| Tax basis HT/TTC | the HT/T cell; if empty and ADJUVANT is exactly HT or TTC, from there; otherwise empty |
+| Observations with a third-party tag | stored as a free-text note on the row |
+| Expense text with litres (`GASOIL 84,22 L`) | litres stored as integer millilitres in `quantity_ml`; the category comes from an alias table, unknown ones go to staging |
+
+Money is integer centimes (the T2 parser); quantities are integer litres; no float, no model. Reports contain counts, row numbers, hashes and fixed phrases; never a cell, a name, a file name or a sheet title.
+
+### 7.5 The guard (decision 213)
+- `TRAINING_MODE=true`: the history importer runs **only** on files that carry the twin marker sheet (`TWIN_MARKER`) and in which every client, driver and site label contains `FICTIF` and every expense label is in the twin vocabulary. A real-looking file is refused there.
+- Production mode: it runs on real files only, under the T2 gates (`REAL_DATA=true`, `SIMULATION_ENABLED=false`, no training marker in the database), and it **refuses** a twin-marked file.

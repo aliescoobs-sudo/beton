@@ -8,6 +8,7 @@ import { StatementView } from '@/modules/ledger/ui/statements/statement-view';
 import { recordMoneyView } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/next';
 import { PageHeader } from '@/ui';
+import { HistoryClientPanel } from '../../../history/client-panel';
 
 /** One client's or supplier's statement, filtered by date, type and status. Owner and support only. */
 export default async function StatementPage({
@@ -67,6 +68,7 @@ export default async function StatementPage({
         exportHref={`/${locale}/statements/${kind}/${id}/export${query ? `?${query}` : ''}`}
         filter={{ from: one('from'), to: one('to'), type: one('type'), status: one('status') }}
       />
+      {kind === 'client' && <HistoryClientPanel user={user} clientId={id} />}
     </div>
   );
 }

@@ -75,14 +75,25 @@ function zipFiles(files: Record<string, string>, deflate: boolean | undefined): 
 
 const escXml = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-const colName = (i: number) => String.fromCharCode(65 + i);
+/** Spreadsheet column letters: 0 = A, 25 = Z, 26 = AA ... */
+const colName = (i: number): string =>
+  i < 26
+    ? String.fromCharCode(65 + i)
+    : `${colName(Math.floor(i / 26) - 1)}${String.fromCharCode(65 + (i % 26))}`;
 
 /**
  * A synthetic workbook with several named sheets (inline strings, numbers as numbers), for the importer tests and the fixtures.
  * Nothing in it comes from a real file.
  */
 export function buildWorkbook(
-  sheets: { name: string; rows: (string | number | { f: string; v: string | number })[][] }[],
+  sheets: {
+    name: string;
+    rows: (string | number | { f: string; v: string | number })[][];
+    /** T11: format this many columns on every row, as a converted spreadsheet does (empty styled cells, no data). */
+    formattedColumns?: number;
+    /** T11: the raw `ref` of an `<autoFilter>` element (a converted file may carry one a strict parser rejects). */
+    autoFilterRef?: string;
+  }[],
   deflate = false,
   /** `date1904`: write the 1904 date system into the workbook (a fixture for the refusal). */
   opts: {
@@ -114,11 +125,13 @@ export function buildWorkbook(
                 ? `<c r="${ref}"><v>${v}</v></c>`
                 : `<c r="${ref}" t="inlineStr"><is><t>${escXml(v)}</t></is></c>`;
             })
-            .join('')}</row>`,
+            .join(
+              '',
+            )}${Array.from({ length: Math.max(0, (s.formattedColumns ?? 0) - r.length) }, (_, k) => `<c r="${colName(r.length + k)}${ri + 1}" s="1"/>`).join('')}</row>`,
       )
       .join('');
     files[`xl/worksheets/sheet${si + 1}.xml`] =
-      `<?xml version="1.0"?><worksheet><sheetData>${rows}</sheetData></worksheet>`;
+      `<?xml version="1.0"?><worksheet><sheetData>${rows}</sheetData>${s.autoFilterRef ? `<autoFilter ref="${escXml(s.autoFilterRef)}"/>` : ''}</worksheet>`;
   });
   return zipFiles(files, deflate);
 }
