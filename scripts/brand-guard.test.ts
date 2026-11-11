@@ -159,6 +159,15 @@ const ALLOWED: { reason: string; pattern: RegExp }[] = [
     pattern: /'belgobeton'|'belgobeton:excel-import'/g,
   },
   {
+    reason: 'the history importer lock key, byte-identical like the Excel import one (T11)',
+    pattern: /'belgobeton:history-import'/g,
+  },
+  {
+    reason:
+      'BELGO is how the company\'s monthly files tag the Tétouan plant ("BETON BELGO MM.2026"): a plant tag the history importer maps by configuration, not the product name (T11, decision 210)',
+    pattern: /\bBELGO\b(?!BETON)/gi,
+  },
+  {
     reason: 'the former name quoted on purpose ("formerly BELGOBETON")',
     pattern:
       /formerly BELGOBETON|ex-BELGOBETON|former(?: working)? name(?: \(?|:? )BELGOBETON|BELGOBETON \(former|BELGOBETON is OBSOLETE|BELGOBETON → KAYAS|old name BELGOBETON|BELGOBETON\)/gi,
