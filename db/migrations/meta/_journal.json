@@ -1058,6 +1058,13 @@
       "when": 1793806271023,
       "tag": "0227_field_session_expiry_fence",
       "breakpoints": true
+    },
+    {
+      "idx": 228,
+      "version": "7",
+      "when": 1793806272023,
+      "tag": "0228_purge_staging",
+      "breakpoints": true
     }
   ]
 }

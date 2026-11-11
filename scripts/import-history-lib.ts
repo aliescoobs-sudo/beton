@@ -5,7 +5,7 @@ import type { InputFile } from '../src/modules/importer/history/service/read-set
 import { parseHistoryMapping, type HistoryMapping } from '../src/modules/importer/history/domain/mapping.ts';
 
 export interface HistoryArgs {
-  mode: 'dry-run' | 'stage' | 'apply' | 'rollback' | 'init-mapping' | null;
+  mode: 'dry-run' | 'stage' | 'apply' | 'rollback' | 'init-mapping' | 'purge-staging' | null;
   target: string | null;
   mapping: string | null;
   account: string | null;
@@ -25,7 +25,12 @@ export function parseHistoryArgs(argv: string[]): HistoryArgs {
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i] as string;
     const next = argv[i + 1];
-    if (a in MODES) {
+    if (a === '--purge-staging') {
+      if (out.mode && out.mode !== 'purge-staging')
+        out.problems.push(`${a} cannot be combined with --${out.mode}`);
+      out.mode = 'purge-staging';
+      out.target = 'staging'; // no value: it concerns the whole staging
+    } else if (a in MODES) {
       const mode = MODES[a as keyof typeof MODES];
       if (out.mode && out.mode !== mode) out.problems.push(`${a} cannot be combined with --${out.mode}`);
       out.mode = mode;
@@ -43,7 +48,7 @@ export function parseHistoryArgs(argv: string[]): HistoryArgs {
     } else if (a !== '--help' && a !== '-h') out.problems.push(`unknown argument ${a}`);
   }
   if (!out.mode && out.problems.length === 0)
-    out.problems.push('choose --dry-run, --stage, --apply, --rollback or --init-mapping');
+    out.problems.push('choose --dry-run, --stage, --apply, --rollback, --purge-staging or --init-mapping');
   if (out.mode && out.mode !== 'init-mapping' && out.mode !== 'dry-run' && !out.account)
     out.problems.push(`--${out.mode} needs --account <email> (the owner or app_admin)`);
   if ((out.mode === 'dry-run' || out.mode === 'stage' || out.mode === 'apply') && !out.mapping)

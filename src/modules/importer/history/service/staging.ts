@@ -137,7 +137,7 @@ export async function listLabels(
       canonical: string | null;
     }>(
       `select id, kind, key, label, uses, status, client_id, truck_id, driver_id, canonical from history.label_map
-        where kind = $1 and ($2::boolean is not true or status = 'pending') order by key limit 2000`,
+        where kind = $1 and purged_at is null and ($2::boolean is not true or status = 'pending') order by key limit 2000`,
       [input.kind, input.onlyOpen ?? false],
     );
     const labels = rows.map((r) => ({
@@ -187,7 +187,7 @@ export async function listQuarantine(
       fixed: Record<string, string> | null;
     }>(
       `select id, kind, file_ord, sheet_pos, row_no, reason, raw, status, fixed from history.quarantine
-        where ($1::boolean is not true or status = 'open') order by created_at, file_ord, row_no limit 2000`,
+        where purged_at is null and ($1::boolean is not true or status = 'open') order by created_at, file_ord, row_no limit 2000`,
       [input.onlyOpen ?? false],
     );
     return rows.map((r) => ({

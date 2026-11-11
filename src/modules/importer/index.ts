@@ -74,6 +74,8 @@ export {
 export {
   assertHistoryEnvironment,
   historyConfirmation,
+  historyPurgeConfirmation,
+  purgeStaging,
   historyRollbackConfirmation,
   type HistoryOptions,
   type HistoryReport,

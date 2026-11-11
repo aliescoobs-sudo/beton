@@ -203,7 +203,7 @@ async function fixedRows(
     fixed: Record<string, string> | null;
     status: string;
   }>(
-    `select file_ord, sheet_pos, row_no, raw, fixed, status from history.quarantine where set_sha = $1 and kind = $2 order by file_ord, sheet_pos, row_no`,
+    `select file_ord, sheet_pos, row_no, raw, fixed, status from history.quarantine where set_sha = $1 and kind = $2 and purged_at is null order by file_ord, sheet_pos, row_no`,
     [setSha, mapping.kind],
   );
   const out = {
@@ -457,7 +457,7 @@ export async function runHistory(opts: HistoryOptions): Promise<HistoryReport> {
           // the same files staged again after their batch was discarded: the rows that batch discarded come back as open, the others are untouched
           await tx.query(
             `update history.quarantine set status = 'open', batch_discarded = false, fixed = null, decided_by = null, decided_at = null
-              where set_sha = $1 and kind = $2 and batch_discarded`,
+              where set_sha = $1 and kind = $2 and batch_discarded and purged_at is null`,
             [read.setSha, mapping.kind],
           );
           await insertMany(
@@ -475,7 +475,7 @@ export async function runHistory(opts: HistoryOptions): Promise<HistoryReport> {
               q.reason,
               JSON.stringify(q.raw),
             ]),
-            'on conflict (set_sha, kind, file_ord, sheet_pos, row_no) do nothing',
+            'on conflict (set_sha, kind, file_ord, sheet_pos, row_no) where purged_at is null do nothing',
           );
           await recordAuditEvent(tx, {
             action: 'import',
@@ -748,7 +748,7 @@ export async function rollbackHistory(opts: {
         ).rows[0]!;
         await tx.query(
           `update history.quarantine set status = 'discarded', batch_discarded = true, decided_by = $3, decided_at = clock_timestamp()
-            where set_sha = $1 and kind = $2 and status in ('open', 'fixed')`,
+            where set_sha = $1 and kind = $2 and status in ('open', 'fixed') and purged_at is null`,
           [set.set_sha, set.kind, opts.actor.id],
         );
         await tx.query(
@@ -837,6 +837,45 @@ export async function rollbackHistory(opts: {
     ended = true;
     await rollbackAndRelease(client);
     return report;
+  } catch (error) {
+    if (!ended) await abandon(client);
+    throw error;
+  }
+}
+
+export const historyPurgeConfirmation = {
+  phrase: 'HISTORY-PURGE-STAGING',
+  operation: 'history-purge-staging',
+};
+
+/**
+ * Retention (gate G3): irreversibly clears the label texts and keys and the raw quarantine cells of discarded or rolled-back staging (see migration 0228 for the
+ * exact scope). Owner or app_admin, a fresh second factor bound to this operation, one audited transaction, counts only. Nothing of the business or the history
+ * rows is touched.
+ */
+export async function purgeStaging(opts: {
+  appPool: pg.Pool;
+  actor: SessionUser;
+  environment: HistoryEnvironment;
+  stepUp?: StepUpProof;
+}): Promise<{ quarantineRowsPurged: number; labelsPurged: number }> {
+  assertActor(opts.actor, 'apply', { given: opts.stepUp, operation: historyPurgeConfirmation.operation });
+  await assertHistoryEnvironment(opts.appPool, opts.environment, []);
+  const client = await opts.appPool.connect();
+  let ended = false;
+  try {
+    await client.query('BEGIN');
+    await client.query(HISTORY_LOCK_SQL);
+    const pool = singleTransactionPool(client, uuidv7(realClock.now()));
+    const counts = await withRlsContext(pool, auditContext(opts.actor), async (tx) => {
+      const r = await tx.query<{ c: { quarantine_rows_purged: number; labels_purged: number } }>(
+        'select history.purge_staging() as c',
+      );
+      return r.rows[0]!.c;
+    });
+    ended = true;
+    await commitAndRelease(client);
+    return { quarantineRowsPurged: counts.quarantine_rows_purged, labelsPurged: counts.labels_purged };
   } catch (error) {
     if (!ended) await abandon(client);
     throw error;

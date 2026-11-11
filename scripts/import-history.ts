@@ -3,6 +3,7 @@
 //   corepack pnpm import:history --dry-run <folder> --mapping <file>              (reads and reports; writes nothing; needs the database)
 //   corepack pnpm import:history --stage   <folder> --mapping <file> --account <email>   (writes the staging: labels to decide, rows in quarantine)
 //   corepack pnpm import:history --apply   <folder> --mapping <file> --account <email>   (typed phrase + authenticator code; blocked while mappings are open)
+//   corepack pnpm import:history --purge-staging --account <email>                (typed phrase + authenticator code; IRREVERSIBLY clears the label texts and raw quarantine cells of discarded or rolled-back stages; counts only in the audit)
 //   corepack pnpm import:history --rollback <batch id> --account <email>          (typed phrase + authenticator code; marks the batch, deletes nothing; a batch that was only STAGED can be rolled back too)
 // One folder = the monthly files of ONE plant and ONE kind (the mapping names both). Files are numbered by their sorted position; the row date
 // is the truth, never the file name. History never touches live stock, invoices, the ledger, trips or dispatch (decision 211).
@@ -21,9 +22,11 @@ import {
   formatHistoryReport,
   formatHistoryRollback,
   historyConfirmation,
+  historyPurgeConfirmation,
   historyRollbackConfirmation,
   ImportRefused,
   ImportTransactionError,
+  purgeStaging,
   rollbackHistory,
   runHistory,
 } from '../src/modules/importer/index.ts';
@@ -39,7 +42,7 @@ const args = parseHistoryArgs(process.argv.slice(2));
 if (args.problems.length || !args.mode || !args.target) {
   for (const p of args.problems) console.error(`import:history: ${p}`);
   console.error(
-    'usage: import:history --dry-run|--stage|--apply <folder> --mapping <file> | --rollback <batch id> | --init-mapping <folder>  (see --help)',
+    'usage: import:history --dry-run|--stage|--apply <folder> --mapping <file> | --rollback <batch id> | --purge-staging | --init-mapping <folder>  (see --help)',
   );
   process.exit(2);
 }
@@ -123,7 +126,28 @@ try {
     return false;
   };
 
-  if (args.mode === 'rollback') {
+  if (args.mode === 'purge-staging') {
+    await assertHistoryEnvironment(appPool, environment, []);
+    console.log(
+      'Purge of the staging: the label texts and keys that were never decided (or kept as bare labels) and the raw cells of the quarantined rows of discarded or rolled-back sets are IRREVERSIBLY cleared. Nothing of the business, the clients or the imported history is touched. It is refused while a batch is still staged.',
+    );
+    if (
+      (await prompt.ask(`Type ${historyPurgeConfirmation.phrase} to confirm: `)) !==
+      historyPurgeConfirmation.phrase
+    )
+      throw new ImportRefused('STEP_UP_REQUIRED', 'Confirmation not typed: nothing was done.');
+    if (!(await stepUp(historyPurgeConfirmation.operation)))
+      throw new ImportRefused('STEP_UP_REQUIRED', 'Second factor not given: nothing was done.');
+    const done = await purgeStaging({
+      appPool,
+      actor: { ...actor, stepUpVerified: true },
+      environment,
+      stepUp: { userId: actor.id, operation: historyPurgeConfirmation.operation },
+    });
+    const text = `History staging purged: ${done.quarantineRowsPurged} quarantined row(s) and ${done.labelsPurged} label(s) cleared.`;
+    console.log(text);
+    logReport('history-purge-staging', text);
+  } else if (args.mode === 'rollback') {
     await assertHistoryEnvironment(appPool, environment, []);
     const rb = historyRollbackConfirmation(args.target);
     console.log(
