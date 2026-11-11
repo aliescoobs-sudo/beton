@@ -9,6 +9,13 @@ cd "$(dirname "$0")/../.."
 base="${APP_BASE_URL:-http://127.0.0.1:3000}"
 domain="${APP_DOMAIN:-}"
 image="${APP_IMAGE:?set APP_IMAGE (ghcr.io/<owner>/kayas@sha256:<digest>)}"
+# R18-11: the commit the digest was approved for (the one pick-image.sh printed) and the platform it runs on, recorded next to the digest so that every
+# maintenance run can be compared with them (scripts/training/ops.sh). Optional; recorded as "unrecorded" when absent.
+commit="${APP_COMMIT:-}"
+platform="${APP_PLATFORM:-linux/amd64}"
+case "$commit" in ''|[0-9a-f][0-9a-f]*) ;; *) echo "init-env.sh: APP_COMMIT must be 40 lowercase hex characters" >&2; exit 1 ;; esac
+[ -z "$commit" ] || [ "${#commit}" = 40 ] || { echo "init-env.sh: APP_COMMIT must be 40 lowercase hex characters" >&2; exit 1; }
+case "$platform" in linux/amd64|linux/arm64) ;; *) echo "init-env.sh: APP_PLATFORM must be linux/amd64 or linux/arm64" >&2; exit 1 ;; esac
 . ./scripts/training/image-policy.sh
 kayas_require_image "$image" init-env.sh
 for f in .env.training .env.training.ops; do
@@ -27,6 +34,8 @@ pw_app=$(rnd) pw_auth=$(rnd) pw_system=$(rnd) pw_migrator=$(rnd) pw_backup=$(rnd
   echo "APP_DOMAIN=$domain"
   echo "APP_PORT=3000"
   echo "APP_IMAGE=$image"
+  echo "APP_COMMIT=$commit"
+  echo "APP_PLATFORM=$platform"
   echo "APP_BASE_URL=$base"
   echo "DATABASE_URL_APP=postgres://belgobeton_app:$pw_app@db:5432/belgobeton"
   echo "DATABASE_URL_AUTH=postgres://belgobeton_auth:$pw_auth@db:5432/belgobeton"

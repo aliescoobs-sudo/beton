@@ -1,5 +1,6 @@
 'use client';
 
+import { withFieldSessionLock } from './session-lock';
 import { useTranslations } from 'next-intl';
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { isStage, tapLocal, type StageView } from '@/modules/operations/domain/trip-stages';
@@ -333,7 +334,8 @@ export function FieldApp({
       },
       confirmPending: (count, unknown) =>
         window.confirm(unknown ? t('signOutPendingUnknown', { count }) : t('signOutPending', { count })),
-      logoutRequest: (signal) => fetch('/api/field/logout', { method: 'POST', signal }),
+      logoutRequest: (signal) =>
+        withFieldSessionLock(() => fetch('/api/field/logout', { method: 'POST', signal })),
       signOutMark: {
         set: () => localStorage.setItem(SIGNED_OUT_KEY, '1'),
         clear: () => localStorage.removeItem(SIGNED_OUT_KEY),
@@ -523,16 +525,19 @@ export function FieldApp({
     setMessage(null);
     // R15A-01: no sign-in is sent while an older logout request is still on its way (bounded by its own deadline, then aborted).
     await getSession().logoutsSettled();
-    const res = await fetch('/api/field/login', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        code: form.get('code'),
-        pin: form.get('pin'),
-        deviceId: deviceId(),
-        deviceLabel: navigator.userAgent.slice(0, 60),
+    // R18-05: one sign-in/sign-out at a time across the browser's tabs
+    const res = await withFieldSessionLock(() =>
+      fetch('/api/field/login', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          code: form.get('code'),
+          pin: form.get('pin'),
+          deviceId: deviceId(),
+          deviceLabel: navigator.userAgent.slice(0, 60),
+        }),
       }),
-    }).catch(() => null);
+    ).catch(() => null);
     if (!res) return setMessage(t('errors.network'));
     if (res.ok) {
       etagRef.current = null;

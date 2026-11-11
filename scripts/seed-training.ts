@@ -623,11 +623,12 @@ export async function seedTraining(opts: SeedTrainingOptions): Promise<SeedTrain
     }
     let placed = false;
     try {
-      lock.assertHeld('the placing of the credentials file');
-      commitCredentialsFile(staged);
+      // R18-11: each publication is ONE commit step (the commit mutex + the holder re-checked inside it), not a check followed by an action
+      await lock.commit('the placing of the credentials file', () => commitCredentialsFile(staged));
       placed = true;
-      lock.assertHeld('the training marker');
-      await migrator.query('insert into public.training_marker default values');
+      await lock.commit('the training marker', () =>
+        migrator.query('insert into public.training_marker default values'),
+      );
     } catch (error) {
       // the rename failed (commit already removed the staged file) or the marker could not be written: nothing secret stays behind.
       // The final file is only ever removed if THIS attempt put it there: a displaced attempt never touches a file a newer seed placed.

@@ -55,6 +55,8 @@ export interface ForgetResult {
   complete: boolean;
   legacyCleanupPending: boolean;
   failed: WipeResult['failed'];
+  /** R18-06: an erase is owed but could not be written to the phone's storage: a reload would forget it. */
+  persistFailed?: boolean;
 }
 
 interface Owed {
@@ -62,7 +64,13 @@ interface Owed {
   /** The cutoff of the ORIGINAL wipe: a retry never reaches what was queued after that wipe began. */
   cutoff: number | null;
 }
-const pendingOwed = (): Owed[] => {
+/**
+ * R18-06: when localStorage cannot hold the owed erase (full, blocked, private mode) the debt is kept HERE, in memory, and the failure is reported
+ * (`ForgetResult.persistFailed`): the erase is still retried while the page lives, and the caller shows that a reload would lose the memory of it.
+ */
+let memoryOwed: Owed[] = [];
+let persistFailedLast = false;
+const storedOwed = (): Owed[] => {
   try {
     const v = JSON.parse(localStorage.getItem(ERASE_PENDING_KEY) ?? '[]') as unknown;
     return Array.isArray(v) ? (v as Owed[]) : [];
@@ -70,19 +78,29 @@ const pendingOwed = (): Owed[] => {
     return [];
   }
 };
+const pendingOwed = (): Owed[] => {
+  const stored = storedOwed();
+  return [...stored, ...memoryOwed.filter((m) => !stored.some((o) => sameScope(o.scope, m.scope)))];
+};
 const sameScope = (a: WipeScope, b: WipeScope) => JSON.stringify(a) === JSON.stringify(b);
 /** Is an erase still owed on this phone? (From the persistent flag, so it survives a reload.) */
 export const erasePending = (): boolean => pendingOwed().length > 0;
 function setPending(owed: Owed, complete: boolean): void {
+  const rest = pendingOwed().filter((o) => !sameScope(o.scope, owed.scope));
+  const next = complete ? rest : [...rest, owed];
+  memoryOwed = next; // the memory always holds the truth of this page
   try {
-    const rest = pendingOwed().filter((o) => !sameScope(o.scope, owed.scope));
-    const next = complete ? rest : [...rest, owed];
     if (next.length) localStorage.setItem(ERASE_PENDING_KEY, JSON.stringify(next));
     else localStorage.removeItem(ERASE_PENDING_KEY);
+    persistFailedLast = false;
+    if (!next.length) memoryOwed = [];
   } catch {
-    // no localStorage: the result still tells the caller
+    // R18-06: not durable. Kept in memory and SURFACED, never silently dropped.
+    persistFailedLast = true;
   }
 }
+/** Was the last change of the owed-erase record impossible to persist? A reload would then forget that an erase is owed. */
+export const erasePendingNotPersisted = (): boolean => persistFailedLast && memoryOwed.length > 0;
 
 /**
  * The day, the caches, the queue of taps and the photos waiting. The day and the queue go synchronously, before any await; the photos
@@ -103,13 +121,23 @@ export async function forgetAll(
     cutoff = retryCutoff ?? (await reserveEpoch());
   } catch {
     setPending({ scope, cutoff: null }, false);
-    return { complete: false, legacyCleanupPending: legacyCleanupPending(), failed: ['new-store'] };
+    return {
+      complete: false,
+      legacyCleanupPending: legacyCleanupPending(),
+      failed: ['new-store'],
+      persistFailed: erasePendingNotPersisted(),
+    };
   }
   setPending({ scope, cutoff }, false);
   await wipeCaches();
   const wiped = await wipePhotos(scope, cutoff);
   setPending({ scope, cutoff }, wiped.complete);
-  return { complete: wiped.complete, legacyCleanupPending: legacyCleanupPending(), failed: wiped.failed };
+  return {
+    complete: wiped.complete,
+    legacyCleanupPending: legacyCleanupPending(),
+    failed: wiped.failed,
+    persistFailed: erasePendingNotPersisted(),
+  };
 }
 
 /** Retries every erase that is still owed (on load, and when the driver asks). Resolves with whether none is left. */
@@ -120,5 +148,6 @@ export async function retryPendingErase(): Promise<ForgetResult> {
     complete: results.every((r) => r.complete) && !erasePending(),
     legacyCleanupPending: legacyCleanupPending(),
     failed: results.flatMap((r) => r.failed),
+    persistFailed: erasePendingNotPersisted(),
   };
 }

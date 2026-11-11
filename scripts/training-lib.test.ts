@@ -499,3 +499,111 @@ describe('R17-09: a failing release never removes the high-water mark', () => {
     b.release();
   });
 });
+
+describe('R18-11: the commit is one step; a holder paused after its last check cannot be superseded', () => {
+  const mk = () => {
+    const d = mkdtempSync(path.join(tmpdir(), 'bb-commit-'));
+    chmodSync(d, 0o700);
+    return { d, final: path.join(d, 'training-accounts.local.txt') };
+  };
+  const clockAt = (t0: number) => {
+    const c = { t: t0, now: () => c.t, heartbeatMs: 3_600_000 };
+    return c;
+  };
+  const gate = () => {
+    let open!: () => void;
+    let mark!: () => void;
+    const wait = new Promise<void>((r) => (open = r));
+    const reached = new Promise<void>((r) => (mark = r));
+    return { wait, open, reached, mark };
+  };
+
+  // the two publication boundaries of the seed, with the real functions behind them
+  const boundaries: [string, (final: string) => () => unknown][] = [
+    [
+      'the credentials file is placed (rename)',
+      (final) => () => {
+        const staged = stageCredentialsFile(final, 'x', 'aaaaaaaaaaaa');
+        return commitCredentialsFile(staged);
+      },
+    ],
+    ['the training marker is committed', () => () => 'marker'],
+  ];
+
+  it.each(boundaries)(
+    'at the boundary where %s: a holder suspended right after its last check is NOT superseded; a taker is refused until the commit ends, then takes over',
+    async (name, make) => {
+      const { d, final } = mk();
+      const c = clockAt(1_000_000);
+      const holder = acquireSeedLock(final, c);
+      const g = gate();
+      let ran = '';
+      const committing = holder.commit(name, async () => {
+        g.mark(); // the last check is done; the holder is "suspended" here
+        await g.wait;
+        ran = String(await make(final)());
+      });
+      await g.reached;
+      // time passes: by the lock's own rules the holder is stale and would be taken over...
+      utimesSync(holder.file, new Date(c.t), new Date(c.t));
+      c.t += 3_600_000;
+      // ...but it is mid-commit (a LIVE process of this host): the taker is refused, nothing is swept, nothing superseded
+      expect(() => acquireSeedLock(final, c)).toThrow(/in the middle of committing/);
+      expect(readdirSync(d).filter((n) => n.startsWith(SEED_LOCK_NAME))).toEqual([
+        path.basename(holder.file),
+      ]);
+      g.open();
+      await committing;
+      expect(ran).not.toBe('');
+      // the commit is over: the mutex is gone and the (now stale) holder can be superseded
+      const taker = acquireSeedLock(final, c);
+      expect(taker.held()).toBe(true);
+      // and the superseded holder can no longer commit anything
+      await expect(holder.commit(name, () => 'late')).rejects.toThrow(/no longer holds the seed lock/);
+      taker.release();
+      holder.release();
+    },
+  );
+
+  it('a commit whose holder was superseded BEFORE it began does not run its action', async () => {
+    const { final } = mk();
+    const c = clockAt(2_000_000);
+    const dead = acquireSeedLock(final, c);
+    utimesSync(dead.file, new Date(c.t), new Date(c.t)); // its heartbeat never runs in this test
+    c.t += 3_600_000;
+    const taker = acquireSeedLock(final, c);
+    let ran = false;
+    await expect(dead.commit('the training marker', () => (ran = true))).rejects.toBeInstanceOf(
+      SeedLockError,
+    );
+    expect(ran).toBe(false);
+    taker.release();
+    dead.release();
+  });
+
+  it('a commit mutex left by a DEAD process (a crash inside the commit) does not block the next seed; one of another host does', () => {
+    const { d, final } = mk();
+    const dead = spawnSync(process.execPath, ['-e', 'process.stdout.write(String(process.pid))']);
+    const deadPid = Number(dead.stdout.toString());
+    writeFileSync(
+      path.join(d, 'training-accounts.seed.commit'),
+      JSON.stringify({ token: 'x', pid: deadPid, host: 'this-host', at: 1 }),
+    );
+    const ok = acquireSeedLock(final, { hostname: 'this-host' });
+    expect(ok.held()).toBe(true);
+    ok.release();
+    writeFileSync(
+      path.join(d, 'training-accounts.seed.commit'),
+      JSON.stringify({ token: 'y', pid: 1, host: 'another-host', at: 1 }),
+    );
+    expect(() => acquireSeedLock(final, { hostname: 'this-host' })).toThrow(/in the middle of committing/);
+  });
+
+  it('seed-training.ts publishes the credentials file and the marker ONLY through lock.commit (no bare assertHeld + action)', () => {
+    const src = readFileSync('scripts/seed-training.ts', 'utf8');
+    expect(src).toMatch(/lock\.commit\('the placing of the credentials file'/);
+    expect(src).toMatch(/lock\.commit\('the training marker'/);
+    expect(src).not.toMatch(/assertHeld\('the placing of the credentials file'\)/);
+    expect(src).not.toMatch(/assertHeld\('the training marker'\)/);
+  });
+});

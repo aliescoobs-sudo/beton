@@ -11,6 +11,7 @@ export async function POST(request: Request): Promise<Response> {
     const result = await syncActions(getPool('app'), user, body?.actions, {
       now: (await getRequestClock()).now(),
     });
+    if (!result.ok && result.error === 'SESSION_ENDED') return fieldJson(401, { error: 'UNAUTHENTICATED' });
     return result.ok ? fieldJson(200, { outcomes: result.value }) : fieldJson(400, { error: result.error });
   });
 }

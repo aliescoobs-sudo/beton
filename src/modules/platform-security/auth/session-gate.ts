@@ -23,6 +23,8 @@ export interface SessionUser {
    * a request without it, so a service reached by any other path cannot do what only a stepped-up action may.
    */
   stepUpVerified?: boolean;
+  /** R18-05: set only for a phone session. `inRequest` carries it to the database, which fences every transaction against the live session. */
+  fieldSession?: { driverId: string; deviceRowId: string; gen: number };
 }
 
 export interface SessionInfo {

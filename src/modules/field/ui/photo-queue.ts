@@ -117,6 +117,14 @@ export function deleteLegacyPhotoStore(): Promise<LegacyOutcome> {
   });
 }
 
+/** R18-06: the former database could not be opened in time (an old page holds it, or a deletion/fence is queued behind one): what it holds is UNKNOWN, not empty. */
+export class LegacyBlocked extends Error {
+  constructor() {
+    super('the former photo database is blocked: its photos cannot be read or erased now');
+    this.name = 'LegacyBlocked';
+  }
+}
+
 /** Does the former database exist on this phone? (Opening a missing one would create it.) */
 async function legacyExists(): Promise<boolean> {
   if (typeof indexedDB.databases === 'function') {
@@ -127,15 +135,16 @@ async function legacyExists(): Promise<boolean> {
 
 /**
  * Opens the former database; it closes itself when another page wants to delete or upgrade it, so it never blocks that. Null when it did not
- * exist (nothing is created: the upgrade is aborted), when it has no photo store any more (fenced), or when the browser did not answer in time.
+ * exist (nothing is created: the upgrade is aborted) or when it has no photo store any more (fenced): those are PROVEN empty. When the browser
+ * did not answer in time, or a deletion/fence is queued behind an old page, it REJECTS with `LegacyBlocked` (R18-06): unknown is not empty.
  */
 function openLegacy(): Promise<IDBDatabase | null> {
-  if (deletionQueued) return Promise.resolve(null);
+  if (deletionQueued) return Promise.reject(new LegacyBlocked());
   return new Promise((resolve, reject) => {
     let timedOut = false;
     const timer = setTimeout(() => {
       timedOut = true;
-      resolve(null);
+      reject(new LegacyBlocked());
     }, 1500);
     const req = indexedDB.open(LEGACY_DB);
     let created = false;
@@ -255,7 +264,22 @@ interface Tombstone {
   at: number;
   cutoff: number;
   scope: WipeScope;
+  /**
+   * R18-06: true until the wipe has PROVEN that the former database holds nothing it covers any more (erased, or fenced/deleted). While open, every
+   * copy applies this tombstone to the former rows whatever the epoch of its snapshot (a snapshot taken between the wipe's epoch and its commit used to
+   * ignore it), and it is never dropped by the cap. Absent on tombstones written before: they behave as closed.
+   */
+  open?: boolean;
+  /**
+   * R18-06: epoch stamps drawn INSIDE the transaction that committed the tombstone (`committed`) and the one that closed it (`closedAt`). A copy applies a
+   * tombstone when any part of its life (still open, committed or closed) came after the copy's snapshot began; before this, only the wipe's reserved
+   * epoch was compared, which is earlier than its commit, so a snapshot taken between the two ignored the tombstone and put an erased photo back.
+   */
+  committed?: number;
+  closedAt?: number;
 }
+/** The newest event of a tombstone's life (reservation, commit, close). */
+const lastEvent = (t: Tombstone): number => Math.max(t.at, t.committed ?? 0, t.closedAt ?? 0);
 const MAX_TOMBSTONES = 50;
 const covers = (t: Tombstone, row: QueuedPhoto): boolean =>
   (t.scope === 'everything'
@@ -268,11 +292,24 @@ const covers = (t: Tombstone, row: QueuedPhoto): boolean =>
  * Serializes everything that moves or erases photos across pages: the Web Locks API when the browser has it, else a lease in the database
  * (an expiring record, renewed while held). A lock that cannot be had in time REJECTS: the caller reports an incomplete operation.
  */
-export async function withStoreLock<T>(fn: () => Promise<T>): Promise<T> {
+/** The fallback lease a section holds (null with Web Locks, which cannot be lost mid-section). Every write transaction below re-validates it. */
+export type Held = { me: string } | null;
+
+/** R18-06: inside a write transaction on the new database, abort it when the section's fallback lease expired or was taken over. */
+function guardLease(tx: IDBTransaction, held: Held): void {
+  if (!held) return;
+  const lk = tx.objectStore(META).get('lock');
+  lk.onsuccess = () => {
+    const cur = lk.result as { owner: string; until: number } | undefined;
+    if (!cur || cur.owner !== held.me || cur.until < Date.now()) tx.abort();
+  };
+}
+
+export async function withStoreLock<T>(fn: (held: Held) => Promise<T>): Promise<T> {
   const locks = (
     globalThis as { navigator?: { locks?: { request: (n: string, cb: () => Promise<T>) => Promise<T> } } }
   ).navigator?.locks;
-  if (locks?.request) return locks.request(LOCK_NAME, fn);
+  if (locks?.request) return locks.request(LOCK_NAME, () => fn(null));
   const me = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const LEASE_MS = 10_000;
   const acquire = () =>
@@ -293,7 +330,7 @@ export async function withStoreLock<T>(fn: () => Promise<T>): Promise<T> {
   }
   const beat = setInterval(() => void acquire().catch(() => undefined), LEASE_MS / 3);
   try {
-    return await fn();
+    return await fn({ me });
   } finally {
     clearInterval(beat);
     await meta<void>((s, done) => {
@@ -383,7 +420,7 @@ type CopyResult = 'none' | 'copied' | 'error';
  * wipe that started after the snapshot has erased), and only after that commit take out of the former database exactly the keys it handled.
  * Rows an old page wrote after the snapshot are not in the copy, so they are never touched here (the next round copies them).
  */
-async function copyRound(): Promise<CopyResult> {
+async function copyRound(held: Held): Promise<CopyResult> {
   if (deletionQueued || !(await legacyExists())) return 'none';
   let rows: QueuedPhoto[];
   let snapshotEpoch: number;
@@ -402,10 +439,13 @@ async function copyRound(): Promise<CopyResult> {
     try {
       await new Promise<void>((resolve, reject) => {
         const tx = db.transaction([STORE, META], 'readwrite');
+        guardLease(tx, held);
         const store = tx.objectStore(STORE);
         const wipes = tx.objectStore(META).get('wipes');
         wipes.onsuccess = () => {
-          const tombs = ((wipes.result as Tombstone[] | undefined) ?? []).filter((t) => t.at > snapshotEpoch);
+          const tombs = ((wipes.result as Tombstone[] | undefined) ?? []).filter(
+            (t) => t.open === true || lastEvent(t) > snapshotEpoch,
+          );
           for (const row of rows) {
             // a wipe took its cutoff after this snapshot began: the photo it covers was erased on purpose and is not put back
             if (tombs.some((t) => covers(t, { ...row, seq: row.seq ?? 0 }))) {
@@ -444,16 +484,20 @@ async function copyRound(): Promise<CopyResult> {
 }
 
 /** The migration proper, to be called under the store lock. Returns what became of the former database. */
-async function migrateLocked(): Promise<LegacyOutcome | 'none' | 'error-copy'> {
+async function migrateLocked(held: Held): Promise<LegacyOutcome | 'none' | 'error-copy'> {
   if (deletionQueued) return 'blocked';
   if (!(await legacyExists().catch(() => true))) {
     flag.clear();
+    await closeAllTombstones(held).catch(() => undefined); // nothing is left to cover
     return 'none';
   }
   for (let round = 0; round < 6; round++) {
-    const copied = await copyRound();
+    const copied = await copyRound(held);
     if (copied === 'none') {
-      if (!(await legacyExists().catch(() => true))) flag.clear();
+      if (!(await legacyExists().catch(() => true))) {
+        flag.clear();
+        await closeAllTombstones(held).catch(() => undefined);
+      }
       return flag.isSet() ? 'blocked' : 'none';
     }
     if (copied === 'error') {
@@ -463,6 +507,7 @@ async function migrateLocked(): Promise<LegacyOutcome | 'none' | 'error-copy'> {
     // the copy is committed and the former rows it handled are out: fence, which only succeeds when nothing is left (and nobody is writing)
     const fenced = await fenceLegacy();
     if (fenced === 'fenced') {
+      await closeAllTombstones(held).catch(() => undefined); // fenced: the store is gone, nobody can write a photo there any more
       await point('delete-legacy').catch(() => {
         flag.set();
       });
@@ -487,7 +532,7 @@ async function migrateLocked(): Promise<LegacyOutcome | 'none' | 'error-copy'> {
  * outcome. Also the retry of a pending deletion. `none` when there is no former database. Serialized with every wipe, across pages.
  */
 export async function migrateLegacyPhotos(): Promise<LegacyOutcome | 'none'> {
-  const r = await withStoreLock(migrateLocked);
+  const r = await withStoreLock((held) => migrateLocked(held));
   return r === 'error-copy' ? 'error' : r;
 }
 
@@ -602,7 +647,7 @@ export async function wipePhotos(scope: WipeScope = 'everything', cutoff?: numbe
     if (!result.failed.includes(what)) result.failed.push(what);
   };
   try {
-    await withStoreLock(async () => {
+    await withStoreLock(async (held) => {
       const at = await reserveEpoch(); // the wipe's own place in the epoch (a copy that began before it must not put its photos back)
       const limit = cutoff ?? at;
       const inScope = (row: QueuedPhoto) =>
@@ -612,24 +657,31 @@ export async function wipePhotos(scope: WipeScope = 'everything', cutoff?: numbe
             ? row.userId === scope.only
             : row.userId !== scope.except) && (row.seq ?? 0) <= limit;
       // 1. move the former database's photos into the new one, so that one scope and one cutoff apply to all of them
-      const migrated = await migrateLocked().catch((): 'error-copy' => 'error-copy');
+      const migrated = await migrateLocked(held).catch((): 'error-copy' => 'error-copy');
       if (migrated === 'error-copy') fail('migrate');
       else result.legacy = migrated;
-      // 2. the new store, and the tombstone, in ONE transaction
+      // 2. the new store, and the tombstone, in ONE transaction. The tombstone is OPEN until the former database is proven clear of what it covers.
+      const legacyGone = migrated === 'none' || migrated === 'deleted';
       try {
         await point('erase-new');
-        await eraseNew(inScope, { at, cutoff: limit, scope });
+        await eraseNew(inScope, { at, cutoff: limit, scope, open: !legacyGone }, !legacyGone, held);
       } catch {
         fail('new-store');
       }
       // 3. whatever could not be moved (blocked, unreadable) is erased in the former database too, within the same scope
-      if (migrated !== 'none' && migrated !== 'deleted') {
+      if (!legacyGone) {
         try {
           await point('erase-legacy');
           const db = await openLegacy();
           if (db) await eraseRows(db, inScope);
-        } catch {
-          fail('legacy-store');
+          // proven: the former database holds nothing this wipe covers (or has no photo store at all), so the tombstone may close
+          await closeTombstone(at, held).catch(() => undefined);
+        } catch (error) {
+          // R18-06: a former database that cannot be opened in time is UNKNOWN, not clear: the tombstone stays open and the wipe is incomplete
+          // (it is reported as `blocked`, which is what an old page holding the database is); any other failure is a failed erase of that store
+          if (error instanceof LegacyBlocked) {
+            if (result.legacy === 'none' || result.legacy === 'deleted') result.legacy = 'blocked';
+          } else fail('legacy-store');
         }
       }
     });
@@ -641,11 +693,17 @@ export async function wipePhotos(scope: WipeScope = 'everything', cutoff?: numbe
 }
 
 /** The rows in scope out of the new store, and the tombstone in, in one transaction that must COMMIT. */
-async function eraseNew(inScope: (row: QueuedPhoto) => boolean, tomb: Tombstone): Promise<void> {
+async function eraseNew(
+  inScope: (row: QueuedPhoto) => boolean,
+  tomb: Tombstone,
+  keepEvery: boolean,
+  held: Held,
+): Promise<void> {
   const db = await open();
   try {
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction([STORE, META], 'readwrite');
+      guardLease(tx, held); // R18-06: a lease that expired since the section began aborts the erase instead of letting it commit
       const cursor = tx.objectStore(STORE).openCursor();
       cursor.onsuccess = () => {
         const c = cursor.result;
@@ -656,12 +714,74 @@ async function eraseNew(inScope: (row: QueuedPhoto) => boolean, tomb: Tombstone)
       const m = tx.objectStore(META);
       const wipes = m.get('wipes');
       wipes.onsuccess = () => {
-        const list = ((wipes.result as Tombstone[] | undefined) ?? []).concat(tomb).slice(-MAX_TOMBSTONES);
-        m.put(list, 'wipes');
+        const ep = m.get('epoch');
+        ep.onsuccess = () => {
+          const next = (typeof ep.result === 'number' ? ep.result : Date.now() * 1000) + 1;
+          m.put(next, 'epoch'); // drawn in THIS transaction: the tombstone's commit has a place in the epoch
+          const all = ((wipes.result as Tombstone[] | undefined) ?? []).concat({ ...tomb, committed: next });
+          // R18-06: an open tombstone is never dropped, and no tombstone is dropped at all while the former database may still hold a photo
+          const list = keepEvery
+            ? all
+            : [
+                ...all.filter((t) => t.open === true),
+                ...all.filter((t) => t.open !== true).slice(-MAX_TOMBSTONES),
+              ].sort((x, y) => x.at - y.at);
+          m.put(list, 'wipes');
+        };
       };
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
       tx.onabort = () => reject(tx.error ?? new Error('erase aborted'));
+    });
+  } finally {
+    db.close();
+  }
+}
+
+/** Closes EVERY open tombstone: the former database is proven gone or fenced (no photo can be in it, none can be written), so none of them has a source left to cover. */
+async function closeAllTombstones(held: Held): Promise<void> {
+  const db = await open();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(META, 'readwrite');
+      guardLease(tx, held);
+      const m = tx.objectStore(META);
+      const wipes = m.get('wipes');
+      wipes.onsuccess = () => {
+        const list = (wipes.result as Tombstone[] | undefined) ?? [];
+        if (list.some((t) => t.open === true))
+          m.put(
+            list.map((t) => (t.open ? { ...t, open: false } : t)),
+            'wipes',
+          );
+      };
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error ?? new Error('close aborted'));
+    });
+  } finally {
+    db.close();
+  }
+}
+
+/** Closes the tombstone of the wipe at epoch `at`: the former database is proven clear of what it covers. Under the lease like every write. */
+async function closeTombstone(at: number, held: Held): Promise<void> {
+  const db = await open();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(META, 'readwrite');
+      guardLease(tx, held);
+      const m = tx.objectStore(META);
+      const wipes = m.get('wipes');
+      wipes.onsuccess = () => {
+        const list = ((wipes.result as Tombstone[] | undefined) ?? []).map((t) =>
+          t.at === at ? { ...t, open: false } : t,
+        );
+        m.put(list, 'wipes');
+      };
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error ?? new Error('close aborted'));
     });
   } finally {
     db.close();

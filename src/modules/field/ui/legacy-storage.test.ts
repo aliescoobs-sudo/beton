@@ -6,6 +6,7 @@ import {
   deleteLegacyPhotoStore,
   LEGACY_DB,
   legacyCleanupPending,
+  PhotoListIncomplete,
   queuedPhotos,
   queuePhoto,
   wipePhotos,
@@ -13,6 +14,18 @@ import {
 
 // KAYAS rebrand: the photo database was renamed. A phone that used the former name must not keep any residue after a sign-out or a wipe.
 const names = async () => (await indexedDB.databases()).map((d) => d.name);
+/**
+ * R18-06: while an old page holds the former database (a deletion or fence queued behind it), what it holds cannot be read: the list is INCOMPLETE
+ * (a count of "at least these"), never presented as complete. Returns the rows that could be read.
+ */
+async function incompleteRows(): Promise<string[]> {
+  const err = await queuedPhotos().then(
+    () => null,
+    (e: unknown) => e,
+  );
+  expect(err).toBeInstanceOf(PhotoListIncomplete);
+  return (err as PhotoListIncomplete).rows.map((p) => p.key);
+}
 
 async function createLegacyStore(): Promise<void> {
   await new Promise<void>((resolve, reject) => {
@@ -117,8 +130,8 @@ describe('R16-02: legacy cleanup outcome is explicit', () => {
   it('a blocked deletion never loses an unsent photo: it is copied first, counted, and the cleanup completes when the old page closes', async () => {
     await reset();
     const old = await oldPage([{ key: 'p1', userId: 'A' }]);
-    const listed = await queuedPhotos(); // copy, then the deletion is asked: blocked
-    expect(listed.map((p) => p.key)).toEqual(['p1']);
+    const listed = await incompleteRows(); // copy, then the deletion is asked: blocked, so the former database is unknown (not empty)
+    expect(listed).toEqual(['p1']);
     expect(legacyCleanupPending()).toBe(true);
     expect(await names()).toContain(LEGACY_DB);
     // the former database holds no photo while its deletion waits (the copy is committed, then the rows are taken out)
@@ -127,7 +140,7 @@ describe('R16-02: legacy cleanup outcome is explicit', () => {
       c.onsuccess = () => resolve(c.result);
     });
     expect(count).toBe(0);
-    expect((await queuedPhotos()).map((p) => p.key)).toEqual(['p1']); // still counted, not doubled
+    expect(await incompleteRows()).toEqual(['p1']); // still counted, not doubled, and still flagged as possibly more
     old.close();
     await settled();
     expect(await names()).not.toContain(LEGACY_DB);
@@ -146,7 +159,7 @@ describe('R16-02: legacy cleanup outcome is explicit', () => {
     expect(result.legacy).toBe('blocked');
     expect(legacyCleanupPending()).toBe(true);
     expect(await names()).toContain(LEGACY_DB);
-    expect((await queuedPhotos()).map((p) => p.key)).toEqual(['theirs']);
+    expect(await incompleteRows()).toEqual(['theirs']);
     old.close();
     await settled();
     expect(await names()).not.toContain(LEGACY_DB);

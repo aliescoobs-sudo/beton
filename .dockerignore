@@ -34,3 +34,4 @@ vitest.config.ts
 scripts/training-screens.ts
 brand-incoming
 generated_images
+.training-evidence

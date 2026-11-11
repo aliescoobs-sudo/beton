@@ -17,6 +17,7 @@ import {
   writeFileSync,
   writeSync,
 } from 'node:fs';
+import { hostname } from 'node:os';
 import path from 'node:path';
 import { TRAINING_EMAIL_DOMAIN } from '../src/lib/training.ts';
 import { parsePin } from '../src/modules/field/domain/pin.ts';
@@ -289,6 +290,43 @@ export const STAGING_MIN_AGE_MS = 10 * 60_000;
 
 export class SeedLockError extends Error {}
 
+/**
+ * R18-11: the COMMIT MUTEX. `assertHeld` followed by the action leaves an instant in which a stalled holder can be superseded and then resume
+ * (publishing credentials or committing the training marker after takeover). The commit is therefore one step, `lock.commit(step, action)`:
+ * the holder creates this file exclusively (it names its pid and host), re-checks that it still holds the lock, runs the action, and removes it.
+ * A taker refuses to supersede while the file names a LIVE process of this host (a process suspended inside its commit is alive: the exclusion does
+ * not expire), and takes over only when the file is absent or names a dead process. Failing closed: a mutex of another host, or one that cannot be
+ * read, is a refusal.
+ */
+export const SEED_COMMIT_MUTEX = 'training-accounts.seed.commit';
+const commitMutexPath = (dir: string): string => path.join(dir, SEED_COMMIT_MUTEX);
+function commitInFlight(dir: string, hostname: string): { pid: number } | null {
+  const file = commitMutexPath(dir);
+  let content: { pid?: number; host?: string };
+  try {
+    content = JSON.parse(readFileSync(file, 'utf8')) as { pid?: number; host?: string };
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    return { pid: -1 }; // unreadable: treated as live
+  }
+  if (typeof content.pid !== 'number' || content.host !== hostname) return { pid: content.pid ?? -1 };
+  try {
+    process.kill(content.pid, 0);
+    return { pid: content.pid };
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ESRCH') {
+      // its holder is gone: nobody can resume the commit it was making
+      try {
+        unlinkSync(file);
+      } catch {
+        // someone else removed it
+      }
+      return null;
+    }
+    return { pid: content.pid }; // EPERM: it exists
+  }
+}
+
 const LOCK_FILE = /^training-accounts\.seed\.lock(?:\.([0-9]+))?$/;
 const epochFile = (dir: string, epoch: number): string => path.join(dir, `${SEED_LOCK_NAME}.${epoch}`);
 
@@ -301,6 +339,11 @@ export interface SeedLock {
   held(): boolean;
   /** Throws SeedLockError (naming the step) unless held(). Call immediately before every commit. */
   assertHeld(step: string): void;
+  /**
+   * R18-11: runs `action` as a COMMIT: under the commit mutex and with the lock re-checked inside it, so no taker can supersede this attempt between
+   * the check and the action. Use it for every publication (the credentials file, the training marker).
+   */
+  commit<T>(step: string, action: () => T | Promise<T>): Promise<T>;
   release(): void;
 }
 
@@ -325,6 +368,8 @@ export function acquireSeedLock(
     now?: () => number;
     staleMs?: number;
     heartbeatMs?: number;
+    /** Test seam: the host name written into and compared with the commit mutex. */
+    hostname?: string;
     /** Test seam (R17-09): the two filesystem operations that mark a released lock, so a failure of each can be injected. */
     io?: {
       utimes?: (file: string, at: Date, mt: Date) => void;
@@ -386,9 +431,28 @@ export function acquireSeedLock(
   }
   // The next number is created exclusively. Two takers that judged the same lock abandoned both try the SAME name: one wins, the other
   // is refused. The winner supersedes the older locks; it never removes anybody's current lock.
+  const host = opts.hostname ?? hostname();
+  const blockedByCommit = (): string | null => {
+    const inflight = commitInFlight(dir, host);
+    return inflight
+      ? `a training seed is in the middle of committing (process ${inflight.pid}): it cannot be superseded now; nothing was swept, written or removed`
+      : null;
+  };
+  const early = blockedByCommit();
+  if (early) refuse(early);
   const epoch = (top ?? 0) + 1;
   if (!create(epoch))
     return refuse('another training seed took the credentials folder at the same moment: nothing was done');
+  // a commit that began while this taker was deciding: give the number back as abandoned (the numbering never restarts) and refuse
+  const late = blockedByCommit();
+  if (late) {
+    try {
+      writeFileSync(epochFile(dir, epoch), JSON.stringify({ token, epoch, abandoned: true, at: now() }));
+    } catch {
+      // left as a fresh lock: the next taker is refused until it goes stale (failing closed)
+    }
+    refuse(late);
+  }
   const file = epochFile(dir, epoch);
   for (const old of epochs) discardCredentialsFile(lockPath(dir, old)); // superseded (or released) locks, best effort
 
@@ -414,15 +478,53 @@ export function acquireSeedLock(
     }
   }, opts.heartbeatMs ?? SEED_LOCK_HEARTBEAT_MS);
   beat.unref();
+  const lock_assert = (step: string): void => {
+    if (!held())
+      throw new SeedLockError(
+        `training seed stopped before "${step}": this attempt no longer holds the seed lock (it was stalled, or another seed took over). Nothing further was written by it.`,
+      );
+  };
   return {
     file,
     attempt,
     held,
-    assertHeld: (step) => {
-      if (!held())
-        throw new SeedLockError(
-          `training seed stopped before "${step}": this attempt no longer holds the seed lock (it was stalled, or another seed took over). Nothing further was written by it.`,
+    assertHeld: lock_assert,
+    commit: async (step, action) => {
+      const mutex = commitMutexPath(dir);
+      lock_assert(step);
+      let fd: number;
+      try {
+        fd = openSync(
+          mutex,
+          constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
+          0o600,
         );
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+          if (commitInFlight(dir, host))
+            refuse(`training seed stopped before "${step}": another attempt is committing`);
+          return refuse(
+            `training seed stopped before "${step}": a commit mutex could not be taken (try again)`,
+          );
+        }
+        throw error;
+      }
+      try {
+        writeSync(fd, JSON.stringify({ token, pid: process.pid, host, at: now() }));
+      } finally {
+        closeSync(fd);
+      }
+      try {
+        lock_assert(step); // the check that counts: nobody can supersede us from here to the end of the action
+        return await action();
+      } finally {
+        try {
+          if ((JSON.parse(readFileSync(mutex, 'utf8')) as { token?: string }).token === token)
+            unlinkSync(mutex);
+        } catch {
+          // already gone
+        }
+      }
     },
     release: () => {
       if (released) return;

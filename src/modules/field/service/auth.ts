@@ -334,6 +334,8 @@ export async function sessionOfToken(
     locale: 'ar',
     twoFactorEnabled: false,
     reenrolRequired: false,
+    // R18-05: every transaction this user opens is fenced against the live session
+    fieldSession: { driverId: token.driverId, deviceRowId: token.deviceRowId, gen: token.gen },
   };
 }
 

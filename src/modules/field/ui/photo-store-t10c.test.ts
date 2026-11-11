@@ -113,6 +113,7 @@ describe('R17-07: the legacy migration against wipes and old pages', () => {
     await listing;
     const r = await wipe;
     old.close();
+    await new Promise((res) => setTimeout(res, 50)); // R18-06: the browser runs the queued fence/deletion once the old page lets go; until then the former database is unknown
     expect(r.failed).toEqual([]);
     expect(await keys()).toEqual([]); // erased, and not resurrected by the migration that had its snapshot
   });
@@ -132,6 +133,7 @@ describe('R17-07: the legacy migration against wipes and old pages', () => {
     g.open();
     await migrating;
     old.close();
+    await new Promise((res) => setTimeout(res, 50)); // the queued fence/deletion runs once the old page lets go
     expect(await keys()).toEqual(['kept']);
   });
 
@@ -145,8 +147,11 @@ describe('R17-07: the legacy migration against wipes and old pages', () => {
     g.open();
     await migrating;
     setHooks(undefined);
-    // the old page keeps its connection: the former database cannot be fenced or deleted, but nothing it holds was thrown away
-    const all = await keys();
+    // the old page keeps its connection: the former database cannot be fenced or deleted, but nothing it holds was thrown away.
+    // R18-06: and the list says it cannot see everything (the open is blocked): "at least these", never a complete-looking count.
+    const err = await queuedPhotos().catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(PhotoListIncomplete);
+    const all = (err as PhotoListIncomplete).rows.map((p) => p.key).sort();
     expect(all).toContain('first');
     const stillThere = await legacyKeys(old);
     expect(stillThere.includes('late') || all.includes('late')).toBe(true);

@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const jar = { value: undefined as string | undefined, deleted: 0 };
 const closed: unknown[] = [];
 let closeFails = false;
+let closeResult: boolean | 'cas' = true;
+const server = { gen: 4 }; // the phone's generation on the server (R18-05: the compare-and-set)
 let verified: unknown = {
   driverId: 'd',
   deviceHash: 'h',
@@ -32,7 +34,12 @@ vi.mock('@/modules/field', () => ({
   closeFieldSession: async (_d: unknown, token: unknown) => {
     if (closeFails) throw new Error('db down');
     closed.push(token);
-    return true;
+    if (closeResult === 'cas') {
+      const live = (token as { gen: number }).gen === server.gen;
+      if (live) server.gen += 1;
+      return live;
+    }
+    return closeResult;
   },
 }));
 
@@ -43,6 +50,8 @@ beforeEach(() => {
   jar.deleted = 0;
   closed.length = 0;
   closeFails = false;
+  closeResult = true;
+  server.gen = 4;
   verified = {
     driverId: 'd',
     deviceHash: 'h',
@@ -85,6 +94,36 @@ describe('POST /api/field/logout', () => {
     expect(res.status).toBe(200);
     expect(closed).toEqual([]);
     expect(jar.deleted).toBe(1);
+  });
+
+  it('R18-05: a logout whose compare-and-set found the session already superseded (a newer sign-in of the phone) does NOT delete the shared cookie', async () => {
+    jar.value = 'the-cookie-this-request-carried';
+    closeResult = false; // the generation moved: another tab signed in; the browser's cookie may be the NEWER one
+    const res = await post();
+    expect(res.status).toBe(200);
+    expect(closed).toHaveLength(1); // the server was asked
+    expect(jar.deleted).toBe(0); // and no Set-Cookie that would sign the newer tab out
+  });
+
+  it("R18-05: tab A's logout (token of generation 4) reaches the server AFTER tab B signed in (generation 5): B's fresh cookie survives, and a second logout of B's own token still works", async () => {
+    closeResult = 'cas';
+    server.gen = 5; // tab B's sign-in moved the generation before A's delayed logout was processed
+    jar.value = 'tab-a-old-cookie';
+    expect((await post()).status).toBe(200);
+    expect(jar.deleted).toBe(0);
+    expect(server.gen).toBe(5); // and B's session was not touched
+    // B's own logout (its token carries generation 5) ends it and drops the cookie
+    verified = {
+      driverId: 'd',
+      deviceHash: 'h',
+      deviceRowId: '0194a8a0-0000-7000-8000-0000000000aa',
+      gen: 5,
+      exp: 9e9,
+    };
+    jar.value = 'tab-b-cookie';
+    expect((await post()).status).toBe(200);
+    expect(jar.deleted).toBe(1);
+    expect(server.gen).toBe(6);
   });
 
   it('is idempotent: with no phone cookie it answers 200, ends nothing and clears nothing', async () => {

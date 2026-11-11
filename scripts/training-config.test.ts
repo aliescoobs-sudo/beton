@@ -52,9 +52,12 @@ describe('the training stack (T1)', () => {
     expect(block('ops')).toMatch(/- accounts:\/app\/out/);
     expect(compose).not.toMatch(/\.\/out:/);
     expect(compose).toMatch(/\n {2}accounts: \{\}/);
+    // R18-11: the root job that makes the folder is now run by ops.sh (--prepare-out), so that it leaves execution evidence like every ops job
     const up = readFileSync('scripts/training-up.sh', 'utf8');
-    expect(up).not.toMatch(/1777|chmod [0-7]*7 out/);
-    expect(up).toMatch(/chown 10001:10001 \/app\/out && chmod 700 \/app\/out/);
+    const ops = readFileSync('scripts/training/ops.sh', 'utf8');
+    expect(up + ops).not.toMatch(/1777|chmod [0-7]*7 out/);
+    expect(up).toMatch(/\$ops --prepare-out/);
+    expect(ops).toMatch(/chown 10001:10001 \/app\/out && chmod 700 \/app\/out/);
   });
   it('R11-07: generates no push keys', () => {
     expect(initEnv).not.toMatch(/VAPID/);

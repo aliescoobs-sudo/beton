@@ -49,7 +49,7 @@ done <<<"$holders"
 $dc pull
 # R11-04: the credentials file lives in a Docker volume ("accounts"), not in a folder of this checkout that other users of the machine could
 # reach: the folder is made owned by the container user (10001) and closed to everybody else (0700) before the seed writes into it.
-$dc run --rm -T --user root ops sh -c 'mkdir -p /app/out && chown 10001:10001 /app/out && chmod 700 /app/out'
+$ops --prepare-out
 $dc up -d --wait db
 $ops db-bootstrap
 $ops db-migrate

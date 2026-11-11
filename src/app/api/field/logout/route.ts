@@ -21,11 +21,15 @@ export async function POST(request: Request): Promise<Response> {
       Math.floor((await getRequestClock()).now().getTime() / 1000),
     );
     if (token) {
+      let closed: boolean;
       try {
-        await closeFieldSession(deps, token);
+        closed = await closeFieldSession(deps, token);
       } catch {
         return fieldJson(503, { error: 'UNAVAILABLE' }, { 'retry-after': '5' });
       }
+      // R18-05: the compare-and-set said "this token was not the live one" (a newer sign-in of the same phone, or the session had already ended): the cookie in the browser
+      // may now be the NEWER one (another tab signed in while this request was on its way), and a Set-Cookie that deletes it would sign that tab out. Nothing is cleared.
+      if (!closed) return fieldJson(200, { ok: true });
     }
     jar.delete(FIELD_COOKIE);
     return fieldJson(200, { ok: true });

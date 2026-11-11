@@ -285,7 +285,7 @@ export async function syncActions(
   actions: unknown,
   /** The server's instant (the application's clock): the stage is stamped with it; the phone's time of the tap is kept apart. */
   deps: { now?: Date } = {},
-): Promise<Result<SyncOutcome[], 'INVALID'>> {
+): Promise<Result<SyncOutcome[], 'INVALID' | 'SESSION_ENDED'>> {
   const parsed = z.array(actionSchema).max(200).safeParse(actions);
   if (!parsed.success) return err('INVALID');
   const out: SyncOutcome[] = [];
@@ -328,6 +328,10 @@ export async function syncActions(
       });
       out.push({ key: a.key, status });
     } catch (error) {
+      // R18-05: the session ended between two transactions of the batch (the database fence refused this one): the REST of the batch is not applied
+      // and not answered as rejected: the phone keeps its queue and sends it again after the next sign-in (every key is idempotent).
+      if (/field_session: ended/.test((error as { message?: string }).message ?? ''))
+        return err('SESSION_ENDED');
       out.push(outcomeOf(a.key, error));
     }
   }
