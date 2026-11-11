@@ -285,7 +285,7 @@ describe('B2-B6: a stage by an owner', () => {
 });
 
 describe('B5: the environment decides which files may be staged', () => {
-  const twinBelgo = () => [
+  const twinTetouan = () => [
     { ord: 1, buf: buildTwin({ belgoRows: 12, chaounRows: 12, belgoClients: 3, chaounClients: 2 })[0]!.buf },
   ];
   const twinMapping = (): HistoryMapping => ({
@@ -303,7 +303,7 @@ describe('B5: the environment decides which files may be staged', () => {
       runHistory({
         appPool: app,
         actor: { ...A.owner, stepUpVerified: true } as never,
-        files: twinBelgo(),
+        files: twinTetouan(),
         mapping: twinMapping(),
         environment: PROD,
         mode: 'stage',
