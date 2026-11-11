@@ -94,6 +94,8 @@ test.beforeAll(async () => {
       truckCode = (await tx.query<{ code: string }>('select code from truck where id = $1', [scene.truckId]))
         .rows[0]!.code;
       // rotation 1 should have departed 40 minutes ago; rotation 2 of the same truck is planned to load in 30 minutes
+      // decision 207 / R18-01: a plant manager sees a rotation only when its order is of his plant (the shared scene's order has no plant): both orders are made in the plant
+      const o1 = await insertOrder(tx, owner.id, { ...master, clientId: scene.clientId }, today);
       const o2 = await insertOrder(tx, owner.id, { ...master, clientId: scene.clientId }, today);
       const trip = async (orderId: string, base: number) =>
         (
@@ -104,18 +106,17 @@ test.beforeAll(async () => {
             [today, orderId, scene.truckId, id, base, base + 10, base + 40, base + 80, base + 110, owner.id],
           )
         ).rows[0]!.id;
-      const t1 = await trip(scene.orderId, nowMin - 50); // planned departure = nowMin - 40
+      const t1 = await trip(o1.id, nowMin - 50); // planned departure = nowMin - 40
       await trip(o2.id, nowMin + 30);
-      const dl = await insertDelivery(tx, owner.id, scene, 8000);
+      const dl = await insertDelivery(tx, owner.id, { ...scene, orderId: o1.id }, 8000);
       const delivery = (await tx.query<{ id: string }>('select id from delivery where bl_no = $1', [dl.blNo]))
         .rows[0]!.id;
       await tx.query(
         `insert into trip_event (id, trip_id, step, at, delivery_id, created_by) values (gen_random_uuid(), $1, 'loaded', now() - interval '1 minute', $2, $3)`,
         [t1, delivery, owner.id],
       );
-      order1 = (
-        await tx.query<{ code: string }>('select code from sales_order where id = $1', [scene.orderId])
-      ).rows[0]!.code;
+      order1 = (await tx.query<{ code: string }>('select code from sales_order where id = $1', [o1.id]))
+        .rows[0]!.code;
       order2 = (await tx.query<{ code: string }>('select code from sales_order where id = $1', [o2.id]))
         .rows[0]!.code;
       return id;

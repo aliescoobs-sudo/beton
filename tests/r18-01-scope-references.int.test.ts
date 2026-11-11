@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { recordTripStep } from '../src/modules/operations';
 import { testEnv } from './db-env';
 import { insertDelivery, insertOrder } from './helpers/ledger-fixtures';
 import { plantWorld, type World } from './helpers/plant-world';
@@ -101,10 +102,22 @@ describe("R18-01: a plan cannot be attached to a reference outside the manager's
         [o.id, w.truckA, w.scene.recetteId, w.pmA.id],
       );
       expect(err).not.toBeNull();
+      expect(err!.code).toBe('42501');
       errs.push(err!.message);
     }
-    expect(new Set(errs).size).toBe(1);
+    // one answer, naming the table and no reference (a mistake in the trigger itself — a field a load does not have — would show up here as another text)
+    expect([...new Set(errs)]).toEqual(['delivery: reference not available']);
     expect(await w.count('select 1 from delivery')).toBe(before);
+    // positive control, through the real service the plant screen calls: the manager's OWN rotation takes its load (the load insert passes the same trigger)
+    const own = await w.newTrip(w.plantA, w.truckN, w.driverA, { day: d });
+    const made = await recordTripStep(
+      app,
+      w.pmA,
+      { tripId: own.trip, step: 'loaded' },
+      { today: d, now: new Date() },
+    );
+    expect(made.ok, JSON.stringify(made)).toBe(true);
+    expect(await w.count(`select 1 from delivery where order_id = '${own.order}'`)).toBe(1);
   });
 });
 

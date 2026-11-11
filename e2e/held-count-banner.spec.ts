@@ -99,7 +99,7 @@ test('the office banner shows the seeded hold as a number, and the HTML and the 
   page,
   browser,
 }) => {
-  await loginAndEnrol(page, 'fr', E2E_MD.queueOffice.email);
+  await loginAndEnrol(page, 'fr', E2E_MD.heldOffice.email);
   await page.goto('/fr/invoices/queue');
   const banner = page.getByTestId('queue-held');
   await expect(banner).toBeVisible();

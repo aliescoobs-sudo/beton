@@ -115,6 +115,7 @@ export default async function globalSetup() {
       [E2E_MD.tripPlantAr, 'plant', 'ar'],
       [E2E_MD.tripOffice, 'office', 'fr'],
       [E2E_MD.queueOffice, 'office', 'fr'],
+      [E2E_MD.heldOffice, 'office', 'fr'],
       [E2E_MD.queueOfficeAr, 'office', 'ar'],
       [E2E_MD.queueAccountant, 'accountant', 'fr'],
       [E2E_MD.queuePlant, 'plant', 'fr'],

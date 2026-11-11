@@ -557,7 +557,9 @@ test('R16-02 same account: a blocked legacy deletion is reported pending, the un
   });
   await page.getByTestId('field-signout').click();
   await expect(page.getByTestId('field-login')).toBeVisible();
-  expect(asked).toMatch(/\b1\b|١/);
+  // R18-06: while the old page holds the former database its content cannot be read, so the count is "at least": the one photo we can see plus
+  // one for what we cannot (the "unknown" wording of the confirmation, not a complete-looking 1)
+  expect(asked).toMatch(/\b2\b|٢/);
   expect((await localState(page)).photos).toBe(0);
   // the account's rows are erased from the old database too, but the database itself is still there: pending, not "deleted"
   expect(

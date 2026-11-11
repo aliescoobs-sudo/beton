@@ -155,6 +155,8 @@ export const E2E_MD = {
   astOff: { email: 'e2e-as-off@kayas.test', name: 'Comptable Assistant coupé' },
   astAdmin: { email: 'e2e-as-admin@kayas.test', name: 'Admin Assistant' },
   // T11 history import spec: a plant manager (bound to a plant by the spec), a sales office and an accountant, each enrolled once
+  // R18 4E held-count banner spec: its own sales office (enrolled once)
+  heldOffice: { email: 'e2e-hc-office@kayas.test', name: 'Bureau Bandeau Retenues' },
   histManager: { email: 'e2e-hi-manager@kayas.test', name: 'Chef de centrale Historique' },
   histOffice: { email: 'e2e-hi-office@kayas.test', name: 'Bureau Historique' },
   histAccountant: { email: 'e2e-hi-accountant@kayas.test', name: 'Comptable Historique' },

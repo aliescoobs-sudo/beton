@@ -14,6 +14,7 @@ DECLARE
   v_only   uuid;
   v_found  boolean := true;
   v_tfound boolean := true;
+  v_driver text;
 BEGIN
   IF TG_TABLE_NAME IN ('delivery', 'trip_plan') THEN
     SELECT o.plant_id, true INTO v_parent, v_found FROM public.sales_order o WHERE o.id = NEW.order_id;
@@ -23,9 +24,15 @@ BEGIN
     -- R18-01: a scoped actor reaches only references of his own plant; absent, foreign and plantless are ONE answer, before any other diagnostic
     IF ctx.plant_scope() IS NOT NULL THEN
       IF v_found IS NOT TRUE OR v_parent IS DISTINCT FROM ctx.plant_scope()
-         OR v_tfound IS NOT TRUE OR (v_truck IS NOT NULL AND v_truck <> ctx.plant_scope())
-         OR (TG_TABLE_NAME = 'trip_plan' AND NEW.driver_id IS NOT NULL AND public.driver_in_plant_scope(NEW.driver_id) IS NOT TRUE) THEN
+         OR v_tfound IS NOT TRUE OR (v_truck IS NOT NULL AND v_truck <> ctx.plant_scope()) THEN
         RAISE EXCEPTION '%: reference not available', TG_TABLE_NAME USING ERRCODE = 'insufficient_privilege';
+      END IF;
+      -- only a plan has a driver (a load has no such field: it must not even be named in an expression evaluated for a load)
+      IF TG_TABLE_NAME = 'trip_plan' THEN
+        v_driver := to_jsonb(NEW) ->> 'driver_id';
+        IF v_driver IS NOT NULL AND public.driver_in_plant_scope(v_driver::uuid) IS NOT TRUE THEN
+          RAISE EXCEPTION '%: reference not available', TG_TABLE_NAME USING ERRCODE = 'insufficient_privilege';
+        END IF;
       END IF;
     END IF;
   ELSIF TG_TABLE_NAME = 'purchase_receipt' THEN
