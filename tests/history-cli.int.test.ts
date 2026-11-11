@@ -52,6 +52,11 @@ async function enrol(db: pg.Pool, e: ReturnType<typeof testEnv>, userId: string)
   );
   return secret;
 }
+/** The stub authenticator counts 30-second steps of the real clock, like the CLI: a sequence that expects "the step already spent" must not straddle a boundary. */
+const inFreshStep = async (needMs = 24_000) => {
+  const left = 30_000 - (Date.now() % 30_000);
+  if (left < needMs) await new Promise((r) => setTimeout(r, left + 500));
+};
 const stepOf = (offset = 0) => Math.floor(Date.now() / 30_000) + offset;
 /** The stub authenticator: the code of a given 30-second step of a user's secret. */
 const code = (userId: string, offset = 0): Promise<string> =>
@@ -268,6 +273,7 @@ describe('the real step-up path of import:history (production mode, real-shaped 
     const second = await stagedSet('RB');
     const before = await written(migrator);
     const applied0 = await count(migrator, `history.batch where status = 'applied'`);
+    await inFreshStep();
     const used = await code(op.id, 0);
     const ok = applyAs(op.email, first.folder, `${historyConfirmation(first.set).phrase}\n${used}\n`);
     expect(ok.code, ok.out).toBe(0);
@@ -337,6 +343,7 @@ describe('the real step-up path of import:history (production mode, real-shaped 
     );
     expect(rb).toMatch(/^refused/);
     expect(await count(migrator, `history.batch where id = '${batch}' and status = 'applied'`)).toBe(1);
+    await inFreshStep();
     // the command: a wrong typed phrase, then a replayed code, leave it applied; the next step's code rolls it back
     const phrase = historyRollbackConfirmation(batch).phrase;
     const back = (input: string) => cli(env, ['--rollback', batch, '--account', op.email], PROD, input);
@@ -422,6 +429,7 @@ describe('the whole command on a twin workbook set, TRAINING mode, on a scratch 
       await decideQuarantine(sApp, owner, { id: q.id, action: 'discard' });
     const peek = cli(scratch, ['--dry-run', tetouanDir, '--mapping', mapFile, '--account', email], TRAINING);
     const setSha = sha2(peek.out);
+    await inFreshStep();
     // a wrong phrase and a wrong code write nothing
     expect(
       cli(

@@ -189,7 +189,10 @@ describe('suppliers, types, prices, trucks', () => {
     );
     expect(ok.counts.created).toBe(1);
     expect((await listSuppliers(app, owner)).some((x) => x.name === `Sablière ${tag}`)).toBe(true);
-    const no = 700 + Math.floor(Math.random() * 90);
+    // a truck code ('T' + up to three digits) that no other suite of the shared database has taken
+    const taken = new Set((await listTrucks(app, owner)).map((x) => x.code));
+    let no = 100 + Math.floor(Math.random() * 900);
+    while (taken.has(`T${no}`)) no = 100 + Math.floor(Math.random() * 900);
     const t = await runImport(
       'trucks',
       readSheet(

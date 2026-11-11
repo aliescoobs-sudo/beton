@@ -25,6 +25,9 @@ afterAll(() => app.end());
 const users = {} as Record<'owner' | 'partner' | 'plant' | 'office' | 'support', SessionUser>;
 const marker = `oc${randomUUID().replace(/-/g, '').slice(0, 10)}`;
 const TODAY = '2026-07-03';
+// order_chain() lists the newest 300 orders by delivery date: the shared test database holds more than that dated after 2026-06-02, so this file's
+// orders are dated far out and always lead the list.
+const DELIVERY = '2099-11-30';
 let scene: DeliveryScene;
 let master: OrderMaster;
 const inCtx = <T>(user: SessionUser, fn: (tx: pg.PoolClient) => Promise<T>) =>
@@ -40,10 +43,12 @@ beforeAll(async () => {
 
 /** An order of 10 m³: 4 m³ planned, 6 m³ loaded and delivered, 4 m³ invoiced, 1 000,00 paid. */
 async function walked() {
-  const c = await clientWithLoads(app, users.owner.id, master, scene, [[4000, 2000]]);
+  const c = await clientWithLoads(app, users.owner.id, master, scene, [[4000, 2000]], {
+    deliveryDate: DELIVERY,
+  });
   const order = c.orders[0]!;
   const planned = await saveDispatch(app, users.plant, {
-    date: '2026-06-02',
+    date: DELIVERY,
     rotations: [{ orderId: order.id, truckId: scene.truckId, driverId: null, volumeL: 4000 }],
   });
   if (!planned.ok) throw new Error(planned.error);
@@ -83,7 +88,10 @@ describe('the six stages of an order (AC-INT-16)', () => {
   });
 
   it('a loaded load that is not delivered counts as loaded and not as delivered; a cancelled load as neither', async () => {
-    const c = await clientWithLoads(app, users.owner.id, master, scene, [[3000]], { delivered: false });
+    const c = await clientWithLoads(app, users.owner.id, master, scene, [[3000]], {
+      delivered: false,
+      deliveryDate: DELIVERY,
+    });
     expect(await rowOf(users.owner, c.orders[0]!.code)).toMatchObject({
       loadedL: 3_000,
       deliveredL: 0,
@@ -94,7 +102,7 @@ describe('the six stages of an order (AC-INT-16)', () => {
   });
 
   it('an order cancelled by its reversal is flagged and has no payment stage', async () => {
-    const c = await clientWithLoads(app, users.owner.id, master, scene, [[]]);
+    const c = await clientWithLoads(app, users.owner.id, master, scene, [[]], { deliveryDate: DELIVERY });
     const order = c.orders[0]!;
     const done = await cancelOrder(
       app,

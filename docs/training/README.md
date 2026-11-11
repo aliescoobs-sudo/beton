@@ -21,3 +21,6 @@ Chaque matin, avant la séance : `./scripts/training-rearm.sh` (moins d'une minu
 **Historique importé (jumeau fictif)** : la répétition rôle par rôle de l'import de l'historique (livraisons et dépenses) est dans [HISTORIQUE-REPETITION.fr.md](HISTORIQUE-REPETITION.fr.md).
 
 Les captures (téléphone, ×2) sont produites par `corepack pnpm training:screens` à partir d'une base de formation fictive.
+
+**Téléphone sur le même Wi-Fi** (TLS, adresse privée, fermable) : [RESEAU-LOCAL.fr.md](RESEAU-LOCAL.fr.md).
+**Fichier d'identifiants** : il vit dans le volume Docker `kayas-training_accounts` (`/app/out/training-accounts.local.txt`, mode 0600, propriétaire du conteneur) ; ne le copiez pas. Un compte à la fois : `./scripts/training/show-accounts.sh <nom>`. Le compte administrateur y a un bloc supplémentaire « clé TOTP » (authentificateur de préparation de l'historique).

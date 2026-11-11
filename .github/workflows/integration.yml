@@ -43,13 +43,6 @@ jobs:
           node-version: 24
       - run: corepack enable
       - run: pnpm install --frozen-lockfile
-      # The runner's apt mirror (azure.archive.ubuntu.com) can fail to resolve for a while; fall back to the main archive only then.
-      - name: apt mirror fallback
-        run: |
-          if ! getent hosts azure.archive.ubuntu.com >/dev/null; then
-            echo "azure.archive.ubuntu.com does not resolve: using archive.ubuntu.com"
-            sudo sed -i 's|mirror+file:/etc/apt/apt-mirrors.txt|http://archive.ubuntu.com/ubuntu/|g; s|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g' /etc/apt/sources.list /etc/apt/sources.list.d/* 2>/dev/null || true
-          fi
       # poppler: the same real PDF renderer as the unit job. age + a PostgreSQL 17 client: the backup/restore suite seals with age and runs
       # pg_dump against the version 17 service (a version 16 client refuses a version 17 server).
       - name: Tools (poppler, age, PostgreSQL 17 client)

@@ -175,3 +175,6 @@ local exercises on one Mac. The conditions below are mandatory; record each one 
    No synthetic-factor finance exception exists.
 7. **Supervision and closure.** Only supervised sessions, with no real client, supplier, cheque, document or photo. Stop the instance when nobody is training
    (`training-down.sh`). The nightly dumps are same-host, database-only recovery, not a portable backup.
+
+## Local network (T11b)
+A phone on the same Wi-Fi can use the training instance through a TLS proxy bound to ONE private address: `./scripts/training/lan-up.sh` to open, `./scripts/training/lan-down.sh` to close. Steps, the one-time certificate trust on the phone and the limits are in `docs/training/RESEAU-LOCAL.fr.md`. It is a deliberate, owner-approved exception to "local only" (step 8): it ends with `lan-down.sh`, and it never applies to production. Under Colima the proxy is published on the Mac's loopback and `scripts/training/lan-relay.mjs` (private source addresses only) carries the Wi-Fi address to it.

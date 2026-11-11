@@ -250,7 +250,7 @@ export async function insertOrderWithItems(
   master: OrderMaster,
   clientId: string,
   items: number[],
-  options: { zoneId?: string; volumeL?: number; methods?: string[] } = {},
+  options: { zoneId?: string; volumeL?: number; methods?: string[]; deliveryDate?: string } = {},
 ): Promise<{ id: string; code: string; itemIds: string[] }> {
   const id = randomUUID();
   const code = (await tx.query<{ n: string }>(`select public.next_doc_number('CMD', 2026, 5) as n`)).rows[0]
@@ -258,7 +258,7 @@ export async function insertOrderWithItems(
   await tx.query(
     `insert into sales_order (id, code, client_id, zone_id, concrete_type_id, volume_l, order_date, delivery_date, selling_price_id,
                               unit_price_ht_centimes, vat_rate_bp, total_ht_centimes, total_vat_centimes, total_ttc_centimes, created_by)
-     values ($1, $2, $3, $8, $4, $9, '2026-06-01', '2026-06-02', $5, $6, 2000, 780000, 156000, 936000, $7)`,
+     values ($1, $2, $3, $8, $4, $9, '2026-06-01', $10, $5, $6, 2000, 780000, 156000, 936000, $7)`,
     [
       id,
       code,
@@ -269,6 +269,7 @@ export async function insertOrderWithItems(
       actorId,
       options.zoneId ?? null,
       options.volumeL ?? 10000,
+      options.deliveryDate ?? '2026-06-02',
     ],
   );
   const itemIds: string[] = [];
@@ -624,7 +625,7 @@ export async function clientWithLoads(
   master: OrderMaster,
   scene: Pick<DeliveryScene, 'truckId' | 'recetteId'>,
   loadsPerOrder: number[][],
-  options: { delivered?: boolean } = {},
+  options: { delivered?: boolean; deliveryDate?: string } = {},
 ) {
   return withRlsContext(
     app,
@@ -646,7 +647,9 @@ export async function clientWithLoads(
         blNos: string[];
       }[] = [];
       for (const loads of loadsPerOrder) {
-        const order = await insertOrderWithItems(tx, ownerId, master, clientId, [936_000]);
+        const order = await insertOrderWithItems(tx, ownerId, master, clientId, [936_000], {
+          deliveryDate: options.deliveryDate,
+        });
         const deliveryIds: string[] = [];
         const blNos: string[] = [];
         for (const litres of loads) {
