@@ -12,6 +12,7 @@ import { SYSTEM_ACTOR_ID } from '../src/modules/platform-security/auth/actors';
 import { testEnv } from './db-env';
 import { deliveryScene, insertOrder, orderMaster } from './helpers/ledger-fixtures';
 import { v1Actors } from './helpers/v1-actors';
+import { freeTruckCode } from './helpers/codes';
 
 /**
  * T10a, R17-02 and decision 207. Plants A and B, and a rotation with NO plant. Everything is tried as the application login (raw SQL), then
@@ -207,10 +208,12 @@ describe('R17-02: a plant manager reads his plant only; a rotation with no plant
     // the free driver becomes the default driver of a truck of plant A (a truck of its own: the shared trucks keep their plant)
     const truck = randomUUID();
     expect(
-      await superSql(
-        `insert into truck (id, code, plate, plant_id) values ($1, 'T' || (100 + floor(random() * 899))::int, $2, $3)`,
-        [truck, `TI-${marker}`, plantA],
-      ),
+      await superSql(`insert into truck (id, code, plate, plant_id) values ($1, $4, $2, $3)`, [
+        truck,
+        `TI-${marker}`,
+        plantA,
+        await freeTruckCode('T'),
+      ]),
     ).toBe(1);
     expect(await superSql(`update truck set default_driver_id = $2 where id = $1`, [truck, freeDriver])).toBe(
       1,

@@ -29,6 +29,7 @@ import {
 import { resetSimClock } from '../helpers/reset-sim-clock';
 import { ANONYMOUS_ACTOR_ID, SYSTEM_ACTOR_ID } from '../../src/modules/platform-security/auth/actors';
 import { POLICY_ROLES } from '../../src/modules/platform-security/domain/permissions';
+import { freeTruckCode } from '../helpers/codes';
 
 // AC-SEC-04, generated from the registry: for every RLS table × every role, read exactly what the matrix allows.
 type DbRole = (typeof DB_ROLES)[number];
@@ -1319,11 +1320,11 @@ const FIXTURES: Record<
   },
   truck: {
     writers: ['owner', 'partner'],
-    seed: (tx, actor) =>
+    seed: async (tx, actor) =>
       tx.query(
         `insert into truck (id, code, plate)
-         values (gen_random_uuid(), 'T' || (100 + floor(random() * 899))::int, 'M' || substr(md5($1), 1, 6) || substr(replace($2::text, '-', ''), 21, 12))`,
-        [marker, actor],
+         values (gen_random_uuid(), $3, 'M' || substr(md5($1), 1, 6) || substr(replace($2::text, '-', ''), 21, 12))`,
+        [marker, actor, await freeTruckCode('T')],
       ),
     // The plate is 19 characters at most: a marker hash and the last 12 hex digits of the actor id.
     visible: `select a as owner from truck t join unnest($2::text[]) a

@@ -7,6 +7,7 @@ import type { SessionUser } from '../src/modules/platform-security/auth/session-
 import { testEnv } from './db-env';
 import { deliveryScene, insertOrder, orderMaster } from './helpers/ledger-fixtures';
 import { v1Actors } from './helpers/v1-actors';
+import { freeTruckCode } from './helpers/codes';
 
 /** R15B-05: a truck's or a driver's rotation of the day before, running past midnight, double-books the first hour of the next day. */
 const env = testEnv();
@@ -79,11 +80,13 @@ describe('R15B-05: adjacent days', () => {
     await nightTrip(night.truck, night.order, '2093-06-09');
     // a truck of its own (the shared ones may be broken or busy in a full run)
     const otherId = randomUUID();
+    const otherCode = await freeTruckCode('T');
     await as((tx) =>
-      tx.query(
-        `insert into truck (id, code, plate, capacity_l) values ($1, 'T' || (100 + floor(random() * 899))::int, $2, 8000)`,
-        [otherId, `AD-${marker}`],
-      ),
+      tx.query(`insert into truck (id, code, plate, capacity_l) values ($1, $3, $2, 8000)`, [
+        otherId,
+        `AD-${marker}`,
+        otherCode,
+      ]),
     );
     const r = await saveDispatch(app, owner, {
       date: '2093-06-10',

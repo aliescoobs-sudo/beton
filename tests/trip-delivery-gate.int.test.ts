@@ -19,6 +19,7 @@ import {
 import { getInvoiceQueue } from '../src/modules/ledger';
 import { countHeldDeliveries, listDeliveryExceptions } from '../src/modules/operations';
 import { v1Actors } from './helpers/v1-actors';
+import { freeDriverCode } from './helpers/codes';
 
 // T9 (docs/T9-TRIP-SHARED-STATUS.md): ONE shared status of a rotation, written by the driver and by the plant through record_trip_stage.
 // Forward-only with an implicit fill, idempotent and race-safe, corrections as new rows, authorization in the database, and a driver's
@@ -98,7 +99,7 @@ async function userRow(role: string, plant: string | null): Promise<SessionUser>
   } as unknown as SessionUser;
 }
 async function newDriver(name: string, user: SessionUser): Promise<string> {
-  const code = `CH-${5000 + Math.floor(Math.random() * 4000)}`;
+  const code = await freeDriverCode();
   return (
     await superRows<{ id: string }>(
       `insert into driver (id, code, name, created_by, kind, user_id) values (gen_random_uuid(), $1, $2, $3, 'driver', $4) returning id`,

@@ -19,6 +19,7 @@ import {
   type DeliveryScene,
 } from './helpers/ledger-fixtures';
 import { v1Actors } from './helpers/v1-actors';
+import { freeDriverCode } from './helpers/codes';
 
 // R14-01: cancelling, starting and replacing a rotation are one serialized decision. The races are made deterministic: one transaction
 // is held open (it has taken its locks and not committed) while the other is started, which must wait, then see the committed state.
@@ -87,7 +88,7 @@ async function superSql(sql: string, params: unknown[] = []): Promise<number> {
   }
 }
 async function newDriver(name: string, user: SessionUser): Promise<string> {
-  const code = `CH-${3000 + Math.floor(Math.random() * 4000)}`;
+  const code = await freeDriverCode();
   const c = new pg.Client({ connectionString: superuserUrl(env, TEST_DATABASE) });
   await c.connect();
   try {

@@ -26,6 +26,7 @@ import {
   type DeliveryScene,
 } from './helpers/ledger-fixtures';
 import { v1Actors } from './helpers/v1-actors';
+import { freeDriverCode } from './helpers/codes';
 
 // T5 phase 2: the delay of every driver tap is recorded, the board and the statistics are scoped in the database (the driver's own, his
 // plant manager's plant, owner and app_admin), estimates fall back from history to an audited override, and a plant manager can reassign or
@@ -91,7 +92,7 @@ async function userRow(role: string, plant: string | null): Promise<SessionUser>
   } as unknown as SessionUser;
 }
 async function newDriver(name: string, user: SessionUser): Promise<string> {
-  const code = `CH-${7000 + Math.floor(Math.random() * 2000)}`;
+  const code = await freeDriverCode();
   const c = new pg.Client({ connectionString: superuserUrl(env, TEST_DATABASE) });
   await c.connect();
   try {
