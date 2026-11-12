@@ -12,6 +12,7 @@ import { readParameters, releaseFieldAttempt, reserveFieldAttempt } from '../src
 import type { SessionUser } from '../src/modules/platform-security/auth/session-gate';
 import { authTestKit } from './auth-helpers';
 import { realSessionUser } from './helpers/actors';
+import { freeDriverCode } from './helpers/codes';
 
 // R11-01 / R12-03: the phone sign-in has a per-IP limit that is an atomic reservation made before the expensive work, counts every
 // attempt that does not end in a sign-in (the one that locks a driver included), shares one bucket for an unknown IP, and bounds the
@@ -242,12 +243,13 @@ describe('real HTTP requests in parallel', () => {
   }, 60_000);
 
   it('the fifth wrong PIN that locks a driver still counts against the IP, and a correct sign-in is given back', async () => {
-    const no = 700 + Math.floor(Math.random() * 250);
+    const driverCode = await freeDriverCode();
+    const no = driverCode.slice(3);
     const d = (
       await withRlsContext(app, { userId: owner.id, role: 'owner', requestId: randomUUID() }, (tx) =>
         tx.query<{ id: string; code: string }>(
           `insert into driver (id, code, name, created_by, kind) values (gen_random_uuid(), $1, $2, $3, 'driver') returning id, code`,
-          [`CH-${no}`, `ip throttle ${no}`, owner.id],
+          [driverCode, `ip throttle ${no}`, owner.id],
         ),
       )
     ).rows[0]!;

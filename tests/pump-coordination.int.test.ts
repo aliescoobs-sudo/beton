@@ -17,6 +17,7 @@ import type { SessionUser } from '../src/modules/platform-security/auth/session-
 import { testEnv } from './db-env';
 import { realSessionUser } from './helpers/actors';
 import { deliveryScene, insertOrder, orderMaster, type DeliveryScene } from './helpers/ledger-fixtures';
+import { freeDriverCode } from './helpers/codes';
 
 // C3 (REQUIREMENTS-V1 §16.6, basic): a pumped pour needs a pump scheduled on site before any truck is planned for it; a truck planned
 // to arrive before the pump is ready and a pump booked twice raise a conflict and an alert. Times and quantities only.
@@ -46,10 +47,11 @@ beforeAll(async () => {
   driver = await realSessionUser(env.DATABASE_URL_MIGRATOR, 'driver');
   scene = await deliveryScene(app, owner.id, marker, DAY);
   master = await orderMaster(app, owner.id, marker);
+  const opCode = await freeDriverCode();
   const op = await asOwner((tx) =>
     tx.query<{ id: string }>(
       `insert into driver (id, code, name, created_by, kind) values (gen_random_uuid(), $1, $2, $3, 'pump_operator') returning id`,
-      [`CH-${6000 + Math.floor(Math.random() * 3000)}`, `Opérateur ${marker}`, owner.id],
+      [opCode, `Opérateur ${marker}`, owner.id],
     ),
   );
   operator = op.rows[0]!.id;

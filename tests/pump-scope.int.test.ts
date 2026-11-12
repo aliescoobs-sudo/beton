@@ -26,6 +26,7 @@ import {
   type DeliveryScene,
 } from './helpers/ledger-fixtures';
 import { v1Actors } from './helpers/v1-actors';
+import { freeDriverCode } from './helpers/codes';
 
 // D1 / F01 (CODEX-REVIEW-FINAL): a plant manager reads and writes the pump surface of his own plant only, and the same holds for
 // the emergency instructions and the redirect candidates. Two plants, one manager each.
@@ -90,11 +91,12 @@ beforeAll(async () => {
     [id, `${marker} pmB`, `${marker}-pmb-${id}@kayas.test`, plantB],
   );
   pmB = { ...v.session('plant_manager'), id, name: `${marker} pmB`, email: `${id}@kayas.test` };
+  const opCode = await freeDriverCode();
   operator = (
     await asOwner(plantA, (tx) =>
       tx.query<{ id: string }>(
         `insert into driver (id, code, name, created_by, kind) values (gen_random_uuid(), $1, $2, $3, 'pump_operator') returning id`,
-        [`CH-${6000 + Math.floor(Math.random() * 3000)}`, `Opérateur ${marker}`, owner.id],
+        [opCode, `Opérateur ${marker}`, owner.id],
       ),
     )
   ).rows[0]!.id;
@@ -250,11 +252,12 @@ describe('the emergency instruction and the redirect candidates follow the same 
       (await listRedirectCandidates(app, pmB, opened.value.id, { now: NOW })).length,
     ).toBeGreaterThanOrEqual(0);
     // an emergency on that rotation: the driver of another plant is not the manager's to instruct
+    const drvCode = await freeDriverCode();
     const driver = (
       await asOwner(plantB, (tx) =>
         tx.query<{ id: string }>(
           `insert into driver (id, code, name, created_by) values (gen_random_uuid(), $1, $2, $3) returning id`,
-          [`CH-${3000 + Math.floor(Math.random() * 2999)}`, `Chauffeur ${marker}`, owner.id],
+          [drvCode, `Chauffeur ${marker}`, owner.id],
         ),
       )
     ).rows[0]!.id;

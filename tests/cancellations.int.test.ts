@@ -26,6 +26,7 @@ import {
 } from './helpers/ledger-fixtures';
 import { realSessionUser } from './helpers/actors';
 import { v1Actors } from './helpers/v1-actors';
+import { freeDriverCode } from './helpers/codes';
 
 // R6 (CP-PROD-PLAN, REQUIREMENTS-V1 §8): the seven cancellation cases, from the real state of the order, with who decides.
 const env = testEnv();
@@ -438,7 +439,7 @@ describe('the redirect reaches the driver app (C3, REQUIREMENTS-V1 §7 and §8)'
     const driverId = await asOwner(async (tx) => {
       const d = await tx.query<{ id: string }>(
         `insert into driver (id, code, name, created_by, user_id) values (gen_random_uuid(), $1, $2, $3, $4) returning id`,
-        [`CH-${5000 + Math.floor(Math.random() * 4000)}`, `rd${marker}`, u.owner!.id, drvUser.id],
+        [await freeDriverCode(), `rd${marker}`, u.owner!.id, drvUser.id],
       );
       return d.rows[0]!.id;
     });
@@ -566,7 +567,7 @@ describe('a redirect carries the destination address to the driver (§16.10)', (
     const driverId = await asOwner(async (tx) => {
       const d = await tx.query<{ id: string }>(
         `insert into driver (id, code, name, created_by, user_id) values (gen_random_uuid(), $1, $2, $3, $4) returning id`,
-        [`CH-${5000 + Math.floor(Math.random() * 4000)}`, `ra${marker}`, u.owner!.id, drvUser.id],
+        [await freeDriverCode(), `ra${marker}`, u.owner!.id, drvUser.id],
       );
       return d.rows[0]!.id;
     });

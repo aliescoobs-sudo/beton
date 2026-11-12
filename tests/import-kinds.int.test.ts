@@ -18,6 +18,7 @@ import type { SessionUser } from '../src/modules/platform-security/auth/session-
 import { testEnv } from './db-env';
 import { realSessionUser } from './helpers/actors';
 import { buildXlsx } from './helpers/xlsx-writer';
+import { freeTruckCode } from './helpers/codes';
 
 // T2: the kinds added for the go-live (pumps, prices and recipes per plant, the last invoice number) and the strictness of the cells.
 // Synthetic data only.
@@ -125,7 +126,7 @@ describe('recipes per plant', () => {
 
 describe('pumps', () => {
   it('imports a pump truck with kind pump and its own code; the plate is not reused', async () => {
-    const no = 80 + Math.floor(Math.random() * 18);
+    const no = (await freeTruckCode('P')).slice(1);
     const rows = [
       ['Code', 'Immatriculation', 'Capacité'],
       [`P${no}`, `PMP-${tag}`, '1.5'],
@@ -143,7 +144,7 @@ describe('pumps', () => {
       'pumps',
       [
         ['Code', 'Immatriculation'],
-        [`T${900 + Math.floor(Math.random() * 90)}`, `PMX-${tag}`],
+        [await freeTruckCode('T'), `PMX-${tag}`],
       ],
       false,
     );

@@ -16,6 +16,7 @@ import {
   type DeliveryScene,
 } from './helpers/ledger-fixtures';
 import { v1Actors } from './helpers/v1-actors';
+import { freeDriverCode } from './helpers/codes';
 
 // Privacy residual of group B (migration 0122): who reads the raw taps of a named driver. trip_event: partner and support KEEP the read (the
 // dispatch board needs it) but a plant manager only reads his own plant's. trip_driver_report: nothing in the application reads it with the app
@@ -107,10 +108,11 @@ beforeAll(async () => {
       .id;
   });
   const driverId = randomUUID();
+  const driverCode = await freeDriverCode();
   await withRlsContext(app, { userId: owner.id, role: 'owner', requestId: marker }, (tx) =>
     tx.query(`insert into driver (id, code, name, created_by, kind) values ($1, $2, $3, $4, 'driver')`, [
       driverId,
-      `CH-${5000 + Math.floor(Math.random() * 4000)}`,
+      driverCode,
       `Chauffeur ${marker}`,
       owner.id,
     ]),
