@@ -7,6 +7,8 @@ plan (`go-public.sh`, the Funnel check) are removed. The operator is responsible
 inspect and do not vouch for it (see step 8). It is **not** a launch:
 the final review (`docs/reviews/CODEX-REVIEW-FINAL.md`) still stands for real data (Batch D, paused: see CP-PROD-PLAN.md).
 
+> **T10g (12 Nov 2026):** the local-only policy above is for the Mac/iMac training instance. A separate, reviewed **staging stack for a rented VPS** (fictitious data, training mode ON, HTTP Basic Auth on the whole site, history import off, strict release-bound wrappers) is described in `docs/STAGING-VPS.md` and was rehearsed locally (`docs/checkpoints/CP-STAGING.md`). It is not the `public` profile of the training compose file, which stays unused.
+
 ## What "training mode" is (`TRAINING_MODE=true`)
 - **Guard.** The server refuses to start without a completed training seed on its database (the marker) when `TRAINING_MODE=true`, and the seed only fills an empty, unmarked database (a failed seed leaves one that is refused: remove the volume with `./scripts/training/dc.sh down -v` and start again). The server refuses to start with `TRAINING_MODE=true` next to `APP_ENV=production` or `REAL_DATA=true`; and a database that holds the training
   seed (a marker row, migration 0111) refuses to start without `TRAINING_MODE=true`. A boot warning is logged if the configured address looks like a Tailscale
