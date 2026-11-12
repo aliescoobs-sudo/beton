@@ -13,7 +13,7 @@ for f in .env.staging .env.staging.ops; do [ -r "$f" ] || { echo "up.sh: $f is m
 if [ -n "${APP_IMAGE+x}" ]; then echo "up.sh: APP_IMAGE is set in the shell. Refused: the image comes from .env.staging only." >&2; exit 1; fi
 docker info >/dev/null 2>&1 || { echo "up.sh: Docker does not answer" >&2; exit 1; }
 rehearsal=no; grep -q -E '^STAGING_REHEARSAL=1$' .env.staging && rehearsal=yes
-[ "$rehearsal" = yes ] || $dc pull
+[ "$rehearsal" = yes ] || $dc pull db proxy   # the app image was pulled by hand with a read-only token that was then logged out (docs/STAGING-VPS.md, section 8)
 $ops --prepare-out
 $dc up -d --wait db
 $ops db-bootstrap

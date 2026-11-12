@@ -15,6 +15,7 @@ test-results
 playwright-report
 *.tsbuildinfo
 imports
+import-work
 *.xlsx
 docs/reviews
 keys

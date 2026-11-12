@@ -135,6 +135,9 @@ services:
       - ./imports:/app/imports:ro
       - ./keys:/app/keys:ro
       - ./reports:/app/reports:ro
+      # T10g (R19B-09): the import tools write mapping files and reports; `imports/` stays read-only (the workbook), these two are the writable places
+      - ./import-work:/app/import-work
+      - ./import-work/reports:/app/.logs
     command: ['sh', '-c', 'echo "run a command: ./scripts/ops/ops.sh <script> [args]"']
     networks: [internal]
 

@@ -5,12 +5,7 @@
 set -euo pipefail
 umask 077
 cd "$(dirname "$0")/../.."
-pidfile=.training-lan-relay.pid
-if [ -f "$pidfile" ]; then
-  pid=$(cat "$pidfile")
-  case "$(ps -p "$pid" -o command= 2>/dev/null)" in *lan-relay.mjs*) kill "$pid" 2>/dev/null || true ;; esac
-  : > "$pidfile"
-fi
+./scripts/training/relay-stop.sh || { echo "lan-down.sh: the relay could not be stopped: nothing else was changed" >&2; exit 1; }
 ./scripts/training/dc.sh down-lan || true
 [ -w .env.training ] && [ ! -L .env.training ] || { echo "lan-down.sh: .env.training missing or a link" >&2; exit 1; }
 tmp=$(mktemp ./.env.training.XXXXXX)

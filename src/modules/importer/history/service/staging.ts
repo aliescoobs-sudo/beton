@@ -158,6 +158,8 @@ export async function listLabels(
 
 export interface QuarantineRow {
   id: string;
+  /** The set of files the row was staged from (T10g, R19B-12): lets a caller keep a decision to ONE set. */
+  setSha: string;
   kind: 'deliveries' | 'expenses';
   fileOrd: number;
   sheetPos: number;
@@ -171,12 +173,13 @@ export interface QuarantineRow {
 export async function listQuarantine(
   appPool: pg.Pool,
   actor: SessionUser,
-  input: { onlyOpen?: boolean } = {},
+  input: { onlyOpen?: boolean; setSha?: string } = {},
 ): Promise<QuarantineRow[]> {
   await require(appPool, actor, 'history.admin');
   return inRequest(appPool, actor, async (tx) => {
     const { rows } = await tx.query<{
       id: string;
+      set_sha: string;
       kind: QuarantineRow['kind'];
       file_ord: number;
       sheet_pos: number;
@@ -186,12 +189,14 @@ export async function listQuarantine(
       status: QuarantineRow['status'];
       fixed: Record<string, string> | null;
     }>(
-      `select id, kind, file_ord, sheet_pos, row_no, reason, raw, status, fixed from history.quarantine
-        where purged_at is null and ($1::boolean is not true or status = 'open') order by created_at, file_ord, row_no limit 2000`,
-      [input.onlyOpen ?? false],
+      `select id, set_sha, kind, file_ord, sheet_pos, row_no, reason, raw, status, fixed from history.quarantine
+        where purged_at is null and ($1::boolean is not true or status = 'open') and ($2::text is null or set_sha = $2)
+        order by created_at, file_ord, row_no limit 2000`,
+      [input.onlyOpen ?? false, input.setSha ?? null],
     );
     return rows.map((r) => ({
       id: r.id,
+      setSha: r.set_sha,
       kind: r.kind,
       fileOrd: r.file_ord,
       sheetPos: r.sheet_pos,
@@ -201,6 +206,31 @@ export async function listQuarantine(
       status: r.status,
       fixed: r.fixed,
     }));
+  });
+}
+
+export interface StagedSet {
+  setSha: string;
+  /** Quarantined rows still waiting for a decision. */
+  openQuarantine: number;
+  /** Batches of this set that are staged but neither applied nor rolled back. */
+  stagedBatches: number;
+}
+
+/** The sets of files that still have pending staging work (T10g, R19B-12): open quarantine rows or a batch that is staged only. Counts only, no cell. */
+export async function listStagedSets(appPool: pg.Pool, actor: SessionUser): Promise<StagedSet[]> {
+  await require(appPool, actor, 'history.admin');
+  return inRequest(appPool, actor, async (tx) => {
+    const { rows } = await tx.query<{ set_sha: string; open_quarantine: number; staged_batches: number }>(
+      `select s.set_sha,
+              (select count(*)::int from history.quarantine q where q.set_sha = s.set_sha and q.status = 'open' and q.purged_at is null) as open_quarantine,
+              (select count(*)::int from history.batch b where b.set_sha = s.set_sha and b.status = 'staged') as staged_batches
+         from (select set_sha from history.quarantine where purged_at is null union select set_sha from history.batch) s
+        order by s.set_sha`,
+    );
+    return rows
+      .map((r) => ({ setSha: r.set_sha, openQuarantine: r.open_quarantine, stagedBatches: r.staged_batches }))
+      .filter((r) => r.openQuarantine > 0 || r.stagedBatches > 0);
   });
 }
 

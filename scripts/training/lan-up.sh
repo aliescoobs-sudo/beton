@@ -26,13 +26,9 @@ mv -f "$tmp" .env.training
 trap - EXIT
 ./scripts/training/dc.sh up -d app
 ./scripts/training/dc.sh up-lan
-# the relay: one private address, one port; a previous one (same pid file) is stopped first
+# the relay: one private address, one port; a previous one is stopped, and its stop verified, first
 pidfile=.training-lan-relay.pid
-if [ -f "$pidfile" ]; then
-  old=$(cat "$pidfile")
-  case "$(ps -p "$old" -o command= 2>/dev/null)" in *lan-relay.mjs*) kill "$old" 2>/dev/null || true ;; esac
-  : > "$pidfile"
-fi
+./scripts/training/relay-stop.sh >/dev/null || { echo "lan-up.sh: a previous relay could not be stopped" >&2; exit 1; }
 mkdir -p .logs
 nohup node scripts/training/lan-relay.mjs "$ip" 8443 8443 > .logs/lan-relay.log 2>&1 &
 echo $! > "$pidfile"

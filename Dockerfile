@@ -18,7 +18,7 @@ WORKDIR /app
 # tries to download a package manager inside a container that has no network (CODEX-REVIEW-R9 item 10).
 RUN apk add --no-cache postgresql17-client age tini tar \
  && addgroup -S -g 10001 app && adduser -S -u 10001 -G app app \
- && mkdir -p /data/file-store /app/backups && chown -R 10001:10001 /data /app/backups
+ && mkdir -p /data/file-store /app/backups /app/.logs && chown -R 10001:10001 /data /app/backups /app/.logs
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000
 COPY --from=build --chown=10001:10001 /app /app
 USER 10001:10001

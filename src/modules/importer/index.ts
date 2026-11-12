@@ -98,6 +98,8 @@ export {
   type LabelRow,
   listLabels,
   listQuarantine,
+  listStagedSets,
+  type StagedSet,
   mappingTargets,
   type QuarantineRow,
   reconciliation,

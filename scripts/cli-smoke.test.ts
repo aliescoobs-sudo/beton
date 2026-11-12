@@ -17,6 +17,7 @@ const NOT_ENTRY_POINTS = new Set([
   'training-birth.ts',
   'training-day.ts',
   'training-lib.ts',
+  'training-twin-lib.ts',
 ]);
 // A bare environment: no .env files, secrets or database settings leak in.
 const bareEnv: NodeJS.ProcessEnv = {

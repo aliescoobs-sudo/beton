@@ -18,6 +18,7 @@ test-results/
 # test and run logs
 .logs/
 imports/
+import-work/
 keys/
 reports/
 

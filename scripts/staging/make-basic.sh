@@ -19,9 +19,22 @@ fi
 if [ "${KAYAS_BASIC_BATCH:-}" != 1 ] && { [ ! -t 0 ] || [ ! -t 2 ]; }; then
   echo "make-basic.sh: no terminal. Run it in an interactive terminal (hidden prompts), or set KAYAS_BASIC_BATCH=1 and supply the three lines on stdin." >&2; exit 1
 fi
+saved_tty=""
+restore_tty() { [ -z "$saved_tty" ] || stty "$saved_tty" </dev/tty 2>/dev/null || true; }
+trap restore_tty EXIT INT TERM
+# Echo is switched OFF before the prompt is printed (not by `read -s` after it): a fast typist, a paste or a slow machine cannot beat the switch.
 read_secret() { # prompt var : hidden when interactive
   local v
-  if [ "${KAYAS_BASIC_BATCH:-}" = 1 ]; then IFS= read -r v || v=""; else IFS= read -r -s -p "$1" v </dev/tty || v=""; printf '\n' >&2; fi
+  if [ "${KAYAS_BASIC_BATCH:-}" = 1 ]; then IFS= read -r v || v=""
+  else
+    saved_tty="$(stty -g </dev/tty)"
+    stty -echo </dev/tty
+    printf '%s' "$1" >&2
+    IFS= read -r v </dev/tty || v=""
+    stty "$saved_tty" </dev/tty 2>/dev/null || true
+    saved_tty=""
+    printf '\n' >&2
+  fi
   printf -v "$2" '%s' "$v"
 }
 user=""; pw1=""; pw2=""
@@ -32,7 +45,7 @@ read_secret "Password again: " pw2
 [ "$pw1" = "$pw2" ] || { echo "make-basic.sh: the two passwords differ" >&2; exit 1; }
 [ "${#pw1}" -ge 16 ] || { echo "make-basic.sh: the password must be at least 16 characters" >&2; exit 1; }
 tmp="$(mktemp staging/.basic-auth.XXXXXX)"
-trap 'rm -f -- "$tmp"' EXIT
+trap 'restore_tty; rm -f -- "$tmp"' EXIT
 hash="$(printf '%s\n' "$pw1" | docker run --rm -i --network none --read-only "$caddy_image" caddy hash-password 2>/dev/null | tail -n1)"
 unset pw1 pw2
 [[ "$hash" =~ ^\$2[aby]\$[0-9]{2}\$[./A-Za-z0-9]{53}$ ]] || { echo "make-basic.sh: Caddy did not return a bcrypt hash; nothing was written" >&2; exit 1; }
@@ -44,5 +57,5 @@ unset pw1 pw2
 } > "$tmp"
 chmod 600 "$tmp"
 mv -f -- "$tmp" "$out"
-trap - EXIT
+trap restore_tty EXIT
 echo "make-basic.sh: wrote $out (mode 0600). The password is not stored anywhere on this host."

@@ -14,7 +14,14 @@ file=.env.bootstrap.prod
 if [ "${1:-}" = --create-env ]; then
   [ ! -e "$file" ] && [ ! -L "$file" ] || { echo "bootstrap.sh: $file already exists" >&2; exit 1; }
   { [ -t 0 ] && [ -t 2 ]; } || { echo "bootstrap.sh: --create-env needs a terminal (hidden prompt)" >&2; exit 1; }
-  IFS= read -r -s -p "Password of the backup login (the one in .env.backup.prod, URL-safe characters only): " pw </dev/tty; echo >&2
+  # echo is switched off BEFORE the prompt is printed (not by `read -s` after it)
+  saved="$(stty -g </dev/tty)"
+  trap 'stty "$saved" </dev/tty 2>/dev/null || true' EXIT INT TERM
+  stty -echo </dev/tty
+  printf '%s' "Password of the backup login (the one in .env.backup.prod, URL-safe characters only): " >&2
+  IFS= read -r pw </dev/tty || pw=""
+  printf '\n' >&2
+  stty "$saved" </dev/tty
   [[ "$pw" =~ ^[A-Za-z0-9._~-]{16,}$ ]] || { echo "bootstrap.sh: the password must be at least 16 URL-safe characters (letters, digits . _ ~ -)" >&2; exit 1; }
   tmp="$(mktemp .env.bootstrap.XXXXXX)"            # mktemp creates the file exclusively, mode 0600
   printf 'DATABASE_URL_BACKUP=postgres://belgobeton_backup:%s@db:5432/belgobeton\n' "$pw" > "$tmp"
