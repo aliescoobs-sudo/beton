@@ -107,6 +107,13 @@ const auditContext = (actor: SessionUser) => ({
   stepUp: actor.stepUpVerified === true ? true : undefined,
 });
 
+/** T10g (R19B-03): the staging profile refuses every mode BEFORE a file is read, a role is checked or the database is asked. */
+function assertNotStaging(env: HistoryEnvironment): void {
+  if (!env.stagingProfile) return;
+  const problem = historyEnvironmentProblem(env, false, []);
+  throw new ImportRefused('ENVIRONMENT', problem ?? 'The history import is disabled on the staging profile.');
+}
+
 export async function assertHistoryEnvironment(
   appPool: pg.Pool,
   env: HistoryEnvironment,
@@ -255,6 +262,7 @@ const str = (v: string) => (v === '' ? null : v);
 
 /** Stages, validates (dry run) or applies one set of monthly files of one plant and one kind. */
 export async function runHistory(opts: HistoryOptions): Promise<HistoryReport> {
+  assertNotStaging(opts.environment);
   const { mapping } = opts;
   const read = readSet(opts.files, mapping);
   // the role first; the proof of an apply is checked below, once the effective decisions are known (it covers them)
@@ -712,6 +720,7 @@ export async function rollbackHistory(opts: {
   environment: HistoryEnvironment;
   stepUp?: StepUpProof;
 }): Promise<HistoryRollbackReport> {
+  assertNotStaging(opts.environment);
   assertActor(opts.actor, 'apply', {
     given: opts.stepUp,
     operation: historyRollbackConfirmation(opts.batchId).operation,
@@ -859,6 +868,7 @@ export async function purgeStaging(opts: {
   environment: HistoryEnvironment;
   stepUp?: StepUpProof;
 }): Promise<{ quarantineRowsPurged: number; labelsPurged: number }> {
+  assertNotStaging(opts.environment);
   assertActor(opts.actor, 'apply', { given: opts.stepUp, operation: historyPurgeConfirmation.operation });
   await assertHistoryEnvironment(opts.appPool, opts.environment, []);
   const client = await opts.appPool.connect();

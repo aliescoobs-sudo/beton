@@ -86,6 +86,10 @@ const envObject = z.object({
   // with a password alone, shows a permanent banner, and switches off imports and every outbound integration. It is refused with
   // APP_ENV=production and with REAL_DATA=true, and a database that holds the training seed refuses to boot without it.
   TRAINING_MODE: flag,
+  // T10g (R19B-03): the STAGING profile of the rented VPS: a training instance behind a Basic Auth gate with fictitious data only. It switches the
+  // server-side history import OFF (the CLI and the service refuse), because the twin validation of every retained value is not complete yet. It is
+  // refused unless TRAINING_MODE=true, and with REAL_DATA=true or APP_ENV=production. The staging compose file forces it on.
+  STAGING_PROFILE: flag,
   // C2: protected first start of a real-data server. With REAL_DATA=true and an incomplete security checklist the server normally
   // refuses to start (a loop: the checklist is completed in the app). FIRST_BOOT=true starts it in a restricted mode instead: only
   // sign-in, enrolment, the checklist, accounts, plants and parameters are served, everything else answers 503, and it refuses to
@@ -183,6 +187,14 @@ const envSchema = envObject.superRefine((env, ctx) => {
       code: 'custom',
       path: ['TRAINING_MODE'],
       message: 'must be "false" when APP_ENV=production (the training instance never runs as production)',
+    });
+  }
+  if (env.STAGING_PROFILE && (!env.TRAINING_MODE || env.REAL_DATA || env.APP_ENV === 'production')) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['STAGING_PROFILE'],
+      message:
+        'only with TRAINING_MODE=true, and never with REAL_DATA=true or APP_ENV=production (the staging profile holds fictitious data only)',
     });
   }
   if (env.TRAINING_MODE && (env.VAPID_PUBLIC_KEY || env.VAPID_PRIVATE_KEY)) {

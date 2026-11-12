@@ -37,6 +37,13 @@ import { listInputFiles, loadHistoryMapping, parseHistoryArgs } from './import-h
 import { createPrompt } from './prompt';
 
 handleHelp(import.meta.url);
+// T10g (R19B-03): the very first thing, before an argument is read, a file opened or a mapping written: the staging profile does not run this importer at all.
+if (process.env.STAGING_PROFILE === 'true') {
+  console.error(
+    'import-history: refused. The server-side history import is DISABLED on the staging profile (STAGING_PROFILE=true); the only data path of staging is the generated seed.',
+  );
+  process.exit(1);
+}
 
 const args = parseHistoryArgs(process.argv.slice(2));
 if (args.problems.length || !args.mode || !args.target) {
@@ -66,7 +73,15 @@ const environment = {
   trainingMode: env.TRAINING_MODE,
   realData: env.REAL_DATA,
   simulationEnabled: env.SIMULATION_ENABLED,
+  stagingProfile: env.STAGING_PROFILE,
 };
+// T10g (R19B-03): on the staging profile the history import does not run at all, before any file is opened or any connection is made.
+if (env.STAGING_PROFILE) {
+  console.error(
+    'import-history: refused. The server-side history import is DISABLED on the staging profile (STAGING_PROFILE=true); the only data path of staging is the generated seed.',
+  );
+  process.exit(1);
+}
 // T11b: a folder that cannot be written (the read-only ops container) must not turn a finished import into an error exit: the report is on stdout.
 const logReport = (name: string, text: string) => {
   try {

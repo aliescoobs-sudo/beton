@@ -28,6 +28,8 @@ export interface HistoryEnvironment {
   trainingMode: boolean;
   realData: boolean;
   simulationEnabled: boolean;
+  /** T10g (R19B-03): the staging profile of the VPS (STAGING_PROFILE=true). The server-side history import is switched off there, in every mode. */
+  stagingProfile?: boolean;
 }
 
 /** What the guard needs to know about a file: whether it is marked, and the labels that carry a name. Nothing else leaves the reader. */
@@ -46,6 +48,8 @@ export function historyEnvironmentProblem(
   files: FileFacts[],
 ): string | null {
   const marked = files.filter((f) => f.marked).length;
+  if (env.stagingProfile)
+    return 'The server-side history import is DISABLED on the staging profile (STAGING_PROFILE=true): the complete twin validation is not in place yet (R19B-03), and the only data path of staging is the generated seed. Nothing was read or written.';
   if (env.trainingMode) {
     if (marked !== files.length)
       return 'On the training instance the history import accepts only the fictitious twin files (marker sheet missing in at least one file).';
