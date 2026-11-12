@@ -82,7 +82,11 @@ describe('the synthetic books', () => {
 });
 
 describe('the valid book', () => {
-  const valid = syntheticValidWorkbook({ prefix, plants, truckNo });
+  // built when the test runs, AFTER beforeAll has found free truck numbers (a book built at collection time used the initial number whatever the database held)
+  let valid: Buffer;
+  beforeAll(() => {
+    valid = syntheticValidWorkbook({ prefix, plants, truckNo });
+  });
   it('passes the dry run, writes everything on the real run, and does nothing the second time', async () => {
     const dry = await go(valid, 'dry-run');
     expect(formatWorkbookReport(dry)).toContain('errors 0');
