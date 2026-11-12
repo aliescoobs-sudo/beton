@@ -34,6 +34,8 @@ rollback() {
   kayas_read_approved deploy.sh release/APPROVED.previous || { kayas_journal ROLLBACK_FAILED "the previous approval is unreadable"; echo "deploy.sh: RECOVERY FAILED: the previous approval is unreadable." >&2; exit 4; }
   local pc="$RELEASE_COMMIT" pi="$RELEASE_IMAGE" pp="$RELEASE_PLATFORM" pr="$RELEASE_RUN_ID"
   kayas_write_approved "$pc" "$pi" "$pp" "$pr"
+  # a deployment killed while git held its index lock leaves a stale lock; no git process of ours runs now (we hold the deploy lock), so it is safe to clear it once
+  if [ -e .git/index.lock ] && ! pgrep -x git >/dev/null 2>&1; then rm -f .git/index.lock; fi
   if ! git checkout --detach --quiet "$pc"; then
     kayas_journal ROLLBACK_FAILED "the previous commit could not be checked out"
     echo "deploy.sh: RECOVERY FAILED: the host files could not be put back at ${pc:0:12}. Start the previous release by hand." >&2; exit 4

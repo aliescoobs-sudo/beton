@@ -588,6 +588,24 @@ describe.skipIf(!hasPython)('scripts/ops/deploy.sh', () => {
     // after a verified recovery a new deployment may start, and --recover with nothing to recover says so
     expect(s.run('scripts/ops/deploy.sh', ['--recover']).stdout).toMatch(/nothing to recover/);
   });
+  it('--recover clears a stale git index lock left by a killed process and still rolls back and verifies', () => {
+    const { s, next } = withNewCommit();
+    s.failOn('db-migrate.ts');
+    // simulate the kill: a switched journal state and a stale lock
+    s.run('scripts/ops/deploy.sh', deployArgs(next)); // fails and rolls back; now fake an interrupted one
+    s.write('release/APPROVED', approvedText(next, IMG_B), 0o640);
+    s.write('release/APPROVED.previous', approvedText(s.head), 0o640);
+    s.git('checkout', '--detach', '-q', next);
+    writeFileSync(
+      path.join(s.root, 'release/.deploy-journal'),
+      '{"at":"x","state":"switched","detail":""}\n',
+    );
+    writeFileSync(path.join(s.root, '.git/index.lock'), '');
+    const rec = s.run('scripts/ops/deploy.sh', ['--recover']);
+    expect(rec.status, rec.stderr).toBe(1);
+    expect(rec.stderr).toMatch(/rolled back to .* and VERIFIED/);
+    expect(s.git('rev-parse', 'HEAD')).toBe(s.head);
+  });
   it('the deploy files it writes are not world-readable, whatever the caller umask', () => {
     const { s, next } = withNewCommit();
     spawnSync('bash', ['-c', `umask 000; exec bash scripts/ops/deploy.sh ${deployArgs(next).join(' ')}`], {
