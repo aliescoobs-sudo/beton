@@ -1,0 +1,106 @@
+# KAYAS STAGING proxy (T10g, R19B-01). Fictitious "twin" data only, behind HTTP Basic Auth on the WHOLE vhost.
+#   - ONE site block for APP_DOMAIN. Everything it answers (pages, RSC, static files, auth, field/phone endpoints, APIs, redirects, Caddy's own
+#     errors) is behind `basic_auth`: there is no path exemption. ACME challenges are answered by Caddy itself, before any site handler, and never
+#     reach this block or the app.
+#   - The credentials are a bcrypt HASH in a private file (staging/basic-auth.caddy, mode 0600, gitignored, made by scripts/staging/make-basic.sh).
+#     It is a file and not an environment variable on purpose: a bcrypt hash contains `$`, which Compose would interpolate.
+#   - The client's Authorization header (the Basic credentials) is NOT forwarded to the app. The client address given to the app is the
+#     connection peer (the app trusts one hop: TRUSTED_PROXY_HOPS=1), whatever X-Forwarded-* the client sent.
+#   - No access log: nothing here records the Authorization header or a URL. Caddy's runtime log stays at WARN.
+#   - STAGING_TLS: `acme` (the default) = a public certificate by ACME (the VPS). `internal` = Caddy's own local CA (the local rehearsal only). Any other value
+#     names a snippet that does not exist, and Caddy refuses to start.
+{
+	admin off
+	http_port {$STAGING_HTTP_PORT:80}
+	https_port {$STAGING_HTTPS_PORT:443}
+	log {
+		output stderr
+		level WARN
+	}
+	servers {
+		timeouts {
+			read_header 10s
+			read_body 30s
+			write 60s
+			idle 2m
+		}
+		max_header_size 16KB
+	}
+}
+
+# Caddy builds its own error responses (the 401 of the gate, 404, 413...) in a separate error route that does not pass through the headers above:
+# the same hardening is repeated there, and the gate's challenge is kept.
+(tls_acme) {
+	# a public certificate by ACME (Caddy's default for a public name); only modern TLS versions
+	tls {
+		protocols tls1.2 tls1.3
+	}
+}
+(tls_internal) {
+	tls {
+		issuer internal
+		protocols tls1.2 tls1.3
+	}
+}
+(hardened_errors) {
+	handle_errors {
+		header {
+			Strict-Transport-Security "max-age=31536000"
+			X-Content-Type-Options nosniff
+			X-Frame-Options DENY
+			Referrer-Policy no-referrer
+			Cache-Control "no-store"
+			-Server
+		}
+		respond "{err.status_code} {err.status_text}" {err.status_code}
+	}
+}
+
+# Internal listener for the container health check only (loopback inside the proxy container, never published, no route to the app).
+http://127.0.0.1:2080 {
+	bind 127.0.0.1
+	respond /healthz 200
+	respond 404
+}
+
+{$APP_DOMAIN} {
+	import tls_{$STAGING_TLS:acme}
+	import hardened_errors
+	route {
+		# 1. Security headers on EVERY response of this site, Caddy-generated ones (401, 404, 413...) included. `defer` runs after the app's own
+		#    headers are in, and `?` only adds a header the app did not set, so nothing is duplicated.
+		header {
+			defer
+			?Strict-Transport-Security "max-age=31536000"
+			?X-Content-Type-Options nosniff
+			?X-Frame-Options DENY
+			?Referrer-Policy no-referrer
+			?Cache-Control "no-store"
+			-Server
+		}
+		# 2. The gate. Nothing below runs without a valid credential.
+		import /etc/caddy/basic-auth.caddy
+		# 3. Bounded requests (the Next server has its own limits, this is the outer one). Field photos are the largest upload.
+		request_body {
+			max_size 12MB
+		}
+		@internal path /api/health/*
+		respond @internal 404
+		encode zstd gzip
+		reverse_proxy app:3000 {
+			header_up -Authorization
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto {scheme}
+			header_up X-Forwarded-Host {host}
+			transport http {
+				dial_timeout 5s
+				response_header_timeout 60s
+			}
+		}
+	}
+}
+
+# Any other name or address that reaches port 80 or 443 (the bare IP, another host name): nothing to serve, no redirect, no information.
+http:// {
+	respond 404
+}

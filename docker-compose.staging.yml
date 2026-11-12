@@ -1,0 +1,181 @@
+# KAYAS STAGING stack (T10g, R19B-01/-11 + container hardening). A copy of the app for a rented VPS, with FICTITIOUS "twin" data only, behind HTTP
+# Basic Auth on the whole vhost (Caddyfile.staging). It is NOT production and NOT the local training stack: real data stays forbidden (gates G1-G12).
+#   - a production BUILD of the app, run as APP_ENV=training with TRAINING_MODE=true, REAL_DATA=false, simulation off;
+#   - no provider AI, no extraction, no maps, no web push: none of their keys exists in these files, and src/lib/env.ts refuses them anyway;
+#   - history import is switched OFF (STAGING_PROFILE=true, T10g group D) and NO host folder is mounted into any container (no importer mount);
+#   - its own compose project, database volume, filestore, accounts volume and Caddy volume: nothing is shared with production or the local training stack;
+#   - one trusted proxy hop (Caddy); only the proxy publishes ports (80 and 443); the database and the app have none;
+#   - the LAN door of the training stack does not exist here.
+# Secrets: two files, chmod 600, never in git: .env.staging (app + compose) and .env.staging.ops (superuser, migrator, backup, seed logins: maintenance
+# only). The Basic Auth HASH is a third private file, staging/basic-auth.caddy (a bcrypt hash has `$`, which compose would interpolate). The image is
+# the approved digest only (release/APPROVED, written by scripts/ops/approve-release.sh) and every command goes through ./scripts/staging/dc.sh.
+# Env secrets are visible to the Docker daemon and to root on the host (docker inspect). Accepted for fictitious data; a production gate (docs/STAGING-VPS.md).
+name: kayas-staging
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '3'
+
+x-hardening: &hardening
+  security_opt: ['no-new-privileges:true']
+  cap_drop: [ALL]
+  logging: *logging
+
+services:
+  db:
+    <<: *hardening
+    image: postgres:17.11-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
+    platform: ${STAGING_PLATFORM:-linux/amd64}
+    restart: unless-stopped
+    # The image starts as root, fixes the ownership of the data directory and drops to the postgres user (gosu): only these five capabilities.
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run/postgresql
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?set POSTGRES_SUPERUSER_PASSWORD in .env.staging.ops}
+      POSTGRES_DB: postgres
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Run once, on the FIRST creation of the volume: writes the birth marker the training seed requires and consumes (reviewed file, read-only).
+      - ./scripts/training/db-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    # A 4 GB host shared by PostgreSQL, Next and Caddy (2 GB swap): the limits add up to 3.25 GB and leave the rest to the kernel and the page cache.
+    mem_limit: 1g
+    memswap_limit: 1g
+    pids_limit: 200
+    cpus: 1.5
+    networks: [internal]
+
+  app:
+    <<: *hardening
+    image: ${APP_IMAGE:?set by scripts/staging/dc.sh from release/APPROVED}
+    platform: ${STAGING_PLATFORM:-linux/amd64}
+    restart: unless-stopped
+    env_file: .env.staging
+    environment:
+      NODE_ENV: production
+      APP_ENV: training
+      TRAINING_MODE: 'true'
+      STAGING_PROFILE: 'true'
+      REAL_DATA: 'false'
+      SIMULATION_ENABLED: 'false'
+      # The test-only escapes are forced off here, whatever .env.staging says (the environment schema refuses them anyway).
+      TRAINING_ALLOW_UNMARKED: 'false'
+      E2E_TEST_RUNNER: ''
+      # Providers off: the keys are not in the files, and these flags are forced.
+      AI_EXTRACTION_ENABLED: 'false'
+      ASSISTANT_ENABLED: 'false'
+      ASSISTANT_PROVIDER: fake
+      # One proxy in front (Caddy) appends the client address to X-Forwarded-For.
+      TRUSTED_PROXY_HOPS: '1'
+      FILE_STORE_DIR: /data/file-store
+      NODE_OPTIONS: --max-old-space-size=1024
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+      - /app/.next/cache:size=128m,uid=10001,gid=10001,mode=0700
+      # Next loads next.config.ts through the SWC native addon, which unpacks into a cache folder it must be able to execute from. A tmpfs is noexec by
+      # default, so this one (and only this one) is mounted exec; it is nosuid/nodev, small, private to uid 10001 and empty at every start.
+      - /home/app/.cache:size=64m,uid=10001,gid=10001,mode=0700,exec
+    volumes:
+      - filestore:/data/file-store
+    depends_on:
+      db:
+        condition: service_healthy
+    mem_limit: 1536m
+    memswap_limit: 1536m
+    pids_limit: 300
+    cpus: 1.5
+    networks: [internal, edge]
+
+  # The ONLY service that publishes ports. HTTPS with an automatic certificate for APP_DOMAIN; Basic Auth on the whole vhost.
+  proxy:
+    <<: *hardening
+    image: caddy:2-alpine
+    restart: unless-stopped
+    cap_add: [NET_BIND_SERVICE]
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /config
+    environment:
+      # Without the domain Caddy refuses to start instead of serving the wrong name.
+      APP_DOMAIN: ${APP_DOMAIN:?set APP_DOMAIN in .env.staging}
+      STAGING_TLS: ${STAGING_TLS:-acme}
+      STAGING_HTTP_PORT: ${STAGING_HTTP_PORT:-80}
+      STAGING_HTTPS_PORT: ${STAGING_HTTPS_PORT:-443}
+    # 80 and 443 on every address on the VPS (the defaults). The variables exist for the LOCAL rehearsal only (loopback, high ports): dc.sh refuses
+    # any other value unless .env.staging says STAGING_REHEARSAL=1, and the rehearsal then has to be loopback-only.
+    ports:
+      - '${STAGING_BIND_IP:-0.0.0.0}:${STAGING_HTTP_PORT:-80}:${STAGING_HTTP_PORT:-80}'
+      - '${STAGING_BIND_IP:-0.0.0.0}:${STAGING_HTTPS_PORT:-443}:${STAGING_HTTPS_PORT:-443}'
+    volumes:
+      - ./Caddyfile.staging:/etc/caddy/Caddyfile:ro
+      # The hash file is created by the runbook BEFORE the first start (a missing file would make Docker create a directory); dc.sh checks it.
+      - ./staging/basic-auth.caddy:/etc/caddy/basic-auth.caddy:ro
+      - caddy_data:/data
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:2080/healthz']
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    depends_on:
+      app:
+        condition: service_healthy
+    mem_limit: 256m
+    memswap_limit: 256m
+    pids_limit: 100
+    cpus: 0.5
+    networks: [edge]
+
+  # Maintenance: bootstrap of the roles, migrations, seed:training, reset:training. Never started by `up`. NO host folder is mounted here.
+  ops:
+    <<: *hardening
+    image: ${APP_IMAGE:?set by scripts/staging/dc.sh from release/APPROVED}
+    platform: ${STAGING_PLATFORM:-linux/amd64}
+    profiles: [ops]
+    env_file: [.env.staging, .env.staging.ops]
+    environment:
+      NODE_ENV: production
+      APP_ENV: training
+      TRAINING_MODE: 'true'
+      STAGING_PROFILE: 'true'
+      REAL_DATA: 'false'
+      SIMULATION_ENABLED: 'false'
+      FILE_STORE_DIR: /data/file-store
+      TRAINING_ACCOUNTS_FILE: /app/out/training-accounts.local.txt
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    volumes:
+      - filestore:/data/file-store
+      - accounts:/app/out
+    command: ['sh', '-c', 'echo "run: ./scripts/staging/ops.sh <script> [args]"']
+    mem_limit: 1g
+    memswap_limit: 1g
+    pids_limit: 200
+    cpus: 1
+    networks: [internal]
+
+networks:
+  internal:
+    internal: true
+  edge: {}
+
+volumes:
+  pgdata: {}
+  filestore: {}
+  # The one-time credentials file of the seed (folder 0700 owned by the container user: no host user reaches it).
+  accounts: {}
+  caddy_data: {}

@@ -1,0 +1,4 @@
+# shape only: the real file is made by scripts/staging/make-basic.sh and is never committed. The hash below is fake.
+basic_auth bcrypt "KAYAS staging" {
+	staging-user $2a$14$0000000000000000000000000000000000000000000000000000
+}

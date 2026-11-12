@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+!.env.staging.example
 node_modules/
 .next/
 next-env.d.ts
@@ -31,3 +32,14 @@ generated_images/
 # Evidence of the training instance's maintenance runs (R18-11): local, never committed
 .training-evidence/
 .training-lan-relay.pid
+
+# Staging (T10g): the Basic Auth hash file, the maintenance evidence and the local rehearsal workspace are private and never committed
+/staging/basic-auth.caddy
+/staging/.basic-auth.*
+.staging-evidence/
+.rehearsal/
+/release/APPROVED
+/release/APPROVED.previous
+/release/.deploy-journal*
+/release/evidence/
+/release/.deploy.lock

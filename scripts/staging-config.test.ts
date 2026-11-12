@@ -1,0 +1,399 @@
+import { spawnSync } from 'node:child_process';
+import { chmodSync, copyFileSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { describe, expect, it } from 'vitest';
+import { hardened, IMG_A as GOOD, makeSandbox, OWNER, stagingConfig } from './ops-sandbox';
+
+// T10g group A (R19B-01): the staging compose, the Caddyfile and the strict wrapper. The validator is run on hand-built effective configurations (so
+// the test needs no Docker), and on the REAL `docker compose config` of the file when Docker is present.
+const hasDocker = spawnSync('docker', ['compose', 'version']).status === 0;
+const hasPython = spawnSync('python3', ['--version']).status === 0;
+const goodConfig = stagingConfig;
+type Json = ReturnType<typeof stagingConfig>;
+function validate(cfg: Json, args: string[] = ['--stack', 'staging', '--image', GOOD]) {
+  const r = spawnSync('python3', ['-I', 'scripts/ops/validate-compose.py', ...args], {
+    input: JSON.stringify(cfg),
+    encoding: 'utf8',
+  });
+  return { code: r.status, err: r.stderr };
+}
+
+describe.skipIf(!hasPython)('the effective-configuration validator (staging)', () => {
+  it('accepts the expected configuration', () => {
+    expect(validate(goodConfig())).toMatchObject({ code: 0 });
+  });
+  const hostile: [string, (c: Json) => void, RegExp][] = [
+    [
+      'another image for the app',
+      (c) => (c.services.app.image = `ghcr.io/${OWNER}/kayas@sha256:${'b2'.repeat(32)}`),
+      /app: image/,
+    ],
+    [
+      'a tag instead of a digest for ops',
+      (c) => (c.services.ops.image = `ghcr.io/${OWNER}/kayas:latest`),
+      /ops: image/,
+    ],
+    ['another platform', (c) => (c.services.app.platform = 'linux/arm64'), /app: platform/],
+    [
+      'the app publishes a port',
+      (c) =>
+        (c.services.app.ports = [{ target: 3000, published: '3000', protocol: 'tcp', host_ip: '0.0.0.0' }]),
+      /app: published ports/,
+    ],
+    [
+      'the database publishes a port',
+      (c) =>
+        (c.services.db.ports = [{ target: 5432, published: '5432', protocol: 'tcp', host_ip: '0.0.0.0' }]),
+      /db: published ports/,
+    ],
+    [
+      'the proxy publishes an extra port',
+      (c) =>
+        c.services.proxy.ports?.push({
+          target: 8080,
+          published: '8080',
+          protocol: 'tcp',
+          host_ip: '0.0.0.0',
+        }),
+      /proxy: published ports/,
+    ],
+    [
+      'the proxy binds a public IP explicitly',
+      (c) => ((c.services.proxy.ports ?? [])[0]!.host_ip = '203.0.113.7'),
+      /specific host address/,
+    ],
+    [
+      'a host folder is mounted into ops (an importer mount)',
+      (c) =>
+        (c.services.ops.volumes = [
+          { type: 'bind', source: '/home/x/imports', target: '/twin', read_only: true },
+        ]),
+      /ops: bind mount to \/twin/,
+    ],
+    [
+      'the docker socket is mounted',
+      (c) =>
+        (c.services.app.volumes = [
+          { type: 'bind', source: '/var/run/docker.sock', target: '/var/run/docker.sock' },
+        ]),
+      /app: bind mount/,
+    ],
+    [
+      'the Basic file is mounted writable',
+      (c) => ((c.services.proxy.volumes ?? [])[1]!.read_only = false),
+      /proxy: bind mount/,
+    ],
+    ['privileged', (c) => (c.services.app.privileged = true), /privileged/],
+    ['host network', (c) => (c.services.app.network_mode = 'host'), /network_mode/],
+    ['an extra capability', (c) => (c.services.app.cap_add = ['SYS_ADMIN']), /capabilities/],
+    ['no cap_drop', (c) => (c.services.app.cap_drop = []), /cap_drop/],
+    ['no no-new-privileges', (c) => (c.services.proxy.security_opt = []), /no-new-privileges/],
+    ['no memory limit', (c) => delete c.services.db.mem_limit, /memory or pids/],
+    ['unbounded logs', (c) => (c.services.app.logging = { driver: 'json-file' }), /bounded log/],
+    ['writable root of the app', (c) => (c.services.app.read_only = false), /read-only root/],
+    [
+      'an unexpected service',
+      (c) => (c.services.lan = hardened({ image: 'caddy:2-alpine' })),
+      /lan: unexpected service/,
+    ],
+    ['real data on', (c) => (c.services.app.environment.REAL_DATA = 'true'), /REAL_DATA/],
+    ['training off', (c) => (c.services.app.environment.TRAINING_MODE = 'false'), /TRAINING_MODE/],
+    [
+      'the staging profile off',
+      (c) => (c.services.app.environment.STAGING_PROFILE = 'false'),
+      /STAGING_PROFILE/,
+    ],
+    [
+      'a provider key in the environment',
+      (c) => (c.services.app.environment.ANTHROPIC_API_KEY = 'x'),
+      /ANTHROPIC_API_KEY must be absent/,
+    ],
+    [
+      'a push key in the environment',
+      (c) => (c.services.ops.environment.VAPID_PRIVATE_KEY = 'x'),
+      /VAPID_PRIVATE_KEY must be absent/,
+    ],
+    ['the internal network is not internal', (c) => (c.networks.internal!.internal = false), /not internal/],
+    ['another compose project', (c) => (c.name = 'kayas'), /project/],
+  ];
+  for (const [name, mutate, re] of hostile) {
+    it(`refuses: ${name}`, () => {
+      const cfg = goodConfig();
+      mutate(cfg);
+      const r = validate(cfg);
+      expect(r.code).toBe(1);
+      expect(r.err).toMatch(re);
+    });
+  }
+  it('never prints an environment value', () => {
+    const cfg = goodConfig();
+    cfg.services.app.environment.AUTH_SECRET = 'CANARY-SECRET-VALUE';
+    cfg.services.app.environment.REAL_DATA = 'CANARY-WRONG';
+    expect(validate(cfg).err).not.toContain('CANARY');
+  });
+  it('refuses a local image id unless it is the rehearsal, and a rehearsal port that is not loopback', () => {
+    const id = `sha256:${'c3'.repeat(32)}`;
+    expect(validate(goodConfig(id), ['--stack', 'staging', '--image', id]).code).toBe(2);
+    const cfg = goodConfig(id);
+    cfg.services.proxy.ports = [18080, 18443].map((p) => ({
+      target: p,
+      published: String(p),
+      protocol: 'tcp',
+      host_ip: '127.0.0.1',
+    }));
+    expect(validate(cfg, ['--stack', 'staging', '--image', id, '--rehearsal']).code).toBe(0);
+    (cfg.services.proxy.ports ?? [])[0]!.host_ip = '0.0.0.0';
+    expect(validate(cfg, ['--stack', 'staging', '--image', id, '--rehearsal']).code).toBe(1);
+  });
+});
+
+describe.skipIf(!hasDocker || !hasPython)('the real staging compose file', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'bb-staging-'));
+  const env = `APP_DOMAIN=kayas.example.com\nAPP_IMAGE=${GOOD}\nAPP_BASE_URL=https://kayas.example.com\nPOSTGRES_SUPERUSER_PASSWORD=x\n`;
+  writeFileSync(path.join(dir, '.env.staging'), env);
+  writeFileSync(path.join(dir, '.env.staging.ops'), 'POSTGRES_SUPERUSER_PASSWORD=x\n');
+  copyFileSync('docker-compose.staging.yml', path.join(dir, 'docker-compose.staging.yml'));
+  const config = (extraEnv: Record<string, string> = {}) =>
+    spawnSync(
+      'docker',
+      [
+        'compose',
+        '-f',
+        path.join(dir, 'docker-compose.staging.yml'),
+        '--project-directory',
+        dir,
+        '--env-file',
+        path.join(dir, '.env.staging'),
+        '--env-file',
+        path.join(dir, '.env.staging.ops'),
+        '--profile',
+        'ops',
+        'config',
+        '--format',
+        'json',
+      ],
+      { encoding: 'utf8', env: { ...process.env, APP_IMAGE: GOOD, ...extraEnv } },
+    );
+  it('resolves to a configuration the validator accepts (80/443, hardened, no importer mount)', () => {
+    const r = config();
+    expect(r.stderr).toBe('');
+    expect(r.status).toBe(0);
+    const v = spawnSync(
+      'python3',
+      ['-I', 'scripts/ops/validate-compose.py', '--stack', 'staging', '--image', GOOD],
+      { input: r.stdout, encoding: 'utf8' },
+    );
+    expect(v.stderr).toContain('accepted');
+    expect(v.status).toBe(0);
+    const cfg = JSON.parse(r.stdout) as Json;
+    for (const [name, s] of Object.entries(cfg.services)) {
+      expect(s.cap_drop, name).toContain('ALL');
+      expect(s.security_opt, name).toContain('no-new-privileges:true');
+      expect(Number(s.mem_limit), name).toBeGreaterThan(0);
+      expect(Number(s.pids_limit), name).toBeGreaterThan(0);
+      expect(s.logging?.options?.['max-size'], name).toBe('10m');
+      expect(s.volumes?.filter((x) => x.type === 'bind').length ?? 0, name).toBeLessThanOrEqual(2);
+    }
+    expect(Object.keys(cfg.services).sort()).toEqual(['app', 'db', 'ops', 'proxy']);
+    const memory = Object.entries(cfg.services)
+      .filter(([n]) => n !== 'ops')
+      .reduce((a, [, s]) => a + Number(s.mem_limit), 0);
+    expect(memory).toBeLessThanOrEqual(3.4 * 1024 ** 3); // db + app + proxy leave room on a 4 GB host
+    expect(cfg.services.app.environment.TRAINING_MODE).toBe('true');
+    expect(cfg.services.app.environment.TRUSTED_PROXY_HOPS).toBe('1');
+    expect(cfg.services.app.environment.APP_BASE_URL).toBe('https://kayas.example.com');
+    expect(cfg.services.proxy.environment.APP_DOMAIN).toBe('kayas.example.com');
+  });
+  it('a hostile shell cannot widen the effective configuration (the validator would refuse it)', () => {
+    // an environment variable the file reads: a different bind address for the proxy
+    const r = config({ STAGING_BIND_IP: '203.0.113.9' });
+    const v = spawnSync(
+      'python3',
+      ['-I', 'scripts/ops/validate-compose.py', '--stack', 'staging', '--image', GOOD],
+      { input: r.stdout, encoding: 'utf8' },
+    );
+    expect(v.status).toBe(1);
+    expect(v.stderr).toMatch(/specific host address/);
+    const r2 = config({ STAGING_HTTP_PORT: '8080' });
+    expect(
+      spawnSync('python3', ['-I', 'scripts/ops/validate-compose.py', '--stack', 'staging', '--image', GOOD], {
+        input: r2.stdout,
+        encoding: 'utf8',
+      }).status,
+    ).toBe(1);
+  });
+  it('the Caddyfile adapts for Caddy: ACME by default, the internal CA only when asked, anything else fails closed (needs the caddy image locally)', () => {
+    const have = spawnSync('docker', ['image', 'inspect', 'caddy:2-alpine']).status === 0;
+    if (!have) return;
+    const adapt = (tls?: string) =>
+      spawnSync(
+        'docker',
+        [
+          'run',
+          '--rm',
+          '-e',
+          'APP_DOMAIN=kayas.example.com',
+          ...(tls === undefined ? [] : ['-e', `STAGING_TLS=${tls}`]),
+          '-v',
+          `${path.resolve('Caddyfile.staging')}:/etc/caddy/Caddyfile:ro`,
+          '-v',
+          `${path.resolve('staging/basic-auth.caddy.example')}:/etc/caddy/basic-auth.caddy:ro`,
+          'caddy:2-alpine',
+          'caddy',
+          'adapt',
+          '--config',
+          '/etc/caddy/Caddyfile',
+        ],
+        { encoding: 'utf8' },
+      );
+    const def = adapt();
+    expect(def.status).toBe(0);
+    expect(def.stdout).not.toContain('"module":"internal"');
+    expect(def.stdout).toContain('"handler":"authentication"');
+    expect(adapt('acme').stdout).not.toContain('"module":"internal"');
+    expect(adapt('internal').stdout).toContain('"module":"internal"');
+    expect(adapt('bogus').status).not.toBe(0);
+  });
+});
+
+describe('the Caddyfile and the files as text', () => {
+  const caddy = readFileSync('Caddyfile.staging', 'utf8');
+  const compose = readFileSync('docker-compose.staging.yml', 'utf8');
+  const lines = caddy.split('\n').filter((l) => !l.trim().startsWith('#'));
+  const code = lines.join('\n');
+  it('puts the Basic Auth import before the reverse proxy, inside one route, with no path exemption', () => {
+    const imp = code.indexOf('import /etc/caddy/basic-auth.caddy');
+    const rp = code.indexOf('reverse_proxy');
+    expect(imp).toBeGreaterThan(0);
+    expect(rp).toBeGreaterThan(imp);
+    expect(code.indexOf('route {')).toBeLessThan(imp);
+    // the only matcher is the health path that is answered with 404 AFTER the gate
+    expect(code.match(/^\s*@\w+/gm)?.map((m) => m.trim())).toEqual(['@internal']);
+    expect(code).toMatch(/@internal path \/api\/health\/\*\n\s*respond @internal 404/);
+    // exactly one reverse_proxy, one site for the domain
+    expect(code.match(/reverse_proxy/g)).toHaveLength(1);
+    expect(code.match(/\{\$APP_DOMAIN\} \{/g)).toHaveLength(1);
+  });
+  it('writes no access log, drops the client Authorization header, overwrites X-Forwarded-*', () => {
+    expect(code).not.toMatch(/^\s*log\s+\w*\s*\{[^}]*access/m);
+    expect(code).not.toMatch(/^\s*(output file|format json)/m);
+    expect(code).toContain('header_up -Authorization');
+    expect(code).toContain('header_up X-Forwarded-For {remote_host}');
+    expect(code).toContain('admin off');
+    expect(code).toMatch(/request_body \{\s*max_size/);
+    expect(code).toMatch(/read_header/);
+  });
+  it('repeats the security headers for Caddy-generated errors and removes the Server header', () => {
+    expect(code).toMatch(
+      /handle_errors \{[\s\S]*Strict-Transport-Security[\s\S]*X-Content-Type-Options[\s\S]*-Server/,
+    );
+  });
+  it('keeps the hash out of every environment file and variable', () => {
+    expect(compose).not.toMatch(/\$2[aby]\$/);
+    expect(compose).not.toMatch(/^\s*[A-Z_]*BASIC[A-Z_]*:/m); // no Basic Auth variable; the hash is a mounted file
+    expect(readFileSync('.env.staging.example', 'utf8')).not.toMatch(/\$2[aby]\$/);
+    expect(readFileSync('.gitignore', 'utf8')).toMatch(/^\/staging\/basic-auth\.caddy$/m);
+  });
+  it('has no provider, push, map, importer or LAN configuration', () => {
+    const noComments = compose
+      .split('\n')
+      .filter((l) => !l.trim().startsWith('#'))
+      .join('\n');
+    expect(noComments).not.toMatch(/ANTHROPIC|VAPID|MAPS|lan-proxy|Caddyfile\.lan|\/twin|imports|OPS_TWIN/i);
+    expect(readFileSync('.env.staging.example', 'utf8')).not.toMatch(/ANTHROPIC_API_KEY=|VAPID_\w+=/);
+    expect(noComments).toContain("REAL_DATA: 'false'");
+    expect(noComments).toContain("STAGING_PROFILE: 'true'");
+  });
+});
+
+describe.skipIf(!hasPython)('scripts/staging/dc.sh (the release-bound wrapper)', () => {
+  const stg = (o: Parameters<typeof makeSandbox>[0] = {}) => makeSandbox({ stack: 'staging', ...o });
+  it('runs a valid command with the approved image', () => {
+    const s = stg();
+    const r = s.run('scripts/staging/dc.sh', ['ps']);
+    expect(r.stderr).toContain('accepted');
+    expect(r.status).toBe(0);
+    expect(s.called()).toContain('config --format json');
+    expect(s.called()).toMatch(/compose -f docker-compose\.staging\.yml .* ps/);
+  });
+  it('refuses an APP_IMAGE or COMPOSE_* exported in the shell, before any docker call', () => {
+    const s = stg();
+    expect(s.run('scripts/staging/dc.sh', ['ps'], { APP_IMAGE: 'evil/shell:latest' }).stderr).toMatch(
+      /APP_IMAGE is set in the shell/,
+    );
+    expect(s.run('scripts/staging/dc.sh', ['ps'], { COMPOSE_FILE: 'evil.yml' }).stderr).toMatch(
+      /COMPOSE_FILE is set/,
+    );
+    expect(s.called()).toBe('');
+  });
+  it('refuses an APP_IMAGE in either env file, an option before the sub-command, and down -v', () => {
+    const s = stg();
+    s.write('.env.staging', `APP_DOMAIN=kayas.example.com\nAPP_IMAGE=${GOOD}\n`);
+    expect(s.run('scripts/staging/dc.sh', ['ps']).stderr).toMatch(/sets APP_IMAGE/);
+    s.write('.env.staging', 'APP_DOMAIN=kayas.example.com\n');
+    s.write('.env.staging.ops', `X=1\nAPP_IMAGE=${GOOD}\n`);
+    expect(s.run('scripts/staging/dc.sh', ['ps']).stderr).toMatch(/sets APP_IMAGE/);
+    s.write('.env.staging.ops', 'X=1\n');
+    expect(s.run('scripts/staging/dc.sh', ['-f', 'evil.yml', 'ps']).stderr).toMatch(
+      /not an allowed first argument/,
+    );
+    expect(s.run('scripts/staging/dc.sh', ['down', '-v']).stderr).toMatch(/refused/);
+    expect(s.called()).toBe('');
+  });
+  it('refuses rehearsal-only settings without the rehearsal flag', () => {
+    const s = stg();
+    s.write('.env.staging', 'APP_DOMAIN=kayas.example.com\nSTAGING_HTTP_PORT=8080\n');
+    expect(s.run('scripts/staging/dc.sh', ['ps']).stderr).toMatch(/rehearsal-only/);
+  });
+  it('refuses when the effective configuration is not the expected one, before anything runs', () => {
+    const cfg = stagingConfig();
+    cfg.services.ops.volumes = [{ type: 'bind', source: '/home/x', target: '/twin', read_only: true }];
+    const s = stg({ config: cfg });
+    const r = s.run('scripts/staging/dc.sh', ['run', '--rm', 'ops']);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/REFUSED ops: bind mount/);
+    expect(s.called()).not.toMatch(/run --rm/);
+  });
+  it('allow-lists the options of run: no volume, env, entrypoint or privilege can be added', () => {
+    const s = stg();
+    for (const bad of [
+      ['-v', '/:/host'],
+      ['-e', 'A=1'],
+      ['--entrypoint', 'sh'],
+      ['--privileged'],
+      ['--network', 'host'],
+      ['--cap-add', 'SYS_ADMIN'],
+      ['--user', 'root'],
+    ]) {
+      const r = s.run('scripts/staging/dc.sh', ['run', ...bad, 'ops', 'true']);
+      if (bad[0] === '--user')
+        expect(r.status).toBe(0); // root with the CHOWN/FOWNER jobs is the one allowed form for staging
+      else expect(r.status, bad.join(' ')).toBe(1);
+    }
+    expect(
+      s
+        .calls()
+        .filter((c) => / run /.test(c))
+        .every((c) => !/-v \/:\/host|--privileged|--entrypoint/.test(c)),
+    ).toBe(true);
+  });
+  it('starts the proxy only with a private regular Basic Auth hash file', () => {
+    const missing = stg();
+    missing.write('staging/basic-auth.caddy', 'x');
+    spawnSync('rm', ['-f', path.join(missing.root, 'staging/basic-auth.caddy')]);
+    expect(missing.run('scripts/staging/dc.sh', ['up-proxy']).stderr).toMatch(
+      /missing or not a regular file/,
+    );
+    const wide = stg();
+    chmodSync(path.join(wide.root, 'staging/basic-auth.caddy'), 0o644);
+    expect(wide.run('scripts/staging/dc.sh', ['up-proxy']).stderr).toMatch(/mode 0600/);
+    const junk = stg();
+    junk.write('staging/basic-auth.caddy', 'hello\n');
+    expect(junk.run('scripts/staging/dc.sh', ['up-proxy']).stderr).toMatch(/does not look like/);
+    expect(stg().run('scripts/staging/dc.sh', ['up-proxy']).status).toBe(0);
+    // the database alone may start without the file (the first start order); a bare `up` may not
+    expect(missing.run('scripts/staging/dc.sh', ['up', '-d', '--wait', 'db']).status).toBe(0);
+    expect(missing.run('scripts/staging/dc.sh', ['up', '-d']).status).toBe(1);
+  });
+});

@@ -6,6 +6,7 @@ node_modules
 .env
 .env.*
 !.env.example
+!.env.staging.example
 .logs
 backups
 file-store
@@ -35,3 +36,7 @@ scripts/training-screens.ts
 brand-incoming
 generated_images
 .training-evidence
+.staging-evidence
+.rehearsal
+staging
+release
