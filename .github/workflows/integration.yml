@@ -3,11 +3,12 @@
 # seeds the pilot master data). No e2e here (it needs a production build and ~40 minutes). Secrets are random per run and CI-only.
 name: Integration tests
 
+# T10f: on a push to main this workflow is CALLED by build-image.yml, whose image job needs it: no image (no digest to deploy) is published for a commit whose
+# integration tests failed. That is the enforced equivalent of a required status check (branch protection is not available on this private repository's plan).
 on:
-  push:
-    branches: [main]
   pull_request:
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read

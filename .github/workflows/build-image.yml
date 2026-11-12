@@ -37,9 +37,13 @@ jobs:
         env:
           REQUIRE_PDF_RENDERER: '1'
 
+  integration:
+    name: Integration tests
+    uses: ./.github/workflows/integration.yml
+
   image:
     name: Build and push (linux/amd64)
-    needs: checks
+    needs: [checks, integration]
     runs-on: ubuntu-24.04
     permissions:
       contents: read
