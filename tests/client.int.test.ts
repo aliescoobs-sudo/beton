@@ -143,7 +143,9 @@ describe('phone is sealed (AC-MD-01 data part)', () => {
       tx.query<{ phone_enc: string }>('select phone_enc from client where id = $1', [client.id]),
     );
     expect(rows[0]!.phone_enc).toMatch(/^f1\./);
-    expect(rows[0]!.phone_enc).not.toContain('600');
+    // sealed = random bytes: a short-substring check on them is a coin toss, so assert the token shape and that it is not the plain value
+    expect(rows[0]!.phone_enc).toMatch(/^f\d+\.t?\d*\.?[A-Za-z0-9_.-]+$/);
+    expect(rows[0]!.phone_enc).not.toBe('+212 500-000456');
     const listed = (await listClients(app, users.office, deps)).find((c) => c.id === client.id);
     expect(listed?.phone).toBe('+212 500-000456');
   });

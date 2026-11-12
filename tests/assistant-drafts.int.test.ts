@@ -952,7 +952,12 @@ describe('the drafts of a person are theirs', () => {
     const rows = await inCtx(users.owner, (tx) =>
       tx.query<{ params_enc: string }>('select params_enc from ai_proposal order by created_at desc limit 5'),
     );
-    for (const r of rows.rows) expect(r.params_enc ?? '').not.toMatch(/MAD|8451237|45\s?000/);
+    // The stored value is a sealed token (random bytes, so a substring check on its characters is a coin toss): assert its shape, and that it is not readable JSON.
+    expect(rows.rows.length).toBeGreaterThan(0);
+    for (const r of rows.rows) {
+      expect(r.params_enc).toMatch(/^f\d+\.t\d+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/);
+      expect(() => JSON.parse(r.params_enc)).toThrow();
+    }
     expect(d.out.chips).toHaveLength(1);
   });
 });

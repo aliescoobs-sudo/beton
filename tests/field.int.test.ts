@@ -435,7 +435,7 @@ describe('emergency and the office instructions (AC-PROD-22, 23)', () => {
         made.value.id,
       ]),
     );
-    expect(raw.rows[0]?.address_enc).not.toContain('Martil');
+    expect(raw.rows[0]?.address_enc).toMatch(/^f\d+\.[A-Za-z0-9_.-]+$/); // a sealed token (random bytes: no substring check on them)
     const day = await getDriverDay(app, s.user, today, cipher);
     const ins = day.instructions.find((i) => i.id === made.value.id);
     expect(ins).toMatchObject({ kind: 'redirect', address: '12 rue Exemple, Martil', acknowledgedAt: null });
