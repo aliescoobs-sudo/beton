@@ -276,6 +276,9 @@ case "$*" in
   "image inspect --format {{.Os}}/{{.Architecture}} "*) echo "\${DOCKER_STUB_PLATFORM:-linux/amd64}"; exit 0;;
   "image inspect --format {{.Id}} "*) echo "sha256:stubimageid\${DOCKER_STUB_ID_SUFFIX:-}"; exit 0;;
   "inspect --format {{.Config.Image}}|{{.Image}}|{{.State.ExitCode}} "*) echo "\${DOCKER_STUB_ACTUAL_IMAGE:-$(sed -n 's/^IMAGE=//p' "${root}/release/APPROVED" 2>/dev/null)}|sha256:stubimageid|0"; exit 0;;
+  "ps -aq --no-trunc") if [ -e "${root}/ps.fail" ]; then exit 1; fi; cat "${root}/ps.ids" 2>/dev/null; exit 0;;
+  "inspect "*) if [ -e "${root}/inspect.fail" ]; then exit 1; fi; cat "${root}/inspect.json" 2>/dev/null; exit 0;;
+  *"hash-password"*) cat > "${root}/stdin.log"; echo '$2a$14$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUVWXYZ01234'; exit 0;;
   *"exec -T app wget"*) if [ -s "${root}/app.notready" ] && grep -q -f "${root}/app.notready" "${root}/release/APPROVED"; then exit 1; fi; echo '{"status":"ready"}'; exit 0;;
 esac
 exit 0

@@ -19,7 +19,7 @@ Written 2026-11-02, rewritten 2026-11-03 (C2) after the independent review `docs
 
 ## 2. Secrets (on the server only, `chmod 600`, never in git, one file per purpose)
 - `.env.prod` (**the app**): `DATABASE_URL_APP`, `DATABASE_URL_AUTH`, `DATABASE_URL_SYSTEM` (host `db`, internal), `AUTH_SECRET` (≥ 32 random chars), `FIELD_ENCRYPTION_KEYS`, `RECOVERY_CODES_KEYS`, `LOOKUP_HMAC_KEY`, `APP_BASE_URL=https://<APP_DOMAIN>`, `BACKUP_AGE_RECIPIENT`, `FIELD_APP_ENABLED=false` until its acceptance passes. **No migrator, backup or superuser login in this file** (the security checklist checks it; the app does not even read `DATABASE_URL_MIGRATOR`).
-- `.env.ops.prod` (**maintenance and compose**): `POSTGRES_SUPERUSER_PASSWORD`, `DATABASE_URL_MIGRATOR`, `APP_DOMAIN`, `APP_IMAGE=ghcr.io/<owner>/kayas@sha256:<digest>`, `FIRST_BOOT` (only during §3).
+- `.env.ops.prod` (**maintenance and compose**): `POSTGRES_SUPERUSER_PASSWORD`, `DATABASE_URL_MIGRATOR`, `APP_DOMAIN`, `FIRST_BOOT` (only during §3). **No `APP_IMAGE` in any env file** (T10g, R19B-02): the wrappers refuse one. The image, the commit, the platform and the CI run id are in `release/APPROVED` (§6), written by `scripts/ops/approve-release.sh` and by `deploy.sh`.
 - `.env.backup.prod` (**the backup job only**): `DATABASE_URL_BACKUP`, `BACKUP_AGE_RECIPIENT`. Nothing else of the application's secrets.
 - `.env.bootstrap.prod` (**temporary, first install only**): the one line `DATABASE_URL_BACKUP=…` (the same value as in `.env.backup.prod`), because creating the roles sets the backup login's password. `./scripts/ops/bootstrap.sh` refuses the file if it holds anything else and **deletes it after a successful run**. The app and the maintenance container never read it.
 - `keys/backup-signing.pub` (public key of the office signing key; not a secret).
@@ -30,16 +30,19 @@ Written 2026-11-02, rewritten 2026-11-03 (C2) after the independent review `docs
 The image is built by GitHub Actions and pulled **by digest** (§6). On the server: `docker login ghcr.io` once with a read-only token (`read:packages`) of the private registry.
 ```
 git clone <repo> /srv/kayas && cd /srv/kayas
+git checkout --detach <approved commit>            # the commit the CI run built; never a branch tip
 sudo ./scripts/ops/init-host.sh <backup-pull-user> <deploy-user>
-# .env.ops.prod: APP_IMAGE=ghcr.io/<owner>/kayas@sha256:<digest>  APP_DOMAIN=…  FIRST_BOOT=true
-docker pull "$(grep ^APP_IMAGE= .env.ops.prod | cut -d= -f2-)"
+# .env.ops.prod: APP_DOMAIN=…  FIRST_BOOT=true    (NO APP_IMAGE: it comes from release/APPROVED)
+./scripts/ops/approve-release.sh <commit> ghcr.io/<owner>/kayas@sha256:<digest> linux/amd64 <run id>   # the four values the CI job summary prints
+docker pull ghcr.io/<owner>/kayas@sha256:<digest>
 ./scripts/ops/dc.sh up -d --wait db
-printf 'DATABASE_URL_BACKUP=<the same value as in .env.backup.prod>\n' > .env.bootstrap.prod
-./scripts/ops/bootstrap.sh                 # roles and the database; deletes .env.bootstrap.prod when it succeeds
-./scripts/ops/ops.sh db-migrate            # structure only (no data)
-./scripts/ops/ops.sh create-owner          # the owner, with 2FA enrolment
+./scripts/ops/bootstrap.sh --create-env     # asks for the backup login's password at a hidden prompt; writes .env.bootstrap.prod with mode 0600
+./scripts/ops/bootstrap.sh                  # roles and the database; deletes .env.bootstrap.prod when it succeeds
+./scripts/ops/ops.sh db-migrate             # structure only (no data)
+./scripts/ops/ops.sh create-owner           # a terminal: password and authenticator code at HIDDEN prompts; the owner, with 2FA enrolment
 ./scripts/ops/dc.sh up -d app proxy
 ```
+Every one of these commands refuses (before a credential reaches a container) when a shell variable such as `APP_IMAGE` or `COMPOSE_*` is set, when `release/APPROVED` is missing or malformed (tag, other registry or owner, wrong platform), when the host files are not at the approved commit or a tracked file was edited, or when the resolved configuration is not the expected one (`scripts/ops/validate-compose.py`). Each privileged job leaves a line in `release/evidence/jobs.jsonl` with the approved digest next to the actual image id.
 **Why `FIRST_BOOT=true`:** with `REAL_DATA=true` the server refuses to start until the security checklist is complete, and the checklist is completed inside the app (enrol the second factor, mark the items). `FIRST_BOOT=true` breaks that loop without weakening the protection: the server starts in a **restricted mode** that serves only sign-in, enrolment, the checklist, user accounts, plants and parameters (every other page and endpoint answers 503). It **refuses to start** (a) once any client, supplier, order, delivery, invoice or payment exists, and (b) once the checklist is complete, so it cannot stay on. Procedure: the owner signs in and enrols, creates the plants and accounts, works through *Liste de sécurité* (`/checklist`); the manual items are marked with evidence; the restore test evidence arrives through §5; when the sign-off is done **remove `FIRST_BOOT` from `.env.ops.prod` and run `./scripts/ops/dc.sh up -d app`**. Check: `./scripts/ops/dc.sh exec -T app wget -qO- http://127.0.0.1:3000/api/health/ready` answers `{"status":"ready"}` (database reachable **and** every migration of this build applied).
 
 ## 4. Loading the data (Excel)
@@ -68,12 +71,12 @@ A rolled-back or discarded stage keeps its label texts and raw quarantine cells 
 ## 6. Updating (by digest)
 CI builds on GitHub (`.github/workflows/build-image.yml`): lint, types, unit tests, then the image for `linux/amd64`, pushed to the private registry `ghcr.io/<owner>/kayas`; the job summary prints the **digest**. No Docker build on the server (a 2 GB VM was killed by `next build`).
 ```
-git pull        # scripts and compose file only
-./scripts/ops/deploy.sh ghcr.io/<owner>/kayas@sha256:<digest>
+./scripts/ops/deploy.sh <commit> ghcr.io/<owner>/kayas@sha256:<digest> linux/amd64 <run id>     # the four values of the CI job summary
+./scripts/ops/deploy.sh --recover       # after an interrupted or failed deployment (the journal release/.deploy-journal says which)
 ```
 **Release checklist (before a digest is deployed):** (1) the commit's GitHub checks are green, **including `Integration tests (PostgreSQL 17)`** (GitHub branch protection is not available on this private repository's plan, so the equivalent is built into the workflow: `build-image.yml` runs the integration workflow and its image job `needs` it, so **a digest exists only for a commit whose integration tests passed**); (2) the FULL e2e suite (`NEXT_DIST_DIR=.next-e2e corepack pnpm exec playwright test`, about 40 minutes, run locally because CI does not run every spec) passed on THAT commit, with the log kept under `.logs/`; (3) `docs/REAL-DATA-GATES.md` has been re-read: a gate is closed only by evidence from the release or a disposable rehearsal, never by a green run; (4) the digest that is deployed is the one the build printed for that commit.
 
-`deploy.sh` pulls the digest, takes a fresh backup, writes `APP_IMAGE`, migrates with the new image, starts it, waits for readiness and **returns to the previous digest on any failure after the switch** (migration, start or readiness); a failure before the switch (pull, backup) leaves the running image alone. It can be started from any directory. Migrations are additive (expand/contract), so the previous image runs on the migrated schema. Rollback of data is a restore (§5) into a scratch database first, then a decision. Base images (Node, Caddy, Postgres) are rebuilt and redeployed on a schedule (at least monthly) so security fixes arrive: `unattended-upgrades` updates the host, not the images.
+`deploy.sh` (T10g, R19B-02/-08): takes an exclusive lock (one deployment at a time; the kernel releases it if the process dies), fetches the origin and requires the commit to be part of `origin/main`, pulls the digest and checks its platform, takes a fresh backup **with the current release**, writes the new approval and checks the host out at the **exact commit** (it never follows a branch tip), migrates with the new image, starts it and waits until **the app answers readiness and the public route (`https://$APP_DOMAIN/fr/login`) answers 200**. Every step is a line of the journal `release/.deploy-journal`. A failure before the switch (pull, platform, backup) leaves the running release alone and says so. A failure after it puts the previous approval and commit back, starts the previous image, and says "rolled back … and VERIFIED" **only if** the previous app became ready and the public route answered (exit 1); otherwise it says **RECOVERY FAILED** and exits 4: the service is then degraded or down and needs a person. A killed deployment leaves a non-terminal journal state; the next `deploy.sh` refuses until `deploy.sh --recover` has run. Migrations are additive (expand/contract), so the previous image runs on the migrated database; an image rollback is not a data rollback (§5). **Not covered here:** R19B-06 (backup pruning/ownership with real host users) and R19B-07 (replacement-host recovery) stay production gates (`docs/REAL-DATA-GATES.md`, G10/G11).
 
 ## 7. Module flags
 A module is switched on only after its acceptance tests pass **on the server**. Environment flags (`FIELD_APP_ENABLED`, `NOTIFICATIONS_ENABLED`, `CANCELLATIONS_ENABLED`, `DOCUMENTS_V1_ENABLED`, `DARIJA_ENABLED`, `ASSISTANT_DET_ENABLED`, `TRANSFERS_ENABLED`, `FINANCE_ENABLED`) are off by default. Finance has a second switch inside the database (owner or app_admin, fresh second factor); both must be on. Never on with real data: `ASSISTANT_ENABLED`, `AI_EXTRACTION_ENABLED`, `SIMULATION_ENABLED` (the server refuses to start). The client and supplier portals have no account creation and stay off until the independent review.

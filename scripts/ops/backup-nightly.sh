@@ -6,10 +6,18 @@
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 cd "$here/../.."
+. ./scripts/ops/release-lib.sh
+. ./scripts/ops/job-lib.sh
+# T10g (R19B-02): the backup job runs the approved image only, from host files at the approved commit, and leaves execution evidence. A refusal here happens
+# before the backup login's secret file is read by any container.
+kayas_reject_overrides backup-nightly.sh
+kayas_read_approved backup-nightly.sh
+kayas_require_release_checkout backup-nightly.sh
+JOB_TTY=no
 trap '"$here/alert.sh" "nightly backup FAILED on $(hostname) (line $LINENO)"' ERR
-./scripts/ops/dc.sh run --rm -T backup node --import ./scripts/register-ts-paths.mjs scripts/backup.ts
+kayas_run_job ./scripts/ops/dc.sh release/evidence/jobs.jsonl backup backup -- node --import ./scripts/register-ts-paths.mjs scripts/backup.ts
 latest=$(ls -1t backups/*.audit-anchor.json | head -n 1)
-./scripts/ops/dc.sh run --rm -T backup node --import ./scripts/register-ts-paths.mjs scripts/backup-verify.ts check "$latest" --max-age-hours 1
+kayas_run_job ./scripts/ops/dc.sh release/evidence/jobs.jsonl backup-verify backup -- node --import ./scripts/register-ts-paths.mjs scripts/backup-verify.ts check "$latest" --max-age-hours 1
 # keep 14 sets (database, documents, manifest), oldest first out
 ls -1t backups/*.audit-anchor.json | tail -n +15 | while read -r f; do
   base="${f%.audit-anchor.json}"

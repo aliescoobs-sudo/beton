@@ -2,15 +2,39 @@
 # Only the reverse proxy publishes ports (80 and 443). The image is pulled BY DIGEST from the private registry (APP_IMAGE).
 # Secrets are on the server only, chmod 600, never in git, one file per purpose:
 #   .env.prod         the app (no migrator, no backup, no superuser)
-#   .env.ops.prod     maintenance and compose interpolation: POSTGRES_SUPERUSER_PASSWORD, DATABASE_URL_MIGRATOR, APP_DOMAIN, APP_IMAGE, FIRST_BOOT
+#   .env.ops.prod     maintenance and compose interpolation: POSTGRES_SUPERUSER_PASSWORD, DATABASE_URL_MIGRATOR, APP_DOMAIN, FIRST_BOOT
 #   .env.backup.prod  the backup job only: DATABASE_URL_BACKUP, BACKUP_AGE_RECIPIENT
 # EVERY command goes through ./scripts/ops/dc.sh, which passes --env-file .env.ops.prod (a bare `docker compose` cannot read this file).
+# T10g (R19B-02): the image is NOT in any env file. dc.sh passes the digest of release/APPROVED explicitly, refuses a shell APP_IMAGE and any COMPOSE_*,
+# requires the host files to be at the approved commit, and checks the RESOLVED configuration (scripts/ops/validate-compose.py) before a container is made.
 name: kayas
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '3'
+
+x-hardening: &hardening
+  security_opt: ['no-new-privileges:true']
+  cap_drop: [ALL]
+  logging: *logging
 
 services:
   db:
+    <<: *hardening
     image: postgres:17.11-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
     restart: unless-stopped
+    # The image starts as root, fixes the ownership of the data directory and drops to the postgres user: only these five capabilities.
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run/postgresql
+    mem_limit: 1g
+    memswap_limit: 1g
+    pids_limit: 200
+    cpus: 1.5
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?set POSTGRES_SUPERUSER_PASSWORD in .env.ops.prod}
@@ -26,15 +50,27 @@ services:
     networks: [internal]
 
   app:
-    image: ${APP_IMAGE:?set APP_IMAGE in .env.ops.prod to ghcr.io/<owner>/kayas@sha256:<digest>}
+    <<: *hardening
+    image: ${APP_IMAGE:?APP_IMAGE is set by scripts/ops/dc.sh from release/APPROVED}
     restart: unless-stopped
     env_file: .env.prod
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+      - /app/.next/cache:size=128m,uid=10001,gid=10001,mode=0700
+      # the SWC native addon of Next unpacks into a cache it must execute from (a tmpfs is noexec by default): small, nosuid, private to uid 10001
+      - /home/app/.cache:size=64m,uid=10001,gid=10001,mode=0700,exec
+    mem_limit: 1536m
+    memswap_limit: 1536m
+    pids_limit: 300
+    cpus: 1.5
     environment:
       NODE_ENV: production
       REAL_DATA: 'true'
       SIMULATION_ENABLED: 'false'
       TRUSTED_PROXY_HOPS: '1'
       FILE_STORE_DIR: /data/file-store
+      NODE_OPTIONS: --max-old-space-size=1024
       # The protected first start (RUNBOOK §3). Off everywhere else; the server refuses to start with it once it is not needed.
       FIRST_BOOT: ${FIRST_BOOT:-false}
     volumes:
@@ -45,8 +81,24 @@ services:
     networks: [internal, edge]
 
   proxy:
+    <<: *hardening
     image: caddy:2-alpine
     restart: unless-stopped
+    cap_add: [NET_BIND_SERVICE]
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /config
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:2019/config/']
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    mem_limit: 256m
+    memswap_limit: 256m
+    pids_limit: 100
+    cpus: 0.5
     environment:
       # Without the domain Caddy would serve "localhost" and never ask for the certificate (CODEX-REVIEW-R9 item 6).
       APP_DOMAIN: ${APP_DOMAIN:?set APP_DOMAIN in .env.ops.prod}
@@ -62,8 +114,13 @@ services:
   # Maintenance container: migrations, bootstrap, owner creation, key rotation, Excel import, restore evidence. Never started by `up`.
   # It runs plain node (scripts/ops/ops.sh): no pnpm, no download. The migrator login lives in .env.ops.prod and nowhere else.
   ops:
-    image: ${APP_IMAGE:?set APP_IMAGE in .env.ops.prod}
+    <<: *hardening
+    image: ${APP_IMAGE:?APP_IMAGE is set by scripts/ops/dc.sh from release/APPROVED}
     profiles: [ops]
+    mem_limit: 1g
+    memswap_limit: 1g
+    pids_limit: 200
+    cpus: 1
     env_file: [.env.prod, .env.ops.prod]
     environment:
       NODE_ENV: production
@@ -85,9 +142,19 @@ services:
   # belongs in no file the app or the maintenance container reads. Its extra secret is a TEMPORARY file, `.env.bootstrap.prod`, that
   # `scripts/ops/bootstrap.sh` checks (nothing but DATABASE_URL_BACKUP) and deletes after a successful run. Never started by `up`.
   bootstrap:
-    image: ${APP_IMAGE:?set APP_IMAGE in .env.ops.prod}
+    <<: *hardening
+    image: ${APP_IMAGE:?APP_IMAGE is set by scripts/ops/dc.sh from release/APPROVED}
     profiles: [bootstrap]
-    env_file: [.env.prod, .env.ops.prod, .env.bootstrap.prod]
+    # .env.bootstrap.prod exists only during the first install; the effective configuration must be readable without it
+    env_file:
+      - .env.prod
+      - .env.ops.prod
+      - path: .env.bootstrap.prod
+        required: false
+    mem_limit: 512m
+    memswap_limit: 512m
+    pids_limit: 100
+    cpus: 0.5
     environment:
       NODE_ENV: production
       REAL_DATA: 'true'
@@ -97,8 +164,13 @@ services:
 
   # Backup job: its own login and its own secret file. It sees the documents read-only and writes only the backups directory.
   backup:
-    image: ${APP_IMAGE:?set APP_IMAGE in .env.ops.prod}
+    <<: *hardening
+    image: ${APP_IMAGE:?APP_IMAGE is set by scripts/ops/dc.sh from release/APPROVED}
     profiles: [ops]
+    mem_limit: 1g
+    memswap_limit: 1g
+    pids_limit: 200
+    cpus: 1
     env_file: [.env.backup.prod]
     environment:
       NODE_ENV: production

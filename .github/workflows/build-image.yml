@@ -1,5 +1,5 @@
 # Builds the production image for the server (linux/amd64), pushes it to the PRIVATE GitHub Container Registry and prints the DIGEST.
-# The server deploys that digest, never a moving tag:   ./scripts/ops/deploy.sh ghcr.io/<owner>/kayas@sha256:<digest>
+# The server deploys that digest, never a moving tag:   ./scripts/ops/deploy.sh <commit> ghcr.io/<owner>/kayas@sha256:<digest> linux/amd64 <run id>
 # Nothing here holds a secret: the push uses the job's own GITHUB_TOKEN. The package must stay PRIVATE (Packages settings), and the
 # server logs in once with a read-only token (read:packages). The build needs a runner with enough memory (a standard GitHub-hosted
 # runner has 16 GB; the 2 GB local VM could not finish `next build`).
@@ -76,10 +76,11 @@ jobs:
             echo ""
             echo "Commit: \`${{ github.sha }}\`"
             echo ""
-            echo "Deploy this exact image on the server:"
+            echo "Approved release (copy these four values; the integration job of this same run passed, because this image job needs it):"
             echo ""
             echo '```'
-            echo "./scripts/ops/deploy.sh ${{ steps.meta.outputs.name }}@${{ steps.build.outputs.digest }}"
+            echo "./scripts/ops/approve-release.sh ${{ github.sha }} ${{ steps.meta.outputs.name }}@${{ steps.build.outputs.digest }} linux/amd64 ${{ github.run_id }}"
+            echo "./scripts/ops/deploy.sh          ${{ github.sha }} ${{ steps.meta.outputs.name }}@${{ steps.build.outputs.digest }} linux/amd64 ${{ github.run_id }}"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
           # Read by scripts/training/pick-image.sh: ties the digest to the exact commit it was built from.

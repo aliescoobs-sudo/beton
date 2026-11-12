@@ -1,18 +1,4 @@
-import { spawnSync } from 'node:child_process';
-import {
-  copyFileSync,
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readdirSync,
-  readFileSync,
-  renameSync,
-  statSync,
-  symlinkSync,
-  writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { loadEnv, loadMaintenanceEnv } from '../src/lib/env';
 import { CHECKLIST } from '../src/modules/platform-security/domain/checklist';
@@ -65,7 +51,9 @@ describe('secrets are separated (item 3)', () => {
 describe('every compose and cron command loads its env file (item 4)', () => {
   it('goes through scripts/ops/dc.sh, which passes --env-file', () => {
     const dc = readFileSync('scripts/ops/dc.sh', 'utf8');
-    expect(dc).toMatch(/docker compose -f docker-compose\.prod\.yml --env-file \.env\.ops\.prod "\$@"/);
+    // T10g: the wrapper also binds the command to the approved release (scripts/release-binding.test.ts); here only the env file matters
+    expect(dc).toMatch(/docker compose -f docker-compose\.prod\.yml --env-file \.env\.ops\.prod/);
+    expect(dc).toMatch(/exec "\$\{base\[@\]\}" "\$sub" "\$@"/);
     const offenders: string[] = [];
     const files = ['docs/RUNBOOK.md', ...readdirSync('scripts/ops').map((f) => `scripts/ops/${f}`)].filter(
       (f) => f !== 'scripts/ops/dc.sh',
@@ -150,17 +138,21 @@ describe('deploy by digest from the private registry (GitHub Actions)', () => {
     expect(y).toMatch(/steps\.build\.outputs\.digest/);
     expect(y).not.toMatch(/\bghp_[A-Za-z0-9]/);
   });
-  it('the server deploys by digest only, with a rollback', () => {
-    const d = readFileSync('scripts/ops/deploy.sh', 'utf8');
+  it('the server deploys by digest only, with a verified rollback (behaviour: scripts/release-binding.test.ts)', () => {
+    const d = ['deploy.sh', 'deploy-stage.sh', 'deploy-run.sh']
+      .map((f) => readFileSync(`scripts/ops/${f}`, 'utf8'))
+      .join('\n');
     expect(d).toMatch(/@sha256:/);
     expect(d).toMatch(/rolled back/);
+    expect(d).toMatch(/RECOVERY FAILED/);
     expect(d).toMatch(/backup-nightly\.sh/);
+    expect(d).not.toMatch(/git pull/);
   });
 });
 
 describe('bootstrap and host ownership (F04 of the final review)', () => {
   it('the bootstrap service is the only one that reads the temporary bootstrap file, and it is not in the default profile', () => {
-    expect(block('bootstrap')).toMatch(/env_file: \[\.env\.prod, \.env\.ops\.prod, \.env\.bootstrap\.prod\]/);
+    expect(block('bootstrap')).toMatch(/- path: \.env\.bootstrap\.prod\s+required: false/);
     expect(block('bootstrap')).toMatch(/profiles: \[bootstrap\]/);
     for (const name of ['app', 'ops', 'backup'])
       expect(block(name).match(/env_file:.*$/m)?.[0] ?? '', name).not.toMatch(/bootstrap/);
@@ -181,169 +173,5 @@ describe('bootstrap and host ownership (F04 of the final review)', () => {
   it('production bootstrap creates its own database only, not the scratch test database', () => {
     const script = readFileSync('scripts/db-bootstrap.ts', 'utf8');
     expect(script).toMatch(/if \(process\.env\.NODE_ENV !== 'production'\) databases\.push\(TEST_DATABASE\)/);
-  });
-});
-
-describe('scripts/ops/bootstrap.sh (F04)', () => {
-  const run = (content: string | null, dcExit: number) => {
-    const dir = mkdtempSync(path.join(tmpdir(), 'bb-boot-'));
-    mkdirSync(path.join(dir, 'scripts/ops'), { recursive: true });
-    copyFileSync('scripts/ops/bootstrap.sh', path.join(dir, 'scripts/ops/bootstrap.sh'));
-    writeFileSync(
-      path.join(dir, 'dc-stub.sh'),
-      `#!/usr/bin/env bash\necho "$@" >> "${dir}/dc.log"\nexit ${dcExit}\n`,
-      { mode: 0o755 },
-    );
-    if (content !== null) writeFileSync(path.join(dir, '.env.bootstrap.prod'), content);
-    const r = spawnSync('bash', [path.join(dir, 'scripts/ops/bootstrap.sh')], {
-      env: { ...process.env, DC: path.join(dir, 'dc-stub.sh') },
-      encoding: 'utf8',
-    });
-    return {
-      dir,
-      status: r.status,
-      err: r.stderr,
-      left: existsSync(path.join(dir, '.env.bootstrap.prod')),
-      called: existsSync(path.join(dir, 'dc.log')),
-    };
-  };
-  it('runs the bootstrap service once and deletes the file when it succeeds', () => {
-    const r = run('DATABASE_URL_BACKUP=postgres://b:pw@db:5432/x\n', 0);
-    expect(r.status).toBe(0);
-    expect(r.called).toBe(true);
-    expect(r.left).toBe(false);
-  });
-  it('keeps the file when the run fails (so it can be retried) and says so by its exit code', () => {
-    const r = run('DATABASE_URL_BACKUP=postgres://b:pw@db:5432/x\n', 3);
-    expect(r.status).not.toBe(0);
-    expect(r.left).toBe(true);
-  });
-  it('refuses a file with any other variable, an empty file and a missing file, and runs nothing', () => {
-    for (const content of [
-      'DATABASE_URL_BACKUP=postgres://b@db/x\nAUTH_SECRET=oops\n',
-      '# nothing\n',
-      null,
-    ]) {
-      const r = run(content, 0);
-      expect(r.status, String(content)).not.toBe(0);
-      expect(r.called, String(content)).toBe(false);
-    }
-  });
-});
-
-describe('scripts/ops/deploy.sh (F05 of the final review)', () => {
-  const OLD = `ghcr.io/o/kayas@sha256:${'a'.repeat(64)}`;
-  const NEW = `ghcr.io/o/kayas@sha256:${'b'.repeat(64)}`;
-  /** Runs deploy.sh from a directory that is NOT the repository root, against stubs; `fail` names the step that fails. */
-  const deploy = (
-    fail: 'none' | 'pull' | 'backup' | 'migrate' | 'up' | 'ready',
-    previous: string | null = OLD,
-    hostile: 'none' | 'stale-temp' | 'symlink' = 'none',
-  ) => {
-    const dir = mkdtempSync(path.join(tmpdir(), 'bb-deploy-'));
-    mkdirSync(path.join(dir, 'scripts/ops'), { recursive: true });
-    copyFileSync('scripts/ops/deploy.sh', path.join(dir, 'scripts/ops/deploy.sh'));
-    writeFileSync(
-      path.join(dir, '.env.ops.prod'),
-      `APP_DOMAIN=x.test\n${previous ? `APP_IMAGE=${previous}\n` : ''}FIRST_BOOT=\n`,
-    );
-    if (hostile === 'stale-temp')
-      writeFileSync(path.join(dir, '.env.ops.prod.new'), 'planted\n', { mode: 0o666 });
-    if (hostile === 'symlink') {
-      renameSync(path.join(dir, '.env.ops.prod'), path.join(dir, 'real.env'));
-      symlinkSync('real.env', path.join(dir, '.env.ops.prod'));
-    }
-    const log = path.join(dir, 'calls.log');
-    const stub = (name: string, body: string) =>
-      writeFileSync(path.join(dir, name), `#!/usr/bin/env bash\n${body}\n`, { mode: 0o755 });
-    stub('docker', `echo "docker $*" >> "${log}"; [ "${fail}" = pull ] && exit 5; exit 0`);
-    stub('backup', `echo "backup" >> "${log}"; [ "${fail}" = backup ] && exit 6; exit 0`);
-    stub('ops', `echo "ops $*" >> "${log}"; [ "${fail}" = migrate ] && exit 7; exit 0`);
-    stub(
-      'dc',
-      `echo "dc $*" >> "${log}"
-case "$1" in
-  up) if [ "${fail}" = up ] && [ ! -f "${dir}/rolled" ] && grep -q "${'b'.repeat(64)}" "${dir}/.env.ops.prod"; then exit 8; fi;;
-  exec) if [ "${fail}" = ready ]; then exit 1; fi; echo '{"status":"ready"}';;
-esac
-exit 0`,
-    );
-    // umask 022 on purpose: the script must make its own files private, whatever the caller's umask
-    const r = spawnSync(
-      'bash',
-      ['-c', 'umask 022; exec bash "$0" "$@"', path.join(dir, 'scripts/ops/deploy.sh'), NEW],
-      {
-        cwd: tmpdir(), // not the repository: the script must find its own root
-        env: {
-          ...process.env,
-          DOCKER: path.join(dir, 'docker'),
-          DC: path.join(dir, 'dc'),
-          OPS: path.join(dir, 'ops'),
-          BACKUP: path.join(dir, 'backup'),
-          READY_TRIES: '2',
-          READY_SLEEP: '0',
-        },
-        encoding: 'utf8',
-      },
-    );
-    const env = readFileSync(path.join(dir, '.env.ops.prod'), 'utf8');
-    return {
-      dir,
-      mode: statSync(path.join(dir, hostile === 'symlink' ? 'real.env' : '.env.ops.prod')).mode & 0o777,
-      leftovers: readdirSync(dir).filter((f) => f.startsWith('.env.ops.prod.')),
-      status: r.status,
-      err: r.stderr,
-      image: /^APP_IMAGE=(.*)$/m.exec(env)?.[1] ?? null,
-      calls: existsSync(log) ? readFileSync(log, 'utf8').split('\n').filter(Boolean) : [],
-    };
-  };
-
-  it('works from any directory and ends on the new digest after a clean run', () => {
-    const r = deploy('none');
-    expect(r.status, r.err).toBe(0);
-    expect(r.image).toBe(NEW);
-    expect(r.calls).toEqual(expect.arrayContaining(['backup', expect.stringContaining('db-migrate')]));
-  });
-  it('R11-03: the env file is rewritten privately, whatever the umask; a planted temp name is never reused; a symlink is refused', () => {
-    const clean = deploy('none');
-    expect(clean.status, clean.err).toBe(0);
-    expect(clean.mode.toString(8)).toBe('600');
-    expect(clean.leftovers).toEqual([]);
-    const planted = deploy('none', OLD, 'stale-temp');
-    expect(planted.status, planted.err).toBe(0);
-    expect(planted.mode.toString(8)).toBe('600');
-    // the planted world-writable file was not the one written: it still says what the attacker put there
-    expect(readFileSync(path.join(planted.dir, '.env.ops.prod.new'), 'utf8')).toBe('planted\n');
-    expect(planted.image).toBe(NEW);
-    const linked = deploy('none', OLD, 'symlink');
-    expect(linked.status).not.toBe(0);
-    expect(linked.err).toMatch(/symbolic link/);
-    expect(linked.calls).toEqual([]);
-  });
-  it('a failure before the switch changes nothing and rolls nothing back (pull, backup)', () => {
-    for (const fail of ['pull', 'backup'] as const) {
-      const r = deploy(fail);
-      expect(r.status, fail).not.toBe(0);
-      expect(r.image, fail).toBe(OLD);
-      expect(
-        r.calls.filter((c) => c.startsWith('dc up')),
-        fail,
-      ).toEqual([]);
-    }
-  });
-  it('every failure after the switch puts the previous image back and starts it: migration, start, readiness', () => {
-    for (const fail of ['migrate', 'up', 'ready'] as const) {
-      const r = deploy(fail);
-      expect(r.status, fail).not.toBe(0);
-      expect(r.image, fail).toBe(OLD);
-      expect(r.err, fail).toMatch(/rolled back to/);
-      // the last thing run is the start of the previous image
-      expect(r.calls[r.calls.length - 1], fail).toBe('dc up -d app');
-    }
-  });
-  it('with no previous image it fails loudly and does not invent one', () => {
-    const r = deploy('migrate', null);
-    expect(r.status).not.toBe(0);
-    expect(r.err).toMatch(/no previous image/);
   });
 });
