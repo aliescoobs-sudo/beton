@@ -45,7 +45,7 @@ beforeAll(async () => {
   const master = await orderMaster(app, owner.id, `${marker}a`);
   const scene = await deliveryScene(app, owner.id, `${marker}a`, '2092-01-01');
   const b = await createPlant(app, owner, {
-    code: `B${marker.slice(2, 7).toUpperCase().replace(/[0-9]/g, 'X')}`,
+    code: Array.from({ length: 6 }, () => String.fromCharCode(65 + Math.floor(Math.random() * 26))).join(''), // 26^6, not 7^4 (a code made of the marker's hex letters met itself now and then)
     name: `RH B ${marker}`,
   });
   if (!b.ok) throw new Error(b.error);
