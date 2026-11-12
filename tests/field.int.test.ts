@@ -25,6 +25,7 @@ import type { SessionUser } from '../src/modules/platform-security/auth/session-
 import { authTestKit } from './auth-helpers';
 import { realSessionUser } from './helpers/actors';
 import { deliveryScene, insertDelivery } from './helpers/ledger-fixtures';
+import { freeTruckCode } from './helpers/codes';
 
 // R4 (CP-PROD-PLAN): AC-PROD-20 to 26. The phone signs in with a PIN and one bound device; every door checks the caller's own
 // driver; nothing it returns holds a price.
@@ -469,10 +470,11 @@ describe('the pump operator (AC-PROD-26)', () => {
   it('has five steps in order and records the m3 pumped; only its own jobs', async () => {
     const op = await newDriver('pump_operator');
     const s = await sessionFor(op);
+    const pumpCode = await freeTruckCode('P');
     const pump = await asOwner((tx) =>
       tx.query<{ id: string }>(
         `insert into truck (id, code, plate, kind) values (gen_random_uuid(), $1, $2, 'pump') returning id`,
-        [`P${n++ % 900}`, `PM-${marker.slice(0, 8)}${n}`],
+        [pumpCode, `PM-${marker.slice(0, 8)}${n++}`],
       ),
     );
     const made = await createPumpJob(

@@ -29,7 +29,7 @@ import {
 import { resetSimClock } from '../helpers/reset-sim-clock';
 import { ANONYMOUS_ACTOR_ID, SYSTEM_ACTOR_ID } from '../../src/modules/platform-security/auth/actors';
 import { POLICY_ROLES } from '../../src/modules/platform-security/domain/permissions';
-import { freeTruckCode } from '../helpers/codes';
+import { freeDriverCode, freeTruckCode } from '../helpers/codes';
 
 // AC-SEC-04, generated from the registry: for every RLS table × every role, read exactly what the matrix allows.
 type DbRole = (typeof DB_ROLES)[number];
@@ -419,12 +419,12 @@ const FIXTURES: Record<
     seed: async (tx, actor) => {
       const n = Math.floor(Math.random() * 1e9);
       const pump = await tx.query<{ id: string }>(
-        `insert into truck (id, code, plate, kind) values (gen_random_uuid(), 'P' || ($1::int % 900 + 100), 'PJ-' || $1::text, 'pump') returning id`,
-        [n],
+        `insert into truck (id, code, plate, kind) values (gen_random_uuid(), $2, 'PJ-' || $1::text, 'pump') returning id`,
+        [n, await freeTruckCode('P')],
       );
       const op = await tx.query<{ id: string }>(
-        `insert into driver (id, code, name, created_by, kind) values (gen_random_uuid(), 'CH-' || ($1::int % 8000 + 1000), $2, $3, 'pump_operator') returning id`,
-        [n, `pj${marker}`, actor],
+        `insert into driver (id, code, name, created_by, kind) values (gen_random_uuid(), $1, $2, $3, 'pump_operator') returning id`,
+        [await freeDriverCode(), `pj${marker}`, actor],
       );
       return tx.query(`select public.create_pump_job(current_date, $1, $2, null, $3, null, 10)`, [
         pump.rows[0]?.id,
@@ -728,11 +728,11 @@ const FIXTURES: Record<
   },
   driver: {
     writers: ['owner', 'partner'],
-    seed: (tx, actor) =>
+    seed: async (tx, actor) =>
       tx.query(
         `insert into driver (id, code, name, created_by)
-         values (gen_random_uuid(), 'CH-' || (1000 + (('x' || substr(md5($1::text || $2::text), 1, 4))::bit(16)::int % 8999)), $1::text, $2::uuid)`,
-        [marker, actor],
+         values (gen_random_uuid(), $3, $1::text, $2::uuid)`,
+        [marker, actor, await freeDriverCode()],
       ),
     visible: `select created_by::text as owner from driver where name = $1`,
   },
@@ -1415,17 +1415,17 @@ beforeAll(async () => {
     const scene = await deliveryScene(app, actors.owner, `${marker}fld`);
     await withRlsContext(app, { userId: actors.owner, role: 'owner', requestId: marker }, async (tx) => {
       const drv = await tx.query<{ id: string }>(
-        `insert into driver (id, code, name, created_by) values (gen_random_uuid(), 'CH-' || ($1::int % 8000 + 1000), $2, $3) returning id`,
-        [n, `fd${marker}`, actors.owner],
+        `insert into driver (id, code, name, created_by) values (gen_random_uuid(), $1, $2, $3) returning id`,
+        [await freeDriverCode(), `fd${marker}`, actors.owner],
       );
       preField.driver = drv.rows[0]!.id;
       const pump = await tx.query<{ id: string }>(
-        `insert into truck (id, code, plate, kind) values (gen_random_uuid(), 'P' || ($1::int % 900 + 100), 'PF-' || $1::text, 'pump') returning id`,
-        [n],
+        `insert into truck (id, code, plate, kind) values (gen_random_uuid(), $2, 'PF-' || $1::text, 'pump') returning id`,
+        [n, await freeTruckCode('P')],
       );
       const op = await tx.query<{ id: string }>(
-        `insert into driver (id, code, name, created_by, kind) values (gen_random_uuid(), 'CH-' || (($1::int + 7) % 8000 + 1000), $2, $3, 'pump_operator') returning id`,
-        [n, `fo${marker}`, actors.owner],
+        `insert into driver (id, code, name, created_by, kind) values (gen_random_uuid(), $1, $2, $3, 'pump_operator') returning id`,
+        [await freeDriverCode(), `fo${marker}`, actors.owner],
       );
       const job = await tx.query<{ id: string }>(
         `select public.create_pump_job(current_date, $1, $2, null, $3, null, 10) as id`,

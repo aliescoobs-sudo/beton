@@ -163,11 +163,11 @@ describe('cases 1 and 2: the order was never produced', () => {
   it('case 2: planned rotations leave the plan and the driver is told "do not load"', async () => {
     const o = await newOrder();
     const driverUser = u.driver!.id;
+    const drvCode = await freeDriverCode();
     const drv = await asOwner(async (tx) => {
-      const n = Math.floor(Math.random() * 8000);
       const d = await tx.query<{ id: string }>(
-        `insert into driver (id, code, name, created_by, user_id) values (gen_random_uuid(), 'CH-' || ($1::int + 1000), $2, $3, $4) returning id`,
-        [n, `cn${marker}`, u.owner!.id, driverUser],
+        `insert into driver (id, code, name, created_by, user_id) values (gen_random_uuid(), $1, $2, $3, $4) returning id`,
+        [drvCode, `cn${marker}`, u.owner!.id, driverUser],
       );
       return d.rows[0]!.id;
     });
@@ -401,11 +401,11 @@ describe('exposure', () => {
   it('a driver acknowledges a redirect of their own rotation only, once', async () => {
     const o = await newOrder();
     const target = await newOrder();
+    const ackCode = await freeDriverCode();
     const drv = await asOwner(async (tx) => {
-      const n = Math.floor(Math.random() * 8000);
       const d = await tx.query<{ id: string }>(
-        `insert into driver (id, code, name, created_by, user_id) values (gen_random_uuid(), 'CH-' || ($1::int + 1000), $2, $3, $4) returning id`,
-        [n, `ack${marker}`, u.owner!.id, u.driver!.id],
+        `insert into driver (id, code, name, created_by, user_id) values (gen_random_uuid(), $1, $2, $3, $4) returning id`,
+        [ackCode, `ack${marker}`, u.owner!.id, u.driver!.id],
       );
       return d.rows[0]!.id;
     }).catch(() => null);
