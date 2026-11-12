@@ -95,9 +95,19 @@ export function stagingConfig(
           bind('/srv/kayas/scripts/training/db-init', '/docker-entrypoint-initdb.d'),
         ],
       }),
-      app: hardened({ image, platform: 'linux/amd64', environment: { ...stagingEnv } }),
+      app: hardened({
+        image,
+        platform: 'linux/amd64',
+        environment: { ...stagingEnv, APP_BASE_URL: 'https://kayas.example.com' },
+      }),
       proxy: hardened({
         image: 'caddy:2-alpine',
+        environment: {
+          APP_DOMAIN: 'kayas.example.com',
+          STAGING_TLS: 'acme',
+          STAGING_HTTP_PORT: '80',
+          STAGING_HTTPS_PORT: '443',
+        },
         cap_add: ['NET_BIND_SERVICE'],
         ports: ports80_443(),
         volumes: [

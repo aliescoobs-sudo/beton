@@ -13,6 +13,14 @@ cd "$(dirname "$0")/../.."
 for f in .env.staging .env.staging.ops; do [ -r "$f" ] || { echo "staging dc.sh: $f not found: run ./scripts/staging/init-env.sh first" >&2; exit 1; }; done
 kayas_reject_overrides "staging dc.sh"
 kayas_reject_env_file_image "staging dc.sh" .env.staging .env.staging.ops
+# R20-09: the shell outranks an env file in Compose interpolation. Nothing the proxy, the image choice or the rehearsal read may come from the inherited
+# environment: the fixed names below, and any variable that either env file defines (those would silently win over the file).
+for v in APP_DOMAIN APP_BASE_URL STAGING_TLS STAGING_HTTP_PORT STAGING_HTTPS_PORT STAGING_BIND_IP STAGING_PLATFORM STAGING_REHEARSAL STAGING_PROFILE REHEARSAL_IMAGE POSTGRES_SUPERUSER_PASSWORD DOCKER_CONFIG BUILDKIT_HOST; do
+  if [ -n "${!v+x}" ]; then echo "staging dc.sh: $v is set in the shell. Refused: the proxy domain, TLS mode, ports and rehearsal settings come from the private env files only." >&2; exit 1; fi
+done
+while IFS= read -r v; do
+  if [ -n "${!v+x}" ]; then echo "staging dc.sh: $v is set in the shell and also defined in an env file. Refused: the shell value would override the file." >&2; exit 1; fi
+done < <(sed -n -E 's/^[[:space:]]*(export[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*)=.*/\2/p' .env.staging .env.staging.ops)
 KAYAS_VALIDATE_FLAGS=()
 rehearsal_flag=""
 if grep -q -E '^STAGING_REHEARSAL=1$' .env.staging; then rehearsal_flag="--rehearsal"; KAYAS_VALIDATE_FLAGS=(--rehearsal); fi

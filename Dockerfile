@@ -6,6 +6,7 @@ WORKDIR /app
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
+# The context is filtered by .dockerignore: no test source (e2e, e2e-staging, *.test.ts, *.spec.ts, playwright configs), env file or key enters the image (scripts/dockerignore.test.ts, R20-08).
 COPY . .
 # SIMULATION_ENABLED=false: the production build never carries the pilot simulation.
 ENV SIMULATION_ENABLED=false NEXT_TELEMETRY_DISABLED=1

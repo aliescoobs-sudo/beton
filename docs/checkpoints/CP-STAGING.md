@@ -28,3 +28,7 @@
 ## Not done / needs the owner
 
 Certificate issuance by Let's Encrypt, the real DNS and UFW, the external IPv4 all-port scan, a phone's Basic prompt, the reboot rehearsal, the CI-built digest of the final commit, and everything in `docs/STAGING-VPS.md` §3–§16. No VPS was touched.
+
+## After R20 (T10h, 12 Nov 2026)
+
+Codex R20 verdict: **GO for a fictitious-data staging instance; real data NO-GO.** Changes since the rehearsal above (details `docs/reviews/R20-RESPONSE.md`, decision 227): the staging guide was corrected (R20-07); `.dockerignore` keeps `e2e-staging`, `playwright.staging.config.ts` and `*.spec.ts` out of the image (R20-08, `scripts/dockerignore.test.ts`); `staging/dc.sh` and `validate-compose.py` validate the effective domain, origin and TLS mode before any container call (R20-09, `scripts/staging-config.test.ts`). `scripts/staging/rehearse.sh` was **re-run on the final code**: rc 0, all checks passed (including the 5 Playwright checks) on the rebuilt local image (linux/arm64, content id `sha256:e1b9cf6a…`), through the new `dc.sh` override refusals and the new effective proxy-input validation. The image content check of the guide exits 0 on that rebuilt image; on the image built before the fix it names `/app/e2e-staging` and exits 1, and it passes an older clean image. `staging-config` now has 46 tests. Still not done: certificate issuance, DNS, UFW, the external scans (IPv4 and every global IPv6 address), a phone's Basic prompt, the reboot rehearsal, the CI-built digest of the final commit.

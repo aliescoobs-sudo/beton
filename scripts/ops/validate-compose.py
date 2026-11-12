@@ -66,6 +66,7 @@ STACKS = {
     },
 }
 DIGEST = re.compile(r"^ghcr\.io/aliescoobs-sudo/kayas@sha256:[0-9a-f]{64}$")
+DOMAIN = re.compile(r"[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+")
 LOCAL_ID = re.compile(r"^sha256:[0-9a-f]{64}$")  # the local rehearsal runs an image by its content id; never accepted without --rehearsal
 
 
@@ -160,6 +161,23 @@ def main(argv):
         for k in pol["absent_env"]:
             if env.get(k) not in (None, ""):
                 fail(name, f"{k} must be absent")
+    if stack == "staging":
+        # R20-09: the EFFECTIVE proxy inputs. One DNS host name (fullmatch: a trailing newline or a second line does not pass), the app origin built from
+        # it, and the public ACME certificate on the VPS (the internal CA only in the local rehearsal).
+        penv = (services.get("proxy") or {}).get("environment") or {}
+        domain = str(penv.get("APP_DOMAIN", ""))
+        if not DOMAIN.fullmatch(domain) or len(domain) > 253 or any(len(x) > 63 for x in domain.split(".")):
+            fail("proxy", "APP_DOMAIN is not a single-line DNS host name")
+        tls = str(penv.get("STAGING_TLS", ""))
+        if tls != "acme" and not (rehearsal and tls == "internal"):
+            fail("proxy", "STAGING_TLS must be acme (the internal CA is for the local rehearsal only)")
+        https_port = str(penv.get("STAGING_HTTPS_PORT", ""))
+        if not rehearsal and (https_port != "443" or str(penv.get("STAGING_HTTP_PORT", "")) != "80"):
+            fail("proxy", "the proxy ports must be 80 and 443")
+        origin = str(((services.get("app") or {}).get("environment") or {}).get("APP_BASE_URL", ""))
+        want_origin = "https://" + domain + (":" + https_port if rehearsal else "")
+        if origin != want_origin:
+            fail("app", "APP_BASE_URL does not match the proxy domain")
     # networks: the internal one stays internal; no network may be external
     nets = cfg.get("networks") or {}
     if not (nets.get("internal") or {}).get("internal"):

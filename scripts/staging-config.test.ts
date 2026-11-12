@@ -142,6 +142,9 @@ describe.skipIf(!hasPython)('the effective-configuration validator (staging)', (
       protocol: 'tcp',
       host_ip: '127.0.0.1',
     }));
+    cfg.services.proxy.environment.STAGING_HTTPS_PORT = '18443';
+    cfg.services.proxy.environment.STAGING_TLS = 'internal';
+    cfg.services.app.environment.APP_BASE_URL = 'https://kayas.example.com:18443';
     expect(validate(cfg, ['--stack', 'staging', '--image', id, '--rehearsal']).code).toBe(0);
     (cfg.services.proxy.ports ?? [])[0]!.host_ip = '0.0.0.0';
     expect(validate(cfg, ['--stack', 'staging', '--image', id, '--rehearsal']).code).toBe(1);
@@ -346,6 +349,71 @@ describe.skipIf(!hasPython)('scripts/staging/dc.sh (the release-bound wrapper)',
     s.write('.env.staging', 'APP_DOMAIN=kayas.example.com\nSTAGING_HTTP_PORT=8080\n');
     expect(s.run('scripts/staging/dc.sh', ['ps']).stderr).toMatch(/rehearsal-only/);
   });
+  it('R20-09: refuses inherited proxy / TLS / rehearsal / image overrides in the shell, before any docker call', () => {
+    const overrides: Record<string, string>[] = [
+      { APP_DOMAIN: 'evil.example.com' },
+      { STAGING_TLS: 'internal' },
+      { STAGING_HTTPS_PORT: '8443' },
+      { STAGING_BIND_IP: '127.0.0.1' },
+      { STAGING_REHEARSAL: '1' },
+      { REHEARSAL_IMAGE: `sha256:${'a'.repeat(64)}` },
+      { APP_BASE_URL: 'https://evil.example.com' },
+      { AUTH_SECRET: 'shell-wins-over-file' }, // defined in .env.staging: the shell would override it
+      { DOCKER_CONFIG: '/tmp/x' },
+    ];
+    for (const env of overrides) {
+      const s = stg();
+      const r = s.run('scripts/staging/dc.sh', ['ps'], env);
+      expect(r.status, JSON.stringify(Object.keys(env))).toBe(1);
+      expect(r.stderr).toMatch(/is set in the shell/);
+      expect(s.called()).toBe('');
+    }
+  });
+  it('R20-09: a multi-line / config-token host name, the internal CA and a mismatched origin are refused before any container call', () => {
+    const bad: Record<string, (c: ReturnType<typeof stagingConfig>) => void> = {
+      'a multi-line host name': (c) => {
+        c.services.proxy.environment.APP_DOMAIN = 'kayas.example.com\nevil.example.com {\n\trespond 200';
+      },
+      'a trailing newline': (c) => {
+        c.services.proxy.environment.APP_DOMAIN = 'kayas.example.com\n';
+      },
+      'a config token in the host name': (c) => {
+        c.services.proxy.environment.APP_DOMAIN = 'kayas.example.com {';
+      },
+      'an uppercase / scheme host name': (c) => {
+        c.services.proxy.environment.APP_DOMAIN = 'https://kayas.example.com';
+      },
+      'no dot': (c) => {
+        c.services.proxy.environment.APP_DOMAIN = 'localhost';
+      },
+      'the internal CA on the VPS profile': (c) => {
+        c.services.proxy.environment.STAGING_TLS = 'internal';
+      },
+      'an unknown TLS mode': (c) => {
+        c.services.proxy.environment.STAGING_TLS = 'off';
+      },
+      'a different origin': (c) => {
+        c.services.app.environment.APP_BASE_URL = 'https://other.example.com';
+      },
+      'an http origin': (c) => {
+        c.services.app.environment.APP_BASE_URL = 'http://kayas.example.com';
+      },
+      'an origin with a port on the VPS': (c) => {
+        c.services.app.environment.APP_BASE_URL = 'https://kayas.example.com:8443';
+      },
+    };
+    for (const [name, mutate] of Object.entries(bad)) {
+      const cfg = stagingConfig();
+      mutate(cfg);
+      const s = stg({ config: cfg });
+      const r = s.run('scripts/staging/dc.sh', ['run', '--rm', 'ops']);
+      expect(r.status, name).toBe(1);
+      expect(r.stderr, name).toMatch(/REFUSED (proxy|app)/);
+      expect(s.called(), name).not.toMatch(/run --rm/);
+    }
+    const ok = stg({ config: stagingConfig() }).run('scripts/staging/dc.sh', ['ps']);
+    expect(ok.status).toBe(0); // valid generated inputs pass
+  }, 90_000);
   it('refuses when the effective configuration is not the expected one, before anything runs', () => {
     const cfg = stagingConfig();
     cfg.services.ops.volumes = [{ type: 'bind', source: '/home/x', target: '/twin', read_only: true }];

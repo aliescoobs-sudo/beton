@@ -29,6 +29,10 @@ out/
 e2e
 tests
 playwright.config.ts
+# R20-08: the staging browser tests and their config are test sources too
+e2e-staging
+playwright.staging.config.ts
+**/*.spec.ts
 vitest.config.ts
 **/*.test.ts
 **/*.test.tsx
