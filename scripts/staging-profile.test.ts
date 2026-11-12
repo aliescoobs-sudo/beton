@@ -147,7 +147,7 @@ describe('no importer mount can exist in the staging stack', () => {
     expect(sources.sort()).toEqual([
       './Caddyfile.staging',
       './scripts/training/db-init',
-      './staging/basic-auth.caddy',
+      './staging', // the Basic Auth hash directory, read-only (decision 228); it holds no import data
     ]);
     expect(compose).not.toMatch(/\/twin|imports|import-work|OPS_TWIN|history/);
     expect(readFileSync('scripts/staging/ops.sh', 'utf8')).toMatch(

@@ -32,7 +32,26 @@ sleep "${BOUNDARY_PAUSE:-10}"
 state="$($dc ps --format '{{.Service}} {{.State}} {{.Health}}' app)"
 case "$state" in "app running healthy") ;; *) echo "up.sh: the app is not running and healthy after the boot probe ($state): the proxy is NOT started" >&2; exit 1 ;; esac
 $dc exec -T app wget -qO- http://127.0.0.1:3000/api/health/ready | grep -q '"ready"' || { echo "up.sh: the app stopped answering readiness: the proxy is NOT started" >&2; exit 1; }
-$dc up-proxy
+# The proxy is the only part a visitor sees: a crash loop (for example "permission denied" on the Basic Auth hash) must fail HERE with its cause, not only as
+# "unhealthy". Nothing from the file or from the environment is printed.
+proxy_fail() {
+  local why="$1"
+  echo "up.sh: the proxy did not start correctly: $why" >&2
+  echo "up.sh: look at the cause with  ./scripts/staging/dc.sh logs --tail 30 proxy   (docs/STAGING-VPS.md, troubleshooting). The app and the database are running; the site is NOT reachable." >&2
+  exit 1
+}
+if ! $dc up-proxy; then
+  if $dc logs --tail 50 proxy 2>&1 | grep -q 'permission denied'; then
+    proxy_fail "Caddy cannot read a file it needs (permission denied): normally staging/basic-auth.caddy, which must be mode 0644 and owned by the deploy user; re-run ./scripts/staging/make-basic.sh (it fixes the mode)."
+  fi
+  proxy_fail "it is restarting or unhealthy (crash loop?)."
+fi
+# Inside the container: the Caddyfile and the hash file are readable, and Caddy has loaded its configuration (its own /healthz site answers).
+$dc exec -T proxy sh -c 'test -r /etc/caddy/Caddyfile && test -r /etc/caddy/staging/basic-auth.caddy' || proxy_fail "the Caddyfile or the Basic Auth hash file is not readable inside the proxy container."
+$dc exec -T proxy wget -qO- http://127.0.0.1:2080/healthz >/dev/null 2>&1 || proxy_fail "Caddy is running but has not loaded its configuration (its health endpoint does not answer)."
+sleep "${PROXY_PAUSE:-3}"
+pstate="$($dc ps --format '{{.Service}} {{.State}} {{.Health}}' proxy)"
+case "$pstate" in "proxy running healthy") ;; *) proxy_fail "the proxy is not running and healthy a few seconds after start ($pstate)." ;; esac
 cat <<'NEXT'
 
 The staging stack is up. The proxy answers on 80/443 with Basic Auth in front of every path.

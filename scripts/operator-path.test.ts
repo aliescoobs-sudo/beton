@@ -103,7 +103,7 @@ p.close();
         expect(m[1], `${f}: ${m[1]}`).not.toMatch(/password|authenticator|code \(|secret|token|key/i);
     }
   });
-  it('make-basic.sh: the password is typed hidden, reaches Caddy on stdin only, and the file is 0600 under umask 022', () => {
+  it('make-basic.sh: the password is typed hidden, reaches Caddy on stdin only, and the file is 0644 (the proxy cannot read 0600) under umask 022', () => {
     const sb = makeSandbox({ stack: 'staging' });
     spawnSync('rm', ['-f', path.join(sb.root, 'staging/basic-auth.caddy')]);
     const out = pty(
@@ -119,7 +119,7 @@ p.close();
     expect(out.status, out.transcript).toBe(0);
     expect(out.transcript).not.toContain(CANARY);
     const file = path.join(sb.root, 'staging/basic-auth.caddy');
-    expect(mode(file)).toBe(0o600);
+    expect(mode(file)).toBe(0o644);
     expect(readFileSync(file, 'utf8')).toMatch(
       /basic_auth bcrypt "KAYAS staging" \{\n\tali-basic \$2a\$14\$[./A-Za-z0-9]{53}\n\}/,
     );
@@ -161,7 +161,7 @@ p.close();
     );
     expect(batch.status, batch.stderr).toBe(0);
     expect(batch.stdout + batch.stderr).not.toContain(CANARY);
-    expect(mode(path.join(sb.root, 'staging/basic-auth.caddy'))).toBe(0o600);
+    expect(mode(path.join(sb.root, 'staging/basic-auth.caddy'))).toBe(0o644);
     expect(
       sb.run(
         'scripts/staging/make-basic.sh',

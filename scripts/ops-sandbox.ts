@@ -112,7 +112,7 @@ export function stagingConfig(
         ports: ports80_443(),
         volumes: [
           bind('/srv/kayas/Caddyfile.staging', '/etc/caddy/Caddyfile'),
-          bind('/srv/kayas/staging/basic-auth.caddy', '/etc/caddy/basic-auth.caddy'),
+          bind('/srv/kayas/staging', '/etc/caddy/staging'),
         ],
       }),
       ops: hardened({
@@ -262,7 +262,9 @@ export function makeSandbox(
     w(
       'staging/basic-auth.caddy',
       'basic_auth bcrypt "x" {\n\tu $2a$14$aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n}\n',
+      0o644, // the proxy container's root has no DAC_OVERRIDE: the hash file must be world-readable (decision 228)
     );
+    chmodSync(path.join(root, 'staging'), 0o755);
   }
   mkdirSync(path.join(root, 'release'), { recursive: true });
   if (opts.approved !== false) {

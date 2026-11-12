@@ -2,7 +2,7 @@
 #   - ONE site block for APP_DOMAIN. Everything it answers (pages, RSC, static files, auth, field/phone endpoints, APIs, redirects, Caddy's own
 #     errors) is behind `basic_auth`: there is no path exemption. ACME challenges are answered by Caddy itself, before any site handler, and never
 #     reach this block or the app.
-#   - The credentials are a bcrypt HASH in a private file (staging/basic-auth.caddy, mode 0600, gitignored, made by scripts/staging/make-basic.sh).
+#   - The credentials are a bcrypt HASH in a private file (staging/basic-auth.caddy, mode 0644 so that the hardened proxy, whose root has no DAC_OVERRIDE, can read it; a hash only; gitignored, made by scripts/staging/make-basic.sh).
 #     It is a file and not an environment variable on purpose: a bcrypt hash contains `$`, which Compose would interpolate.
 #   - The client's Authorization header (the Basic credentials) is NOT forwarded to the app. The client address given to the app is the
 #     connection peer (the app trusts one hop: TRUSTED_PROXY_HOPS=1), whatever X-Forwarded-* the client sent.
@@ -79,7 +79,7 @@ http://127.0.0.1:2080 {
 			-Server
 		}
 		# 2. The gate. Nothing below runs without a valid credential.
-		import /etc/caddy/basic-auth.caddy
+		import /etc/caddy/staging/basic-auth.caddy
 		# 3. Bounded requests (the Next server has its own limits, this is the outer one). Field photos are the largest upload.
 		request_body {
 			max_size 12MB

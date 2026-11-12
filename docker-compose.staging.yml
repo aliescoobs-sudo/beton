@@ -121,8 +121,10 @@ services:
       - '${STAGING_BIND_IP:-0.0.0.0}:${STAGING_HTTPS_PORT:-443}:${STAGING_HTTPS_PORT:-443}'
     volumes:
       - ./Caddyfile.staging:/etc/caddy/Caddyfile:ro
-      # The hash file is created by the runbook BEFORE the first start (a missing file would make Docker create a directory); dc.sh checks it.
-      - ./staging/basic-auth.caddy:/etc/caddy/basic-auth.caddy:ro
+      # The DIRECTORY is mounted (read-only), not the file: make-basic.sh replaces the file by an atomic rename (a new inode), and a single-file bind
+      # mount would keep serving the old one. The hash file is created by the runbook BEFORE the first start; dc.sh checks it (owner, mode 0644: the
+      # proxy's root has no DAC_OVERRIDE and the file belongs to the deploy user; not writable by group or others).
+      - ./staging:/etc/caddy/staging:ro
       - caddy_data:/data
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:2080/healthz']

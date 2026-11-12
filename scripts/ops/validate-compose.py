@@ -25,7 +25,7 @@ STACKS = {
             "app": {"image": "APPROVED", "binds": [], "cap_add": set()},
             "proxy": {"image": CADDY, "ports": {("80", "tcp"), ("443", "tcp")},
                       "binds": [("Caddyfile.staging", "/etc/caddy/Caddyfile", True),
-                                ("staging/basic-auth.caddy", "/etc/caddy/basic-auth.caddy", True)],
+                                ("staging", "/etc/caddy/staging", True)],
                       "cap_add": {"NET_BIND_SERVICE"}},
             "ops": {"image": "APPROVED", "binds": [], "cap_add": set()},
         },

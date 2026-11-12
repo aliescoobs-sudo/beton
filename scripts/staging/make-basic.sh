@@ -6,12 +6,21 @@
 #   ./scripts/staging/make-basic.sh            (asks for the user name, then the password twice)
 # Batch use (a securely supplied stdin, no TTY): the user name on the first line, the password on the second, the same password on the third.
 #   KAYAS_BASIC_BATCH=1 ./scripts/staging/make-basic.sh < /secure/pipe
-# The file is created private from its first byte (umask 077, then an atomic rename, mode 0600). An existing file is not replaced unless KAYAS_BASIC_REPLACE=1.
+# The file is written while private (umask 077, mode 0600) and then made mode 0644 and renamed atomically. 0644 is deliberate and the smallest change that
+# works: the proxy container is hardened (cap_drop ALL, so its root has NO DAC_OVERRIDE) and the file belongs to the deploy user, so a 0600 file is
+# "permission denied" for it. The file holds a bcrypt HASH of a password of at least 16 characters (never the password), in a directory that is not writable
+# by anyone but its owner; the cost is that other local users of the host can read the hash (a single-admin VPS; decision 228).
+# An existing file is not replaced unless KAYAS_BASIC_REPLACE=1. When the proxy already runs, the script recreates it through ./scripts/staging/dc.sh:
+# the rename gives the file a new inode and the container only sees it again when it is recreated (Caddy's admin API is off, so there is no reload).
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 umask 077
 out=staging/basic-auth.caddy
 caddy_image="caddy:2-alpine"
+dir_mode="$(stat -c '%a' staging 2>/dev/null || stat -f '%Lp' staging)"
+if [ -L staging ] || [ ! -d staging ] || [ $((8#$dir_mode & 8#022)) -ne 0 ] || [ $((8#$dir_mode & 8#001)) -eq 0 ]; then
+  echo "make-basic.sh: staging/ must be a real directory, not writable by group or others, and traversable by others (mode 0755): the proxy container reads the hash through it." >&2; exit 1
+fi
 if [ -e "$out" ] || [ -L "$out" ]; then
   [ "${KAYAS_BASIC_REPLACE:-}" = 1 ] || { echo "make-basic.sh: $out already exists. To replace it run with KAYAS_BASIC_REPLACE=1." >&2; exit 1; }
   [ -L "$out" ] && { echo "make-basic.sh: $out is a link: refused" >&2; exit 1; }
@@ -55,7 +64,17 @@ unset pw1 pw2
   printf '\t%s %s\n' "$user" "$hash"
   echo '}'
 } > "$tmp"
-chmod 600 "$tmp"
+chmod 644 "$tmp"
 mv -f -- "$tmp" "$out"
 trap restore_tty EXIT
-echo "make-basic.sh: wrote $out (mode 0600). The password is not stored anywhere on this host."
+echo "make-basic.sh: wrote $out (mode 0644: a bcrypt hash only; the hardened proxy has to be able to read it). The password is not stored anywhere on this host."
+# A running proxy keeps the OLD inode (and the old hash): recreate it through the validated wrapper.
+if [ -r .env.staging ] && [ -x scripts/staging/dc.sh ]; then
+  running="$(./scripts/staging/dc.sh ps -q proxy 2>/dev/null || true)"
+  if [ -n "$running" ]; then
+    echo "make-basic.sh: the proxy is running: recreating it so that it reads the new hash."
+    ./scripts/staging/dc.sh up -d --force-recreate --wait proxy || { echo "make-basic.sh: the proxy did not become healthy: look at  ./scripts/staging/dc.sh logs --tail 30 proxy" >&2; exit 1; }
+  else
+    echo "make-basic.sh: the proxy is not running; ./scripts/staging/up.sh will start it with the new hash."
+  fi
+fi

@@ -4,6 +4,8 @@ Written 12 Nov 2026 for the independent review `docs/reviews/CODEX-REVIEW-R19B-D
 
 ## 0. What staging is — and what it is not
 
+*Tip: on the VPS, read one section at a time with `sed -n '/^## 11/,/^## 12/p' docs/STAGING-VPS.md` (change the two numbers).*
+
 - A copy of the app with **fictitious "twin" data only**, **training mode ON**, behind **HTTP Basic Auth on the whole site**, on a rented VPS, so that the owner and a few people can look at it from their phones.
 - **Real data stays forbidden.** Gates G1–G12 (`docs/REAL-DATA-GATES.md`) stay open. Nothing here approves any real file, real name or real amount.
 - **Data policy: staging data is disposable. It is RESET (`scripts/staging/reset.sh`), never restored from a backup, and its volumes are never reused for real data.** There is no backup job on staging. Losing the VPS loses nothing that matters.
@@ -82,7 +84,7 @@ sudo stat -c '%a %U %n' /home/deploy /home/deploy/.ssh /home/deploy/.docker /hom
 **Second-session test (a NEW terminal, key only):**
 
 ```
-ssh -i ~/.ssh/kayas-staging-deploy deploy@kayas.aliobsil.com 'id; docker ps'
+ssh -i ~/.ssh/kayas-staging-deploy deploy@<IPv4 of the VPS> 'id; docker ps'     # by IP: see the note in §11
 ```
 
 Only when that works, treat the access as provisioned. `deploy` has no sudo. The checks that need root (`verify-host.sh`) run as `ubuntu`. Confirm the SSH daemon settings (`sudo sshd -T | grep -Ei 'passwordauthentication|kbdinteractive|permitrootlogin|pubkeyauthentication|maxauthtries'`): password off, keyboard-interactive off, root login off, public key on, `maxauthtries 3`. Keep the provider's web console (rescue access) reachable in case you lock yourself out.
@@ -112,7 +114,7 @@ The repository is private. Use a **read-only deploy key** for it, created on the
 sudo install -d -m 755 -o deploy -g deploy /srv/kayas
 ```
 
-**As `deploy`** (a new session: `ssh -i ~/.ssh/kayas-staging-deploy deploy@kayas.aliobsil.com`; the key name is the one from §5):
+**As `deploy`** (a new session: `ssh -i ~/.ssh/kayas-staging-deploy deploy@<IPv4 of the VPS>`, by IP, §11; the key name is the one from §5):
 
 ```
 ssh-keygen -t ed25519 -f ~/.ssh/kayas-repo-readonly -C "kayas staging read-only"
@@ -135,7 +137,9 @@ read -rs -p "GHCR token: " T; echo                       # hidden; nothing in th
 printf %s "$T" | docker login ghcr.io -u aliescoobs-sudo --password-stdin; unset T
 docker pull ghcr.io/aliescoobs-sudo/kayas@sha256:<digest>
 docker logout ghcr.io                                    # the token does not stay at rest
-ls -l ~/.docker/config.json; grep -c auth ~/.docker/config.json   # after logout: no stored auth
+# after logout there must be no stored credential: the "auths" object is empty (do NOT use `grep -c auth`: it counts the word "auths" and prints 1 even when empty)
+if [ ! -e ~/.docker/config.json ] || grep -Eq '"auths":[[:space:]]*\{\}' ~/.docker/config.json; then echo "no stored registry credential"; else echo "STILL LOGGED IN: run docker logout ghcr.io"; fi
+# expected output: no stored registry credential
 ```
 
 Linux has no OS keychain for Docker by default: while logged in, the token sits in `~/.docker/config.json` (mode 0600, under `/home/deploy`, mode 0700). Logging out right after the pull keeps it off the disk; log in again for an upgrade. Never type the token as an argument.
@@ -191,12 +195,19 @@ The compose project `kayas-staging` has its own database, filestore, accounts an
 
 ## 11. The Basic Auth gate (as `deploy`, in a real terminal)
 
+Run this in the **deploy terminal you already have open** (the same session you used for the clone). If you need a new one, connect **by IP address**: the owner's network (NAT64) cannot resolve the host name for ssh, so use `ssh -t -i ~/.ssh/kayas-staging-deploy deploy@<IPv4 of the VPS>` (the name works for the browser and `curl`, not for ssh from that network).
+
 ```
-ssh -t -i ~/.ssh/kayas-staging-deploy deploy@kayas.aliobsil.com
 cd /srv/kayas && ./scripts/staging/make-basic.sh
 ```
 
-It asks for a user name and a password (at least 16 characters) at **hidden** prompts, computes the bcrypt hash with Caddy's own tool in a throwaway container (the password reaches it on stdin, never as an argument), and writes `staging/basic-auth.caddy` (mode 0600). Use a strong password **different from every app password**; store it in the owner's password manager. The hash is a **file**, not an environment variable, because a bcrypt hash contains `$` and Compose would mangle it. The gate covers **every** path: pages, RSC, static files, the app's login, the phone endpoints, the APIs and every error page, with no exemption. Only Caddy's own certificate challenge is answered before the gate, and it never reaches the app.
+It asks for a user name and a password (at least 16 characters) at **hidden** prompts, computes the bcrypt hash with Caddy's own tool in a throwaway container (the password reaches it on stdin, never as an argument), and writes `staging/basic-auth.caddy` atomically. Use a strong password **different from every app password**; store it in the owner's password manager. The hash is a **file**, not an environment variable, because a bcrypt hash contains `$` and Compose would mangle it. The gate covers **every** path: pages, RSC, static files, the app's login, the phone endpoints, the APIs and every error page, with no exemption. Only Caddy's own certificate challenge is answered before the gate, and it never reaches the app.
+
+**The file is mode 0644, on purpose (decision 228).** The proxy container is hardened (`cap_drop: ALL`, so its root has no `DAC_OVERRIDE`) and the file belongs to the `deploy` user, so a 0600 file is "permission denied" for Caddy and the proxy restarts in a loop. The file holds only a **bcrypt hash** of a password of at least 16 characters, never the password, in a directory (`staging/`) that nobody but `deploy` can write. The cost: other local users of the VPS could read the hash (a single-admin host: acceptable for fictitious data; a production host would need another design). `dc.sh` refuses the file when it is not readable by others, is writable by group or others, belongs to someone else, is a link or a directory.
+
+**Running it again** (to change the password) is safe: `KAYAS_BASIC_REPLACE=1 ./scripts/staging/make-basic.sh`. The proxy container sees the directory read-only, and a new file is a new inode, so a running proxy is **recreated** by the script itself through `dc.sh` (`up -d --force-recreate --wait proxy`); you do not have to do anything else. If the proxy is not running, `up.sh` starts it with the new hash.
+
+**Reading this guide on the VPS:** `sed -n '/^## 11/,/^## 12/p' docs/STAGING-VPS.md` prints one section (change the numbers).
 
 ## 12. First start — the one safe order
 
@@ -213,6 +224,8 @@ The seed creates 11 fictitious accounts; their one-time credentials are in a Doc
 ./scripts/staging/show-accounts.sh proprietaire         # one block
 ```
 
+**If the proxy restarts in a loop** (`dc.sh ps` shows it restarting or unhealthy; `up.sh` stops with "the proxy did not start correctly"): run `./scripts/staging/dc.sh logs --tail 30 proxy`. The message `Could not import /etc/caddy/staging/basic-auth.caddy: open …: permission denied` means the hash file is not readable by the hardened proxy: check `ls -l staging/basic-auth.caddy` (it must be `-rw-r--r--` and owned by `deploy`) and run `./scripts/staging/make-basic.sh` again with `KAYAS_BASIC_REPLACE=1` (it writes the right mode and recreates the proxy). Do **not** add capabilities to the compose file to "fix" this. `up.sh` also checks, from inside the container, that the Caddyfile and the hash are readable and that Caddy answered on its own health endpoint.
+
 Then clear the terminal. Expected: the red banner "Version de formation — données fictives" on every page; reserved training accounts only (every address ends with the domain in `TRAINING_EMAIL_DOMAIN`, `src/lib/training.ts:4` — compare with that constant, not with a name remembered from an older version); no outbound call.
 
 ## 13. Owner and admin TOTP (through the protected HTTPS site)
@@ -221,16 +234,20 @@ Do this **before** giving the address to anyone. In a browser: `https://kayas.al
 
 ## 14. External checks — before the address is shared
 
+**Caddy's log does not print a certificate line in this logging configuration** (there is no access log and the default level hides the issuance). Do not wait for one; the reliable proof is the external checks below. Never use `-k`/`--insecure`: a certificate error is a finding, not something to skip.
+
 From **another machine** (your Mac, on a different network if possible). `curl` asks for the password when you give `-u user` without it, so it never enters the shell history.
 
 ```
 H=kayas.aliobsil.com
+curl -sS -o /dev/null -w '%{http_code}\n' https://$H/                   # 401   (no credentials)
+curl -sS -u 'USER' -o /dev/null -w '%{http_code}\n' https://$H/         # hidden password prompt (never on the command line): 307 or 200
+curl -sSI http://$H/ | head -n3                                          # 308, Location: https://$H/
 curl -sI https://$H/ | head -n1                          # HTTP/2 401   (no credentials)
 curl -sI -u 'wronguser:wrongpass' https://$H/fr/login | head -n1       # 401
 curl -s -o /dev/null -w '%{http_code}\n' -u 'user' https://$H/fr/login   # prompts; 200 and the app's login page
 curl -s -o /dev/null -w '%{http_code}\n' -u 'user' https://$H/fr/admin/field   # 307: valid Basic still needs an app session
-curl -sI http://$H/ | head -n3                           # 308 to https://$H/
-curl -sk -o /dev/null -w '%{http_code}\n' https://<IPv4 of the VPS>/           # not served (TLS error, no site for a bare address)
+curl -sS -o /dev/null -w '%{http_code}\n' https://<IPv4 of the VPS>/    # must NOT print 200: curl fails the certificate check (exit 60) because the name does not match; never add -k
 curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: other.example' http://<IPv4>/ # 404
 openssl s_client -connect $H:443 -servername $H </dev/null 2>/dev/null | openssl x509 -noout -issuer -dates   # a Let's Encrypt certificate, valid
 nmap -Pn -p- <IPv4 of the VPS>                           # ALL ports: only 22, 80, 443 open
@@ -252,7 +269,7 @@ Forged `X-Forwarded-For`, `Host` and `Authorization` headers never reach the app
 ```
 sudo reboot            # as ubuntu
 # after the VPS is back (2-3 minutes):
-ssh -i ~/.ssh/kayas-staging-deploy deploy@kayas.aliobsil.com 'cd /srv/kayas && ./scripts/staging/dc.sh ps'     # db, app, proxy: running, healthy
+ssh -i ~/.ssh/kayas-staging-deploy deploy@<IPv4 of the VPS> 'cd /srv/kayas && ./scripts/staging/dc.sh ps'     # db, app, proxy: running, healthy
 # then repeat the 401 / 200 checks of §14 from outside. No manual step may be needed.
 ```
 

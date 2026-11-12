@@ -104,7 +104,7 @@ docker run -d --name kayas-rehearsal-echo --network kayas-staging_edge --network
   node -e "require('http').createServer((q,r)=>{r.setHeader('content-type','application/json');r.end(JSON.stringify(q.headers))}).listen(3000)" >/dev/null
 sed 's#app:3000#echo:3000#' Caddyfile.staging > "$tmp/Caddyfile.echo"
 docker run -d --name kayas-rehearsal-proxy2 --network kayas-staging_edge -e APP_DOMAIN="$H" -e STAGING_TLS=internal -e STAGING_HTTP_PORT=18090 -e STAGING_HTTPS_PORT=18444 \
-  -p 127.0.0.1:18090:18090 -p 127.0.0.1:18444:18444 -v "$PWD/$tmp/Caddyfile.echo:/etc/caddy/Caddyfile:ro" -v "$PWD/staging/basic-auth.caddy:/etc/caddy/basic-auth.caddy:ro" \
+  -p 127.0.0.1:18090:18090 -p 127.0.0.1:18444:18444 -v "$PWD/$tmp/Caddyfile.echo:/etc/caddy/Caddyfile:ro" -v "$PWD/staging:/etc/caddy/staging:ro" \
   --read-only --tmpfs /tmp --tmpfs /config --tmpfs /data caddy:2-alpine >/dev/null
 for _ in $(seq 1 30); do curl -s -o /dev/null --max-time 2 -k --resolve "$H:18444:127.0.0.1" "https://$H:18444/" && break; sleep 1; done
 echo_json="$(curl -sS -k --max-time 10 --resolve "$H:18444:127.0.0.1" "${auth[@]}" -H 'X-Forwarded-For: 6.6.6.6' -H 'X-Forwarded-Host: evil.example' -H 'X-Forwarded-Proto: http' -H 'X-Real-Ip: 6.6.6.6' "https://$H:18444/echo")"

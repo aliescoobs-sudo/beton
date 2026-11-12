@@ -1,5 +1,14 @@
 import { spawnSync } from 'node:child_process';
-import { chmodSync, copyFileSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  copyFileSync,
+  mkdirSync,
+  rmSync,
+  mkdtempSync,
+  readFileSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -229,6 +238,11 @@ describe.skipIf(!hasDocker || !hasPython)('the real staging compose file', () =>
   it('the Caddyfile adapts for Caddy: ACME by default, the internal CA only when asked, anything else fails closed (needs the caddy image locally)', () => {
     const have = spawnSync('docker', ['image', 'inspect', 'caddy:2-alpine']).status === 0;
     if (!have) return;
+    mkdirSync(path.resolve('.logs'), { recursive: true });
+    const gateDir = mkdtempSync(path.resolve('.logs', 'gate-'));
+    chmodSync(gateDir, 0o755);
+    copyFileSync('staging/basic-auth.caddy.example', path.join(gateDir, 'basic-auth.caddy'));
+    chmodSync(path.join(gateDir, 'basic-auth.caddy'), 0o644);
     const adapt = (tls?: string) =>
       spawnSync(
         'docker',
@@ -241,7 +255,7 @@ describe.skipIf(!hasDocker || !hasPython)('the real staging compose file', () =>
           '-v',
           `${path.resolve('Caddyfile.staging')}:/etc/caddy/Caddyfile:ro`,
           '-v',
-          `${path.resolve('staging/basic-auth.caddy.example')}:/etc/caddy/basic-auth.caddy:ro`,
+          `${gateDir}:/etc/caddy/staging:ro`,
           'caddy:2-alpine',
           'caddy',
           'adapt',
@@ -257,6 +271,7 @@ describe.skipIf(!hasDocker || !hasPython)('the real staging compose file', () =>
     expect(adapt('acme').stdout).not.toContain('"module":"internal"');
     expect(adapt('internal').stdout).toContain('"module":"internal"');
     expect(adapt('bogus').status).not.toBe(0);
+    rmSync(gateDir, { recursive: true, force: true });
   });
 });
 
@@ -266,7 +281,7 @@ describe('the Caddyfile and the files as text', () => {
   const lines = caddy.split('\n').filter((l) => !l.trim().startsWith('#'));
   const code = lines.join('\n');
   it('puts the Basic Auth import before the reverse proxy, inside one route, with no path exemption', () => {
-    const imp = code.indexOf('import /etc/caddy/basic-auth.caddy');
+    const imp = code.indexOf('import /etc/caddy/staging/basic-auth.caddy');
     const rp = code.indexOf('reverse_proxy');
     expect(imp).toBeGreaterThan(0);
     expect(rp).toBeGreaterThan(imp);
@@ -307,6 +322,49 @@ describe('the Caddyfile and the files as text', () => {
     expect(readFileSync('.env.staging.example', 'utf8')).not.toMatch(/ANTHROPIC_API_KEY=|VAPID_\w+=/);
     expect(noComments).toContain("REAL_DATA: 'false'");
     expect(noComments).toContain("STAGING_PROFILE: 'true'");
+  });
+});
+
+describe('the proxy flags, the Basic Auth hash mode and the readability test stay consistent (decision 228)', () => {
+  const compose = readFileSync('docker-compose.staging.yml', 'utf8');
+  const from = compose.indexOf('\n  proxy:');
+  const rest = compose.slice(from + 1);
+  const next = rest.slice(rest.indexOf('\n') + 1).search(/\n {2}[a-z][a-z-]*:\n|\nvolumes:/);
+  const proxyBlock = next < 0 ? rest : rest.slice(0, rest.indexOf('\n') + 1 + next);
+  const code = (t: string) =>
+    t
+      .split('\n')
+      .filter((l) => !l.trim().startsWith('#'))
+      .join('\n');
+  it('the proxy is hardened, runs as the image root without DAC_OVERRIDE, and mounts the DIRECTORY of the hash read-only', () => {
+    const p = code(proxyBlock);
+    expect(p).toContain('<<: *hardening');
+    expect(code(compose)).toMatch(/x-hardening: &hardening[\s\S]*?cap_drop: \[ALL\]/);
+    expect(p).toMatch(/cap_add: \[NET_BIND_SERVICE\]/);
+    expect(p).toMatch(/read_only: true/);
+    expect(p).not.toMatch(/DAC_OVERRIDE|DAC_READ_SEARCH|privileged|^\s+user:/m);
+    expect(p).toContain('./staging:/etc/caddy/staging:ro');
+    expect(p).not.toMatch(/basic-auth\.caddy:\/etc/); // a single-file mount keeps the OLD inode after make-basic.sh renames a new file into place
+    expect(code(readFileSync('Caddyfile.staging', 'utf8'))).toContain(
+      'import /etc/caddy/staging/basic-auth.caddy',
+    );
+  });
+  it('make-basic.sh writes a file the proxy can read (0644) and dc.sh accepts exactly that; the Docker test uses the same flags', () => {
+    const mk = code(readFileSync('scripts/staging/make-basic.sh', 'utf8'));
+    expect(mk).toMatch(/chmod 644 "\$tmp"/);
+    expect(mk).not.toMatch(/chmod 600 "\$tmp"/);
+    expect(mk).toMatch(/force-recreate --wait proxy/); // a running proxy keeps the old inode and hash otherwise
+    const dcsh = code(readFileSync('scripts/staging/dc.sh', 'utf8'));
+    expect(dcsh).toContain('must be mode 0644');
+    const t = readFileSync('tests/staging-proxy-readability.int.test.ts', 'utf8').replace(/\s+/g, ' ');
+    for (const flag of [
+      "'--cap-drop', 'ALL'",
+      "'--cap-add', 'NET_BIND_SERVICE'",
+      "'--read-only'",
+      'no-new-privileges:true',
+    ])
+      expect(t).toContain(flag);
+    expect(t).not.toMatch(/'--cap-add', 'DAC|'--user'|'--privileged'/);
   });
 });
 
@@ -446,22 +504,60 @@ describe.skipIf(!hasPython)('scripts/staging/dc.sh (the release-bound wrapper)',
         .every((c) => !/-v \/:\/host|--privileged|--entrypoint/.test(c)),
     ).toBe(true);
   });
-  it('starts the proxy only with a private regular Basic Auth hash file', () => {
+  it('starts the proxy only with a regular, readable-by-the-proxy, not group/world-writable Basic Auth hash file', () => {
     const missing = stg();
     missing.write('staging/basic-auth.caddy', 'x');
     spawnSync('rm', ['-f', path.join(missing.root, 'staging/basic-auth.caddy')]);
     expect(missing.run('scripts/staging/dc.sh', ['up-proxy']).stderr).toMatch(
       /missing or not a regular file/,
     );
-    const wide = stg();
-    chmodSync(path.join(wide.root, 'staging/basic-auth.caddy'), 0o644);
-    expect(wide.run('scripts/staging/dc.sh', ['up-proxy']).stderr).toMatch(/mode 0600/);
+    // decision 228: 0644 is the CORRECT mode (the proxy's root has no DAC_OVERRIDE); 0600 is what crash-looped the first real VPS
+    const hashPath = (s: { root: string }) => path.join(s.root, 'staging/basic-auth.caddy');
+    for (const bad of [0o600, 0o640, 0o664, 0o666, 0o646, 0o444 | 0o020]) {
+      const s = stg();
+      chmodSync(hashPath(s), bad);
+      const r = s.run('scripts/staging/dc.sh', ['up-proxy']);
+      expect(r.status, bad.toString(8)).toBe(1);
+      expect(r.stderr, bad.toString(8)).toMatch(/must be mode 0644/);
+      expect(s.called(), bad.toString(8)).not.toMatch(/up -d --wait proxy/);
+    }
+    for (const ok of [0o644, 0o444]) {
+      const s = stg();
+      chmodSync(hashPath(s), ok);
+      expect(s.run('scripts/staging/dc.sh', ['up-proxy']).status, ok.toString(8)).toBe(0);
+    }
+    // a wrong owner: the files belong to the real user; a stub `id` makes the "current user" someone else
+    const alien = stg();
+    writeFileSync(path.join(alien.root, 'bin/id'), '#!/bin/sh\necho 424242\n', { mode: 0o755 });
+    expect(alien.run('scripts/staging/dc.sh', ['up-proxy']).stderr).toMatch(
+      /must belong to the current user/,
+    );
+    const dirWide = stg();
+    chmodSync(path.join(dirWide.root, 'staging'), 0o775);
+    expect(dirWide.run('scripts/staging/dc.sh', ['up-proxy']).stderr).toMatch(/staging\/ must belong/);
+    const dirClosed = stg();
+    chmodSync(path.join(dirClosed.root, 'staging'), 0o750);
+    expect(dirClosed.run('scripts/staging/dc.sh', ['up-proxy']).stderr).toMatch(/traversable by others/);
+    const asDir = stg();
+    spawnSync('rm', ['-f', hashPath(asDir)]);
+    mkdirSync(hashPath(asDir));
+    expect(asDir.run('scripts/staging/dc.sh', ['up-proxy']).stderr).toMatch(/not a regular file/);
+    const link = stg();
+    spawnSync('rm', ['-f', hashPath(link)]);
+    symlinkSync('/etc/hostname', hashPath(link));
+    expect(link.run('scripts/staging/dc.sh', ['up-proxy']).stderr).toMatch(/not a regular file/);
+    const stagingLink = stg();
+    spawnSync('mv', [path.join(stagingLink.root, 'staging'), path.join(stagingLink.root, 'staging.real')]);
+    symlinkSync('staging.real', path.join(stagingLink.root, 'staging'));
+    expect(stagingLink.run('scripts/staging/dc.sh', ['up-proxy']).stderr).toMatch(
+      /staging\/ is missing, a link/,
+    );
     const junk = stg();
-    junk.write('staging/basic-auth.caddy', 'hello\n');
+    junk.write('staging/basic-auth.caddy', 'hello\n', 0o644);
     expect(junk.run('scripts/staging/dc.sh', ['up-proxy']).stderr).toMatch(/does not look like/);
     expect(stg().run('scripts/staging/dc.sh', ['up-proxy']).status).toBe(0);
     // the database alone may start without the file (the first start order); a bare `up` may not
     expect(missing.run('scripts/staging/dc.sh', ['up', '-d', '--wait', 'db']).status).toBe(0);
     expect(missing.run('scripts/staging/dc.sh', ['up', '-d']).status).toBe(1);
-  });
+  }, 120_000);
 });

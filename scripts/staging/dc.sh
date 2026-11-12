@@ -6,7 +6,7 @@
 #   3. what compose RESOLVED (env files and defaults included) is checked by scripts/ops/validate-compose.py BEFORE anything runs: service set, images,
 #      published ports (proxy 80/443 only), mounts, capabilities, hardening, forced training/staging flags, absent provider keys. Nothing is printed
 #      from the environment;
-#   4. the Basic Auth hash file must exist as a private regular file before any command that can start the proxy.
+#   4. the Basic Auth hash file must exist as a regular file the proxy container can read (owner = deploy user, mode 0644, not group/world-writable) before any command that can start the proxy.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 . ./scripts/ops/release-lib.sh
@@ -72,9 +72,22 @@ esac
 case "$needs_gate" in
   yes)
     hash=staging/basic-auth.caddy
+    # The proxy container's root has no DAC_OVERRIDE: it reads the file only as "other" (the file belongs to the deploy user). So the file must be world-readable
+    # and NOT writable by group or others; the directory must be a real directory that others can traverse and nobody but the owner can write.
+    me="$(id -u)"
+    owner() { stat -c '%u' "$1" 2>/dev/null || stat -f '%u' "$1"; }
+    modeof() { stat -c '%a' "$1" 2>/dev/null || stat -f '%Lp' "$1"; }
+    if [ -L staging ] || [ ! -d staging ]; then echo "staging dc.sh: staging/ is missing, a link or not a directory." >&2; exit 1; fi
+    dmode="$(modeof staging)"
+    if [ "$(owner staging)" != "$me" ] || [ $((8#$dmode & 8#022)) -ne 0 ] || [ $((8#$dmode & 8#001)) -eq 0 ]; then
+      echo "staging dc.sh: staging/ must belong to the current user, not be writable by group or others, and be traversable by others (mode 0755; it is $dmode)." >&2; exit 1
+    fi
     if [ -L "$hash" ] || [ ! -f "$hash" ]; then echo "staging dc.sh: $hash is missing or not a regular file: run ./scripts/staging/make-basic.sh first." >&2; exit 1; fi
-    mode="$(stat -c '%a' "$hash" 2>/dev/null || stat -f '%Lp' "$hash")"
-    [ "$mode" = 600 ] || { echo "staging dc.sh: $hash must be mode 0600 (it is $mode)." >&2; exit 1; }
+    [ "$(owner "$hash")" = "$me" ] || { echo "staging dc.sh: $hash does not belong to the current user." >&2; exit 1; }
+    mode="$(modeof "$hash")"
+    if [ $((8#$mode & 8#022)) -ne 0 ] || [ $((8#$mode & 8#004)) -eq 0 ]; then
+      echo "staging dc.sh: $hash must be mode 0644: readable by the proxy container (its root has no DAC_OVERRIDE) and not writable by group or others (it is $mode). Run ./scripts/staging/make-basic.sh again or: chmod 644 $hash" >&2; exit 1
+    fi
     grep -q -E '^basic_auth bcrypt ' "$hash" && grep -q -E '\$2[aby]\$' "$hash" || { echo "staging dc.sh: $hash does not look like a Basic Auth hash file." >&2; exit 1; }
     ;;
 esac
