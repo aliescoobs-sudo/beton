@@ -285,6 +285,8 @@ for f in "${root}"/hang.*; do [ -e "$f" ] || continue; w="$(cat "$f")"; case "$*
 for f in "${root}"/fail.*; do [ -e "$f" ] || continue; w="$(cat "$f")"; case "$*" in *"$w"*) exit 1;; esac; done
 case "$*" in
   *" config --format json") cur="$(sed -n 's/^IMAGE=//p' "${root}/release/APPROVED" 2>/dev/null)"; sed "s#${IMG_A}#\${cur:-${IMG_A}}#g" "${root}/config.json"; exit 0;;
+  *" ps -q proxy") cat "${root}/proxy.id" 2>/dev/null; exit 0;;
+  *" ps --format "*" proxy") cat "${root}/proxy.state" 2>/dev/null || echo "proxy running healthy"; exit 0;;
   "image inspect --format {{.Os}}/{{.Architecture}} "*) echo "\${DOCKER_STUB_PLATFORM:-linux/amd64}"; exit 0;;
   "image inspect --format {{.Id}} "*) echo "sha256:stubimageid\${DOCKER_STUB_ID_SUFFIX:-}"; exit 0;;
   "inspect --format {{.Config.Image}}|{{.Image}}|{{.State.ExitCode}} "*) echo "\${DOCKER_STUB_ACTUAL_IMAGE:-$(sed -n 's/^IMAGE=//p' "${root}/release/APPROVED" 2>/dev/null)}|sha256:stubimageid|0"; exit 0;;

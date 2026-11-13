@@ -11,7 +11,8 @@
 # "permission denied" for it. The file holds a bcrypt HASH of a password of at least 16 characters (never the password), in a directory that is not writable
 # by anyone but its owner; the cost is that other local users of the host can read the hash (a single-admin VPS; decision 228).
 # An existing file is not replaced unless KAYAS_BASIC_REPLACE=1. When the proxy already runs, the script recreates it through ./scripts/staging/dc.sh:
-# the rename gives the file a new inode and the container only sees it again when it is recreated (Caddy's admin API is off, so there is no reload).
+# the rename gives the file a new inode and Caddy only reads it at start (its admin API is off, so there is no reload). If the status of the proxy cannot be
+# read, or the recreation or the health confirmation fails, the script exits NON-ZERO: the old Basic credential may still work (R21-01).
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 umask 077
@@ -68,13 +69,28 @@ chmod 644 "$tmp"
 mv -f -- "$tmp" "$out"
 trap restore_tty EXIT
 echo "make-basic.sh: wrote $out (mode 0644: a bcrypt hash only; the hardened proxy has to be able to read it). The password is not stored anywhere on this host."
-# A running proxy keeps the OLD inode (and the old hash): recreate it through the validated wrapper.
+# Rotation: Caddy reads the hash only at start (admin API off), so a RUNNING proxy keeps accepting the OLD password until it is recreated. A new file is
+# also a new inode. The proxy is therefore recreated through the validated wrapper, and the rotation is reported as applied ONLY when the wrapper has
+# confirmed a running, healthy proxy afterwards. Any doubt is an incomplete rotation (non-zero exit), never a silent success (R21-01).
 if [ -r .env.staging ] && [ -x scripts/staging/dc.sh ]; then
-  running="$(./scripts/staging/dc.sh ps -q proxy 2>/dev/null || true)"
+  not_applied() {
+    echo "make-basic.sh: rotation NOT applied: the old Basic credential may still work; do not rely on it; verify with the curl checks of docs/STAGING-VPS.md (section 11, rotation). $1" >&2
+    exit 1
+  }
+  # a FAILED status query is not the same as "no proxy": only a successful query with an empty answer means the proxy is not running
+  if ! running="$(./scripts/staging/dc.sh ps -q proxy)"; then
+    not_applied "The status of the proxy could not be read (./scripts/staging/dc.sh ps proxy failed)."
+  fi
   if [ -n "$running" ]; then
     echo "make-basic.sh: the proxy is running: recreating it so that it reads the new hash."
-    ./scripts/staging/dc.sh up -d --force-recreate --wait proxy || { echo "make-basic.sh: the proxy did not become healthy: look at  ./scripts/staging/dc.sh logs --tail 30 proxy" >&2; exit 1; }
+    ./scripts/staging/dc.sh up -d --force-recreate --wait proxy >/dev/null || not_applied "The proxy could not be recreated (look at: ./scripts/staging/dc.sh logs --tail 30 proxy)."
+    if ! state="$(./scripts/staging/dc.sh ps --format '{{.Service}} {{.State}} {{.Health}}' proxy)" || [ "$state" != "proxy running healthy" ]; then
+      not_applied "After the recreation the proxy is not confirmed running and healthy."
+    fi
+    echo "make-basic.sh: rotation applied: the proxy was recreated and is running and healthy. Confirm from outside: the OLD password must give 401, the NEW one 200 or 307 (docs/STAGING-VPS.md, section 11)."
   else
-    echo "make-basic.sh: the proxy is not running; ./scripts/staging/up.sh will start it with the new hash."
+    echo "make-basic.sh: the status query succeeded and no proxy is running; ./scripts/staging/up.sh will start it with the new hash."
   fi
+else
+  echo "make-basic.sh: no staging stack is configured here (.env.staging or dc.sh missing): nothing to recreate." >&2
 fi

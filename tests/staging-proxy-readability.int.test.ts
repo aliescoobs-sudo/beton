@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -45,7 +45,7 @@ describe.skipIf(!docker && !process.env.CI)(
     });
 
     // a throwaway copy of the repository layout make-basic.sh needs: scripts/staging/make-basic.sh and a staging/ directory (0755, as a git clone makes it)
-    const makeBasic = (dir: string, user: string, replace = false) => {
+    const makeBasic = (dir: string, user: string, replace = false, pw = PW) => {
       mkdirSync(path.join(dir, 'scripts/staging'), { recursive: true });
       mkdirSync(path.join(dir, 'staging'), { recursive: true, mode: 0o755 });
       spawnSync('chmod', ['755', path.join(dir, 'staging')]);
@@ -53,7 +53,7 @@ describe.skipIf(!docker && !process.env.CI)(
       return spawnSync('bash', ['scripts/staging/make-basic.sh'], {
         cwd: dir,
         encoding: 'utf8',
-        input: `${user}\n${PW}\n${PW}\n`,
+        input: `${user}\n${pw}\n${pw}\n`,
         env: {
           PATH: process.env.PATH ?? '',
           HOME: process.env.HOME ?? dir,
@@ -145,7 +145,7 @@ describe.skipIf(!docker && !process.env.CI)(
       expect(out.stdout + out.stderr).toMatch(/Valid configuration/);
     });
 
-    it('re-running make-basic.sh gives a NEW hash that a running container sees at once (a directory mount follows the rename; a single-file mount would not)', () => {
+    it('re-running make-basic.sh: a running container sees the NEW FILE through the directory mount (file visibility only: Caddy does not reload; see the rotation test below)', () => {
       const dir = path.join(work, 'stale');
       expect(makeBasic(dir, 'first-user').status).toBe(0);
       const c = `kayas-proxytest-c-${rand()}`;
@@ -168,6 +168,104 @@ describe.skipIf(!docker && !process.env.CI)(
       const after = read();
       expect(after).toContain('second-user');
       expect(after).not.toContain('first-user');
+    });
+
+    it('rotation with the real caddy image and the real Caddyfile.staging (HTTP-only copy): until the proxy is recreated the OLD password still works; after it, the old one is 401 and the new one is accepted', () => {
+      // The ONLY change to the real Caddyfile is that the `import tls_...` line is dropped and the site address is http://localhost:<port>, because a TLS
+      // policy cannot sit on an HTTP-only site. The upstream `app` does not exist here: a request that passes the gate gets 502 from the proxy handler (so
+      // "accepted" = anything but 401), a refused one gets 401 from the gate. The recreation is done by this test (docker rm + run), standing in for
+      // `dc.sh up -d --force-recreate --wait proxy`, which scripts/staging-config.test.ts covers with command stubs.
+      const dir = path.join(work, 'rotation');
+      const OLD = 'old-canary-pw-0123456789';
+      const NEW = 'new-canary-pw-9876543210';
+      expect(makeBasic(dir, 'ali-basic', false, OLD).status).toBe(0);
+      const caddyfile = path.join(dir, 'Caddyfile.http');
+      writeFileSync(
+        caddyfile,
+        readFileSync('Caddyfile.staging', 'utf8')
+          .split('\n')
+          .filter((l) => !l.includes('import tls_'))
+          .join('\n'),
+      );
+      const name = `kayas-proxytest-rot-${rand()}`;
+      containers.push(name);
+      const start = () => {
+        d(['rm', '-f', name]);
+        const r = d([
+          'run',
+          '-d',
+          '--name',
+          name,
+          '--security-opt',
+          'no-new-privileges:true',
+          '--cap-drop',
+          'ALL',
+          '--cap-add',
+          'NET_BIND_SERVICE',
+          '--read-only',
+          '--tmpfs',
+          '/tmp',
+          '--tmpfs',
+          '/config',
+          '--tmpfs',
+          '/data',
+          '-p',
+          '127.0.0.1::18080',
+          '-e',
+          'APP_DOMAIN=http://localhost:18080',
+          '-e',
+          'STAGING_TLS=acme',
+          '-e',
+          'STAGING_HTTP_PORT=18080',
+          '-v',
+          `${caddyfile}:/etc/caddy/Caddyfile:ro`,
+          '-v',
+          `${path.join(dir, 'staging')}:/etc/caddy/staging:ro`,
+          CADDY,
+        ]);
+        expect(r.status, r.stderr).toBe(0);
+        const port = d(['port', name, '18080/tcp']).stdout.trim().split(':').pop();
+        return port!;
+      };
+      const code = (port: string, user?: string, pw?: string) => {
+        for (let i = 0; i < 40; i++) {
+          const r = spawnSync(
+            'curl',
+            [
+              '-s',
+              '-o',
+              '/dev/null',
+              '-w',
+              '%{http_code}',
+              '--max-time',
+              '3',
+              ...(user ? ['-u', `${user}:${pw}`] : []),
+              `http://localhost:${port}/`,
+            ],
+            { encoding: 'utf8' },
+          );
+          if (r.stdout && r.stdout !== '000') return r.stdout;
+          spawnSync('sleep', ['0.5']);
+        }
+        return '000';
+      };
+      let port = start();
+      expect(code(port), 'no credentials').toBe('401');
+      expect(code(port, 'ali-basic', OLD), 'old password before rotation').not.toBe('401');
+      // rotate the FILE only (what make-basic.sh does before it recreates the proxy)
+      expect(makeBasic(dir, 'ali-basic', true, NEW).status).toBe(0);
+      expect(
+        code(port, 'ali-basic', OLD),
+        'rotated file, proxy not recreated: the OLD password STILL works (R21-01)',
+      ).not.toBe('401');
+      expect(
+        code(port, 'ali-basic', NEW),
+        'rotated file, proxy not recreated: the new password is not accepted yet',
+      ).toBe('401');
+      port = start(); // recreate
+      expect(code(port, 'ali-basic', OLD), 'old password after the recreation').toBe('401');
+      expect(code(port, 'ali-basic', NEW), 'new password after the recreation').not.toBe('401');
+      expect(code(port, 'ali-basic', NEW)).toBe('502'); // it passed the gate and reached the (absent) upstream
     });
   },
 );

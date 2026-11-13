@@ -368,6 +368,74 @@ describe('the proxy flags, the Basic Auth hash mode and the readability test sta
   });
 });
 
+describe('scripts/staging/make-basic.sh: a rotation is reported applied only when it is (R21-01)', () => {
+  const PW = 'canary-rotation-pw-0123456789';
+  const HASH = '$2a$14$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUVWXYZ01234';
+  const rotate = (s: ReturnType<typeof makeSandbox>) =>
+    s.run(
+      'scripts/staging/make-basic.sh',
+      [],
+      { KAYAS_BASIC_BATCH: '1', KAYAS_BASIC_REPLACE: '1' },
+      `ali-basic\n${PW}\n${PW}\n`,
+    );
+  const quiet = (r: { stdout: string; stderr: string }) => {
+    expect(r.stdout + r.stderr).not.toContain(PW);
+    expect(r.stdout + r.stderr).not.toContain(HASH);
+  };
+  const NOT_APPLIED =
+    /rotation NOT applied: the old Basic credential may still work; do not rely on it; verify with the curl checks of docs\/STAGING-VPS\.md/;
+  it('a FAILED status query is a non-zero "rotation NOT applied", never "not running"', () => {
+    const s = makeSandbox({ stack: 'staging' });
+    s.write('fail.1', 'ps -q proxy');
+    const r = rotate(s);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(NOT_APPLIED);
+    expect(r.stdout + r.stderr).not.toMatch(/no proxy is running|not running/);
+    expect(s.called()).not.toMatch(/force-recreate/);
+    quiet(r);
+  });
+  it('a FAILED recreation is a non-zero "rotation NOT applied"', () => {
+    const s = makeSandbox({ stack: 'staging' });
+    s.write('proxy.id', 'abc123\n');
+    s.write('fail.1', 'force-recreate');
+    const r = rotate(s);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(NOT_APPLIED);
+    expect(r.stderr).toMatch(/could not be recreated/);
+    quiet(r);
+  });
+  it('a recreation that is not confirmed running and healthy is a non-zero "rotation NOT applied"', () => {
+    for (const state of ['proxy restarting unhealthy', 'proxy running starting', '']) {
+      const s = makeSandbox({ stack: 'staging' });
+      s.write('proxy.id', 'abc123\n');
+      s.write('proxy.state', `${state}\n`);
+      const r = rotate(s);
+      expect(r.status, state).toBe(1);
+      expect(r.stderr, state).toMatch(NOT_APPLIED);
+      expect(r.stderr, state).toMatch(/not confirmed running and healthy/);
+      quiet(r);
+    }
+  });
+  it('a SUCCESSFUL query with an empty answer says the proxy is not running and exits 0', () => {
+    const s = makeSandbox({ stack: 'staging' });
+    const r = rotate(s);
+    expect(r.status, r.stderr).toBe(0);
+    expect(r.stdout).toMatch(/status query succeeded and no proxy is running/);
+    expect(s.called()).not.toMatch(/force-recreate/);
+    quiet(r);
+  });
+  it('a successful rotation recreates the proxy through the wrapper, confirms it, and exits 0', () => {
+    const s = makeSandbox({ stack: 'staging' });
+    s.write('proxy.id', 'abc123\n');
+    const r = rotate(s);
+    expect(r.status, r.stderr).toBe(0);
+    expect(s.called()).toMatch(/up -d --force-recreate --wait proxy/);
+    expect(r.stdout).toMatch(/rotation applied/);
+    expect(r.stdout).toMatch(/OLD password must give 401/);
+    quiet(r);
+  });
+});
+
 describe.skipIf(!hasPython)('scripts/staging/dc.sh (the release-bound wrapper)', () => {
   const stg = (o: Parameters<typeof makeSandbox>[0] = {}) => makeSandbox({ stack: 'staging', ...o });
   it('runs a valid command with the approved image', () => {
