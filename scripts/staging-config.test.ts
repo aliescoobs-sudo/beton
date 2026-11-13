@@ -382,6 +382,40 @@ describe('the proxy flags, the Basic Auth hash mode and the readability test sta
   });
 });
 
+describe('docs/STAGING-VPS.md: the registry-credential check prints verdict words only', () => {
+  const guide = readFileSync('docs/STAGING-VPS.md', 'utf8');
+  const start = guide.indexOf("python3 -c '\n") + "python3 -c '\n".length;
+  const code = guide.slice(start, guide.indexOf("'\n", start));
+  const run = (config?: string) => {
+    const home = mkdtempSync(path.join(tmpdir(), 'kayas-auths-'));
+    if (config !== undefined) {
+      mkdirSync(path.join(home, '.docker'));
+      writeFileSync(path.join(home, '.docker/config.json'), config);
+    }
+    const r = spawnSync('python3', ['-c', code], {
+      encoding: 'utf8',
+      env: { HOME: home, PATH: process.env.PATH ?? '' } as unknown as NodeJS.ProcessEnv,
+    });
+    rmSync(home, { recursive: true, force: true });
+    return { status: r.status, out: r.stdout + r.stderr };
+  };
+  it.skipIf(!hasPython && !inCi)(
+    'empty, absent, stored, helper and unreadable configurations give the right verdict and never print a value',
+    () => {
+      expect(run('{"auths":{}}')).toMatchObject({ status: 0 });
+      expect(run('{"auths":{}}').out).toMatch(/auths: empty[\s\S]*credsStore: none[\s\S]*credHelpers: none/);
+      expect(run()).toMatchObject({ status: 0 });
+      const stored = run('{"auths":{"ghcr.io":{"auth":"SECRET-CANARY-VALUE"}}}');
+      expect(stored.status).toBe(1);
+      expect(stored.out).toMatch(/NOT EMPTY/);
+      expect(stored.out).not.toContain('SECRET-CANARY-VALUE');
+      expect(run('{"auths":{},"credsStore":"desktop"}').out).toMatch(/credsStore: CONFIGURED/);
+      expect(run('{"auths":{},"credHelpers":{"ghcr.io":"x"}}').out).toMatch(/credHelpers: CONFIGURED/);
+      expect(run('not json').status).toBe(1);
+    },
+  );
+});
+
 describe('scripts/staging/make-basic.sh removes its own stale temporaries on start', () => {
   it('removes .basic-auth.XXXXXX leftovers only, nothing else', () => {
     const s = makeSandbox({ stack: 'staging' });

@@ -137,9 +137,23 @@ read -rs -p "GHCR token: " T; echo                       # hidden; nothing in th
 printf %s "$T" | docker login ghcr.io -u aliescoobs-sudo --password-stdin; unset T
 docker pull ghcr.io/aliescoobs-sudo/kayas@sha256:<digest>
 docker logout ghcr.io                                    # the token does not stay at rest
-# after logout there must be no stored credential: the "auths" object is empty (do NOT use `grep -c auth`: it counts the word "auths" and prints 1 even when empty)
-if [ ! -e ~/.docker/config.json ] || grep -Eq '"auths":[[:space:]]*\{\}' ~/.docker/config.json; then echo "no stored registry credential"; else echo "STILL LOGGED IN: run docker logout ghcr.io"; fi
-# expected output: no stored registry credential
+# after logout there must be no stored credential. This prints verdict words only, never a value. It is a convenience check of Docker's own config file:
+# if "credsStore" or "credHelpers" is CONFIGURED, a token may live in that helper's store and this file proves nothing about it (check that store too).
+python3 -c '
+import json, os, sys
+p = os.path.expanduser("~/.docker/config.json")
+try:
+    c = json.load(open(p))
+except FileNotFoundError:
+    print("config: absent (nothing stored by Docker here)"); sys.exit(0)
+except Exception:
+    print("config: UNREADABLE"); sys.exit(1)
+bad = bool(c.get("auths"))
+print("auths: " + ("NOT EMPTY: run docker logout ghcr.io" if bad else "empty"))
+print("credsStore: " + ("CONFIGURED" if c.get("credsStore") else "none"))
+print("credHelpers: " + ("CONFIGURED" if c.get("credHelpers") else "none"))
+sys.exit(1 if bad else 0)'
+# expected output after logout on the VPS: "auths: empty", "credsStore: none", "credHelpers: none" (or "config: absent ..."), exit status 0
 ```
 
 Linux has no OS keychain for Docker by default: while logged in, the token sits in `~/.docker/config.json` (mode 0600, under `/home/deploy`, mode 0700). Logging out right after the pull keeps it off the disk; log in again for an upgrade. Never type the token as an argument.
@@ -205,7 +219,15 @@ It asks for a user name and a password (at least 16 characters) at **hidden** pr
 
 **The file is mode 0644, on purpose (decision 228).** The proxy container is hardened (`cap_drop: ALL`, so its root has no `DAC_OVERRIDE`) and the file belongs to the `deploy` user, so a 0600 file is "permission denied" for Caddy and the proxy restarts in a loop. The file holds only a **bcrypt hash** of a password of at least 16 characters, never the password, in a directory (`staging/`) that nobody but `deploy` can write. The cost: other local users of the VPS could read the hash (a single-admin host: acceptable for fictitious data; a production host would need another design). `dc.sh` refuses the file when it is not readable by others, is writable by group or others, belongs to someone else, is a link or a directory.
 
-**Running it again** (to change the password) is safe: `KAYAS_BASIC_REPLACE=1 ./scripts/staging/make-basic.sh`. The proxy container sees the directory read-only, and a new file is a new inode, so a running proxy is **recreated** by the script itself through `dc.sh` (`up -d --force-recreate --wait proxy`); you do not have to do anything else. If the proxy is not running, `up.sh` starts it with the new hash.
+**Rotating the Basic credential** (changing the password or the user): `KAYAS_BASIC_REPLACE=1 ./scripts/staging/make-basic.sh`, in a real terminal. The new hash is written atomically, but **Caddy reads it only when it starts**: a running proxy keeps accepting the OLD password until it is recreated. The script therefore recreates the proxy through the validated wrapper (`dc.sh up -d --force-recreate --wait proxy`) and then asks the wrapper to confirm that the proxy is running and healthy. Read its last line:
+
+- `rotation applied` → recreated and confirmed. Still verify from outside (below).
+- `rotation NOT applied: the old Basic credential may still work …` and a **non-zero exit** → the status of the proxy could not be read, or the recreation or the health confirmation failed. **Do not rely on the rotation.** Fix the cause (`./scripts/staging/dc.sh ps`, `./scripts/staging/dc.sh logs --tail 30 proxy`), run `./scripts/staging/dc.sh up -d --force-recreate --wait proxy` yourself, and verify.
+- `the status query succeeded and no proxy is running` → the proxy really is stopped; `up.sh` starts it with the new hash.
+
+**Verify every rotation from another machine** (hidden password prompts; never put a password on the command line; no `-k`): with the OLD password `curl -sS -o /dev/null -w '%{http_code}\n' -u 'USER' https://HOST/` must print **401**, and with the NEW password it must print **200 or 307**. If the old one still gets through, the proxy was not recreated: recreate it as above and test again. (The repository test `tests/staging-proxy-readability.int.test.ts` shows the same sequence with the real Caddy: the old password keeps working until the proxy is recreated.)
+
+**What is in `staging/`:** the proxy container sees this whole directory, read-only. It must hold only `README.md`, `basic-auth.caddy`, `basic-auth.caddy.example` and, briefly, the helper's `.basic-auth.XXXXXX` temporaries; **put nothing else there** (no backups, exports, notes or other secrets). `dc.sh` refuses to start the proxy and names the offending entry if anything else is present; the next `make-basic.sh` run removes stale temporaries of a killed run. The directory must belong to `deploy` and not be writable by group or others.
 
 **Reading this guide on the VPS:** `sed -n '/^## 11/,/^## 12/p' docs/STAGING-VPS.md` prints one section (change the numbers).
 
