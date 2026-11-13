@@ -65,9 +65,18 @@ kayas_validate_effective "staging dc.sh" staging "${base[@]}" --profile ops conf
 needs_gate=no
 case "$sub" in
   up-proxy) needs_gate=yes ;;
-  up) # `up -d --wait db` (no proxy) is fine; `up` with no service name, or naming the proxy, starts it
-    names=0; for a in "$@"; do case "$a" in -*) ;; *) names=$((names+1)); [ "$a" = proxy ] && needs_gate=yes ;; esac; done
-    [ "$names" -gt 0 ] || needs_gate=yes ;;
+  up) # R21-02: the gate is skipped ONLY for an explicit list of db / app / ops with nothing else but the plain flags below. Anything that could start the
+      # proxy (no service name, `proxy`, a value-taking option such as `--wait-timeout 60` or `-t 60` whose value must not be read as a service name,
+      # `--scale proxy=1`, an unknown option or token) runs the gate. The very first start (`up -d --wait db`) stays possible without the hash file.
+    needs_gate=yes; plain=yes; names=0
+    for a in "$@"; do
+      case "$a" in
+        -d|--detach|--wait) ;;
+        db|app|ops) names=$((names+1)) ;;
+        *) plain=no ;;
+      esac
+    done
+    if [ "$plain" = yes ] && [ "$names" -gt 0 ]; then needs_gate=no; fi ;;
 esac
 case "$needs_gate" in
   yes)

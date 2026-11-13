@@ -572,6 +572,65 @@ describe.skipIf(!hasPython)('scripts/staging/dc.sh (the release-bound wrapper)',
         .every((c) => !/-v \/:\/host|--privileged|--entrypoint/.test(c)),
     ).toBe(true);
   });
+  it('R21-02: every `up` that could start the proxy runs the hash/directory gate BEFORE the container-creating call; only an explicit db/app/ops list skips it', () => {
+    const mayStartProxy: string[][] = [
+      ['up'],
+      ['up', '-d'],
+      ['up', '-d', '--wait'],
+      ['up', '-d', 'proxy'],
+      ['up', '-d', '--wait', '--wait-timeout', '60'],
+      ['up', '-d', '--wait-timeout=60'],
+      ['up', '-d', '-t', '60'],
+      ['up', '-d', '--scale', 'proxy=1'],
+      ['up', '-d', '--scale', 'proxy=1', 'db'],
+      ['up', '-d', '--bogus', 'db'],
+      ['up', '-d', 'db', 'proxy'],
+      ['up', '-d', 'db', 'unknown-service'],
+      ['up-proxy'],
+    ];
+    const dbOnly: string[][] = [
+      ['up', '-d', '--wait', 'db'],
+      ['up', '-d', 'db', 'app'],
+      ['up', '-d', '--wait', 'app'],
+    ];
+    const containerCalls = (s: { calls: () => string[] }) =>
+      s.calls().filter((c) => / up /.test(` ${c}`) && !/config --format json/.test(c));
+    // unsafe gates: 0600, wrong owner (stub id), group-writable, a link
+    const unsafe: [string, (s: ReturnType<typeof makeSandbox>) => void][] = [
+      ['0600', (s) => chmodSync(path.join(s.root, 'staging/basic-auth.caddy'), 0o600)],
+      ['group-writable', (s) => chmodSync(path.join(s.root, 'staging/basic-auth.caddy'), 0o664)],
+      [
+        'wrong owner',
+        (s) => writeFileSync(path.join(s.root, 'bin/id'), '#!/bin/sh\necho 424242\n', { mode: 0o755 }),
+      ],
+      [
+        'symlink',
+        (s) => {
+          spawnSync('rm', ['-f', path.join(s.root, 'staging/basic-auth.caddy')]);
+          symlinkSync('/etc/hostname', path.join(s.root, 'staging/basic-auth.caddy'));
+        },
+      ],
+    ];
+    for (const [name, spoil] of unsafe)
+      for (const args of mayStartProxy) {
+        const s = stg();
+        spoil(s);
+        const r = s.run('scripts/staging/dc.sh', args);
+        expect(r.status, `${name}: ${args.join(' ')}`).toBe(1);
+        expect(containerCalls(s), `${name}: ${args.join(' ')}`).toEqual([]);
+      }
+    // the first start (database / app only) works without any hash file; the same forms with a good gate work too
+    for (const args of dbOnly) {
+      const s = stg();
+      spawnSync('rm', ['-f', path.join(s.root, 'staging/basic-auth.caddy')]);
+      expect(s.run('scripts/staging/dc.sh', args).status, args.join(' ')).toBe(0);
+      expect(containerCalls(s).length, args.join(' ')).toBe(1);
+    }
+    for (const args of mayStartProxy) {
+      const s = stg();
+      expect(s.run('scripts/staging/dc.sh', args).status, `good gate: ${args.join(' ')}`).toBe(0);
+    }
+  }, 180_000);
   it('starts the proxy only with a regular, readable-by-the-proxy, not group/world-writable Basic Auth hash file', () => {
     const missing = stg();
     missing.write('staging/basic-auth.caddy', 'x');
