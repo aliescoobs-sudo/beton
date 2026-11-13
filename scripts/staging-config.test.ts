@@ -5,6 +5,7 @@ import {
   mkdirSync,
   rmSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   symlinkSync,
   writeFileSync,
@@ -368,6 +369,29 @@ describe('the proxy flags, the Basic Auth hash mode and the readability test sta
   });
 });
 
+describe('scripts/staging/make-basic.sh removes its own stale temporaries on start', () => {
+  it('removes .basic-auth.XXXXXX leftovers only, nothing else', () => {
+    const s = makeSandbox({ stack: 'staging' });
+    s.write('staging/.basic-auth.Ab3dE9', 'old hash leftover\n', 0o644);
+    s.write('staging/.basic-auth.zzzzzz', 'old hash leftover\n', 0o600);
+    s.write('staging/.basic-auth.short', 'not ours\n', 0o600);
+    s.write('staging/notes.txt', 'not ours\n', 0o600);
+    const r = s.run(
+      'scripts/staging/make-basic.sh',
+      [],
+      { KAYAS_BASIC_BATCH: '1', KAYAS_BASIC_REPLACE: '1' },
+      'ali-basic\ncanary-stale-pw-0123456789\ncanary-stale-pw-0123456789\n',
+    );
+    expect(r.status, r.stderr).toBe(0);
+    const left = readdirSync(path.join(s.root, 'staging')).sort();
+    expect(left).not.toContain('.basic-auth.Ab3dE9');
+    expect(left).not.toContain('.basic-auth.zzzzzz');
+    expect(left).toContain('.basic-auth.short');
+    expect(left).toContain('notes.txt');
+    expect(left).toContain('basic-auth.caddy');
+  });
+});
+
 describe('scripts/staging/make-basic.sh: a rotation is reported applied only when it is (R21-01)', () => {
   const PW = 'canary-rotation-pw-0123456789';
   const HASH = '$2a$14$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUVWXYZ01234';
@@ -631,6 +655,45 @@ describe.skipIf(!hasPython)('scripts/staging/dc.sh (the release-bound wrapper)',
       expect(s.run('scripts/staging/dc.sh', args).status, `good gate: ${args.join(' ')}`).toBe(0);
     }
   }, 180_000);
+  it('the staging/ directory the proxy sees holds only documented files and the helper temporaries; the offending NAME (never content) is reported', () => {
+    const allowed = ['README.md', 'basic-auth.caddy.example', '.basic-auth.Ab3dE9', '.basic-auth.123456'];
+    for (const name of allowed) {
+      const s = stg();
+      s.write(`staging/${name}`, 'x\n', 0o644);
+      expect(s.run('scripts/staging/dc.sh', ['up-proxy']).status, name).toBe(0);
+    }
+    const refused = [
+      'backup.sql',
+      'notes.txt',
+      '.env',
+      '.basic-auth.short',
+      '.basic-auth.toolong1',
+      '.basic-auth.',
+      'basic-auth.caddy.bak',
+      'basic-auth.caddy~',
+      '..hidden',
+      'weird name',
+    ];
+    for (const name of refused) {
+      const s = stg();
+      s.write(`staging/${name}`, 'SECRET-CANARY-CONTENT\n', 0o644);
+      const r = s.run('scripts/staging/dc.sh', ['up-proxy']);
+      expect(r.status, name).toBe(1);
+      expect(r.stderr, name).toMatch(/staging\/ contains an entry that is not allowed/);
+      expect(r.stderr, name).not.toContain('SECRET-CANARY-CONTENT');
+      expect(s.calls().filter((c) => / up /.test(` ${c}`) && !/config --format/.test(c))).toEqual([]);
+    }
+    const sub = stg();
+    mkdirSync(path.join(sub.root, 'staging/backups'));
+    expect(sub.run('scripts/staging/dc.sh', ['up-proxy']).stderr).toMatch(/not allowed: backups/);
+    const link = stg();
+    symlinkSync('/etc/hostname', path.join(link.root, 'staging/README.md'));
+    expect(link.run('scripts/staging/dc.sh', ['up-proxy']).stderr).toMatch(/not allowed: README\.md/);
+    // the database-only start does not mount the directory and is not blocked by it
+    const db = stg();
+    db.write('staging/backup.sql', 'x', 0o644);
+    expect(db.run('scripts/staging/dc.sh', ['up', '-d', '--wait', 'db']).status).toBe(0);
+  }, 120_000);
   it('starts the proxy only with a regular, readable-by-the-proxy, not group/world-writable Basic Auth hash file', () => {
     const missing = stg();
     missing.write('staging/basic-auth.caddy', 'x');
@@ -668,11 +731,15 @@ describe.skipIf(!hasPython)('scripts/staging/dc.sh (the release-bound wrapper)',
     const asDir = stg();
     spawnSync('rm', ['-f', hashPath(asDir)]);
     mkdirSync(hashPath(asDir));
-    expect(asDir.run('scripts/staging/dc.sh', ['up-proxy']).stderr).toMatch(/not a regular file/);
+    expect(asDir.run('scripts/staging/dc.sh', ['up-proxy']).stderr).toMatch(
+      /not a regular file|not allowed: basic-auth\.caddy/,
+    );
     const link = stg();
     spawnSync('rm', ['-f', hashPath(link)]);
     symlinkSync('/etc/hostname', hashPath(link));
-    expect(link.run('scripts/staging/dc.sh', ['up-proxy']).stderr).toMatch(/not a regular file/);
+    expect(link.run('scripts/staging/dc.sh', ['up-proxy']).stderr).toMatch(
+      /not a regular file|not allowed: basic-auth\.caddy/,
+    );
     const stagingLink = stg();
     spawnSync('mv', [path.join(stagingLink.root, 'staging'), path.join(stagingLink.root, 'staging.real')]);
     symlinkSync('staging.real', path.join(stagingLink.root, 'staging'));

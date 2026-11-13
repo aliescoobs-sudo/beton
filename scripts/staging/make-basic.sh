@@ -22,6 +22,11 @@ dir_mode="$(stat -c '%a' staging 2>/dev/null || stat -f '%Lp' staging)"
 if [ -L staging ] || [ ! -d staging ] || [ $((8#$dir_mode & 8#022)) -ne 0 ] || [ $((8#$dir_mode & 8#001)) -eq 0 ]; then
   echo "make-basic.sh: staging/ must be a real directory, not writable by group or others, and traversable by others (mode 0755): the proxy container reads the hash through it." >&2; exit 1
 fi
+# stale temporaries of an earlier killed run (the proxy sees this whole directory): only this helper's own name pattern, files or links, never a directory
+for stale in staging/.basic-auth.*; do
+  { [ -f "$stale" ] || [ -L "$stale" ]; } || continue
+  [[ "${stale#staging/}" =~ ^\.basic-auth\.[A-Za-z0-9]{6}$ ]] && rm -f -- "$stale"
+done
 if [ -e "$out" ] || [ -L "$out" ]; then
   [ "${KAYAS_BASIC_REPLACE:-}" = 1 ] || { echo "make-basic.sh: $out already exists. To replace it run with KAYAS_BASIC_REPLACE=1." >&2; exit 1; }
   [ -L "$out" ] && { echo "make-basic.sh: $out is a link: refused" >&2; exit 1; }

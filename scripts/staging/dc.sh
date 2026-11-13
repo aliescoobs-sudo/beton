@@ -91,6 +91,19 @@ case "$needs_gate" in
     if [ "$(owner staging)" != "$me" ] || [ $((8#$dmode & 8#022)) -ne 0 ] || [ $((8#$dmode & 8#001)) -eq 0 ]; then
       echo "staging dc.sh: staging/ must belong to the current user, not be writable by group or others, and be traversable by others (mode 0755; it is $dmode)." >&2; exit 1
     fi
+    # R21 (directory exposure): the proxy sees the WHOLE staging/ directory read-only. Nothing may live there but the documented files and the helper's own
+    # temporary names (.basic-auth.XXXXXX). Names only are printed, never contents.
+    for entry in staging/* staging/.[!.]* staging/..?*; do
+      { [ -e "$entry" ] || [ -L "$entry" ]; } || continue
+      name="${entry#staging/}"
+      case "$name" in
+        README.md|basic-auth.caddy|basic-auth.caddy.example) kind=documented ;;
+        *) if [[ "$name" =~ ^\.basic-auth\.[A-Za-z0-9]{6}$ ]]; then kind=temporary; else kind=unknown; fi ;;
+      esac
+      if [ "$kind" = unknown ] || [ -L "$entry" ] || [ ! -f "$entry" ]; then
+        printf 'staging dc.sh: staging/ contains an entry that is not allowed: %q (only regular files README.md, basic-auth.caddy, basic-auth.caddy.example and .basic-auth.XXXXXX temporaries; the proxy container sees this whole directory). Remove it.\n' "$name" >&2; exit 1
+      fi
+    done
     if [ -L "$hash" ] || [ ! -f "$hash" ]; then echo "staging dc.sh: $hash is missing or not a regular file: run ./scripts/staging/make-basic.sh first." >&2; exit 1; fi
     [ "$(owner "$hash")" = "$me" ] || { echo "staging dc.sh: $hash does not belong to the current user." >&2; exit 1; }
     mode="$(modeof "$hash")"
