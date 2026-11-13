@@ -18,6 +18,10 @@ import { makeSandbox } from './ops-sandbox';
 // T10g group C: the operator path. Real pseudo-terminals (scripts/pty-driver.py), real shell scripts in a sandbox, a stub docker, a real TCP relay on loopback.
 vi.setConfig({ testTimeout: 60_000 });
 const hasPython = spawnSync('python3', ['--version']).status === 0;
+const inCi = !!process.env.CI; // in CI the suites below must run: a missing tool is a FAILURE, never a silent skip (R21)
+it.runIf(inCi)('CI: python3 is available (the shell-script suites must not be skipped silently)', () => {
+  expect(hasPython).toBe(true);
+});
 const CANARY = 'CANARY-Secret-7f3a9c2e-Value'; // 28 characters of letters, digits and dashes
 
 type Step = { expect: string; send: string };
@@ -54,11 +58,13 @@ function pty(
 }
 const mode = (p: string) => statSync(p).mode & 0o777;
 
-describe.skipIf(!hasPython)('R19B-04: secrets are typed at hidden prompts on a real terminal', () => {
-  const probe = (dir: string) => {
-    writeFileSync(
-      path.join(dir, 'probe.ts'),
-      `import { createPrompt } from '${path.resolve('scripts/prompt.ts')}';
+describe.skipIf(!hasPython && !inCi)(
+  'R19B-04: secrets are typed at hidden prompts on a real terminal',
+  () => {
+    const probe = (dir: string) => {
+      writeFileSync(
+        path.join(dir, 'probe.ts'),
+        `import { createPrompt } from '${path.resolve('scripts/prompt.ts')}';
 const p = createPrompt();
 const email = await p.ask('email: ');
 const pw = await p.secret('password: ');
@@ -66,191 +72,195 @@ const code = await p.ask('code: ');
 console.log('GOT', email, pw.length, code);
 p.close();
 `,
-    );
-    return ['node', '--import', path.resolve('scripts/register-ts-paths.mjs'), path.join(dir, 'probe.ts')];
-  };
-  it('prompt.ts: the secret is not displayed, and is not handed to the next prompt', () => {
-    const sb = makeSandbox();
-    const out = pty(sb, probe(sb.root), [
-      { expect: 'email: ', send: 'owner@example.test\r' },
-      { expect: 'password: ', send: `${CANARY}\r` },
-      { expect: 'code: ', send: '123456\r' },
-    ]);
-    expect(out.timeout).toBe(false);
-    expect(out.status).toBe(0);
-    expect(out.transcript).not.toContain(CANARY);
-    expect(out.transcript).toContain(`GOT owner@example.test ${CANARY.length} 123456`);
-  });
-  it('prompt.ts: with a pipe (batch) the answers come line by line and nothing is echoed back', () => {
-    const sb = makeSandbox();
-    const r = spawnSync(probe(sb.root)[0]!, probe(sb.root).slice(1), {
-      input: `a@b.c\n${CANARY}\n654321\n`,
-      encoding: 'utf8',
+      );
+      return ['node', '--import', path.resolve('scripts/register-ts-paths.mjs'), path.join(dir, 'probe.ts')];
+    };
+    it('prompt.ts: the secret is not displayed, and is not handed to the next prompt', () => {
+      const sb = makeSandbox();
+      const out = pty(sb, probe(sb.root), [
+        { expect: 'email: ', send: 'owner@example.test\r' },
+        { expect: 'password: ', send: `${CANARY}\r` },
+        { expect: 'code: ', send: '123456\r' },
+      ]);
+      expect(out.timeout).toBe(false);
+      expect(out.status).toBe(0);
+      expect(out.transcript).not.toContain(CANARY);
+      expect(out.transcript).toContain(`GOT owner@example.test ${CANARY.length} 123456`);
     });
-    expect(r.stdout).not.toContain(CANARY);
-    expect(r.stdout).toContain(`GOT a@b.c ${CANARY.length} 654321`);
-  });
-  it('every CLI that reads a secret reads it with prompt.secret, never with ask', () => {
-    for (const f of [
-      'create-owner',
-      'reset-owner-2fa',
-      'reset-owner-password',
-      'import-excel',
-      'import-history',
-    ]) {
-      const src = readFileSync(`scripts/${f}.ts`, 'utf8');
-      for (const m of src.matchAll(/\bask\(\s*[`'"]([^`'"]*)[`'"]/g))
-        expect(m[1], `${f}: ${m[1]}`).not.toMatch(/password|authenticator|code \(|secret|token|key/i);
-    }
-  });
-  it('make-basic.sh: the password is typed hidden, reaches Caddy on stdin only, and the file is 0644 (the proxy cannot read 0600) under umask 022', () => {
-    const sb = makeSandbox({ stack: 'staging' });
-    spawnSync('rm', ['-f', path.join(sb.root, 'staging/basic-auth.caddy')]);
-    const out = pty(
-      sb,
-      ['bash', 'scripts/staging/make-basic.sh'],
-      [
-        { expect: 'user name', send: 'ali-basic\r' },
-        { expect: 'Password \\(hidden', send: `${CANARY}\r` },
-        { expect: 'Password again', send: `${CANARY}\r` },
-      ],
-      { umask: '022' },
-    );
-    expect(out.status, out.transcript).toBe(0);
-    expect(out.transcript).not.toContain(CANARY);
-    const file = path.join(sb.root, 'staging/basic-auth.caddy');
-    expect(mode(file)).toBe(0o644);
-    expect(readFileSync(file, 'utf8')).toMatch(
-      /basic_auth bcrypt "KAYAS staging" \{\n\tali-basic \$2a\$14\$[./A-Za-z0-9]{53}\n\}/,
-    );
-    expect(readFileSync(path.join(sb.root, 'stdin.log'), 'utf8')).toBe(`${CANARY}\n`);
-    expect(sb.called()).not.toContain(CANARY); // never an argument of docker
-    expect(readFileSync(file, 'utf8')).not.toContain(CANARY);
-  });
-  it('make-basic.sh: refuses without a terminal, refuses a weak or mismatched password, never replaces silently, and batch mode needs the explicit flag', () => {
-    const sb = makeSandbox({ stack: 'staging' });
-    spawnSync('rm', ['-f', path.join(sb.root, 'staging/basic-auth.caddy')]);
-    expect(sb.run('scripts/staging/make-basic.sh', [], {}, 'x\n').stderr).toMatch(/no terminal/);
-    const weak = pty(
-      sb,
-      ['bash', 'scripts/staging/make-basic.sh'],
-      [
-        { expect: 'user name', send: 'ali-basic\r' },
-        { expect: 'Password \\(hidden', send: 'short\r' },
-        { expect: 'Password again', send: 'short\r' },
-      ],
-    );
-    expect(weak.status).not.toBe(0);
-    expect(existsSync(path.join(sb.root, 'staging/basic-auth.caddy'))).toBe(false);
-    const diff = pty(
-      sb,
-      ['bash', 'scripts/staging/make-basic.sh'],
-      [
-        { expect: 'user name', send: 'ali-basic\r' },
-        { expect: 'Password \\(hidden', send: `${CANARY}\r` },
-        { expect: 'Password again', send: `${CANARY}x\r` },
-      ],
-    );
-    expect(diff.status).not.toBe(0);
-    expect(diff.transcript).not.toContain(CANARY);
-    const batch = sb.run(
-      'scripts/staging/make-basic.sh',
-      [],
-      { KAYAS_BASIC_BATCH: '1' },
-      `ali-basic\n${CANARY}\n${CANARY}\n`,
-    );
-    expect(batch.status, batch.stderr).toBe(0);
-    expect(batch.stdout + batch.stderr).not.toContain(CANARY);
-    expect(mode(path.join(sb.root, 'staging/basic-auth.caddy'))).toBe(0o644);
-    expect(
-      sb.run(
+    it('prompt.ts: with a pipe (batch) the answers come line by line and nothing is echoed back', () => {
+      const sb = makeSandbox();
+      const r = spawnSync(probe(sb.root)[0]!, probe(sb.root).slice(1), {
+        input: `a@b.c\n${CANARY}\n654321\n`,
+        encoding: 'utf8',
+      });
+      expect(r.stdout).not.toContain(CANARY);
+      expect(r.stdout).toContain(`GOT a@b.c ${CANARY.length} 654321`);
+    });
+    it('every CLI that reads a secret reads it with prompt.secret, never with ask', () => {
+      for (const f of [
+        'create-owner',
+        'reset-owner-2fa',
+        'reset-owner-password',
+        'import-excel',
+        'import-history',
+      ]) {
+        const src = readFileSync(`scripts/${f}.ts`, 'utf8');
+        for (const m of src.matchAll(/\bask\(\s*[`'"]([^`'"]*)[`'"]/g))
+          expect(m[1], `${f}: ${m[1]}`).not.toMatch(/password|authenticator|code \(|secret|token|key/i);
+      }
+    });
+    it('make-basic.sh: the password is typed hidden, reaches Caddy on stdin only, and the file is 0644 (the proxy cannot read 0600) under umask 022', () => {
+      const sb = makeSandbox({ stack: 'staging' });
+      spawnSync('rm', ['-f', path.join(sb.root, 'staging/basic-auth.caddy')]);
+      const out = pty(
+        sb,
+        ['bash', 'scripts/staging/make-basic.sh'],
+        [
+          { expect: 'user name', send: 'ali-basic\r' },
+          { expect: 'Password \\(hidden', send: `${CANARY}\r` },
+          { expect: 'Password again', send: `${CANARY}\r` },
+        ],
+        { umask: '022' },
+      );
+      expect(out.status, out.transcript).toBe(0);
+      expect(out.transcript).not.toContain(CANARY);
+      const file = path.join(sb.root, 'staging/basic-auth.caddy');
+      expect(mode(file)).toBe(0o644);
+      expect(readFileSync(file, 'utf8')).toMatch(
+        /basic_auth bcrypt "KAYAS staging" \{\n\tali-basic \$2a\$14\$[./A-Za-z0-9]{53}\n\}/,
+      );
+      expect(readFileSync(path.join(sb.root, 'stdin.log'), 'utf8')).toBe(`${CANARY}\n`);
+      expect(sb.called()).not.toContain(CANARY); // never an argument of docker
+      expect(readFileSync(file, 'utf8')).not.toContain(CANARY);
+    });
+    it('make-basic.sh: refuses without a terminal, refuses a weak or mismatched password, never replaces silently, and batch mode needs the explicit flag', () => {
+      const sb = makeSandbox({ stack: 'staging' });
+      spawnSync('rm', ['-f', path.join(sb.root, 'staging/basic-auth.caddy')]);
+      expect(sb.run('scripts/staging/make-basic.sh', [], {}, 'x\n').stderr).toMatch(/no terminal/);
+      const weak = pty(
+        sb,
+        ['bash', 'scripts/staging/make-basic.sh'],
+        [
+          { expect: 'user name', send: 'ali-basic\r' },
+          { expect: 'Password \\(hidden', send: 'short\r' },
+          { expect: 'Password again', send: 'short\r' },
+        ],
+      );
+      expect(weak.status).not.toBe(0);
+      expect(existsSync(path.join(sb.root, 'staging/basic-auth.caddy'))).toBe(false);
+      const diff = pty(
+        sb,
+        ['bash', 'scripts/staging/make-basic.sh'],
+        [
+          { expect: 'user name', send: 'ali-basic\r' },
+          { expect: 'Password \\(hidden', send: `${CANARY}\r` },
+          { expect: 'Password again', send: `${CANARY}x\r` },
+        ],
+      );
+      expect(diff.status).not.toBe(0);
+      expect(diff.transcript).not.toContain(CANARY);
+      const batch = sb.run(
         'scripts/staging/make-basic.sh',
         [],
         { KAYAS_BASIC_BATCH: '1' },
         `ali-basic\n${CANARY}\n${CANARY}\n`,
-      ).stderr,
-    ).toMatch(/already exists/);
-  });
-  it('bootstrap.sh --create-env: hidden prompt, file created private from the first byte (0600 under umask 022), refused without a terminal', () => {
-    const sb = makeSandbox();
-    expect(sb.run('scripts/ops/bootstrap.sh', ['--create-env']).stderr).toMatch(/needs a terminal/);
-    const out = pty(
-      sb,
-      ['bash', 'scripts/ops/bootstrap.sh', '--create-env'],
-      [{ expect: 'Password of the backup login', send: `${CANARY}\r` }],
-      { umask: '022' },
-    );
-    expect(out.status, out.transcript).toBe(0);
-    expect(out.transcript).not.toContain(CANARY);
-    const f = path.join(sb.root, '.env.bootstrap.prod');
-    expect(mode(f)).toBe(0o600);
-    expect(readFileSync(f, 'utf8')).toBe(
-      `DATABASE_URL_BACKUP=postgres://belgobeton_backup:${CANARY}@db:5432/belgobeton\n`,
-    );
-    expect(sb.called()).not.toContain(CANARY);
-    // a weak password and an existing file are refused
-    const sb2 = makeSandbox();
-    expect(
-      pty(
-        sb2,
-        ['bash', 'scripts/ops/bootstrap.sh', '--create-env'],
-        [{ expect: 'Password of the backup login', send: 'short\r' }],
-      ).status,
-    ).not.toBe(0);
-    expect(existsSync(path.join(sb2.root, '.env.bootstrap.prod'))).toBe(false);
-    expect(sb.run('scripts/ops/bootstrap.sh', ['--create-env']).status).not.toBe(0);
-  });
-  it('ops.sh: a terminal gives the job a TTY (no -T), a pipe or --batch does not, --interactive without a terminal is refused', () => {
-    const sb = makeSandbox();
-    const t = pty(sb, ['bash', 'scripts/ops/ops.sh', 'create-owner'], []);
-    expect(t.status).toBe(0);
-    const tty = sb.calls().find((c) => / run --name /.test(c))!;
-    expect(tty).not.toMatch(/ -T /);
-    expect(tty).toMatch(/ ops node .*create-owner\.ts/);
-    const b = makeSandbox();
-    expect(b.run('scripts/ops/ops.sh', ['create-owner'], {}, 'x\n').status).toBe(0);
-    expect(b.calls().find((c) => / run --name /.test(c))).toMatch(/ -T ops /);
-    const bb = makeSandbox();
-    expect(pty(bb, ['bash', 'scripts/ops/ops.sh', '--batch', 'create-owner'], []).status).toBe(0);
-    expect(bb.calls().find((c) => / run --name /.test(c))).toMatch(/ -T ops /);
-    const i = makeSandbox();
-    expect(i.run('scripts/ops/ops.sh', ['--interactive', 'create-owner'], {}, '').stderr).toMatch(
-      /needs a terminal/,
-    );
-    expect(i.called()).toBe('');
-  });
-  it('init-env.sh: both secret files are 0600 whatever the umask, and nothing is printed', () => {
-    const dir = mkdtempSync(path.join(tmpdir(), 'bb-init-'));
-    mkdirSync(path.join(dir, 'scripts/staging'), { recursive: true });
-    mkdirSync(path.join(dir, 'scripts/training'), { recursive: true });
-    copyFileSync('scripts/staging/init-env.sh', path.join(dir, 'scripts/staging/init-env.sh'));
-    copyFileSync('scripts/training/image-policy.sh', path.join(dir, 'scripts/training/image-policy.sh'));
-    const r = spawnSync('bash', ['-c', 'umask 022; exec bash scripts/staging/init-env.sh'], {
-      cwd: dir,
-      encoding: 'utf8',
-      env: { PATH: process.env.PATH ?? '', APP_DOMAIN: 'kayas.example.com' } as unknown as NodeJS.ProcessEnv,
+      );
+      expect(batch.status, batch.stderr).toBe(0);
+      expect(batch.stdout + batch.stderr).not.toContain(CANARY);
+      expect(mode(path.join(sb.root, 'staging/basic-auth.caddy'))).toBe(0o644);
+      expect(
+        sb.run(
+          'scripts/staging/make-basic.sh',
+          [],
+          { KAYAS_BASIC_BATCH: '1' },
+          `ali-basic\n${CANARY}\n${CANARY}\n`,
+        ).stderr,
+      ).toMatch(/already exists/);
     });
-    expect(r.status, r.stderr).toBe(0);
-    for (const f of ['.env.staging', '.env.staging.ops']) expect(mode(path.join(dir, f))).toBe(0o600);
-    const env = readFileSync(path.join(dir, '.env.staging'), 'utf8');
-    expect(env).toMatch(/^APP_BASE_URL=https:\/\/kayas\.example\.com$/m);
-    expect(env).not.toMatch(/APP_IMAGE|ANTHROPIC|VAPID|\$2[aby]\$/);
-    expect(r.stdout + r.stderr).not.toMatch(/AUTH_SECRET|postgres:\/\//);
-    expect(
-      spawnSync('bash', ['scripts/staging/init-env.sh'], {
+    it('bootstrap.sh --create-env: hidden prompt, file created private from the first byte (0600 under umask 022), refused without a terminal', () => {
+      const sb = makeSandbox();
+      expect(sb.run('scripts/ops/bootstrap.sh', ['--create-env']).stderr).toMatch(/needs a terminal/);
+      const out = pty(
+        sb,
+        ['bash', 'scripts/ops/bootstrap.sh', '--create-env'],
+        [{ expect: 'Password of the backup login', send: `${CANARY}\r` }],
+        { umask: '022' },
+      );
+      expect(out.status, out.transcript).toBe(0);
+      expect(out.transcript).not.toContain(CANARY);
+      const f = path.join(sb.root, '.env.bootstrap.prod');
+      expect(mode(f)).toBe(0o600);
+      expect(readFileSync(f, 'utf8')).toBe(
+        `DATABASE_URL_BACKUP=postgres://belgobeton_backup:${CANARY}@db:5432/belgobeton\n`,
+      );
+      expect(sb.called()).not.toContain(CANARY);
+      // a weak password and an existing file are refused
+      const sb2 = makeSandbox();
+      expect(
+        pty(
+          sb2,
+          ['bash', 'scripts/ops/bootstrap.sh', '--create-env'],
+          [{ expect: 'Password of the backup login', send: 'short\r' }],
+        ).status,
+      ).not.toBe(0);
+      expect(existsSync(path.join(sb2.root, '.env.bootstrap.prod'))).toBe(false);
+      expect(sb.run('scripts/ops/bootstrap.sh', ['--create-env']).status).not.toBe(0);
+    });
+    it('ops.sh: a terminal gives the job a TTY (no -T), a pipe or --batch does not, --interactive without a terminal is refused', () => {
+      const sb = makeSandbox();
+      const t = pty(sb, ['bash', 'scripts/ops/ops.sh', 'create-owner'], []);
+      expect(t.status).toBe(0);
+      const tty = sb.calls().find((c) => / run --name /.test(c))!;
+      expect(tty).not.toMatch(/ -T /);
+      expect(tty).toMatch(/ ops node .*create-owner\.ts/);
+      const b = makeSandbox();
+      expect(b.run('scripts/ops/ops.sh', ['create-owner'], {}, 'x\n').status).toBe(0);
+      expect(b.calls().find((c) => / run --name /.test(c))).toMatch(/ -T ops /);
+      const bb = makeSandbox();
+      expect(pty(bb, ['bash', 'scripts/ops/ops.sh', '--batch', 'create-owner'], []).status).toBe(0);
+      expect(bb.calls().find((c) => / run --name /.test(c))).toMatch(/ -T ops /);
+      const i = makeSandbox();
+      expect(i.run('scripts/ops/ops.sh', ['--interactive', 'create-owner'], {}, '').stderr).toMatch(
+        /needs a terminal/,
+      );
+      expect(i.called()).toBe('');
+    });
+    it('init-env.sh: both secret files are 0600 whatever the umask, and nothing is printed', () => {
+      const dir = mkdtempSync(path.join(tmpdir(), 'bb-init-'));
+      mkdirSync(path.join(dir, 'scripts/staging'), { recursive: true });
+      mkdirSync(path.join(dir, 'scripts/training'), { recursive: true });
+      copyFileSync('scripts/staging/init-env.sh', path.join(dir, 'scripts/staging/init-env.sh'));
+      copyFileSync('scripts/training/image-policy.sh', path.join(dir, 'scripts/training/image-policy.sh'));
+      const r = spawnSync('bash', ['-c', 'umask 022; exec bash scripts/staging/init-env.sh'], {
         cwd: dir,
         encoding: 'utf8',
         env: {
           PATH: process.env.PATH ?? '',
           APP_DOMAIN: 'kayas.example.com',
         } as unknown as NodeJS.ProcessEnv,
-      }).status,
-    ).not.toBe(0); // never overwrites
-  });
-});
+      });
+      expect(r.status, r.stderr).toBe(0);
+      for (const f of ['.env.staging', '.env.staging.ops']) expect(mode(path.join(dir, f))).toBe(0o600);
+      const env = readFileSync(path.join(dir, '.env.staging'), 'utf8');
+      expect(env).toMatch(/^APP_BASE_URL=https:\/\/kayas\.example\.com$/m);
+      expect(env).not.toMatch(/APP_IMAGE|ANTHROPIC|VAPID|\$2[aby]\$/);
+      expect(r.stdout + r.stderr).not.toMatch(/AUTH_SECRET|postgres:\/\//);
+      expect(
+        spawnSync('bash', ['scripts/staging/init-env.sh'], {
+          cwd: dir,
+          encoding: 'utf8',
+          env: {
+            PATH: process.env.PATH ?? '',
+            APP_DOMAIN: 'kayas.example.com',
+          } as unknown as NodeJS.ProcessEnv,
+        }).status,
+      ).not.toBe(0); // never overwrites
+    });
+  },
+);
 
 // ---------------- R19B-05
-describe.skipIf(!hasPython)('R19B-05: verify-host.sh fails closed and judges every binding', () => {
+describe.skipIf(!hasPython && !inCi)('R19B-05: verify-host.sh fails closed and judges every binding', () => {
   const port = (ip: string, p: string) => ({ HostIp: ip, HostPort: p });
   const container = (
     name: string,

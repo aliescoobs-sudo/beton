@@ -6,6 +6,8 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 // T10i: scripts/staging/up.sh must FAIL, with one clear cause, when the proxy crash-loops or cannot read its files, and must check the files inside the
 // container. The real up.sh runs in a throwaway directory with stub dc.sh / ops.sh / docker (their behaviour is set per scenario by files).
+const PW_CANARY = 'canary-basic-password-0123456789';
+const HASH_CANARY = '$2a$14$CANARYHASHCANARYHASHCANARYHASHCANARYHASHCANARYHASHCAN';
 const roots: string[] = [];
 afterAll(() => roots.forEach((r) => rmSync(r, { recursive: true, force: true })));
 
@@ -14,7 +16,7 @@ echo "dc $*" >> calls.log
 has() { [ -e "scenario/$1" ]; }
 case "$1" in
   up-proxy) has proxy.up.fail && exit 1; exit 0 ;;
-  logs) has proxy.denied && echo '{"level":"error","msg":"adapting config using caddyfile: Could not import /etc/caddy/staging/basic-auth.caddy: open /etc/caddy/staging/basic-auth.caddy: permission denied"}'; has proxy.loop && echo restarting; exit 0 ;;
+  logs) has proxy.denied && echo '{"level":"error","msg":"adapting config using caddyfile: Could not import /etc/caddy/staging/basic-auth.caddy: open /etc/caddy/staging/basic-auth.caddy: permission denied"}'; has proxy.denied && cat staging/basic-auth.caddy; has proxy.loop && echo restarting; exit 0 ;;
   exec) case "$*" in
       *"-T app wget"*) echo '{"status":"ready"}'; exit 0 ;;
       *"-T proxy sh -c"*) has proxy.unreadable && exit 1; exit 0 ;;
@@ -37,9 +39,15 @@ const sandbox = (flags: string[] = []) => {
     { mode: 0o755 },
   );
   writeFileSync(path.join(root, 'bin/docker'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
-  writeFileSync(path.join(root, '.env.staging'), 'STAGING_REHEARSAL=1\n', { mode: 0o600 });
+  writeFileSync(path.join(root, '.env.staging'), `STAGING_REHEARSAL=1\nBASIC_PASSWORD=${PW_CANARY}\n`, {
+    mode: 0o600,
+  });
   writeFileSync(path.join(root, '.env.staging.ops'), 'X=1\n', { mode: 0o600 });
-  writeFileSync(path.join(root, 'staging/basic-auth.caddy'), 'x\n', { mode: 0o644 });
+  writeFileSync(
+    path.join(root, 'staging/basic-auth.caddy'),
+    `basic_auth bcrypt "x" {\n\tu ${HASH_CANARY}\n}\n`,
+    { mode: 0o644 },
+  );
   chmodSync(path.join(root, 'scripts/staging/up.sh'), 0o755);
   for (const f of flags) writeFileSync(path.join(root, 'scenario', f), '');
   return (): { status: number | null; out: string } => {
@@ -54,7 +62,12 @@ const sandbox = (flags: string[] = []) => {
         HOME: root,
       } as unknown as NodeJS.ProcessEnv,
     });
-    return { status: r.status, out: r.stdout + r.stderr };
+    const out = r.stdout + r.stderr;
+    // a hash or a password must never be printed, in any scenario
+    expect(out).not.toContain(PW_CANARY);
+    expect(out).not.toContain(HASH_CANARY);
+    expect(out).not.toContain('CANARYHASH');
+    return { status: r.status, out };
   };
 };
 

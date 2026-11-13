@@ -22,11 +22,15 @@ const procEnv = (s: { bin: string; root: string }, extra: Record<string, string>
     ...extra,
   }) as unknown as NodeJS.ProcessEnv;
 const hasPython = spawnSync('python3', ['--version']).status === 0;
+const inCi = !!process.env.CI; // in CI the suites below must run: a missing tool is a FAILURE, never a silent skip (R21)
+it.runIf(inCi)('CI: python3 is available (the shell-script suites must not be skipped silently)', () => {
+  expect(hasPython).toBe(true);
+});
 const dc = 'scripts/ops/dc.sh';
 const noContainerCalls = (calls: string[]) =>
   calls.filter((c) => / (run|up|exec|create) /.test(` ${c}`) && !/config --format json/.test(c));
 
-describe.skipIf(!hasPython)('scripts/ops/dc.sh binds every command to the approved release', () => {
+describe.skipIf(!hasPython && !inCi)('scripts/ops/dc.sh binds every command to the approved release', () => {
   it('passes the approved digest explicitly and validates the effective configuration first', () => {
     const s = makeSandbox();
     const r = s.run(dc, ['ps']);
@@ -225,7 +229,7 @@ describe.skipIf(!hasPython)('scripts/ops/dc.sh binds every command to the approv
   });
 });
 
-describe.skipIf(!hasPython)('privileged jobs: ops.sh, bootstrap.sh, backup-nightly.sh', () => {
+describe.skipIf(!hasPython && !inCi)('privileged jobs: ops.sh, bootstrap.sh, backup-nightly.sh', () => {
   it('ops.sh runs the job under the approved digest and records commit, digest and the ACTUAL image id (no secret)', () => {
     const s = makeSandbox();
     const r = s.run('scripts/ops/ops.sh', ['--batch', 'db-migrate']);
@@ -358,7 +362,7 @@ describe('approve-release.sh', () => {
 });
 
 // ---- deploy: lock, journal, exact checkout, verified rollback
-describe.skipIf(!hasPython)('scripts/ops/deploy.sh', () => {
+describe.skipIf(!hasPython && !inCi)('scripts/ops/deploy.sh', () => {
   const deployArgs = (commit: string, image = IMG_B) => [commit, image, 'linux/amd64', '999'];
   const withNewCommit = (o: Parameters<typeof makeSandbox>[0] = {}) => {
     const s = makeSandbox({ ...o });

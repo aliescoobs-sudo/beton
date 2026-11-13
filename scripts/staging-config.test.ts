@@ -19,7 +19,17 @@ import { hardened, IMG_A as GOOD, makeSandbox, OWNER, stagingConfig } from './op
 // the test needs no Docker), and on the REAL `docker compose config` of the file when Docker is present.
 const hasDocker = spawnSync('docker', ['compose', 'version']).status === 0;
 const hasPython = spawnSync('python3', ['--version']).status === 0;
+const inCi = !!process.env.CI; // in CI the suites below must run: a missing tool is a FAILURE, never a silent skip (R21)
+it.runIf(inCi)('CI: python3 is available (the shell-script suites must not be skipped silently)', () => {
+  expect(hasPython).toBe(true);
+});
 const goodConfig = stagingConfig;
+it.runIf(inCi)(
+  'CI: docker compose is available (the real-compose checks must not be skipped silently)',
+  () => {
+    expect(hasDocker).toBe(true);
+  },
+);
 type Json = ReturnType<typeof stagingConfig>;
 function validate(cfg: Json, args: string[] = ['--stack', 'staging', '--image', GOOD]) {
   const r = spawnSync('python3', ['-I', 'scripts/ops/validate-compose.py', ...args], {
@@ -29,7 +39,7 @@ function validate(cfg: Json, args: string[] = ['--stack', 'staging', '--image', 
   return { code: r.status, err: r.stderr };
 }
 
-describe.skipIf(!hasPython)('the effective-configuration validator (staging)', () => {
+describe.skipIf(!hasPython && !inCi)('the effective-configuration validator (staging)', () => {
   it('accepts the expected configuration', () => {
     expect(validate(goodConfig())).toMatchObject({ code: 0 });
   });
@@ -161,7 +171,7 @@ describe.skipIf(!hasPython)('the effective-configuration validator (staging)', (
   });
 });
 
-describe.skipIf(!hasDocker || !hasPython)('the real staging compose file', () => {
+describe.skipIf((!hasDocker || !hasPython) && !inCi)('the real staging compose file', () => {
   const dir = mkdtempSync(path.join(tmpdir(), 'bb-staging-'));
   const env = `APP_DOMAIN=kayas.example.com\nAPP_IMAGE=${GOOD}\nAPP_BASE_URL=https://kayas.example.com\nPOSTGRES_SUPERUSER_PASSWORD=x\n`;
   writeFileSync(path.join(dir, '.env.staging'), env);
@@ -237,8 +247,11 @@ describe.skipIf(!hasDocker || !hasPython)('the real staging compose file', () =>
     ).toBe(1);
   });
   it('the Caddyfile adapts for Caddy: ACME by default, the internal CA only when asked, anything else fails closed (needs the caddy image locally)', () => {
-    const have = spawnSync('docker', ['image', 'inspect', 'caddy:2-alpine']).status === 0;
-    if (!have) return;
+    let have = spawnSync('docker', ['image', 'inspect', 'caddy:2-alpine']).status === 0;
+    if (!have && inCi) have = spawnSync('docker', ['pull', 'caddy:2-alpine']).status === 0; // in CI the image is pulled, and its absence is a failure
+    if (!have && inCi)
+      throw new Error('CI: the caddy:2-alpine image is required for the Caddyfile adaptation check');
+    if (!have) return; // locally: skipped when the image is not there
     mkdirSync(path.resolve('.logs'), { recursive: true });
     const gateDir = mkdtempSync(path.resolve('.logs', 'gate-'));
     chmodSync(gateDir, 0o755);
@@ -350,7 +363,7 @@ describe('the proxy flags, the Basic Auth hash mode and the readability test sta
       'import /etc/caddy/staging/basic-auth.caddy',
     );
   });
-  it('make-basic.sh writes a file the proxy can read (0644) and dc.sh accepts exactly that; the Docker test uses the same flags', () => {
+  it('make-basic.sh writes a file the proxy can read (0644); dc.sh requires world-readable and not group/world-writable (so 0644 and 0444 pass, 0600/0640/0664 do not); the Docker test uses the same flags', () => {
     const mk = code(readFileSync('scripts/staging/make-basic.sh', 'utf8'));
     expect(mk).toMatch(/chmod 644 "\$tmp"/);
     expect(mk).not.toMatch(/chmod 600 "\$tmp"/);
@@ -460,7 +473,7 @@ describe('scripts/staging/make-basic.sh: a rotation is reported applied only whe
   });
 });
 
-describe.skipIf(!hasPython)('scripts/staging/dc.sh (the release-bound wrapper)', () => {
+describe.skipIf(!hasPython && !inCi)('scripts/staging/dc.sh (the release-bound wrapper)', () => {
   const stg = (o: Parameters<typeof makeSandbox>[0] = {}) => makeSandbox({ stack: 'staging', ...o });
   it('runs a valid command with the approved image', () => {
     const s = stg();
@@ -716,12 +729,25 @@ describe.skipIf(!hasPython)('scripts/staging/dc.sh (the release-bound wrapper)',
       chmodSync(hashPath(s), ok);
       expect(s.run('scripts/staging/dc.sh', ['up-proxy']).status, ok.toString(8)).toBe(0);
     }
-    // a wrong owner: the files belong to the real user; a stub `id` makes the "current user" someone else
-    const alien = stg();
-    writeFileSync(path.join(alien.root, 'bin/id'), '#!/bin/sh\necho 424242\n', { mode: 0o755 });
-    expect(alien.run('scripts/staging/dc.sh', ['up-proxy']).stderr).toMatch(
-      /must belong to the current user/,
-    );
+    // a wrong owner, the two branches INDEPENDENTLY. A stub `stat` reports another uid for exactly one path; everything else is the real stat.
+    const statStub = (root: string, path1: string) =>
+      writeFileSync(
+        path.join(root, 'bin/stat'),
+        `#!/bin/sh\ncase "$*" in *%u*"${path1}") echo 424242; exit 0;; esac\nexec /usr/bin/stat "$@"\n`,
+        { mode: 0o755 },
+      );
+    const fileOwner = stg();
+    statStub(fileOwner.root, 'staging/basic-auth.caddy');
+    const fo = fileOwner.run('scripts/staging/dc.sh', ['up-proxy']);
+    expect(fo.status).toBe(1);
+    expect(fo.stderr).toMatch(/basic-auth\.caddy does not belong to the current user/); // the directory check had passed
+    expect(fo.stderr).not.toMatch(/staging\/ must belong/);
+    const dirOwner = stg();
+    statStub(dirOwner.root, 'staging');
+    const dow = dirOwner.run('scripts/staging/dc.sh', ['up-proxy']);
+    expect(dow.status).toBe(1);
+    expect(dow.stderr).toMatch(/staging\/ must belong to the current user/);
+    expect(fileOwner.calls().filter((c) => / up /.test(` ${c}`) && !/config --format/.test(c))).toEqual([]);
     const dirWide = stg();
     chmodSync(path.join(dirWide.root, 'staging'), 0o775);
     expect(dirWide.run('scripts/staging/dc.sh', ['up-proxy']).stderr).toMatch(/staging\/ must belong/);
