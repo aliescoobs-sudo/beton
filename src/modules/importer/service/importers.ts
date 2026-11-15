@@ -29,6 +29,9 @@ import {
   SUPPLIER_CATEGORIES,
 } from '@/modules/master-data';
 import {
+  addOpeningInstalment,
+  addOpeningObligation,
+  addOpeningOpenItem,
   addPartyOpeningBalance,
   enterOpeningDate,
   COUNTER_PREFIXES,
@@ -39,12 +42,15 @@ import {
   listClientAliases,
   listInstruments,
   listMoneyAccounts,
+  listOpeningObligations,
+  listOpeningOpenItems,
   receiveInstrument,
   setDocCounter,
   setInvoiceSequence,
   setOpeningBalance,
   type CounterPrefix,
 } from '@/modules/ledger';
+import { listOpeningStock, setOpeningStock } from '@/modules/operations';
 import type { SessionUser } from '@/modules/platform-security';
 import { type DateFormat, type Sheet, toIsoDate, toRecords } from '../domain/sheet';
 import { parseImportAmount, parseWholeNumber } from '../domain/values';
@@ -92,6 +98,10 @@ export const IMPORT_KINDS = [
   'doc_counters',
   'account_balances',
   'cheques_issued',
+  // T19-close A (D246): per-invoice open items, loans and leasing, opening stock per plant and component
+  'open_items',
+  'obligations',
+  'opening_stock',
 ] as const;
 export type ImportKind = (typeof IMPORT_KINDS)[number];
 
@@ -139,6 +149,9 @@ export interface Ctx {
   /** The business date the instruments are received on (default: today). */
   today?: string;
 }
+
+/** The opening date of D246 when neither the books nor the command line give one. */
+const OPENING_DATE = '2026-11-30';
 
 export const COLUMNS = {
   concrete_types: {
@@ -233,14 +246,61 @@ export const COLUMNS = {
     amount: ['amount', 'montant', 'solde'],
     note: ['note', 'remarque', 'commentaire'],
   },
-  // Cheques and LCN we ISSUED and that are not cleared yet (outstanding): supplier, number, bank, amount, written (due) date.
+  // Cheques and LCN we ISSUED and that are not cleared yet (outstanding): supplier, number, bank, amount, the date written on it, its due date
+  // (an LCN is drawn on one date and falls due on another; a cheque falls due on the date written on it) and the day it was handed over
+  // (default: the opening date, never the import day). At least one of the written date and the due date is required.
   cheques_issued: {
     supplier: ['supplier', 'fournisseur', 'code fournisseur', 'tiers', 'code'],
     method: ['method', 'type', 'mode', 'nature'],
     number: ['number', 'numero', 'numéro', 'n°', 'no', 'numero cheque', 'numéro chèque'],
     bank: ['bank', 'banque'],
     amount: ['amount', 'montant'],
-    written: ['written', 'date', 'echeance', 'échéance', 'date cheque', 'date chèque', 'date lcn'],
+    written: ['written', 'date', 'date cheque', 'date chèque', 'date lcn', 'date emission', 'date émission'],
+    due: ['due', 'due date', 'echeance', 'échéance', 'date echeance', 'date échéance'],
+    handed: ['handed', 'date remise', 'remise', 'date de remise'],
+  },
+  // One row per OPEN invoice of a client or supplier at the opening date; a party's opening line is the sum of its balances.
+  // `amount` is the open BALANCE (it is the column of the totals control); `invoiceAmount` is the original invoice amount.
+  open_items: {
+    party: ['party', 'tiers', 'type tiers', 'client ou fournisseur', 'nature'],
+    code: ['code', 'client', 'fournisseur', 'code tiers', 'nom'],
+    number: ['number', 'numero', 'numéro', 'n° facture', 'numero facture', 'numéro facture', 'facture'],
+    invoiceDate: ['invoice date', 'date facture', 'date', 'date de facture'],
+    due: ['due', 'due date', 'echeance', 'échéance', 'date echeance', 'date échéance'],
+    invoiceAmount: ['invoice amount', 'montant facture', 'montant', 'total', 'montant ttc'],
+    amount: ['balance', 'solde', 'reste', 'reste a payer', 'reste à payer', 'reste du', 'reste dû'],
+  },
+  // One row per remaining INSTALMENT of a loan or leasing contract at the opening date.
+  obligations: {
+    reference: ['reference', 'référence', 'contrat', 'numero contrat', 'numéro contrat', 'n° contrat'],
+    type: ['type', 'nature', 'kind'],
+    lender: ['lender', 'organisme', 'banque', 'creancier', 'créancier', 'bailleur'],
+    due: ['due', 'due date', 'echeance', 'échéance', 'date echeance', 'date échéance'],
+    amount: [
+      'amount',
+      'montant',
+      'montant echeance',
+      'montant échéance',
+      'mensualite',
+      'mensualité',
+      'loyer',
+    ],
+  },
+  // The physical count at the opening date: quantity per plant and component (a signed 'opening' stock movement dated that day).
+  opening_stock: {
+    plant: ['plant', 'centrale', 'site'],
+    component: [
+      'component',
+      'composant',
+      'code composant',
+      'matiere',
+      'matière',
+      'designation',
+      'désignation',
+    ],
+    qty: ['qty', 'quantity', 'quantite', 'quantité', 'stock', 'comptage'],
+    unit: ['unit', 'unite', 'unité'],
+    asOf: ['as of', 'date', 'au', 'date inventaire', 'date comptage'],
   },
 } as const satisfies Record<ImportKind, Record<string, readonly string[]>>;
 
@@ -269,7 +329,10 @@ export const REQUIRED_FIELDS: Record<ImportKind, string[]> = {
   invoice_sequence: ['year', 'last'],
   doc_counters: ['prefix', 'year', 'last'],
   account_balances: ['account', 'asOf', 'amount'],
-  cheques_issued: ['supplier', 'method', 'number', 'amount', 'written'],
+  cheques_issued: ['supplier', 'method', 'number', 'amount'],
+  open_items: ['party', 'code', 'number', 'invoiceDate', 'due', 'invoiceAmount', 'amount'],
+  obligations: ['reference', 'type', 'lender', 'due', 'amount'],
+  opening_stock: ['component', 'qty'],
 };
 
 const KIND_ALIASES: Record<string, string> = {
@@ -966,6 +1029,9 @@ async function plan(
     const haveByKey = new Map<string, Awaited<ReturnType<typeof listInstruments>>[number]>();
     for (const i of (await listInstruments(appPool, actor)).filter((x) => x.direction === 'out'))
       haveByKey.set(`${i.partyId}|${(i.number ?? '').toLowerCase()}|${(i.bank ?? '').toLowerCase()}`, i);
+    // D246: an issued cheque or LCN carries the dates of the sheet: written, due, and the day it was handed over (default: the opening date, never the import day)
+    const openingDate =
+      (await getOpeningState(appPool, actor)).openingDate ?? ctx.openingDate ?? OPENING_DATE;
     const seen = new Set<string>();
     for (const { row, values: v } of records) {
       const supplierId = suppliers.get(v.supplier.trim().toLowerCase());
@@ -976,7 +1042,12 @@ async function plan(
           ? 'lcn'
           : null;
       const amount = parseImportAmount(v.amount);
-      const written = toIsoDate(v.written, ctx.dateFormat);
+      const writtenIso = v.written.trim() ? toIsoDate(v.written, ctx.dateFormat) : null;
+      const dueIso = v.due.trim() ? toIsoDate(v.due, ctx.dateFormat) : null;
+      const handedIso = v.handed.trim() ? toIsoDate(v.handed, ctx.dateFormat) : openingDate;
+      const written = writtenIso ?? dueIso;
+      // a cheque falls due on the date written on it: a due date is kept only when it differs
+      const due = written && dueIso && dueIso !== written ? dueIso : null;
       const label = `${v.number} ${v.supplier}`;
       const key = `${supplierId}|${v.number.toLowerCase()}|${v.bank.toLowerCase()}`;
       if (ambSuppliers.has(v.supplier.trim().toLowerCase())) planned.push({ row, label, error: AMBIGUOUS });
@@ -989,11 +1060,20 @@ async function plan(
           label,
           error: `amount in MAD: ${amount.ok ? 'must be above zero' : amount.reason}`,
         });
-      else if (!written)
+      else if (!written || (v.written.trim() && !writtenIso) || (v.due.trim() && !dueIso) || !handedIso)
         planned.push({
           row,
           label,
-          error: `date not understood or ambiguous (expected ${ctx.dateFormat ?? 'dmy'})`,
+          error: `written, due or handover date missing, not understood or ambiguous (expected ${ctx.dateFormat ?? 'dmy'}); the written date or the due date is required`,
+        });
+      else if (due !== null && due < written)
+        planned.push({ row, label, error: 'the due date is before the date written on the paper' });
+      else if (handedIso > openingDate)
+        planned.push({
+          row,
+          label,
+          error:
+            'handed over after the opening date: it is not an opening row, enter it as a payment in the application',
         });
       else if (haveByKey.has(key)) {
         const e = haveByKey.get(key)!;
@@ -1001,6 +1081,7 @@ async function plan(
           ['amount', amount.value, e.amountCentimes],
           ['type', method, e.method],
           ['written date', written, e.writtenDate],
+          ['due date', due, e.dueDate],
         ]);
         planned.push(d.length ? { row, label, error: conflictMessage(d) } : { row, label, exists: true });
       } else if (seen.has(key)) planned.push({ row, label, error: 'twice in the file' });
@@ -1021,11 +1102,364 @@ async function plan(
                 bank: nul(v.bank),
                 writtenDate: written,
               },
-              { today: ctx.today ?? realClock.now().toISOString().slice(0, 10), source: 'opening_30_11' },
+              { today: handedIso, source: 'opening_30_11', dueDate: due },
             );
             return r.ok ? null : fail(r);
           },
         });
+      }
+    }
+  } else if (kind === 'open_items') {
+    const records = rawRecords.map((r) => ({ row: r.row, values: full('open_items', r.values) }));
+    const state = await getOpeningState(appPool, actor);
+    const date = state.openingDate ?? ctx.openingDate ?? null;
+    const clientList = await listClients(appPool, actor);
+    const clients = new Map<string, string>();
+    for (const c of clientList) {
+      clients.set(c.code.toLowerCase(), c.id);
+      clients.set(c.name.trim().toLowerCase(), c.id);
+    }
+    for (const a of await listClientAliases(appPool, actor))
+      clients.set(a.alias.trim().toLowerCase(), a.clientId);
+    const supplierList = await listSuppliers(appPool, actor);
+    const suppliers = new Map<string, string>();
+    for (const x of supplierList) {
+      suppliers.set(x.code.toLowerCase(), x.id);
+      suppliers.set(x.name.trim().toLowerCase(), x.id);
+    }
+    const ambClients = ambiguousKeys(clientList, (c) => [c.code.toLowerCase(), c.name.trim().toLowerCase()]);
+    const ambSuppliers = ambiguousKeys(supplierList, (x) => [
+      x.code.toLowerCase(),
+      x.name.trim().toLowerCase(),
+    ]);
+    const lines = new Map(state.parties.map((p) => [`${p.kind}:${p.partyId}`, p]));
+    const haveItems = new Map(
+      (await listOpeningOpenItems(appPool, actor)).map((i) => [
+        `${i.kind}:${i.partyId}|${i.invoiceNumber.toLowerCase()}`,
+        i,
+      ]),
+    );
+    type Parsed = {
+      row: number;
+      label: string;
+      party: 'client' | 'supplier';
+      id: string;
+      number: string;
+      invoiceDate: string;
+      due: string;
+      amount: number;
+      balance: number;
+    };
+    const ok: Parsed[] = [];
+    const seenKeys = new Set<string>();
+    for (const { row, values: v } of records) {
+      const party = alias(v.party);
+      const label = `${v.number} ${v.code}`;
+      const partyKey = v.code.trim().toLowerCase();
+      const id =
+        party === 'client'
+          ? clients.get(partyKey)
+          : party === 'supplier'
+            ? suppliers.get(partyKey)
+            : undefined;
+      const invoiceDate = toIsoDate(v.invoiceDate, ctx.dateFormat);
+      const due = toIsoDate(v.due, ctx.dateFormat);
+      const amount = parseImportAmount(v.invoiceAmount);
+      const balance = parseImportAmount(v.amount);
+      if (!date) planned.push({ row, label, error: 'no opening date: pass it (--opening-date YYYY-MM-DD)' });
+      else if (party !== 'client' && party !== 'supplier')
+        planned.push({ row, label, error: 'the party must be client or supplier' });
+      else if (
+        (party === 'client' && ambClients.has(partyKey)) ||
+        (party === 'supplier' && ambSuppliers.has(partyKey))
+      )
+        planned.push({ row, label, error: AMBIGUOUS });
+      else if (!id) planned.push({ row, label, error: 'unknown client or supplier (code or exact name)' });
+      else if (!v.number.trim()) planned.push({ row, label, error: 'the invoice number is required' });
+      else if (!invoiceDate || !due)
+        planned.push({
+          row,
+          label,
+          error: `date not understood or ambiguous (expected ${ctx.dateFormat ?? 'dmy'})`,
+        });
+      else if (due < invoiceDate)
+        planned.push({ row, label, error: 'the due date is before the invoice date' });
+      else if (!amount.ok || amount.value <= 0)
+        planned.push({
+          row,
+          label,
+          error: `invoice amount in MAD: ${amount.ok ? 'must be above zero' : amount.reason}`,
+        });
+      else if (!balance.ok || balance.value <= 0)
+        planned.push({
+          row,
+          label,
+          error: `balance in MAD: ${balance.ok ? 'must be above zero (a paid invoice is not an open item)' : balance.reason}`,
+        });
+      else if (balance.value > amount.value)
+        planned.push({ row, label, error: 'the balance is above the invoice amount' });
+      else if (seenKeys.has(`${party}:${id}|${v.number.trim().toLowerCase()}`))
+        planned.push({ row, label, error: 'this invoice number twice for the same party in the file' });
+      else {
+        seenKeys.add(`${party}:${id}|${v.number.trim().toLowerCase()}`);
+        ok.push({
+          row,
+          label,
+          party,
+          id,
+          number: v.number.trim(),
+          invoiceDate,
+          due,
+          amount: amount.value,
+          balance: balance.value,
+        });
+      }
+    }
+    // a party's opening line is the SUM of its balances: the line is made from the items, never typed beside them
+    const sums = new Map<string, number>();
+    for (const i of ok) sums.set(`${i.party}:${i.id}`, (sums.get(`${i.party}:${i.id}`) ?? 0) + i.balance);
+    const lineDone = new Set<string>();
+    let dateDone = state.openingDate !== null;
+    for (const i of ok) {
+      const pk = `${i.party}:${i.id}`;
+      const line = lines.get(pk);
+      const have = haveItems.get(`${pk}|${i.number.toLowerCase()}`);
+      if (line && line.agingUnknown) {
+        planned.push({
+          row: i.row,
+          label: i.label,
+          error:
+            'this party already has a one-line opening balance (age of the debt unknown): per-invoice detail and a single line are alternatives for a party; the line is corrected with the accountant, never edited',
+        });
+      } else if (line && line.amountCentimes !== sums.get(pk)) {
+        planned.push({
+          row: i.row,
+          label: i.label,
+          error: conflictMessage(['balance total of the party']),
+        });
+      } else if (have) {
+        const d = differences([
+          ['invoice date', i.invoiceDate, have.invoiceDate],
+          ['due date', i.due, have.dueDate],
+          ['amount', i.amount, have.amountCentimes],
+          ['balance', i.balance, have.balanceCentimes],
+        ]);
+        planned.push(
+          d.length
+            ? { row: i.row, label: i.label, error: conflictMessage(d) }
+            : { row: i.row, label: i.label, exists: true },
+        );
+      } else {
+        const first = !dateDone;
+        dateDone = true;
+        const makeLine = !line && !lineDone.has(pk);
+        lineDone.add(pk);
+        planned.push({
+          row: i.row,
+          label: i.label,
+          apply: async () => {
+            if (first) {
+              const d = await enterOpeningDate(appPool, actor, { openingDate: date });
+              if (!d.ok && d.error !== 'ALREADY_ENTERED') return fail(d);
+              if (!d.ok && (await getOpeningState(appPool, actor)).openingDate !== date)
+                return 'the books were opened on another date than the one confirmed: run the import again';
+            }
+            if (makeLine) {
+              const r = await addPartyOpeningBalance(
+                appPool,
+                actor,
+                {
+                  ...(i.party === 'client' ? { clientId: i.id } : { supplierId: i.id }),
+                  amountCentimes: sums.get(pk),
+                  reference: 'per-invoice detail',
+                },
+                { agingKnown: true },
+              );
+              if (!r.ok) return fail(r);
+            }
+            const r = await addOpeningOpenItem(appPool, actor, {
+              ...(i.party === 'client' ? { clientId: i.id } : { supplierId: i.id }),
+              invoiceNumber: i.number,
+              invoiceDate: i.invoiceDate,
+              dueDate: i.due,
+              amountCentimes: i.amount,
+              balanceCentimes: i.balance,
+            });
+            return r.ok ? null : fail(r);
+          },
+        });
+      }
+    }
+    planned.sort((x, y) => x.row - y.row);
+  } else if (kind === 'obligations') {
+    const records = rawRecords.map((r) => ({ row: r.row, values: full('obligations', r.values) }));
+    const openingDate =
+      (await getOpeningState(appPool, actor)).openingDate ?? ctx.openingDate ?? OPENING_DATE;
+    const have = new Map(
+      (await listOpeningObligations(appPool, actor)).map((o) => [o.reference.toLowerCase(), o]),
+    );
+    const kindOf = (t: string) => {
+      const x = t.trim().toLowerCase();
+      return ['pret', 'prêt', 'loan', 'credit', 'crédit', 'emprunt'].includes(x)
+        ? 'loan'
+        : ['leasing', 'credit-bail', 'crédit-bail', 'credit bail', 'crédit bail', 'lease'].includes(x)
+          ? 'leasing'
+          : null;
+    };
+    const first = new Map<string, { kind: string; lender: string }>();
+    const created = new Map<string, string>(); // reference → id, once the first row has been applied
+    const seenDue = new Set<string>();
+    for (const { row, values: v } of records) {
+      const ref = v.reference.trim();
+      const refKey = ref.toLowerCase();
+      const type = kindOf(v.type);
+      const due = toIsoDate(v.due, ctx.dateFormat);
+      const amount = parseImportAmount(v.amount);
+      const label = `${ref} ${v.due}`;
+      if (!ref) planned.push({ row, label, error: 'the contract reference is required' });
+      else if (!type) planned.push({ row, label, error: 'type must be loan or leasing' });
+      else if (v.lender.trim().length < 2) planned.push({ row, label, error: 'the lender is required' });
+      else if (!due)
+        planned.push({
+          row,
+          label,
+          error: `date not understood or ambiguous (expected ${ctx.dateFormat ?? 'dmy'})`,
+        });
+      else if (due < openingDate)
+        planned.push({
+          row,
+          label,
+          error: 'this instalment is due before the opening date: it is not a remaining instalment',
+        });
+      else if (!amount.ok || amount.value <= 0)
+        planned.push({
+          row,
+          label,
+          error: `amount in MAD: ${amount.ok ? 'must be above zero' : amount.reason}`,
+        });
+      else if (seenDue.has(`${refKey}|${due}`))
+        planned.push({ row, label, error: 'this instalment date twice for the contract in the file' });
+      else {
+        seenDue.add(`${refKey}|${due}`);
+        const f = first.get(refKey);
+        if (f && (f.kind !== type || f.lender.toLowerCase() !== v.lender.trim().toLowerCase())) {
+          planned.push({ row, label, error: 'type or lender differs from the first row of this contract' });
+          continue;
+        }
+        first.set(refKey, { kind: type, lender: v.lender.trim() });
+        const existing = have.get(refKey);
+        if (existing) {
+          const d = differences([
+            ['type', type, existing.kind],
+            ['lender', v.lender.trim(), existing.lender],
+          ]);
+          const inst = existing.instalments.find((x) => x.dueDate === due);
+          const more = inst ? differences([['amount', amount.value, inst.amountCentimes]]) : [];
+          if (d.length || more.length) {
+            planned.push({ row, label, error: conflictMessage([...d, ...more]) });
+            continue;
+          }
+          if (inst) {
+            planned.push({ row, label, exists: true });
+            continue;
+          }
+        }
+        const lender = v.lender.trim();
+        planned.push({
+          row,
+          label,
+          apply: async () => {
+            let id = existing?.id ?? created.get(refKey);
+            if (!id) {
+              const o = await addOpeningObligation(appPool, actor, { kind: type, lender, reference: ref });
+              if (!o.ok) return fail(o);
+              id = o.value.id;
+              created.set(refKey, id);
+            }
+            const r = await addOpeningInstalment(appPool, actor, {
+              obligationId: id,
+              dueDate: due,
+              amountCentimes: amount.value,
+            });
+            return r.ok ? null : fail(r);
+          },
+        });
+      }
+    }
+  } else if (kind === 'opening_stock') {
+    const records = rawRecords.map((r) => ({ row: r.row, values: full('opening_stock', r.values) }));
+    const state = await getOpeningState(appPool, actor);
+    const openingDate = state.openingDate ?? ctx.openingDate ?? OPENING_DATE;
+    const plantList = (await listPlants(appPool, actor)).filter((p) => p.status === 'active');
+    const plants = new Map(plantList.map((p) => [p.code, p.id]));
+    const components = await listComponents(appPool, actor);
+    const byRef = new Map<string, (typeof components)[number]>();
+    for (const c of components) {
+      byRef.set(c.code.toLowerCase(), c);
+      byRef.set(c.nameFr.trim().toLowerCase(), c);
+    }
+    const ambRef = ambiguousKeys(components, (c) => [c.code.toLowerCase(), c.nameFr.trim().toLowerCase()]);
+    const haveByKey = new Map(
+      (await listOpeningStock(appPool, actor)).map((m) => [`${m.componentId}|${m.plantId ?? ''}`, m]),
+    );
+    const seen = new Set<string>();
+    for (const { row, values: v } of records) {
+      const comp = byRef.get(v.component.trim().toLowerCase());
+      const plantCode = (v.plant || ctx.defaultPlant || '').trim().toUpperCase();
+      const plantId = plantCode ? (plants.get(plantCode) ?? 'unknown') : null;
+      const asOf = v.asOf.trim() ? toIsoDate(v.asOf, ctx.dateFormat) : openingDate;
+      const label = `${v.component} ${plantCode || 'no plant'}`;
+      if (ambRef.has(v.component.trim().toLowerCase())) planned.push({ row, label, error: AMBIGUOUS });
+      else if (!comp) planned.push({ row, label, error: 'unknown component (import the components first)' });
+      else if (plantId === 'unknown') planned.push({ row, label, error: 'unknown plant code' });
+      else if (!plantId && plantList.length > 0)
+        planned.push({ row, label, error: 'the plant is required: stock is counted per plant' });
+      else if (!asOf)
+        planned.push({
+          row,
+          label,
+          error: `date not understood or ambiguous (expected ${ctx.dateFormat ?? 'dmy'})`,
+        });
+      else if (asOf !== openingDate)
+        planned.push({ row, label, error: `the count must be dated the opening date (${openingDate})` });
+      else {
+        const unit = v.unit.trim() || defaultEntryUnit(comp.baseUnit);
+        const qty = parseEntryQty(v.qty, comp.baseUnit, unit);
+        const key = `${comp.id}|${plantId ?? ''}`;
+        if (!qty.ok)
+          planned.push({
+            row,
+            label,
+            error: `quantity (check the quantity and the unit columns): ${qty.error}`,
+          });
+        else if (seen.has(key))
+          planned.push({ row, label, error: 'this component and plant twice in the file' });
+        else {
+          seen.add(key);
+          const e = haveByKey.get(key);
+          if (e) {
+            const d = differences([
+              ['quantity', qty.value, e.qtyBase],
+              ['date', asOf, e.date],
+            ]);
+            planned.push(d.length ? { row, label, error: conflictMessage(d) } : { row, label, exists: true });
+          } else if (qty.value === 0)
+            planned.push({ row, label, exists: true }); // a physical count of zero: nothing to move
+          else
+            planned.push({
+              row,
+              label,
+              apply: async () => {
+                const r = await setOpeningStock(appPool, actor, {
+                  componentId: comp.id,
+                  date: asOf,
+                  qtyBase: qty.value,
+                  ...(plantId ? { plantId } : {}),
+                });
+                return r.ok ? null : fail(r);
+              },
+            });
+        }
       }
     }
   } else {

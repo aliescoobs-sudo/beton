@@ -206,6 +206,16 @@ export {
   type ReminderView,
 } from './service/reminder-service';
 export {
+  addOpeningInstalment,
+  addOpeningObligation,
+  addOpeningOpenItem,
+  listOpeningObligations,
+  listOpeningOpenItems,
+  type OpeningDetailError,
+  type OpeningObligationView,
+  type OpeningOpenItemView,
+} from './service/opening-detail-service';
+export {
   COUNTER_PREFIXES,
   type CounterError,
   type CounterPrefix,

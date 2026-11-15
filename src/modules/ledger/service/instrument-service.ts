@@ -112,6 +112,8 @@ async function enter(
   source: 'opening_30_11' | null = null,
   /** D247: the validated request this outgoing payment carries (the database refuses a payment of the middle band or above without one). */
   controlRequestId: string | null = null,
+  /** D246: the due date of a cheque or LCN when it is not the written date (opening rows only; NULL = the written date). */
+  dueDate: string | null = null,
 ): Promise<Result<InstrumentRef, InstrumentError>> {
   const id = randomUUID();
   let coveredCentimes = 0;
@@ -119,8 +121,8 @@ async function enter(
     await inRequest(appPool, actor, async (tx) => {
       await tx.query(
         `insert into payment_instrument (id, direction, method, amount_centimes, client_id, supplier_id, number, bank,
-                                         written_date, received_date, created_by, source, control_request_id)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+                                         written_date, received_date, created_by, source, control_request_id, due_date)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
         [
           id,
           direction,
@@ -135,6 +137,7 @@ async function enter(
           actor.id,
           source,
           controlRequestId,
+          dueDate,
         ],
       );
       await insertEvent(tx, actor, {
@@ -251,7 +254,7 @@ export async function issueInstrument(
   appPool: pg.Pool,
   actor: SessionUser,
   input: unknown,
-  deps: { today: string; source?: 'opening_30_11'; requestId?: string },
+  deps: { today: string; source?: 'opening_30_11'; requestId?: string; dueDate?: string | null },
 ): Promise<Result<InstrumentRef, InstrumentError>> {
   await require(appPool, actor, 'instruments.write');
   const parsed = parseIssueInput(input);
@@ -264,6 +267,7 @@ export async function issueInstrument(
     deps.today,
     deps.source ?? null,
     deps.requestId ?? null,
+    deps.dueDate ?? null,
   );
 }
 
@@ -539,6 +543,8 @@ export interface InstrumentView {
   number: string | null;
   bank: string | null;
   writtenDate: string | null;
+  /** Set only when the due date differs from the written date (an LCN, or an opening row); the date it falls due is `dueDate ?? writtenDate`. */
+  dueDate: string | null;
   receivedDate: string;
   postDated: boolean;
   /** The client has contested a bounced instrument (derived from a `disputed` event). */
@@ -560,6 +566,7 @@ interface InstrumentRow {
   number: string | null;
   bank: string | null;
   written_date: string | null;
+  due_date: string | null;
   received_date: string;
   client_disputed: boolean;
   unallocated: string;
@@ -582,7 +589,7 @@ export async function listInstruments(appPool: pg.Pool, actor: SessionUser): Pro
     tx.query<InstrumentRow>(
       `select i.id, i.direction, i.method, i.amount_centimes::text, coalesce(i.client_id, i.supplier_id) as party_id,
               coalesce(c.name, s.name) as party_name, i.number, i.bank,
-              to_char(i.written_date, 'YYYY-MM-DD') as written_date, to_char(i.received_date, 'YYYY-MM-DD') as received_date,
+              to_char(i.written_date, 'YYYY-MM-DD') as written_date, to_char(i.due_date, 'YYYY-MM-DD') as due_date, to_char(i.received_date, 'YYYY-MM-DD') as received_date,
               (select json_agg(json_build_object('event', e.event, 'at_date', to_char(e.at_date, 'YYYY-MM-DD'),
                                                  'account_id', e.money_account_id, 'reason', e.reason,
                                                  'deadline', to_char(e.regularization_deadline, 'YYYY-MM-DD'),
@@ -618,6 +625,7 @@ export async function listInstruments(appPool: pg.Pool, actor: SessionUser): Pro
       number: r.number,
       bank: r.bank,
       writtenDate: r.written_date,
+      dueDate: r.due_date,
       receivedDate: r.received_date,
       postDated: r.written_date !== null && isPostDated(r.written_date, r.received_date),
       clientDisputed: r.client_disputed,

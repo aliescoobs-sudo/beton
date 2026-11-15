@@ -59,6 +59,7 @@ export {
   getStockLevels,
   type ReorderThreshold,
   type OpeningStockError,
+  listOpeningStock,
   setOpeningStock,
   setStockThreshold,
   type StockLevel,

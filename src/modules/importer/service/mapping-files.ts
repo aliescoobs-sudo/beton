@@ -23,6 +23,9 @@ export const DEFAULT_SHEET_NAMES: Record<MappingKind, string> = {
   doc_counters: 'Compteurs',
   account_balances: 'Comptes',
   cheques_issued: 'ChequesEmis',
+  open_items: 'FacturesOuvertes',
+  obligations: 'Emprunts',
+  opening_stock: 'Stock',
 };
 
 /** The built-in mapping of a kind: its default sheet name, headers on row 1, dates day first, the usual header names. */

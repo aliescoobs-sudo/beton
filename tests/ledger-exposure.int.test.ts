@@ -232,6 +232,11 @@ describe('functions the application role can execute', () => {
     'public.add_client_alias(p_client uuid, p_alias text)', // T19 item 4 (ADMIN-GAP A2, A4, A5): client PO, aliases, client terms; actor first
     'public.client_alias_list(p_client uuid)', // T19 item 4 (ADMIN-GAP A2, A4, A5): client PO, aliases, client terms; actor first
     'public.order_client_pos(p_codes text[])', // T19 item 4: the PO numbers of orders by code, for the invoice an office role prints
+    'public.add_opening_open_item(p_client uuid, p_supplier uuid, p_invoice_number text, p_invoice_date date, p_due_date date, p_amount bigint, p_balance bigint)', // T19-close A (D246): owner, app_admin
+    'public.opening_open_item_list(p_kind text, p_limit integer)', // T19-close A: owner, app_admin
+    'public.add_opening_obligation(p_kind text, p_lender text, p_reference text)', // T19-close A: owner, app_admin
+    'public.add_opening_instalment(p_obligation uuid, p_due date, p_amount bigint)', // T19-close A: owner, app_admin
+    'public.opening_obligation_list(p_limit integer)', // T19-close A: owner, app_admin
     'public.margin_summary(p_group text, p_from date, p_to date, p_plant uuid, p_class uuid, p_method text, p_client uuid)', // T17 G9: owner, app_admin (aggregated margins)
     'public.pump_check(p_from date, p_to date, p_plant uuid)', // T17 G10: owner, app_admin, the plant manager of his own plant (references and quantities, no cost)
     'public.fuel_check(p_from date, p_to date, p_plant uuid)', // T17 G11: owner, app_admin (litres and basis points, no money)

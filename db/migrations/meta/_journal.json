@@ -1219,6 +1219,13 @@
       "when": 1795189032023,
       "tag": "0250_order_extras_partner",
       "breakpoints": true
+    },
+    {
+      "idx": 251,
+      "version": "7",
+      "when": 1795275432023,
+      "tag": "0251_opening_complete",
+      "breakpoints": true
     }
   ]
 }

@@ -22,6 +22,8 @@ export interface OpeningState {
     partyName: string;
     amountCentimes: number;
     reference: string | null;
+    /** false when the line is backed by per-invoice open items. */
+    agingUnknown: boolean;
   }[];
 }
 
@@ -53,6 +55,8 @@ export async function addPartyOpeningBalance(
   appPool: pg.Pool,
   actor: SessionUser,
   input: unknown,
+  /** T19-close A: true when the line is the sum of per-invoice open items that follow (the age of the debt is known). */
+  options: { agingKnown?: boolean } = {},
 ): Promise<Result<{ id: string }, OpeningError>> {
   await require(appPool, actor, 'opening.write');
   const parsed = parsePartyOpeningInput(input);
@@ -64,8 +68,16 @@ export async function addPartyOpeningBalance(
       tx.query(
         // D246: every row of the opening position is marked; the age of the debt is unknown until the sheet carries it per invoice
         `insert into opening_party_balance (id, client_id, supplier_id, amount_centimes, reference, created_by, source, aging_unknown)
-         values ($1, $2, $3, $4, $5, $6, 'opening_30_11', true)`,
-        [id, v.clientId ?? null, v.supplierId ?? null, v.amountCentimes, v.reference ?? null, actor.id],
+         values ($1, $2, $3, $4, $5, $6, 'opening_30_11', $7)`,
+        [
+          id,
+          v.clientId ?? null,
+          v.supplierId ?? null,
+          v.amountCentimes,
+          v.reference ?? null,
+          actor.id,
+          !options.agingKnown,
+        ],
       ),
     );
     return ok({ id });
@@ -92,9 +104,10 @@ export async function getOpeningState(appPool: pg.Pool, actor: SessionUser): Pro
       name: string;
       amount: string;
       reference: string | null;
+      aging_unknown: boolean;
     }>(
       `select b.id, b.client_id, coalesce(b.client_id, b.supplier_id) as party_id, coalesce(c.name, s.name) as name,
-              b.amount_centimes::text as amount, b.reference
+              b.amount_centimes::text as amount, b.reference, b.aging_unknown
          from opening_party_balance b left join client c on c.id = b.client_id left join supplier s on s.id = b.supplier_id
         order by (b.client_id is null), lower(coalesce(c.name, s.name))`,
     );
@@ -107,6 +120,7 @@ export async function getOpeningState(appPool: pg.Pool, actor: SessionUser): Pro
         partyName: r.name,
         amountCentimes: Number(r.amount),
         reference: r.reference,
+        agingUnknown: r.aging_unknown,
       })),
     };
   });

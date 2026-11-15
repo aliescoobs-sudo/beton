@@ -15,14 +15,14 @@ const put = (name: string, content: unknown) => {
 describe('mapping files', () => {
   it('the built-in defaults cover every kind once, with distinct sheet names', () => {
     const d = defaultMappings();
-    expect(d).toHaveLength(14);
-    expect(new Set(d.map((m) => m.sheet)).size).toBe(14);
-    expect(new Set(d.map((m) => m.kind)).size).toBe(14);
+    expect(d).toHaveLength(17);
+    expect(new Set(d.map((m) => m.sheet)).size).toBe(17);
+    expect(new Set(d.map((m) => m.kind)).size).toBe(17);
   });
   it('writes the defaults as editable files, and what it wrote loads back unchanged', () => {
     const out = join(dir, 'written');
     const { written } = writeDefaultMappingFiles(out);
-    expect(written).toHaveLength(14);
+    expect(written).toHaveLength(17);
     const back = loadMappingFiles(out);
     expect(back.problems).toEqual([]);
     expect(back.mappings.map((m) => m.kind).sort()).toEqual(
@@ -34,7 +34,7 @@ describe('mapping files', () => {
     expect(clients.columns.name).toContain('raison sociale');
     // a second call keeps the person's edits
     writeFileSync(join(out, 'clients.json'), '{"edited":true}');
-    expect(writeDefaultMappingFiles(out).skipped).toHaveLength(14);
+    expect(writeDefaultMappingFiles(out).skipped).toHaveLength(17);
     expect(readFileSync(join(out, 'clients.json'), 'utf8')).toBe('{"edited":true}');
   });
   it('names the file and the problem; a missing path, a typo in a field and a sheet named twice are refused', () => {

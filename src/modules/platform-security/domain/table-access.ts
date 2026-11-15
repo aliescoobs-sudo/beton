@@ -2143,6 +2143,24 @@ export const TABLE_ACCESS = {
     reason:
       'T19 item 6: the events of a charge (recorded, validated, approved, rejected, paid, document_added, reversed); the status is the last one. Written by the charge doors only (decide_charge: nobody decides on their own preparation).',
   },
+  opening_open_item: {
+    kind: 'doors_only',
+    insertOnly: true,
+    reason:
+      "T19-close A (D246): the per-invoice open items of a client or supplier at 30 Nov (invoice number, date, due date, amount, balance), source = opening_30_11. Written by add_opening_open_item (owner, app_admin; the balances never exceed the party's opening line), read by opening_open_item_list.",
+  },
+  opening_obligation: {
+    kind: 'doors_only',
+    insertOnly: true,
+    reason:
+      'T19-close A (D246): a loan or leasing contract open at 30 Nov (lender, reference), source = opening_30_11. Written by add_opening_obligation (owner, app_admin), read by opening_obligation_list.',
+  },
+  opening_obligation_instalment: {
+    kind: 'doors_only',
+    insertOnly: true,
+    reason:
+      'T19-close A (D246): the remaining instalments (due date, amount) of an opening obligation. Written by add_opening_instalment (owner, app_admin), read by opening_obligation_list.',
+  },
   client_reminder: {
     kind: 'doors_only',
     insertOnly: true,

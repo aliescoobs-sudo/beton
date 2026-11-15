@@ -124,6 +124,26 @@ export async function setOpeningStock(
   }
 }
 
+/** The opening stock movements already entered: one per component and plant (the opening importer compares a sheet with them). */
+export async function listOpeningStock(
+  appPool: pg.Pool,
+  actor: SessionUser,
+): Promise<{ componentId: string; plantId: string | null; date: string; qtyBase: number }[]> {
+  await require(appPool, actor, 'stock.read');
+  const { rows } = await inRequest(appPool, actor, (tx) =>
+    tx.query<{ component_id: string; plant_id: string | null; d: string; qty: string }>(
+      `select component_id, plant_id, to_char(movement_date, 'YYYY-MM-DD') as d, qty_base::text as qty
+         from stock_movement where source = 'opening'`,
+    ),
+  );
+  return rows.map((r) => ({
+    componentId: r.component_id,
+    plantId: r.plant_id,
+    date: r.d,
+    qtyBase: Number(r.qty),
+  }));
+}
+
 export type ThresholdError = 'INVALID' | 'NOT_FOUND';
 
 /** The level below which a component is "low": a new row, the latest one is in force. Owner or partner. */
