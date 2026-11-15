@@ -34,7 +34,7 @@ Today: thresholds and `getReorderThresholds` exist; `purchase_plan_item` exists;
 Proposal: table `reorder_request` (plant_id, component_id, requested_qty in base units, needed_by, reason, auto_from_threshold boolean, status `open → seen → ordered → cancelled`, created_by, linked `purchase_plan_item_id` or `purchase_id` nullable, decided_by, decided_at; insert-only events table for status changes).
 - Created by the plant_manager of the plant (manual) or by a daily job when level < threshold and no open request exists for (plant, component) (auto, `created_by` = system).
 - office_purchases sees open requests (quantities and component, no financial balances), turns one into a purchase order (`ACH-YYYY-nnnnn`) from the existing purchase flow; the link makes the chain visible: request → purchase → receipt → stock.
-- plant_manager sees only his plant's requests and their status. He has no access to prices or payments (role decision 4).
+- plant_manager sees only his plant's requests and their status. He has no access to prices or payments (D126 Roles V1).
 - No AI creates or sends a request without human confirmation (CLAUDE.md).
 
 ## 7. Gap 4 — Hook for hauler receipts (T12)
