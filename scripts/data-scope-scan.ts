@@ -94,7 +94,7 @@ export function scanSql(file: string, text: string): Finding[] {
     const line = raw.replace(/--.*$/, '');
     const t = TABLE.exec(line) ?? ALTER.exec(line);
     if (t) table = t[1];
-    const m = SQL_COL.exec(line);
+    const m = SQL_COL.exec(line.replace(/^\s*alter\s+table\s+(?:if\s+exists\s+)?(?:only\s+)?\S+\s+/i, ''));
     if (!m || SKIP_WORDS.has(m[1]!.toLowerCase())) return;
     const kind = classify(m[1]!);
     if (kind) out.push({ file, line: i + 1, name: m[1]!, kind, table, context: raw.trim().slice(0, 120) });
