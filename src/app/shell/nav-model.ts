@@ -202,6 +202,12 @@ const GROUPS: GroupDef[] = [
         allowed: (role) => can(role, 'aging.client') || can(role, 'aging.supplier'),
       },
       {
+        path: '/forecast',
+        labelKey: 'ledger.forecast.link',
+        testId: 'forecast-link',
+        allowed: (role) => can(role, 'forecast.client') || can(role, 'forecast.supplier'),
+      },
+      {
         path: '/reminders',
         labelKey: 'ledger.reminders.link',
         testId: 'reminders-link',

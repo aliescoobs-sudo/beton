@@ -191,6 +191,7 @@ export {
   type OpeningState,
 } from './service/opening-service';
 export { type AgingParty, type AgingReport, agingSides, agingToCsv, getAging } from './service/aging-service';
+export { type ForecastView, getCashForecast } from './service/forecast-service';
 export {
   type AccountRow,
   getClientStatement,

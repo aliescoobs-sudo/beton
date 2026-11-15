@@ -1751,6 +1751,32 @@
       },
       "total": "Total",
       "totalRow": "Total général"
+    },
+    "forecast": {
+      "link": "Prévision de trésorerie",
+      "title": "Prévision de trésorerie à 30, 60 et 90 jours",
+      "intro": "Ce qui doit bouger d’ici 90 jours, au {date} : chèques et LCN clients non encore encaissés, chèques et LCN émis non encore débités, échéances de prêts et de leasing. Les horizons sont cumulés à partir d’aujourd’hui.",
+      "line": "Ligne",
+      "col": {
+        "overdue": "Échu, non réglé",
+        "d30": "30 jours",
+        "d60": "60 jours",
+        "d90": "90 jours"
+      },
+      "kind": {
+        "client_cheque": "Chèques clients",
+        "issued_cheque": "Chèques émis",
+        "instalment": "Prêts et leasing"
+      },
+      "incoming": "Entrées",
+      "outgoing": "Sorties",
+      "net": "Net (entrées − sorties)",
+      "detail": "Détail",
+      "none": "Rien à échoir dans les 90 jours.",
+      "due": "Échéance",
+      "what": "Pièce",
+      "party": "Tiers",
+      "amount": "Montant"
     }
   },
   "operations": {
