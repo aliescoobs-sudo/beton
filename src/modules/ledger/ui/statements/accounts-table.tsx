@@ -4,11 +4,20 @@ import { Money, StatusPill, Table, Th } from '@/ui';
 import type { AccountRow } from '../../service/statement-service';
 
 /** The "Comptes" list: who owes what, what is late, the next due date. Each row opens the statement. */
-export function AccountsTable({ rows, locale }: { rows: AccountRow[]; locale: string }) {
+export function AccountsTable({
+  rows,
+  locale,
+  kinds = ['client', 'supplier'],
+}: {
+  rows: AccountRow[];
+  locale: string;
+  /** The sides to show (an office role reads one side only, D245). */
+  kinds?: readonly ('client' | 'supplier')[];
+}) {
   const t = useTranslations('ledger.statements');
   return (
     <div className="mt-6 space-y-8">
-      {(['client', 'supplier'] as const).map((kind) => {
+      {kinds.map((kind) => {
         const part = rows.filter((r) => r.kind === kind);
         return (
           <section key={kind} data-testid={`accounts-${kind}`}>

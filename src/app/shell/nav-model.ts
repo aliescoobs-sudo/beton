@@ -184,6 +184,12 @@ const GROUPS: GroupDef[] = [
         allowed: 'money_accounts.read',
       },
       {
+        path: '/reminders',
+        labelKey: 'ledger.reminders.link',
+        testId: 'reminders-link',
+        allowed: 'reminders.read',
+      },
+      {
         path: '/statements',
         labelKey: 'ledger.statements.link',
         testId: 'statements-link',

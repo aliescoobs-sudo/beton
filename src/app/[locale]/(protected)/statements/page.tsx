@@ -3,7 +3,7 @@ import { getRequestClock } from '@/app/request-clock';
 import { getPool } from '@/lib/db/pools';
 import { listAccounts } from '@/modules/ledger';
 import { AccountsTable } from '@/modules/ledger/ui/statements/accounts-table';
-import { recordMoneyView } from '@/modules/platform-security';
+import { can, recordMoneyView } from '@/modules/platform-security';
 import { requireAnyPagePermission } from '@/modules/platform-security/next';
 import { PageHeader } from '@/ui';
 
@@ -23,7 +23,13 @@ export default async function StatementsPage({ params }: { params: Promise<{ loc
   return (
     <div>
       <PageHeader title={t('title')} />
-      <AccountsTable rows={rows} locale={locale} />
+      <AccountsTable
+        rows={rows}
+        locale={locale}
+        kinds={(['client', 'supplier'] as const).filter((k) =>
+          can(user.role, k === 'client' ? 'statements.client' : 'statements.supplier'),
+        )}
+      />
     </div>
   );
 }

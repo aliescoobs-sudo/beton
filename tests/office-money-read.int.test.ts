@@ -2,7 +2,9 @@ import { randomUUID } from 'node:crypto';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { withRlsContext } from '../src/lib/db/rls-context';
+import { getCashDay, listClientReminders, logClientReminder } from '../src/modules/ledger';
 import { recordMoneyView } from '../src/modules/platform-security';
+import type { SessionUser } from '../src/modules/platform-security/auth/session-gate';
 import type { Role } from '../src/modules/platform-security/domain/permissions';
 import { testEnv } from './db-env';
 import { realSessionUser } from './helpers/actors';
@@ -158,4 +160,40 @@ describe('both offices', () => {
       expect(user.id).toBe(actors.owner);
     },
   );
+});
+
+describe('the reminder log and the cash day (T19 item 2)', () => {
+  const user = (role: Role) => ({ id: actors[role], role }) as unknown as SessionUser;
+
+  it('office_sales logs and reads reminders; nothing else may; the table is never read directly', async () => {
+    const note = `appel ${marker}`;
+    const made = await logClientReminder(app, user('office_sales'), { clientId, note });
+    expect(made.ok).toBe(true);
+    const list = await listClientReminders(app, user('office_sales'), clientId);
+    expect(list.map((r) => r.note)).toEqual([note]);
+    // the owner reads it too; the other roles hold no permission at all
+    expect((await listClientReminders(app, user('owner'), clientId)).length).toBe(1);
+    await expect(listClientReminders(app, user('office_purchases'), clientId)).rejects.toThrow();
+    await expect(logClientReminder(app, user('plant_manager'), { clientId, note })).rejects.toThrow();
+    // a too-short note and an unknown client are refused, nothing is written
+    expect((await logClientReminder(app, user('office_sales'), { clientId, note: 'a' })).ok).toBe(false);
+    expect((await logClientReminder(app, user('office_sales'), { clientId: randomUUID(), note })).ok).toBe(
+      false,
+    );
+    // the doors themselves refuse the wrong role, and the table is closed to every request role
+    await denied(
+      as('office_purchases', (tx) =>
+        tx.query(`select public.log_client_reminder($1, 'une note')`, [clientId]),
+      ),
+    );
+    await denied(as('office_sales', (tx) => tx.query(`select * from client_reminder`)));
+    await denied(as('owner', (tx) => tx.query(`update client_reminder set note = 'x'`)));
+  });
+
+  it('office_purchases reads the cash day (cash accounts only); office_sales has no such permission', async () => {
+    const day = await getCashDay(app, user('office_purchases'), '2026-06-01');
+    expect(day.length).toBeGreaterThan(0);
+    for (const d of day) expect(d.endCentimes).toBe(d.startCentimes + d.cashIn - d.cashOut);
+    await expect(getCashDay(app, user('office_sales'), '2026-06-01')).rejects.toThrow();
+  });
 });

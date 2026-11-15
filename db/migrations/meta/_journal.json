@@ -1149,6 +1149,13 @@
       "when": 1794325032023,
       "tag": "0240_client_reminder",
       "breakpoints": true
+    },
+    {
+      "idx": 241,
+      "version": "7",
+      "when": 1794411432023,
+      "tag": "0241_client_reminder_fix",
+      "breakpoints": true
     }
   ]
 }

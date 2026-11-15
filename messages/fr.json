@@ -746,7 +746,17 @@
       "afterOutgoing": "Total après les paiements émis non encore passés :",
       "movements": "Mouvements",
       "deposited": "Remis en banque, non encaissé",
-      "empty": "Aucun compte pour le moment."
+      "empty": "Aucun compte pour le moment.",
+      "dayTitle": "La caisse du jour",
+      "day": "Jour",
+      "dayStart": "Début",
+      "dayIn": "Entrées",
+      "dayOut": "Sorties",
+      "dayEnd": "Fin",
+      "dayNone": "Aucun mouvement ce jour.",
+      "daySource": "Origine",
+      "dayAmount": "Montant",
+      "dayRunning": "Solde courant"
     },
     "payments": {
       "title": "Saisir un paiement",
@@ -1542,6 +1552,25 @@
         "ALREADY_WAITING": "Déjà en attente.",
         "NOT_AVAILABLE": "Plus disponible."
       }
+    },
+    "reminders": {
+      "link": "Relances",
+      "title": "Relances clients",
+      "intro": "Qui doit quoi, ce qui est en retard et la dernière relance. Une relance est une note dans le journal : KAYAS n’envoie aucun message.",
+      "client": "Client",
+      "balance": "Solde dû",
+      "lateAmount": "En retard",
+      "lastReminder": "Dernière relance",
+      "logOne": "Noter une relance",
+      "note": "Note (qui, quoi, promesse)",
+      "log": "Noter",
+      "logged": "Relance notée.",
+      "error": "Relance refusée.",
+      "late": "En retard",
+      "neverReminded": "Jamais relancés",
+      "never": "Jamais",
+      "recent": "Dernières relances",
+      "none": "Aucune relance notée."
     }
   },
   "operations": {

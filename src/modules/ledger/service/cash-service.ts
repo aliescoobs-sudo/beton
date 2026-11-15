@@ -63,3 +63,65 @@ export async function getCashPosition(
     accountId,
   );
 }
+
+export interface CashDay {
+  accountId: string;
+  label: string;
+  /** Balance at the start of the day: the opening balance plus every movement dated before it. */
+  startCentimes: number;
+  cashIn: number;
+  cashOut: number;
+  endCentimes: number;
+  lines: { id: string; amountCentimes: number; source: string; runningCentimes: number }[];
+}
+
+/**
+ * The day of a CASH account (D245, the Assistante's view): what came in, what went out, the running balance. Cash accounts only: the policies
+ * of migration 0239 hide every bank account from office_purchases, and the owner may ask too. Amounts are the signed movements the clearing wrote.
+ */
+export async function getCashDay(appPool: pg.Pool, actor: SessionUser, date: string): Promise<CashDay[]> {
+  await require(appPool, actor, 'cash.view');
+  return inRequest(appPool, actor, async (tx) => {
+    const accounts = await tx.query<{
+      id: string;
+      label: string;
+      opening: string | null;
+      as_of: string | null;
+    }>(
+      `select a.id, a.label, b.amount_centimes::text as opening, to_char(b.as_of, 'YYYY-MM-DD') as as_of
+         from money_account a left join opening_balance b on b.account_id = a.id where a.kind = 'cash' order by lower(a.label)`,
+    );
+    const out: CashDay[] = [];
+    for (const a of accounts.rows) {
+      const before = await tx.query<{ s: string }>(
+        `select coalesce(sum(amount_centimes), 0)::text as s from money_movement where account_id = $1 and movement_date < $2::date`,
+        [a.id, date],
+      );
+      const day = await tx.query<{ id: string; amount: string; source: string }>(
+        `select id, amount_centimes::text as amount, source from money_movement where account_id = $1 and movement_date = $2::date order by created_at, id`,
+        [a.id, date],
+      );
+      let running = Number(a.opening ?? 0) + Number(before.rows[0]?.s ?? 0);
+      const start = running;
+      let cashIn = 0;
+      let cashOut = 0;
+      const lines = day.rows.map((m) => {
+        const amount = Number(m.amount);
+        running += amount;
+        if (amount > 0) cashIn += amount;
+        else cashOut += -amount;
+        return { id: m.id, amountCentimes: amount, source: m.source, runningCentimes: running };
+      });
+      out.push({
+        accountId: a.id,
+        label: a.label,
+        startCentimes: start,
+        cashIn,
+        cashOut,
+        endCentimes: running,
+        lines,
+      });
+    }
+    return out;
+  });
+}

@@ -182,7 +182,7 @@ export {
   orderCoverage,
   unallocate,
 } from './service/allocation-service';
-export { getCashPosition } from './service/cash-service';
+export { type CashDay, getCashDay, getCashPosition } from './service/cash-service';
 export {
   addPartyOpeningBalance,
   enterOpeningDate,
@@ -199,3 +199,9 @@ export {
   type PartyStatement,
 } from './service/statement-service';
 export { avoirPdf, invoicePdf, quotePdf, SPECIMEN, statementPdf, type PdfContext } from './pdf/documents';
+export {
+  listClientReminders,
+  logClientReminder,
+  type ReminderError,
+  type ReminderView,
+} from './service/reminder-service';
