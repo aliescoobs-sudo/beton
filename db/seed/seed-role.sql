@@ -20,10 +20,10 @@ DO $$
 DECLARE
   t text;
   -- Tables whose rows carry created_by: the seed writes them as the request user (the system actor).
-  stamped text[] := ARRAY['recette', 'purchase_price', 'selling_price', 'price_grid', 'class_method_recette'];
+  stamped text[] := ARRAY['recette', 'purchase_price', 'selling_price', 'price_grid', 'class_method_recette', 'cost_rate', 'fuel_norm', 'purchase_price_transport'];
 BEGIN
   FOREACH t IN ARRAY ARRAY['zone', 'client', 'supplier', 'component', 'purchase_unit', 'concrete_type', 'truck',
-                           'recette', 'recette_line', 'purchase_price', 'selling_price', 'price_grid', 'class_method_recette'] LOOP
+                           'recette', 'recette_line', 'purchase_price', 'selling_price', 'price_grid', 'class_method_recette', 'cost_rate', 'fuel_norm', 'purchase_price_transport'] LOOP
     EXECUTE format('GRANT SELECT, INSERT ON public.%I TO belgobeton_seed', t);
     EXECUTE format('DROP POLICY IF EXISTS seed_read ON public.%I', t);
     EXECUTE format('CREATE POLICY seed_read ON public.%I FOR SELECT TO belgobeton_seed USING (ctx.role() = ''system'')', t);

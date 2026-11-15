@@ -3287,5 +3287,82 @@
       "applied": "Importé",
       "rolled_back": "Annulé"
     }
+  },
+  "costs": {
+    "link": "Coûts et tarifs",
+    "title": "Coûts, normes carburant et grille des prix",
+    "intro": "Données de coût réservées au propriétaire et à l'administrateur. Une valeur remplacée devient une nouvelle ligne datée : rien n'est modifié ni supprimé.",
+    "banner": "Les chiffres utilisent des valeurs supposées : {count}",
+    "none": "Aucune valeur enregistrée",
+    "assumption": "Hypothèse",
+    "real": "Valeur réelle",
+    "notRecorded": "Non renseigné",
+    "value": "Valeur",
+    "valueMad": "Valeur (MAD)",
+    "from": "À partir du",
+    "plant": "Centrale",
+    "allPlants": "Toutes",
+    "status": "Statut",
+    "source": "Source",
+    "reason": "Motif",
+    "replace": "Remplacer une valeur",
+    "replaceHint": "Saisissez la valeur réelle : elle s'ajoute comme une nouvelle version, à une date postérieure à la dernière.",
+    "replaceRate": "Remplacer le taux",
+    "replaceFuel": "Remplacer la norme",
+    "replaceTransport": "Enregistrer le transport",
+    "replaceGrid": "Remplacer le prix",
+    "rates": {
+      "title": "Taux de coût",
+      "key": "Taux",
+      "keys": {
+        "diesel_per_l": "Gasoil par litre",
+        "delivery_other_per_m3": "Livraison hors carburant par m³",
+        "pump_per_m3": "Pompe par m³",
+        "plant_per_m3": "Centrale par m³",
+        "overhead_per_m3": "Frais généraux par m³"
+      }
+    },
+    "units": {
+      "centimes_per_l": "MAD/L",
+      "centimes_per_m3": "MAD/m³"
+    },
+    "kinds": {
+      "mixer": "Toupie",
+      "pump": "Pompe",
+      "external": "Externe",
+      "hauler": "Camion de transport"
+    },
+    "fuel": {
+      "title": "Normes de carburant",
+      "scope": "Camion ou type",
+      "perTrip": "Litres par voyage",
+      "perHour": "Litres par heure",
+      "perKm": "Litres par km",
+      "tripLitres": "Litres par voyage",
+      "hourLitres": "Litres par heure",
+      "kmLitres": "Litres par km"
+    },
+    "transport": {
+      "title": "Prix d'achat rendu centrale",
+      "component": "Composant",
+      "price": "Prix d'achat",
+      "transport": "Transport"
+    },
+    "grid": {
+      "title": "Grille des prix de vente (m³ HT)",
+      "class": "Classe",
+      "method": "Mode de déversement",
+      "price": "Prix par m³"
+    },
+    "methods": {
+      "GOULOTTE": "Goulotte",
+      "POMPE": "Pompe (incluse)"
+    },
+    "errors": {
+      "INVALID": "Valeurs invalides",
+      "NOT_ALLOWED": "Action non autorisée",
+      "NOT_AFTER_LAST_VERSION": "La date doit être postérieure à la dernière version",
+      "FORBIDDEN": "Action non autorisée"
+    }
   }
 }

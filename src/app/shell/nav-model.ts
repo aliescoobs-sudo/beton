@@ -403,6 +403,12 @@ const GROUPS: GroupDef[] = [
         allowed: 'parameters.read',
       },
       {
+        path: '/costs',
+        labelKey: 'costs.link',
+        testId: 'costs-link',
+        allowed: 'costs.manage',
+      },
+      {
         path: '/company',
         labelKey: 'ledger.company.link',
         testId: 'company-link',

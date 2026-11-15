@@ -1,6 +1,7 @@
 import type pg from 'pg';
 import { withRlsContext } from '@/lib/db/rls-context';
 import { SYSTEM_ACTOR_ID } from '@/modules/platform-security';
+import { seedCostAssumptions } from './pilot-cost-seed';
 
 export interface SeedGuardEnv {
   SIMULATION_ENABLED: boolean;
@@ -44,7 +45,7 @@ const PURCHASE_UNITS = [
   ['Adjuvant', 'L', 1_000],
 ] as const;
 
-const CONCRETE_TYPES = ['B12', 'B20', 'B25', 'B30'] as const;
+const CONCRETE_TYPES = ['B10', 'B12', 'B15', 'B20', 'B25', 'B30', 'B35'] as const;
 
 // T15. Every value below is fake or an assumption to confirm with the plant (decision 79); all names say "fictif".
 /** The 5 zones of D53, with fixed ids: the first 0017 already put them in the dev database. */
@@ -177,6 +178,8 @@ export async function seedPilotMasterData(systemPool: pg.Pool, env: SeedGuardEnv
       }
       await seedZonesPartiesAndTrucks(tx);
       await seedRecettesAndPrices(tx);
+      // T16 G5: the A1 cost and price-grid assumptions (every row flagged is_assumption), the five fictitious FX- recipes
+      await seedCostAssumptions(tx);
     },
   );
 }

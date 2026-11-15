@@ -207,6 +207,12 @@ describe('functions the application role can execute', () => {
     'public.set_class_method_recette(p_class uuid, p_method text, p_plant uuid, p_recette uuid, p_effective_from date, p_reason text)', // T16 G4: owner, app_admin
     'public.price_grid_list()', // T16 G4: owner, app_admin, office_sales (the official selling price)
     'public.class_method_recette_list()', // T16 G4: owner, app_admin
+    'public.set_cost_rate(p_key text, p_value_centimes bigint, p_effective_from date, p_plant uuid, p_source_note text, p_reason text)', // T16 G5: owner, app_admin (checked inside)
+    'public.set_fuel_norm(p_truck_kind text, p_truck uuid, p_per_trip_ml bigint, p_per_hour_ml bigint, p_per_km_ml bigint, p_effective_from date, p_source_note text, p_reason text)', // T16 G5: owner, app_admin
+    'public.set_purchase_price_transport(p_price uuid, p_transport_centimes bigint, p_source_note text, p_reason text)', // T16 G5: owner, app_admin
+    'public.cost_rates_list()', // T16 G5: owner, app_admin
+    'public.fuel_norms_list()', // T16 G5: owner, app_admin
+    'public.purchase_transports_list()', // T16 G5: owner, app_admin
     'public.mark_reorder_seen(p_request uuid)', // T15: office_purchases, owner, app_admin
     'public.link_reorder_to_purchase(p_request uuid, p_purchase_code text)', // T15: office_purchases, owner, app_admin; the whole tuple is checked
     'public.cancel_reorder_request(p_request uuid, p_reason text)', // T15: the plant manager of the plant, owner, app_admin

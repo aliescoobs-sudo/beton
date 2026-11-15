@@ -2100,6 +2100,27 @@ export const TABLE_ACCESS = {
     reason:
       'T16 G4 (SPEC-cost-margin §3, D236): which recette the plant batches for a class and a discharge method, versioned. Written by set_class_method_recette, read by class_method_recette_list (owner, app_admin).',
   },
+  cost_rate: {
+    kind: 'doors_only',
+    insertOnly: true,
+    seed: 'insert',
+    reason:
+      'T16 G5 (SPEC-cost-margin §5, D236, D237): the versioned cost rates (diesel, delivery, pump, plant, overheads), flagged is_assumption. Written by set_cost_rate (owner, app_admin), read by cost_rates_list (owner, app_admin).',
+  },
+  fuel_norm: {
+    kind: 'doors_only',
+    insertOnly: true,
+    seed: 'insert',
+    reason:
+      'T16 G5 (SPEC-cost-margin §8): litres per trip, hour and km of a truck kind or a truck, in millilitres, versioned. Written by set_fuel_norm, read by fuel_norms_list (owner, app_admin).',
+  },
+  purchase_price_transport: {
+    kind: 'doors_only',
+    insertOnly: true,
+    seed: 'insert',
+    reason:
+      'T16 G5 (SPEC-cost-margin §5): the transport that makes a purchase price a delivered-to-plant price, versioned, doors-only because purchase_price is read by the purchasing office and a transport cost is a cost figure. Written by set_purchase_price_transport, read by purchase_transports_list (owner, app_admin).',
+  },
   company_profile: {
     kind: 'rls',
     seed: 'insert',

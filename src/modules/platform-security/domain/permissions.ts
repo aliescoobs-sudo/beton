@@ -348,6 +348,8 @@ export const PERMISSIONS = {
   // T15 (SPEC-stock-engine-gaps §6): the plant manager asks for a component of his plant; office_purchases reads every request and links it to a purchase (quantities only)
   // T15 G3 (SPEC-sms-channel §4): who registers a driver phone number and a vehicle's GPS unit (the numbers are personal data: owner and app_admin only)
   'sms.sender.manage': ['owner', 'app_admin'],
+  // T16 G5 (SPEC-cost-margin §9, D236): cost rates, fuel norms, delivered transport and the price grid are cost data for the owner roles only (any widening needs a later numbered decision)
+  'costs.manage': ['owner', 'app_admin'],
   'reorder.create': ['plant_manager'],
   'reorder.read': ['owner', 'app_admin', 'plant', 'plant_manager', 'office_purchases'],
   'reorder.handle': ['owner', 'app_admin', 'office_purchases'],

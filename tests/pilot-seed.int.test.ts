@@ -62,12 +62,12 @@ describe('pilot master-data seed (decision 79)', () => {
     );
     expect(rows.map((r) => [r.table_name, Number(r.n)])).toEqual([
       ['client', 5],
-      ['component', 6],
-      ['concrete_type', 4],
-      ['purchase_price', 6],
-      ['purchase_unit', 7],
-      ['recette', 3],
-      ['recette_line', 18],
+      ['component', 15], // 6 + the 9 FX- components of the A1 cost seed (T16 G5)
+      ['concrete_type', 12], // 7 classes (B10..B35) + the 5 FX- industrial recipes
+      ['purchase_price', 15],
+      ['purchase_unit', 16],
+      ['recette', 8],
+      ['recette_line', 57], // 18 + 7 + 7 + 8 + 8 + 9 doses of the five FX- recipes
       ['selling_price', 4],
       ['supplier', 5],
       ['truck', 4],

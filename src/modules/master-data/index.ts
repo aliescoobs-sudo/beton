@@ -160,3 +160,17 @@ export {
   type SmsSender,
   type SmsSenderError,
 } from './service/sms-sender-service';
+// T16 G5: the cost data screens (owner and app_admin only; every read and write is a database door)
+export { formatMl, parseLitresToMl } from './domain/cost-input';
+export {
+  COST_RATE_KEYS,
+  DISCHARGE_METHODS,
+  FUEL_KINDS,
+  loadCostScreen,
+  replaceCostRate,
+  replaceFuelNorm,
+  replacePriceGrid,
+  replacePurchaseTransport,
+  type CostError,
+  type CostScreen,
+} from './service/cost-service';

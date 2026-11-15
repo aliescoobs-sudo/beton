@@ -1093,6 +1093,13 @@
       "when": 1793806512023,
       "tag": "0232_discharge_method_price_grid",
       "breakpoints": true
+    },
+    {
+      "idx": 233,
+      "version": "7",
+      "when": 1793806572023,
+      "tag": "0233_cost_rates_fuel_norms",
+      "breakpoints": true
     }
   ]
 }

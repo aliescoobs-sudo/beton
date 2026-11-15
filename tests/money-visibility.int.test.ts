@@ -415,7 +415,13 @@ describe('support is read-only everywhere (DECISIONS 81)', () => {
 // T16 (SPEC-cost-margin §9, D236): the cost and price-grid tables. The application login has NO privilege on them (not even SELECT, so a read is refused 42501 for every role,
 // the owner included: they are read only through the owner/app_admin doors), nothing is updated or deleted, and their audit rows (they hold the figures) are visible to the
 // owner roles only. Extended by every T16 group; the final audit verifies this list is complete (docs/SECURITY-DEBT.md).
-const COST_TABLES = ['price_grid', 'class_method_recette'] as const;
+const COST_TABLES = [
+  'price_grid',
+  'class_method_recette',
+  'cost_rate',
+  'fuel_norm',
+  'purchase_price_transport',
+] as const;
 describe('T16: cost and price-grid tables are doors-only (money-visibility matrix extension)', () => {
   it('belgobeton_app and belgobeton_system hold no privilege at all on any of them', async () => {
     for (const t of COST_TABLES) {
