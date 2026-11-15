@@ -6,7 +6,7 @@ import { listPlants } from '@/modules/master-data';
 import { loadPumpCheck, PUMP_CHECK_KINDS } from '@/modules/operations';
 import { can } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/next';
-import { EmptyState, PageHeader, StatusPill, Table, Td, Th } from '@/ui';
+import { EmptyState, FilterBar, PageHeader, StatusChips, StatusPill, Table, Td, Th } from '@/ui';
 
 const addDays = (iso: string, n: number) =>
   new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
@@ -27,6 +27,7 @@ export default async function PumpCheckPage({
   setRequestLocale(locale);
   const user = await requirePagePermission(locale, 'pump_check.read');
   const t = await getTranslations('pumpCheck');
+  const tl = await getTranslations('list');
   const today = (await getRequestClock()).today();
   const qTo = first(q.to);
   const qFrom = first(q.from);
@@ -38,12 +39,17 @@ export default async function PumpCheckPage({
   const plantId = owner ? (first(q.plant) ?? null) : null;
   const res = await loadPumpCheck(pool, user, { from, to, plantId: plantId || null });
   const rows = res.ok ? res.value : [];
+  const kindAsked = first(q.kind);
+  const kindFilter = PUMP_CHECK_KINDS.find((k) => k === kindAsked) ?? '';
   return (
     <div>
       <PageHeader title={t('title')} description={t('intro')} />
-      <form
-        method="get"
-        className="form-band mb-4 flex flex-wrap items-end gap-3"
+      <FilterBar
+        label={tl('filters')}
+        applyLabel={t('apply')}
+        resetLabel={tl('reset')}
+        resetHref={`/${locale}/pump-check`}
+        applyTestId="pump-check-apply"
         data-testid="pump-check-filters"
       >
         <label className="block">
@@ -67,17 +73,29 @@ export default async function PumpCheckPage({
             </select>
           </label>
         )}
-        <button type="submit" className="btn btn-primary" data-testid="pump-check-apply">
-          {t('apply')}
-        </button>
-      </form>
+      </FilterBar>
       {!res.ok && (
         <p role="alert" className="field-error">
           {t('invalid')}
         </p>
       )}
+      <StatusChips
+        label={tl('status')}
+        path={`/${locale}/pump-check`}
+        q={q}
+        param="kind"
+        current={kindFilter}
+        chips={[
+          { value: '', label: tl('statusAll'), count: rows.length },
+          ...PUMP_CHECK_KINDS.map((k) => ({
+            value: k,
+            label: t(`kinds.${k}.title`),
+            count: rows.filter((r) => r.kind === k).length,
+          })),
+        ]}
+      />
       {res.ok && rows.length === 0 && <EmptyState title={t('none')} />}
-      {PUMP_CHECK_KINDS.map((kind) => {
+      {PUMP_CHECK_KINDS.filter((k) => !kindFilter || k === kindFilter).map((kind) => {
         const list = rows.filter((r) => r.kind === kind);
         return (
           <section key={kind} className="mt-6" data-testid={`pump-check-${kind}`}>

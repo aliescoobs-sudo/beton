@@ -5,7 +5,21 @@ import { isRealDate } from '@/modules/ledger';
 import { formatMl, listPlants } from '@/modules/master-data';
 import { loadFuelCheck } from '@/modules/operations';
 import { requirePagePermission } from '@/modules/platform-security/next';
-import { EmptyState, PageHeader, StatusPill, Table, Td, Th } from '@/ui';
+import {
+  EmptyState,
+  FilterBar,
+  PageHeader,
+  paginate,
+  Pagination,
+  parseSort,
+  SortTh,
+  sortRows,
+  StatusChips,
+  StatusPill,
+  Table,
+  Td,
+  Th,
+} from '@/ui';
 
 const first = (v: string | string[] | undefined): string | undefined => (Array.isArray(v) ? v[0] : v);
 /** Millilitres as litres, signed, display only. */
@@ -32,6 +46,7 @@ export default async function FuelCheckPage({
   setRequestLocale(locale);
   const user = await requirePagePermission(locale, 'fuel_check.read');
   const t = await getTranslations('fuelCheck');
+  const tl = await getTranslations('list');
   const today = (await getRequestClock()).today();
   const qTo = first(q.to);
   const qFrom = first(q.from);
@@ -42,6 +57,17 @@ export default async function FuelCheckPage({
   const plantId = first(q.plant) || null;
   const res = await loadFuelCheck(pool, user, { from, to, plantId });
   const rows = res.ok ? res.value : [];
+  const stateOf = (r: (typeof rows)[number]) => (r.flagged ? 'flagged' : 'other');
+  const stateAsked = first(q.state);
+  const stateFilter = stateAsked === 'flagged' || stateAsked === 'other' ? stateAsked : '';
+  const sort = parseSort(q, ['month', 'truck', 'variance'], { key: 'month', dir: 'desc' });
+  const shown = sortRows(
+    rows.filter((r) => !stateFilter || stateOf(r) === stateFilter),
+    sort,
+    { month: (r) => r.month, truck: (r) => r.truckCode, variance: (r) => r.varianceBp },
+  );
+  const page = paginate(shown, q);
+  const path = `/${locale}/fuel-check`;
   const assumed = rows.some((r) => r.thresholdIsAssumption);
   return (
     <div>
@@ -51,9 +77,12 @@ export default async function FuelCheckPage({
           {t('assumedThreshold')}
         </p>
       )}
-      <form
-        method="get"
-        className="form-band mb-4 flex flex-wrap items-end gap-3"
+      <FilterBar
+        label={tl('filters')}
+        applyLabel={t('apply')}
+        resetLabel={tl('reset')}
+        resetHref={path}
+        applyTestId="fuel-check-apply"
         data-testid="fuel-check-filters"
       >
         <label className="block">
@@ -75,74 +104,105 @@ export default async function FuelCheckPage({
             ))}
           </select>
         </label>
-        <button type="submit" className="btn btn-primary" data-testid="fuel-check-apply">
-          {t('apply')}
-        </button>
-      </form>
+      </FilterBar>
+      <StatusChips
+        label={tl('status')}
+        path={path}
+        q={q}
+        param="state"
+        current={stateFilter}
+        chips={[
+          { value: '', label: tl('statusAll'), count: rows.length },
+          { value: 'flagged', label: t('flagged'), count: rows.filter((r) => r.flagged).length },
+          { value: 'other', label: t('ok'), count: rows.filter((r) => !r.flagged).length },
+        ]}
+      />
       {!res.ok && (
         <p role="alert" className="field-error">
           {t('invalid')}
         </p>
       )}
       {res.ok && rows.length === 0 && <EmptyState title={t('none')} />}
-      {rows.length > 0 && (
-        <Table data-testid="fuel-check-table">
-          <thead>
-            <tr>
-              <Th>{t('month')}</Th>
-              <Th>{t('truck')}</Th>
-              <Th>{t('basis')}</Th>
-              <Th numeric>{t('units')}</Th>
-              <Th numeric>{t('expected')}</Th>
-              <Th numeric>{t('measured')}</Th>
-              <Th numeric>{t('variance')}</Th>
-              <Th numeric>{t('variancePct')}</Th>
-              <Th numeric>{t('threshold')}</Th>
-              <Th>{t('state')}</Th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={`${r.month}-${r.truckId}`} data-flagged={r.flagged}>
-                <Td>
-                  <bdi dir="ltr">{r.month}</bdi>
-                </Td>
-                <Td>
-                  <bdi dir="ltr">{r.truckCode}</bdi>{' '}
-                  <span className="text-muted">{t(`kinds.${r.truckKind}` as never)}</span>
-                </Td>
-                <Td>{t(`bases.${r.basis}`)}</Td>
-                <Td numeric>{r.units}</Td>
-                <Td numeric>
-                  <bdi dir="ltr">{r.expectedMl === null ? '—' : litres(r.expectedMl)}</bdi>
-                </Td>
-                <Td numeric>
-                  <bdi dir="ltr">{litres(r.measuredMl)}</bdi>
-                </Td>
-                <Td numeric>
-                  <bdi dir="ltr">{r.varianceMl === null ? '—' : litres(r.varianceMl)}</bdi>
-                </Td>
-                <Td numeric>
-                  <bdi dir="ltr">{pct(r.varianceBp)}</bdi>
-                </Td>
-                <Td numeric>
-                  <bdi dir="ltr">{pct(r.thresholdBp)}</bdi>
-                </Td>
-                <Td>
-                  {r.flagged ? (
-                    <StatusPill status="late">{t('flagged')}</StatusPill>
-                  ) : r.noNormUnits > 0 ? (
-                    <StatusPill status="due">{t('noNorm', { count: r.noNormUnits })}</StatusPill>
-                  ) : r.thresholdBp === null ? (
-                    <StatusPill status="due">{t('noThreshold')}</StatusPill>
-                  ) : (
-                    <StatusPill status="paid">{t('ok')}</StatusPill>
-                  )}
-                </Td>
+      {rows.length > 0 && shown.length === 0 && (
+        <EmptyState title={tl('noMatch')} description={tl('noMatchHint')} />
+      )}
+      {shown.length > 0 && (
+        <>
+          <Table data-testid="fuel-check-table">
+            <thead>
+              <tr>
+                <SortTh id="month" sort={sort} path={path} q={q}>
+                  {t('month')}
+                </SortTh>
+                <SortTh id="truck" sort={sort} path={path} q={q}>
+                  {t('truck')}
+                </SortTh>
+                <Th>{t('basis')}</Th>
+                <Th numeric>{t('units')}</Th>
+                <Th numeric>{t('expected')}</Th>
+                <Th numeric>{t('measured')}</Th>
+                <Th numeric>{t('variance')}</Th>
+                <SortTh id="variance" sort={sort} path={path} q={q} numeric>
+                  {t('variancePct')}
+                </SortTh>
+                <Th numeric>{t('threshold')}</Th>
+                <Th>{t('state')}</Th>
               </tr>
-            ))}
-          </tbody>
-        </Table>
+            </thead>
+            <tbody>
+              {page.rows.map((r) => (
+                <tr key={`${r.month}-${r.truckId}`} data-flagged={r.flagged}>
+                  <Td>
+                    <bdi dir="ltr">{r.month}</bdi>
+                  </Td>
+                  <Td>
+                    <bdi dir="ltr">{r.truckCode}</bdi>{' '}
+                    <span className="text-muted">{t(`kinds.${r.truckKind}` as never)}</span>
+                  </Td>
+                  <Td>{t(`bases.${r.basis}`)}</Td>
+                  <Td numeric>{r.units}</Td>
+                  <Td numeric>
+                    <bdi dir="ltr">{r.expectedMl === null ? '—' : litres(r.expectedMl)}</bdi>
+                  </Td>
+                  <Td numeric>
+                    <bdi dir="ltr">{litres(r.measuredMl)}</bdi>
+                  </Td>
+                  <Td numeric>
+                    <bdi dir="ltr">{r.varianceMl === null ? '—' : litres(r.varianceMl)}</bdi>
+                  </Td>
+                  <Td numeric>
+                    <bdi dir="ltr">{pct(r.varianceBp)}</bdi>
+                  </Td>
+                  <Td numeric>
+                    <bdi dir="ltr">{pct(r.thresholdBp)}</bdi>
+                  </Td>
+                  <Td>
+                    {r.flagged ? (
+                      <StatusPill status="late">{t('flagged')}</StatusPill>
+                    ) : r.noNormUnits > 0 ? (
+                      <StatusPill status="due">{t('noNorm', { count: r.noNormUnits })}</StatusPill>
+                    ) : r.thresholdBp === null ? (
+                      <StatusPill status="due">{t('noThreshold')}</StatusPill>
+                    ) : (
+                      <StatusPill status="paid">{t('ok')}</StatusPill>
+                    )}
+                  </Td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+          <Pagination
+            page={page}
+            path={path}
+            q={q}
+            labels={{
+              prev: tl('prev'),
+              next: tl('next'),
+              nav: tl('pageNav'),
+              range: tl('range', { from: page.from, to: page.to, total: page.total }),
+            }}
+          />
+        </>
       )}
     </div>
   );

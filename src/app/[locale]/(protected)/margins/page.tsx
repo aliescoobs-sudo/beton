@@ -3,7 +3,18 @@ import { getPool } from '@/lib/db/pools';
 import { loadMargins, MARGIN_GROUPS, type MarginBlRow, type MarginSummaryRow } from '@/modules/master-data';
 import { recordMoneyView } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/next';
-import { EmptyState, Money, PageHeader, StatusPill, Table, Td, Th } from '@/ui';
+import {
+  EmptyState,
+  FilterBar,
+  Money,
+  PageHeader,
+  paginate,
+  Pagination,
+  StatusPill,
+  Table,
+  Td,
+  Th,
+} from '@/ui';
 
 /** Basis points as a signed percentage, display only: -1234 → "-12,34 %". */
 function bp(v: number | null): string {
@@ -34,6 +45,7 @@ export default async function MarginsPage({
   setRequestLocale(locale);
   const user = await requirePagePermission(locale, 'bl_margins.read');
   const t = await getTranslations('margins');
+  const tl = await getTranslations('list');
   const pool = getPool('app');
   await recordMoneyView(pool, user, 'screen:margins');
   const res = await loadMargins(pool, user, {
@@ -55,6 +67,7 @@ export default async function MarginsPage({
       </div>
     );
   const d = res.value;
+  const blPage = paginate(d.bls, q, 50);
   const label = (r: MarginSummaryRow) => (r.key === 'NONE' ? t('methodNone') : r.label);
   const neg = (v: number) => (v < 0 ? 'text-red-700' : undefined);
   const marginCells = (m: number, b: number | null) => (
@@ -132,7 +145,14 @@ export default async function MarginsPage({
           {t('banner', { inputs: d.total.assumedInputs, bls: d.total.assumedBlCount })}
         </p>
       )}
-      <form method="get" className="form-band mb-4 grid gap-3 sm:grid-cols-4" data-testid="margins-filters">
+      <FilterBar
+        label={tl('filters')}
+        applyLabel={t('apply')}
+        resetLabel={tl('reset')}
+        resetHref={`/${locale}/margins`}
+        applyTestId="margins-apply"
+        data-testid="margins-filters"
+      >
         <label className="block">
           <span className="field-label">{t('group')}</span>
           <select name="group" defaultValue={d.filters.group} className="input mt-1">
@@ -199,12 +219,7 @@ export default async function MarginsPage({
             ))}
           </select>
         </label>
-        <div className="flex items-end">
-          <button type="submit" className="btn btn-primary" data-testid="margins-apply">
-            {t('apply')}
-          </button>
-        </div>
-      </form>
+      </FilterBar>
 
       {d.summary.length === 0 && !d.total?.incompleteCount ? (
         <EmptyState title={t('none')} />
@@ -281,7 +296,24 @@ export default async function MarginsPage({
       )}
 
       <h2 className="mt-6 text-lg font-semibold">{t('blsTitle')}</h2>
-      {d.bls.length === 0 ? <EmptyState title={t('none')} /> : blTable(d.bls, 'margins-bls', false)}
+      {d.bls.length === 0 ? (
+        <EmptyState title={t('none')} />
+      ) : (
+        <>
+          {blTable(blPage.rows, 'margins-bls', false)}
+          <Pagination
+            page={blPage}
+            path={`/${locale}/margins`}
+            q={q}
+            labels={{
+              prev: tl('prev'),
+              next: tl('next'),
+              nav: tl('pageNav'),
+              range: tl('range', { from: blPage.from, to: blPage.to, total: blPage.total }),
+            }}
+          />
+        </>
+      )}
     </div>
   );
 }
