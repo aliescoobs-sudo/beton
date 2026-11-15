@@ -57,6 +57,13 @@ for (const [locale, key] of [
       await page.reload();
       await expect(page.getByTestId('reminders-log')).toContainText('Appel du lundi');
     }
+    await visit(page, locale, '/aging', 'office-sales-aging');
+    await expect(page.getByTestId('aging-client')).toBeVisible();
+    await expect(page.getByTestId('aging-supplier')).toHaveCount(0);
+    await visit(page, locale, '/forecast', 'office-sales-forecast');
+    await expect(page.getByTestId('forecast-client_cheque')).toBeVisible();
+    await expect(page.getByTestId('forecast-issued_cheque')).toHaveCount(0);
+    await expect(page.getByTestId('forecast-net')).toHaveCount(0);
     await visit(page, locale, '/instruments', 'office-sales-instruments');
     await visit(page, locale, '/charges', 'office-sales-charges');
     await expect(page.getByTestId('charge-form')).toHaveCount(0); // it validates, it does not record
@@ -86,6 +93,13 @@ for (const [locale, key] of [
     await visit(page, locale, '/statements', 'office-purchases-accounts');
     await expect(page.getByTestId('accounts-supplier')).toBeVisible();
     await expect(page.getByTestId('accounts-client')).toHaveCount(0);
+    await visit(page, locale, '/aging', 'office-purchases-aging');
+    await expect(page.getByTestId('aging-supplier')).toBeVisible();
+    await expect(page.getByTestId('aging-client')).toHaveCount(0);
+    await visit(page, locale, '/forecast', 'office-purchases-forecast');
+    await expect(page.getByTestId('forecast-issued_cheque')).toBeVisible();
+    await expect(page.getByTestId('forecast-client_cheque')).toHaveCount(0);
+    await expect(page.getByTestId('forecast-instalment')).toHaveCount(0);
     await visit(page, locale, '/cash', 'office-purchases-cash');
     await expect(page.getByTestId('cash-day')).toBeVisible();
     await expect(page.getByTestId('cash-incoming')).toHaveCount(0); // the client side of the position is not hers
@@ -159,4 +173,24 @@ test('the order form searches by alias and makes the PO number mandatory for a c
   } finally {
     await app.end();
   }
+});
+
+// T19c B2/B3: the owner reads both sides of the aging and the forecast with the net line; the CSV export is served (and audited).
+test('the owner sees both sides of the aging and the forecast with the net line, and exports the aging (French)', async ({
+  page,
+}) => {
+  await loginOwner(page, 'fr');
+  await visit(page, 'fr', '/aging', 'owner-aging');
+  await expect(page.getByTestId('aging-client')).toBeVisible();
+  await expect(page.getByTestId('aging-supplier')).toBeVisible();
+  const csv = await page.request.get('/fr/aging/export?kind=client');
+  expect(csv.status()).toBe(200);
+  expect(csv.headers()['content-type']).toContain('text/csv');
+  expect((await csv.text()).split('\n')[0]).toBe(
+    'code;name;current;d1_30;d31_60;d61_90;d90plus;no_due_date;total',
+  );
+  expect((await page.request.get('/fr/aging/export?kind=other')).status()).toBe(404);
+  await visit(page, 'fr', '/forecast', 'owner-forecast');
+  for (const id of ['client_cheque', 'issued_cheque', 'instalment', 'net'])
+    await expect(page.getByTestId(`forecast-${id}`)).toBeVisible();
 });

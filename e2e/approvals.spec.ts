@@ -16,7 +16,7 @@ const env = testEnv(E2E_DATABASE);
 const migrator = new pg.Pool({ connectionString: env.DATABASE_URL_MIGRATOR, max: 1 });
 const app = new pg.Pool({ connectionString: env.DATABASE_URL_APP, max: 2 });
 test.afterAll(() => Promise.all([migrator.end(), app.end()]));
-const codes = { price: '', held: '', payment: '', supplier: '' };
+const codes = { price: '', held: '', payment: '', payment2: '', supplier: '' };
 
 test.beforeAll(async () => {
   const owner = await realSessionUser(env.DATABASE_URL_MIGRATOR, 'owner');
@@ -39,6 +39,17 @@ test.beforeAll(async () => {
   });
   if (!prepared.ok) throw new Error(prepared.error);
   codes.payment = prepared.value.id;
+  // T19c A: a second one is approved from the request page, which goes through the same database door (a fresh second factor above the upper limit)
+  const second = await preparePayment(app, assistante, {
+    supplierId: supplier.supplierId,
+    method: 'cheque',
+    amount: '9500',
+    number: `E2F${marker.slice(-8)}`,
+    bank: 'BMCE',
+    writtenDate: '2026-12-16',
+  });
+  if (!second.ok) throw new Error(second.error);
+  codes.payment2 = second.value.id;
   await withRlsContext(migrator, { userId: owner.id, role: 'owner', requestId: marker }, async (tx) => {
     await tx.query(
       `insert into order_price_status (order_id, provisional_unit_price_centimes, created_by) values ($1, 78000, $2)`,
@@ -94,4 +105,15 @@ test('an outgoing payment above the upper limit waits in the inbox; approving it
   await page.goto('/fr/payment-requests');
   await expect(page.getByTestId(`pr-actions-${codes.payment}`)).toBeVisible();
   await expect(page.getByTestId(`pr-actions-${codes.payment}`).getByTestId('pr-issue')).toBeVisible();
+});
+
+test('the request page approves above the upper limit through the same door; a fresh sign-in carries the second factor, so the approval is recorded (French)', async ({
+  page,
+}) => {
+  await loginOwner(page, 'fr');
+  await page.goto('/fr/payment-requests');
+  const actions = page.getByTestId(`pr-actions-${codes.payment2}`);
+  await expect(actions).toBeVisible();
+  await actions.getByRole('button', { name: 'Approuver' }).click();
+  await expect(actions.getByTestId('pr-issue')).toBeVisible();
 });

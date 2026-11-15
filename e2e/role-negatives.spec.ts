@@ -235,6 +235,11 @@ test('office roles: the known PDF and export targets (a real invoice, quote, sta
     ['quote PDF', `/fr/quotes/${made.quote}/pdf`],
     ['client statement PDF', `/fr/statements/client/${scene.clientId}/pdf`],
     ['client statement export', `/fr/statements/client/${scene.clientId}/export`],
+    // T19c B2/B3: the aging screens, their CSV and the cash forecast follow the side split of the statements (each office role reads its own side, the blind office none)
+    ['client aging export', '/fr/aging/export?kind=client'],
+    ['supplier aging export', '/fr/aging/export?kind=supplier'],
+    ['aging screen', '/fr/aging'],
+    ['cash forecast screen', '/fr/forecast'],
     ['accounting export', '/fr/accounting/export?file=sales&from=2026-01-01&to=2026-12-31'],
     ['finance export', '/fr/finance/export?from=2026-01-01&to=2026-12-31'],
   ];
@@ -256,7 +261,11 @@ test('office roles: the known PDF and export targets (a real invoice, quote, sta
     for (const [label, url] of targets) {
       const r = await send(who.cookie, 'GET', url);
       // D245: the Responsable (office_sales) reads the CLIENT side, statements included; everything else stays refused to every office role
-      const ownSide = role === 'office_sales' && label.startsWith('client statement');
+      const ownSide =
+        (role === 'office_sales' &&
+          (label.startsWith('client statement') || label === 'client aging export')) ||
+        (role === 'office_purchases' && label === 'supplier aging export') ||
+        (role !== 'office' && (label === 'aging screen' || label === 'cash forecast screen'));
       if (ownSide) expect(reached(r), `${role}: its own side, ${label}`).toBe(true);
       else if (!denied(r)) leaks.push(`${role}: ${label} (${url}) -> ${r.status}`);
     }

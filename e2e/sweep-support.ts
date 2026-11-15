@@ -217,12 +217,12 @@ export function identityFactory(deps: {
 export const actionRefused = (p: Probe): boolean =>
   denied(p) || (p.status >= 300 && p.status < 400) || (p.status === 200 && !/"ok":true/.test(p.body));
 
-/** The number of business writes in the audit log (not logins, step-ups or denials, and not a person's own notifications or push subscription, and not `export:charges`: the sweep's own positive control, a valid admin, legitimately exports the charges register and that export is audited, T19): equal before and after a sweep means the sweep wrote nothing. */
+/** The number of business writes in the audit log (not logins, step-ups or denials, and not a person's own notifications or push subscription, and not `export:charges`, `export:aging-client`, `export:aging-supplier`: the sweep's own positive control, a valid admin, legitimately exports them and each export is audited, T19 and T19c): equal before and after a sweep means the sweep wrote nothing. */
 export async function businessWrites(migrator: pg.Pool): Promise<number> {
   return Number(
     (
       await migrator.query<{ n: string }>(
-        `select count(*)::text n from audit_event where action in ('insert','update','reverse','archive','import','export','user_created','user_disabled','user_enabled') and table_name not in ('notification','push_subscription','export:charges')`,
+        `select count(*)::text n from audit_event where action in ('insert','update','reverse','archive','import','export','user_created','user_disabled','user_enabled') and table_name not in ('notification','push_subscription','export:charges','export:aging-client','export:aging-supplier')`,
       )
     ).rows[0]!.n,
   );

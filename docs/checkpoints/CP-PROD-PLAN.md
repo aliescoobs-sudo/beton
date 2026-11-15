@@ -116,7 +116,7 @@ Each AC has one proving test named in the table at the end of the batch.
 - AC-PROD-33 `docs/RUNBOOK.md` covers install, update, backup, restore, key rotation, incident and rollback.
 
 ## Information-visibility matrix (§16.1)
-Four rights per money item, stated separately. Entering or printing never grants a balance or an aggregate. Source: `src/modules/platform-security/domain/visibility-matrix.ts` (this table is printed from it and a unit test fails when they differ); the balance column is proved in the database by `tests/visibility-matrix.int.test.ts`. D245 (T19): office_sales reads the CLIENT side and office_purchases the SUPPLIER side and the cash accounts, each audited, nothing else. Known exceptions: office_sales prints invoices with amounts; office_purchases enters supplier invoices and payments; the accountant exports HT, VAT and TTC; reference prices are visible to internal non-field roles (`public.reference_prices`).
+Four rights per money item, stated separately. Entering or printing never grants a balance or an aggregate. Source: `src/modules/platform-security/domain/visibility-matrix.ts` (this table is printed from it and a unit test fails when they differ); the balance column is proved in the database by `tests/visibility-matrix.int.test.ts`. D245 (T19): office_sales reads the CLIENT side and office_purchases the SUPPLIER side and the cash accounts, each audited, nothing else. T19c: the aging screens and the 30/60/90 day cash forecast follow the same split (the instalments of loans and leasing and the net line are owner and app_admin only). Known exceptions: office_sales prints invoices with amounts; office_purchases enters supplier invoices and payments; the accountant exports HT, VAT and TTC; reference prices are visible to internal non-field roles (`public.reference_prices`).
 
 | Item | Enters | Sees in a document | Sees balances and aggregates | Exports |
 |---|---|---|---|---|
@@ -130,6 +130,9 @@ Four rights per money item, stated separately. Entering or printing never grants
 | Client and supplier balances | — | owner, app_admin, support | owner, app_admin, support | — |
 | Client balances and statements | — | owner, app_admin, support, office_sales | owner, app_admin, support, office_sales | owner, app_admin, support, office_sales |
 | Supplier balances and statements | — | owner, app_admin, support, office_purchases | owner, app_admin, support, office_purchases | owner, app_admin, support, office_purchases |
+| Client aging and client cheques due (30/60/90 days) | — | owner, app_admin, office_sales | owner, app_admin, office_sales | owner, app_admin, office_sales |
+| Supplier aging and issued cheques due (30/60/90 days) | — | owner, app_admin, office_purchases | owner, app_admin, office_purchases | owner, app_admin, office_purchases |
+| Loan and leasing instalments and the net cash forecast | owner, app_admin | owner, app_admin | owner, app_admin | — |
 | Cash accounts (the cash, never a bank account) | — | owner, app_admin, support, office_purchases | owner, app_admin, support, office_purchases | — |
 | Cash, bank, treasury, forecast | owner, app_admin | owner, app_admin, support | owner, app_admin, support | — |
 | Fuel purchases (amounts) | owner, app_admin | owner, app_admin, support | owner, app_admin, support | — |
