@@ -15,6 +15,7 @@ import {
 import { SYSTEM_ACTOR_ID } from '../src/modules/platform-security/auth/actors';
 import type { SessionUser } from '../src/modules/platform-security/auth/session-gate';
 import { testEnv } from './db-env';
+import { noActorOffenders } from './helpers/no-actor-sweep';
 import { plantWorld, type World } from './helpers/plant-world';
 
 /** T15 G3 (SPEC-sms-channel §4, D235): the hauler kind, the GPS unit mapping and the sealed, hashed sender registry. Fictitious numbers only. */
@@ -310,5 +311,23 @@ describe('T15 G3: the sender registry', () => {
         { hmacKey, cipher },
       ),
     ).rejects.toThrow();
+  });
+});
+
+describe('T15 G3: the sweep with a registered sender', () => {
+  it('end_sms_sender refuses (42501) every context that is not an admitted actor, with a REAL open mapping, and writes nothing', async () => {
+    const p = phone();
+    const id = await reg(w.owner, hash(p), seal(p), await freshDriver());
+    const offenders = await noActorOffenders(
+      app,
+      'select public.end_sms_sender($1, current_date, $2)',
+      [id, 'lost_phone'],
+      { plantManager: w.pmA.id, driver: w.driverUserA.id },
+    );
+    expect(offenders).toEqual([]);
+    expect(
+      (await w.sup<{ v: string | null }>(`select valid_to::text v from sms_sender where id = $1`, [id]))[0]!
+        .v,
+    ).toBeNull();
   });
 });

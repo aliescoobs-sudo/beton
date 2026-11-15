@@ -6,6 +6,7 @@ import { reorderThreshold } from '../src/modules/operations/domain/stock';
 import { SYSTEM_ACTOR_ID } from '../src/modules/platform-security/auth/actors';
 import { testEnv } from './db-env';
 import { insertPurchase, purchaseMaster } from './helpers/ledger-fixtures';
+import { noActorOffenders } from './helpers/no-actor-sweep';
 import { plantWorld, type World } from './helpers/plant-world';
 
 /** T15 G2 (SPEC-stock-engine-gaps §6): the reorder request, its doors, the link to a purchase and the daily job. Fictitious data; refusals assert the SQLSTATE. */
@@ -347,5 +348,21 @@ describe('T15 G2: the daily job', () => {
       });
       expect(sql === null ? null : Number(sql)).toBe(ts);
     }
+  });
+});
+
+describe('T15 G2: the sweep with real targets', () => {
+  it('link_reorder_to_purchase refuses (42501) every context that is not an admitted actor, with a REAL request and a REAL purchase, and links nothing', async () => {
+    const pm = await purchaseMaster(app, w.owner.id, `${marker}sw${n++}`);
+    const id = await create(w.pmA, pm.componentId);
+    const pA = await w.asOwnerIn(w.plantA, (tx) => insertPurchase(tx, w.owner.id, pm));
+    const offenders = await noActorOffenders(
+      app,
+      'select public.link_reorder_to_purchase($1,$2)',
+      [id, pA.code],
+      { plantManager: w.pmA.id, driver: w.driverUserA.id },
+    );
+    expect(offenders).toEqual([]);
+    expect(await state(id)).toBe('open');
   });
 });
