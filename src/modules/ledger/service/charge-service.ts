@@ -9,19 +9,8 @@ import { can, inRequest, require, type SessionUser } from '@/modules/platform-se
  * decides on their own preparation, that a charge cannot be paid before its control, that a charge without a supporting document is flagged. The
  * amounts are integer centimes; a typed amount is parsed once by the shared money parser. Nothing is computed here but the TTC shown.
  */
-export const CHARGE_CATEGORIES = [
-  'rent',
-  'electricity_water',
-  'telecom',
-  'insurance',
-  'maintenance',
-  'transport',
-  'taxes_fees',
-  'bank_fees',
-  'supplies',
-  'other',
-] as const;
-export const CHARGE_MODES = ['cash', 'cheque', 'transfer', 'card'] as const;
+export { CHARGE_CATEGORIES, CHARGE_MODES } from '../domain/charge';
+import { CHARGE_CATEGORIES, CHARGE_MODES } from '../domain/charge';
 export type ChargeStatus =
   | 'recorded'
   | 'pending_validation'

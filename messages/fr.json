@@ -3727,6 +3727,7 @@
     "noMatch": "Aucun résultat pour ces filtres.",
     "noMatchHint": "Élargissez ou réinitialisez les filtres.",
     "sortBy": "Trier par {column}",
-    "search": "Recherche"
+    "search": "Recherche",
+    "exportCsv": "Exporter (CSV)"
   }
 }

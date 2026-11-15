@@ -81,7 +81,8 @@ test('owner: the 5-second home, the shell, the order flow in Arabic (RTL), the l
   await expect(page.getByTestId('order-step-delivery')).toBeVisible();
   // fields with no backend yet are shown, disabled, with a note
   await expect(page.getByTestId('order-hour')).toBeDisabled();
-  await expect(page.getByTestId('order-po')).toBeDisabled();
+  // T19: the client PO number is now a real field (the hour has no backend yet and stays disabled)
+  await expect(page.getByTestId('order-po')).toBeEnabled();
   await shot(page, 'order-flow-2-fr');
   await page.getByTestId('order-next').click();
   await expect(page.getByTestId('order-step-summary')).toBeVisible();

@@ -91,7 +91,7 @@ export default async function ChargesPage({
       <PageHeader
         title={t('title')}
         description={reads ? t('intro') : t('introValidator')}
-        actions={reads ? <ExportButton href={`${path}/export`} label={tl('export')} /> : undefined}
+        actions={reads ? <ExportButton href={`${path}/export`} label={tl('exportCsv')} /> : undefined}
       />
       {reads && <ChargeForm today={today} record={recordChargeAction} />}
       {all.some((c) => c.noDocument) && (

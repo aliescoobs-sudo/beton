@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { type FormEvent, useState } from 'react';
-import { CHARGE_CATEGORIES, CHARGE_MODES } from '../../service/charge-service';
+import { CHARGE_CATEGORIES, CHARGE_MODES } from '../../domain/charge';
 
 type Answer = { ok: boolean; error?: string; withDocument?: boolean };
 

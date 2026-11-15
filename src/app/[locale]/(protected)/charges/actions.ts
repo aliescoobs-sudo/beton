@@ -34,14 +34,18 @@ async function guarded(
 }
 
 // @permission charges.write (owner, app_admin, office_purchases): record a charge (the doors check the actor again)
-export const recordChargeAction = (input: unknown) =>
-  guarded('charges.write', (u) => recordCharge(getPool('app'), u, input));
+export async function recordChargeAction(input: unknown): Promise<Answer> {
+  return guarded('charges.write', (u) => recordCharge(getPool('app'), u, input));
+}
 // @permission charges.decide (owner, app_admin, office_sales): validate, approve or reject; nobody decides on their own preparation (the door)
-export const decideChargeAction = (input: unknown) =>
-  guarded('charges.decide', (u) => decideCharge(getPool('app'), u, input));
+export async function decideChargeAction(input: unknown): Promise<Answer> {
+  return guarded('charges.decide', (u) => decideCharge(getPool('app'), u, input));
+}
 // @permission charges.write (owner, app_admin, office_purchases): mark paid once the control allows it; a missing document is flagged
-export const payChargeAction = (input: unknown) =>
-  guarded('charges.write', (u) => markChargePaid(getPool('app'), u, input));
+export async function payChargeAction(input: unknown): Promise<Answer> {
+  return guarded('charges.write', (u) => markChargePaid(getPool('app'), u, input));
+}
 // @permission charges.write (owner, app_admin, office_purchases): add the supporting document reference later
-export const addDocumentAction = (input: unknown) =>
-  guarded('charges.write', (u) => addChargeDocument(getPool('app'), u, input));
+export async function addDocumentAction(input: unknown): Promise<Answer> {
+  return guarded('charges.write', (u) => addChargeDocument(getPool('app'), u, input));
+}

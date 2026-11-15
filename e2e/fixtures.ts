@@ -64,6 +64,11 @@ export const E2E_MD = {
   t18OfficeFr: { email: 'e2e-t18-office-fr@kayas.test', name: 'Bureau T18' },
   t18OfficeAr: { email: 'e2e-t18-office-ar@kayas.test', name: 'مكتب T18' },
   t18PlantFr: { email: 'e2e-t18-plant-fr@kayas.test', name: 'Centrale T18' },
+  // T19: the two office roles of the money-read screens, one per language, each enrolled once by the spec
+  t19SalesFr: { email: 'e2e-t19-sales-fr@kayas.test', name: 'Responsable T19' },
+  t19SalesAr: { email: 'e2e-t19-sales-ar@kayas.test', name: 'مسؤول T19' },
+  t19PurchFr: { email: 'e2e-t19-purch-fr@kayas.test', name: 'Assistante T19' },
+  t19PurchAr: { email: 'e2e-t19-purch-ar@kayas.test', name: 'مساعدة T19' },
   t18PlantAr: { email: 'e2e-t18-plant-ar@kayas.test', name: 'مركز T18' },
   orderOfficeAr: { email: 'e2e-or-office-ar@kayas.test', name: 'مكتب الطلبيات' },
   orderAdmin: { email: 'e2e-or-admin@kayas.test', name: 'Admin Commandes' },

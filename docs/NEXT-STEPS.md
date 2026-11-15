@@ -65,3 +65,10 @@ Ask for small, testable tasks, with security and the rules engine first, UI and 
 - AI eval (~50 Darija/French examples) → final provider; request ZDR.
 - Moroccan hosting provider.
 - Opening-balance meetings with each responsible person.
+
+## T19 follow-up (15 Nov 2026): what comes next for the 1 Dec go-live
+- **T19b** (D246): the historical posting path for Jan-Nov (source = historical_import, batch id) and the importer kinds for Ventes, Encaissements, Achats, Paiements, Charges; cash count with variance; bank reconciliation; monthly close and lock; daily checklist; monthly owner table.
+- **Finish T19 partials** (see docs/reviews/T19-REPORT.md): per-invoice aging and loans/leasing/opening stock in the opening importer; the order form showing that a client requires its PO and searching by alias; HT/TTC basis in the ledger; owner approvals-inbox entry for outgoing payments above the upper limit; charges feeding the finance entries.
+- **Owner decisions on Monday 16 Nov**: the two payment-control limits (1 000 and 5 000 MAD, parameters on the settings screen); whether a private individual's building-site address counts as a "personal address" (D249 scan exception).
+- **T20** (D251): the fictitious realistic twin seed.
+- **Final audit**: every row of docs/SECURITY-DEBT.md dated 2026-11-15 under T19; run the data-scope scan and the office-money-read tests again.
