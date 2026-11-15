@@ -99,6 +99,16 @@ describe('permission matrix (SPEC-platform-security §4)', () => {
     }
   });
 
+  // T17 (SPEC-cost-margin §9, D239, D236): the margin screen and the pump and fuel checks hold costs or cost-derived figures: owner and app_admin only, for EVERY role of the system.
+  it('T17: the per-BL margins are for owner and app_admin only; the grid is a selling price that office_sales may read, never a cost', () => {
+    for (const role of USER_ROLES) {
+      const ownerRole = role === 'owner' || role === 'app_admin';
+      expect(can(role, 'bl_margins.read'), `${role} bl_margins.read`).toBe(ownerRole);
+      expect(can(role, 'costs.manage'), `${role} costs.manage`).toBe(ownerRole);
+      expect(can(role, 'grid.read'), `${role} grid.read`).toBe(ownerRole || role === 'office_sales');
+    }
+  });
+
   it('office writes money blind: it can create but holds no money read permission', () => {
     expect(can('office', 'orders.write')).toBe(true);
     expect(can('office', 'invoices.write')).toBe(true);

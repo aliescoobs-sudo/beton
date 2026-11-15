@@ -165,8 +165,8 @@ async function seedOrders(tx: Tx, today: string, openingDate: string, rng: Rng):
         siteId: null,
         zoneId: null,
         concreteTypeId: typeId(typeCode),
-        // fictitious scenario data: every third client takes the pump
-        dischargeMethod: clientIndex % 3 === 0 ? 'POMPE' : 'GOULOTTE',
+        // fictitious scenario data: no pump job exists in the scenario, so every order is a chute order (a POMPE BL without a pump job is flagged, D243)
+        dischargeMethod: 'GOULOTTE',
         volumeL: volumeM3 * 1000,
         deliveryDate,
         broughtByUserId: null,

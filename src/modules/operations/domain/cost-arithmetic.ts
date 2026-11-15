@@ -72,3 +72,31 @@ export function costBlocks(p: {
     total: materials + delivery + pump + plant + overheads,
   };
 }
+
+/** T17 G9 (SPEC-cost-margin §6): the sale price HT of a BL line, the order's unit price HT per m3 x litres / 1000, one rounding (the way an invoice line is made). Signed with the litres. */
+export const salePriceCentimes = (unitPriceHtCentimesPerM3: bigint, volumeL: bigint): bigint =>
+  mulDivRound(unitPriceHtCentimesPerM3 * volumeL, 1000n);
+
+export interface Margins {
+  /** M1 on materials = price - materials. */
+  m1: bigint;
+  /** M2 after delivery = price - materials - delivery - pump (the pump block is 0 for GOULOTTE). */
+  m2: bigint;
+  /** M3 full = price - the five blocks. */
+  m3: bigint;
+}
+
+/** The three margins of a price and its blocks (centimes). Plain subtraction: nothing is rounded, so the sum of the per-BL margins is the margin of the sum. */
+export const marginsOf = (price: bigint, blocks: CostBlocks): Margins => ({
+  m1: price - blocks.materials,
+  m2: price - blocks.materials - blocks.delivery - blocks.pump,
+  m3: price - blocks.total,
+});
+
+/** A margin in basis points of the price (10 000 bp = 100 %), half away from zero; null when the price is not positive. */
+export const marginBp = (margin: bigint, price: bigint): bigint | null =>
+  price > 0n ? mulDivRound(margin * 10_000n, price) : null;
+
+/** An amount per m3 from a total and the litres: the display figure only (a total is always a sum of per-BL integers, never a recomputation from this). */
+export const perM3Centimes = (totalCentimes: bigint, volumeL: bigint): bigint | null =>
+  volumeL > 0n ? mulDivRound(totalCentimes * 1000n, volumeL) : null;

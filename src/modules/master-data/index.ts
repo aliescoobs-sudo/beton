@@ -176,3 +176,12 @@ export {
   type CostScreen,
   type GridPriceInForce,
 } from './service/cost-service';
+export {
+  loadMargins,
+  MARGIN_GROUPS,
+  type MarginBlRow,
+  type MarginFilters,
+  type MarginGroup,
+  type MarginScreen,
+  type MarginSummaryRow,
+} from './service/margin-service';

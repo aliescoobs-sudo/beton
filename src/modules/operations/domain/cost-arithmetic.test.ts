@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   costBlocks,
+  marginBp,
+  marginsOf,
   materialsLineCentimes,
   mulDivRound,
+  perM3Centimes,
   ratePerM3Centimes,
+  salePriceCentimes,
   tripFuelCentimes,
 } from './cost-arithmetic';
 
@@ -86,5 +90,42 @@ describe('the elements of a load (a hand-checked load of the fictitious FX-B25-P
     expect(none.delivery).toBe(0n);
     expect(none.plant).toBe(0n);
     expect(none.total).toBe(none.materials + none.pump + none.overheads);
+  });
+});
+
+describe('T17 G9: the sale price and the three margins', () => {
+  const blocks = costBlocks({
+    volumeL: 8_000n,
+    method: 'POMPE',
+    materialsLines: [599_008n],
+    perTripMl: 22_000n,
+    dieselCentimesPerL: 1_700n,
+    deliveryOtherPerM3: 6_800n,
+    pumpPerM3: 4_000n,
+    plantPerM3: 4_000n,
+    overheadPerM3: 3_000n,
+  });
+  it('the price of a BL is one rounding of unit price x litres / 1000, signed with the litres', () => {
+    expect(salePriceCentimes(88_000n, 8_000n)).toBe(704_000n);
+    expect(salePriceCentimes(88_001n, 3_333n)).toBe(293_307n);
+    expect(salePriceCentimes(88_000n, -8_000n)).toBe(-704_000n);
+    expect(salePriceCentimes(1n, 500n)).toBe(1n); // 0,5 centime: a tie goes away from zero
+    expect(salePriceCentimes(1n, -500n)).toBe(-1n);
+  });
+  it('M1, M2 and M3 are plain subtractions; the pump counts from M2 on, the plant and overheads only in M3', () => {
+    const price = salePriceCentimes(88_000n, 8_000n);
+    const m = marginsOf(price, blocks);
+    expect(m.m1).toBe(price - 599_008n);
+    expect(m.m2).toBe(price - 599_008n - blocks.delivery - blocks.pump);
+    expect(m.m3).toBe(price - blocks.total);
+    expect(m.m1 > m.m2 && m.m2 > m.m3).toBe(true);
+  });
+  it('basis points of the price round half away from zero and are null without a positive price; a negative margin stays negative', () => {
+    expect(marginBp(1n, 8n)).toBe(1_250n);
+    expect(marginBp(1n, 3n)).toBe(3_333n);
+    expect(marginBp(-1n, 3n)).toBe(-3_333n);
+    expect(marginBp(5n, 0n)).toBeNull();
+    expect(perM3Centimes(704_000n, 8_000n)).toBe(88_000n);
+    expect(perM3Centimes(1n, 0n)).toBeNull();
   });
 });

@@ -409,6 +409,12 @@ const GROUPS: GroupDef[] = [
         allowed: 'costs.manage',
       },
       {
+        path: '/margins',
+        labelKey: 'margins.link',
+        testId: 'margins-link',
+        allowed: 'bl_margins.read',
+      },
+      {
         path: '/company',
         labelKey: 'ledger.company.link',
         testId: 'company-link',

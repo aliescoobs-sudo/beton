@@ -82,15 +82,33 @@ beforeAll(async () => {
       [c],
     );
     // an industrial class needs a selling price for an order to exist; the A1 seed gives none, the fixture does
-    const price = await w.sup<{ id: string }>(
-      `insert into selling_price (id, concrete_type_id, client_id, price_ht_per_m3_centimes, effective_from, created_by)
-       values (gen_random_uuid(), $1, null, 78000, '2026-01-01', $2) returning id`,
-      [row!.t, w.owner.id],
-    );
+    // T17: another suite of the same run may have made this price already (the fictitious classes are shared): take it, or make it
+    const find = () =>
+      w.sup<{ id: string }>(
+        `select id from selling_price where concrete_type_id = $1 and client_id is null and plant_id is null and price_ht_per_m3_centimes = 78000 order by effective_from desc limit 1`,
+        [row!.t],
+      );
+    let price = await find();
+    if (!price[0]) {
+      try {
+        price = await w.sup<{ id: string }>(
+          `insert into selling_price (id, concrete_type_id, client_id, price_ht_per_m3_centimes, effective_from, created_by)
+           values (gen_random_uuid(), $1, null, 78000, '2026-01-01', $2) returning id`,
+          [row!.t, w.owner.id],
+        );
+      } catch {
+        price = await find();
+      }
+    }
     return { typeId: row!.t, recetteId: row!.r, priceId: price[0]!.id };
   };
   fxB25P = await fx('FXB25P');
   fxB20G = await fx('FXB20G');
+  // T17 (D243): a POMPE BL of the world's client is complete only when a pump job exists that day: the loads of these tests are on 2026-06-01
+  await w.sup(
+    `insert into pump_job (id, job_date, pump_id, operator_id, client_id, site_label, created_by) values (gen_random_uuid(), '2026-06-01', $1, $2, $3, 'chantier fictif', $4)`,
+    [w.truckA, w.driverA, w.scene.clientId, w.owner.id],
+  );
 });
 afterAll(async () => {
   await w.done();

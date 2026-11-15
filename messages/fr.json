@@ -3390,5 +3390,53 @@
       "NOT_AFTER_LAST_VERSION": "La date doit être postérieure à la dernière version",
       "FORBIDDEN": "Action non autorisée"
     }
+  },
+  "margins": {
+    "link": "Marges",
+    "title": "Marges",
+    "intro": "Prix de vente moins coûts figés au BL, par mois, centrale, classe, mode de déchargement ou client. Réservé au propriétaire et à l'administrateur de l'application. Pas d'export.",
+    "banner": "Les chiffres utilisent des valeurs supposées : {inputs, plural, one {# donnée supposée} other {# données supposées}} dans {bls, plural, one {# BL} other {# BL}}. Ils seront remplacés par les valeurs réelles.",
+    "invalid": "Filtre refusé.",
+    "group": "Regrouper par",
+    "groups": {
+      "month": "Mois",
+      "plant": "Centrale",
+      "class": "Classe",
+      "method": "Mode de déchargement",
+      "client": "Client",
+      "class_method": "Classe × mode"
+    },
+    "from": "Du",
+    "to": "Au",
+    "plant": "Centrale",
+    "class": "Classe",
+    "method": "Mode",
+    "client": "Client",
+    "apply": "Appliquer",
+    "none": "Aucun BL complet dans cette sélection.",
+    "total": "Total",
+    "methods": {
+      "GOULOTTE": "Goulotte",
+      "POMPE": "Pompe"
+    },
+    "methodNone": "Mode non enregistré",
+    "blCount": "BL",
+    "volume": "m³",
+    "price": "Prix HT",
+    "materials": "Matières",
+    "delivery": "Livraison",
+    "pump": "Pompe",
+    "plantCost": "Centrale",
+    "overheads": "Frais généraux",
+    "totalCost": "Coût total",
+    "incomplete": "Incomplets",
+    "incompleteTitle": "BL à snapshot incomplet ({count})",
+    "incompleteNote": "Un coût manquant (tarif, prix, norme, mode de déchargement, chantier de pompe) ne vaut jamais zéro : ces BL sont comptés et listés ici, jamais ajoutés aux totaux.",
+    "noneIncomplete": "Aucun BL incomplet.",
+    "missing": "Éléments manquants",
+    "blsTitle": "BL complets (200 derniers)",
+    "bl": "BL",
+    "date": "Date",
+    "reversal": "annulation"
   }
 }

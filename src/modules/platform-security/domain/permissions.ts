@@ -351,6 +351,8 @@ export const PERMISSIONS = {
   // T16 G5 (SPEC-cost-margin §9, D236): cost rates, fuel norms, delivered transport and the price grid are cost data for the owner roles only (any widening needs a later numbered decision)
   'costs.manage': ['owner', 'app_admin'],
   // T17 G8 (D239): the selling-price GRID as a reference next to an order's price. A selling price, not a cost: office_sales reads it (door price_grid_list); no cost figure comes with it
+  // T17 G9 (SPEC-cost-margin §9, §10): the margin read doors and the /margins screen: costs, margins and snapshots are owner and app_admin only (D236)
+  'bl_margins.read': ['owner', 'app_admin'],
   'grid.read': ['owner', 'app_admin', 'office_sales'],
   'reorder.create': ['plant_manager'],
   'reorder.read': ['owner', 'app_admin', 'plant', 'plant_manager', 'office_purchases'],
