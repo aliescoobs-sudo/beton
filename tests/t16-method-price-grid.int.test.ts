@@ -140,15 +140,30 @@ describe('T16 G4: the discharge method on the order line and the BL', () => {
     ).toBe('GOULOTTE');
     expect(await code(() => make(w.owner, null))).toBe('23514');
     expect(await code(() => make(w.owner, 'BETON'))).toBe('23514');
-    // the setting does not leak: the plain create_order door afterwards records NO method
-    const legacy = await inPlant(
-      w.owner,
-      `select * from public.create_order($1, null, null, $2, 10000, current_date + 5, current_date, null, null, $3::jsonb, 2000)`,
-      [m.clientId, m.typeId, JSON.stringify({ preset: 'cash' })],
-    );
-    expect(
-      (await w.sup(`select discharge_method m from sales_order where id = $1`, [legacy.rows[0]!.id]))[0]!.m,
-    ).toBeNull();
+    // T17 G7: the 11-argument door refuses every NEW order with a clear business error (23514) and writes nothing; legacy rows are untouched
+    const before = (await w.sup<{ c: string }>(`select count(*)::text c from sales_order`))[0]!.c;
+    let refused = '';
+    try {
+      await inPlant(
+        w.owner,
+        `select * from public.create_order($1, null, null, $2, 10000, current_date + 5, current_date, null, null, $3::jsonb, 2000)`,
+        [m.clientId, m.typeId, JSON.stringify({ preset: 'cash' })],
+      );
+    } catch (e) {
+      refused = `${(e as { code?: string }).code} ${(e as Error).message}`;
+    }
+    expect(refused).toMatch(/^23514 .*needs a discharge method/);
+    expect((await w.sup<{ c: string }>(`select count(*)::text c from sales_order`))[0]!.c).toBe(before);
+    // the setting does not leak: the two-choice door leaves nothing behind for the next statement of the transaction
+    const after = await w.as(w.owner, async (tx) => {
+      await tx.query(`select set_config('app.plant_id', $1, true)`, [w.plantA]);
+      await tx.query(
+        `select * from public.create_order_with_method($1, null, null, $2, 10000, current_date + 5, current_date, null, null, $3::jsonb, 2000, 'POMPE')`,
+        [m.clientId, m.typeId, JSON.stringify({ preset: 'cash' })],
+      );
+      return (await tx.query(`select current_setting('app.order_discharge_method', true) as v`)).rows[0]!.v;
+    });
+    expect(after === '' || after === null).toBe(true);
     // purchases keeps being refused by the wrapped door
     expect(await code(() => make(w.purchases, 'POMPE'))).toBe('42501');
   });

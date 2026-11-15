@@ -682,7 +682,14 @@
       "override": "Prix dérogatoire (facultatif)",
       "overridePrice": "Prix HT par m³ (MAD)",
       "overrideReason": "Motif (obligatoire si un prix est saisi)",
-      "forbiddenOverride": "Seul le propriétaire peut changer le prix."
+      "forbiddenOverride": "Seul le propriétaire peut changer le prix.",
+      "discharge": {
+        "label": "Mode de déchargement",
+        "choose": "Choisir : goulotte ou pompe",
+        "GOULOTTE": "Goulotte (toupie seule)",
+        "POMPE": "Pompe (toupie + camion pompe)",
+        "required": "Choisissez le mode de déchargement : goulotte ou pompe."
+      }
     },
     "accounts": {
       "title": "Caisse et comptes bancaires",
@@ -2681,7 +2688,8 @@
         "bls": "BL",
         "amountHt": "Montant HT",
         "advance": "Acompte reçu",
-        "netToPay": "Net à payer"
+        "netToPay": "Net à payer",
+        "discharge": "Mode de déchargement"
       },
       "enum": {
         "plan": {
@@ -2705,6 +2713,10 @@
         },
         "volume": {
           "whole": "Tout le chargement"
+        },
+        "discharge": {
+          "GOULOTTE": "Goulotte",
+          "POMPE": "Pompe"
         }
       },
       "note": {

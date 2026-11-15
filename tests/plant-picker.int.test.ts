@@ -41,6 +41,7 @@ afterAll(async () => {
 const orderInput = (extra: object = {}) => ({
   clientId: order.clientId,
   concreteTypeId: order.typeId,
+  dischargeMethod: 'GOULOTTE',
   volumeL: 5000,
   deliveryDate: '2026-06-10',
   plan: { preset: 'cash' },

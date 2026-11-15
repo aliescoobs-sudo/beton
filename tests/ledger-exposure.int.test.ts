@@ -662,7 +662,7 @@ describe('review of CP-L4: an office-context call never receives a price, a tota
     const call = <T>(fn: (tx: pg.PoolClient) => Promise<T>) => inCtx('office', fresh.id, fn);
     const order = await call((tx) =>
       tx.query<Record<string, unknown>>(
-        `select * from public.create_order($1, null, null, $2, 10000, $3, $4, null, null, $5, 2000)`,
+        `select * from public.create_order_with_method($1, null, null, $2, 10000, $3, $4, null, null, $5, 2000, 'GOULOTTE')`,
         [master.clientId, master.typeId, '2026-06-12', today, JSON.stringify({ preset: 'cash' })],
       ),
     );
@@ -683,7 +683,7 @@ describe('review of CP-L4: an office-context call never receives a price, a tota
   it('a bad plan, an unknown client or type and a missing price give errors that hold no amount', async () => {
     const calls: [string, unknown[]][] = [
       [
-        `select * from public.create_order($1, null, null, $2, 10000, $3, $4, null, null, $5, 2000)`,
+        `select * from public.create_order_with_method($1, null, null, $2, 10000, $3, $4, null, null, $5, 2000, 'GOULOTTE')`,
         [
           master.clientId,
           master.typeId,
@@ -696,11 +696,11 @@ describe('review of CP-L4: an office-context call never receives a price, a tota
         ],
       ],
       [
-        `select * from public.create_order($1, null, null, $2, 10000, $3, $4, null, null, $5, 2000)`,
+        `select * from public.create_order_with_method($1, null, null, $2, 10000, $3, $4, null, null, $5, 2000, 'GOULOTTE')`,
         [randomUUID(), master.typeId, '2026-06-12', today, JSON.stringify({ preset: 'cash' })],
       ],
       [
-        `select * from public.create_order($1, null, null, $2, 10000, $3, $4, null, null, $5, 2000)`,
+        `select * from public.create_order_with_method($1, null, null, $2, 10000, $3, $4, null, null, $5, 2000, 'GOULOTTE')`,
         [master.clientId, randomUUID(), '2026-06-12', today, JSON.stringify({ preset: 'cash' })],
       ],
       [

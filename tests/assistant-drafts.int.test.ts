@@ -233,6 +233,7 @@ describe('the matrix of the drafts (AC-ASSIST-03, 19)', () => {
     const p = await draft(users.plant, 'Fais une commande', 'plan_order', () => ({
       client: 'CLT-001',
       type: 'B25',
+      discharge: 'GOULOTTE',
       m3: 5,
       date: '2026-06-10',
     }));
@@ -267,13 +268,20 @@ describe('a draft writes nothing to a business table (AC-ASSIST-10)', () => {
         users.owner,
         'Commande',
         'plan_order',
-        () => ({ client: target.code, type: typeCode, m3: 7.5, date: '2026-06-10', plan: 'advance50' }),
+        () => ({
+          client: target.code,
+          type: typeCode,
+          discharge: 'GOULOTTE',
+          m3: 7.5,
+          date: '2026-06-10',
+          plan: 'advance50',
+        }),
       ],
       [
         users.office,
         'Commande',
         'plan_order',
-        () => ({ client: target.code, type: typeCode, m3: 7.5, date: '2026-06-10' }),
+        () => ({ client: target.code, type: typeCode, discharge: 'GOULOTTE', m3: 7.5, date: '2026-06-10' }),
       ],
       [
         users.owner,
@@ -347,6 +355,7 @@ describe('what the card shows (AC-ASSIST-13, 20)', () => {
     const owner = await draft(users.owner, 'Commande', 'plan_order', () => ({
       client: target.code,
       type: typeCode,
+      discharge: 'GOULOTTE',
       m3: 7.5,
       date: '2026-06-10',
       plan: 'advance50',
@@ -358,6 +367,7 @@ describe('what the card shows (AC-ASSIST-13, 20)', () => {
     const office = await draft(users.office, 'Commande', 'plan_order', () => ({
       client: target.code,
       type: typeCode,
+      discharge: 'GOULOTTE',
       m3: 7.5,
       date: '2026-06-10',
       plan: 'advance50',
@@ -474,6 +484,7 @@ describe('what a draft refuses (AC-ASSIST-07, 09)', () => {
     const unknown = await draft(users.owner, 'Commande', 'plan_order', () => ({
       client: 'CLT-9999',
       type: typeCode,
+      discharge: 'GOULOTTE',
       m3: 5,
       date: '2026-06-10',
     }));
@@ -481,6 +492,7 @@ describe('what a draft refuses (AC-ASSIST-07, 09)', () => {
     const price = await draft(users.office, 'Commande à 900 dh le m³', 'plan_order', (r) => ({
       client: target.code,
       type: typeCode,
+      discharge: 'GOULOTTE',
       m3: 5,
       date: '2026-06-10',
       price: r.amt[0],
@@ -489,6 +501,7 @@ describe('what a draft refuses (AC-ASSIST-07, 09)', () => {
     const past = await draft(users.owner, 'Commande', 'plan_order', () => ({
       client: target.code,
       type: typeCode,
+      discharge: 'GOULOTTE',
       m3: 5,
       date: '2026-05-01',
     }));
@@ -529,13 +542,13 @@ describe('confirming a draft (AC-ASSIST-11, 12)', () => {
         users.owner,
         'Commande',
         'plan_order',
-        () => ({ client: target.code, type: typeCode, m3: 2, date: '2026-06-10' }),
+        () => ({ client: target.code, type: typeCode, discharge: 'GOULOTTE', m3: 2, date: '2026-06-10' }),
       ],
       [
         users.office,
         'Commande',
         'plan_order',
-        () => ({ client: target.code, type: typeCode, m3: 2, date: '2026-06-10' }),
+        () => ({ client: target.code, type: typeCode, discharge: 'GOULOTTE', m3: 2, date: '2026-06-10' }),
       ],
       [
         users.owner,
@@ -813,6 +826,7 @@ describe('the confirmed record is what the form would have made (AC-ASSIST-13, 2
       const d = await draft(user, 'Commande', 'plan_order', () => ({
         client: target.code,
         type: typeCode,
+        discharge: 'POMPE',
         m3: 7.5,
         date: '2026-06-10',
         plan: 'cheque30',
@@ -827,6 +841,7 @@ describe('the confirmed record is what the form would have made (AC-ASSIST-13, 2
           clientId: target.clientId,
           siteId: null,
           zoneId: null,
+          dischargeMethod: 'POMPE',
           concreteTypeId: typeId,
           volumeL: 7500,
           deliveryDate: '2026-06-10',
@@ -839,7 +854,7 @@ describe('the confirmed record is what the form would have made (AC-ASSIST-13, 2
         const o = (
           await inCtx(users.owner, (tx) =>
             tx.query(
-              `select client_id, concrete_type_id, volume_l, delivery_date::text as d, unit_price_ht_centimes::text as p, vat_rate_bp, total_ht_centimes::text as ht, total_ttc_centimes::text as ttc, zone_id from sales_order where code = $1`,
+              `select client_id, concrete_type_id, volume_l, delivery_date::text as d, unit_price_ht_centimes::text as p, vat_rate_bp, total_ht_centimes::text as ht, total_ttc_centimes::text as ttc, zone_id, discharge_method from sales_order where code = $1`,
               [c],
             ),
           )

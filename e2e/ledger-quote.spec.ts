@@ -30,6 +30,7 @@ test('the owner makes a quote, reads it, converts it into an order that a human 
   await page.getByTestId('quote-convert').click();
   await expect(page).toHaveURL(/\/fr\/orders\/new\?quote=/);
   await expect(page.getByTestId('order-volume')).toHaveValue('5');
+  await page.getByTestId('order-method').selectOption('GOULOTTE');
   await page.getByTestId('order-preset').selectOption('cash');
   await page.getByTestId('order-save').click();
   const order = /CMD-\d{4}-\d{5}/.exec(

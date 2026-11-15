@@ -165,6 +165,8 @@ async function seedOrders(tx: Tx, today: string, openingDate: string, rng: Rng):
         siteId: null,
         zoneId: null,
         concreteTypeId: typeId(typeCode),
+        // fictitious scenario data: every third client takes the pump
+        dischargeMethod: clientIndex % 3 === 0 ? 'POMPE' : 'GOULOTTE',
         volumeL: volumeM3 * 1000,
         deliveryDate,
         broughtByUserId: null,

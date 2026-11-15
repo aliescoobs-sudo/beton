@@ -27,6 +27,7 @@ export type OrderError =
   | 'PLAN_INVALID'
   | 'DELIVERY_BEFORE_ORDER'
   | 'FORBIDDEN_OVERRIDE'
+  | 'METHOD_REQUIRED'
   | 'CONFLICT';
 
 /**
@@ -43,6 +44,7 @@ export interface CreatedOrder {
 export const dbFailure = (error: unknown): OrderError => {
   const { code, message } = error as { code?: string; message?: string };
   if (code === '23514') {
+    if (/discharge method/.test(message ?? '')) return 'METHOD_REQUIRED';
     if (/client is not active/.test(message ?? '')) return 'CLIENT_ARCHIVED';
     if (/concrete type is not active/.test(message ?? '')) return 'TYPE_INACTIVE';
     if (/price is not the one in force/.test(message ?? '')) return 'NO_PRICE';
@@ -153,8 +155,8 @@ export async function insertOrderRows(
   await tx.query(
     `insert into sales_order (id, code, client_id, site_id, zone_id, concrete_type_id, volume_l, order_date,
                                   delivery_date, selling_price_id, unit_price_ht_centimes, vat_rate_bp,
-                                  total_ht_centimes, total_vat_centimes, total_ttc_centimes, brought_by_user_id, reason, quote_id, created_by)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)`,
+                                  total_ht_centimes, total_vat_centimes, total_ttc_centimes, brought_by_user_id, reason, quote_id, created_by, discharge_method)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)`,
     [
       id,
       code,
@@ -175,6 +177,7 @@ export async function insertOrderRows(
       p.reason,
       v.quoteId ?? null,
       actor.id,
+      v.dischargeMethod,
     ],
   );
   for (const [n, item] of p.plan.entries()) {
@@ -255,7 +258,7 @@ async function createOrderBlind(
   try {
     return await inRequest(appPool, actor, async (tx): Promise<Result<CreatedOrder, OrderError>> => {
       const made = await tx.query<{ code: string; id: string }>(
-        'select code, id from public.create_order($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
+        'select code, id from public.create_order_with_method($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)',
         [
           v.clientId,
           v.siteId,
@@ -268,6 +271,7 @@ async function createOrderBlind(
           v.quoteId ?? null,
           JSON.stringify(plan),
           parameterOrDefault('vat_rate_bp', undefined),
+          v.dischargeMethod,
         ],
       );
       const code = made.rows[0]?.code;

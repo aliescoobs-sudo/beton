@@ -109,10 +109,21 @@ describe('order input', () => {
   const base = {
     clientId: id,
     concreteTypeId: id2,
+    dischargeMethod: 'GOULOTTE',
     volumeL: 8000,
     deliveryDate: '2026-06-05',
     plan: { preset: 'cash' },
   };
+  it('D239 d: the discharge method is required, exactly GOULOTTE or POMPE, with no default', () => {
+    const { dischargeMethod: _omitted, ...without } = base;
+    void _omitted;
+    expect(parseOrderInput(without).ok).toBe(false);
+    expect(parseOrderInput({ ...base, dischargeMethod: null }).ok).toBe(false);
+    expect(parseOrderInput({ ...base, dischargeMethod: '' }).ok).toBe(false);
+    expect(parseOrderInput({ ...base, dischargeMethod: 'BETON' }).ok).toBe(false);
+    expect(parseOrderInput({ ...base, dischargeMethod: 'goulotte' }).ok).toBe(false);
+    expect(parseOrderInput({ ...base, dischargeMethod: 'POMPE' }).ok).toBe(true);
+  });
   it('accepts a preset, a custom plan with one kind of share per item, an override and a quote', () => {
     expect(parseOrderInput(base).ok).toBe(true);
     expect(parseOrderInput({ ...base, quoteId: id }).ok).toBe(true);

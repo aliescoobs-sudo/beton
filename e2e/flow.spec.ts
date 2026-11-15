@@ -30,6 +30,7 @@ async function newOrder(page: Page, m3: string) {
   await page.getByTestId('order-client').selectOption({ index: 1 });
   await page.getByTestId('order-type').selectOption({ label: 'B25 · Béton B25' });
   await page.getByTestId('order-volume').fill(m3);
+  await page.getByTestId('order-method').selectOption('GOULOTTE');
   await page.getByTestId('order-preset').selectOption('cash');
   await page.getByTestId('order-save').click();
   const saved = page.getByTestId('order-saved');

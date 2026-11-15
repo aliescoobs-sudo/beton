@@ -3,6 +3,10 @@ import { err, ok, type Result } from '@/lib/result';
 import { isRealDate } from './dates';
 import { PLAN_METHODS } from './plan';
 
+/** The two discharge methods of D236: mixer alone (chute) or mixer plus pump truck. */
+export const DISCHARGE_METHODS = ['GOULOTTE', 'POMPE'] as const;
+export type DischargeMethod = (typeof DISCHARGE_METHODS)[number];
+
 const date = z.string().refine(isRealDate, 'date');
 const customItem = z
   .object({
@@ -29,6 +33,8 @@ const orderInputSchema = z.object({
   siteId: z.uuid().nullable().default(null),
   zoneId: z.uuid().nullable().default(null),
   concreteTypeId: z.uuid(),
+  /** D239 d: required, exactly two choices, no default. A missing or unknown method is an invalid input. */
+  dischargeMethod: z.enum(DISCHARGE_METHODS),
   /** Litres: the form converts m³ with parseMilliQty (7,5 m³ → 7 500), never with a float. */
   volumeL: z.number().int().min(1).max(100_000_000),
   deliveryDate: date,

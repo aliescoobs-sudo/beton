@@ -46,12 +46,19 @@ export const FIXTURES: Fixture[] = [
   }),
   f('owner', 'fr', "Quel est l'écart de consommation du mois ?", 'consumption_variance'),
   f('owner', 'ar', 'شنو هو التحميل الجاي؟', 'next_load'),
-  f('owner', 'fr', 'Prépare une commande de 20 m³ B25 pour demain pour Atlas BTP', 'plan_order', {
-    client: 'CLT-001',
-    type: 'B25',
-    m3: 20,
-    date: '2026-10-27',
-  }),
+  f(
+    'owner',
+    'fr',
+    'Prépare une commande de 20 m³ B25 à la goulotte pour demain pour Atlas BTP',
+    'plan_order',
+    {
+      discharge: 'GOULOTTE',
+      client: 'CLT-001',
+      type: 'B25',
+      m3: 20,
+      date: '2026-10-27',
+    },
+  ),
   f('owner', 'fr', 'Encaisse un chèque 8451237 de 45 000 dh de Martil Immo', 'record_payment', {
     client: 'CLT-002',
     method: 'cheque',
@@ -89,12 +96,19 @@ export const FIXTURES: Fixture[] = [
   f('office', 'fr', 'Où en est la commande CMD-2026-00012 ?', 'order_chain', {
     order_code: 'CMD-2026-00012',
   }),
-  f('office', 'fr', 'Prépare une commande de 7,5 m³ B25 pour demain pour Atlas BTP', 'plan_order', {
-    client: 'CLT-001',
-    type: 'B25',
-    m3: 7.5,
-    date: '2026-10-27',
-  }),
+  f(
+    'office',
+    'fr',
+    'Prépare une commande de 7,5 m³ B25 avec pompe pour demain pour Atlas BTP',
+    'plan_order',
+    {
+      discharge: 'POMPE',
+      client: 'CLT-001',
+      type: 'B25',
+      m3: 7.5,
+      date: '2026-10-27',
+    },
+  ),
   f('office', 'fr', 'Enregistre un chèque 8451237 de 45 000 dh de Martil Immo', 'record_payment', {
     client: 'CLT-002',
     method: 'cheque',

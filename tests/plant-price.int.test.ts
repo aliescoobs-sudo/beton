@@ -39,6 +39,7 @@ afterAll(async () => {
 const input = (plantId: string) => ({
   clientId: master.clientId,
   concreteTypeId: master.typeId,
+  dischargeMethod: 'GOULOTTE',
   plantId,
   volumeL: 5000,
   deliveryDate: '2026-06-10',

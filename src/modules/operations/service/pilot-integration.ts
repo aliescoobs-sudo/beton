@@ -137,6 +137,7 @@ async function walkSales(
       siteId: null,
       zoneId: null,
       concreteTypeId: type.id,
+      dischargeMethod: 'GOULOTTE',
       volumeL: volumeM3 * 1000,
       deliveryDate,
       broughtByUserId: null,

@@ -92,6 +92,7 @@ async function freshOrder(by: SessionUser, extra: Record<string, unknown> = {}, 
       {
         clientId,
         concreteTypeId: type.value.id,
+        dischargeMethod: 'GOULOTTE',
         volumeL: 10_000,
         deliveryDate,
         plan: { preset: 'cash' },

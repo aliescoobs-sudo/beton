@@ -133,6 +133,7 @@ describe('converting a quote to an order (AC-LED-23)', () => {
     const order = {
       clientId: s.clientId,
       concreteTypeId: s.typeId,
+      dischargeMethod: 'GOULOTTE',
       volumeL: 10_000,
       deliveryDate: '2026-06-05',
       plan: { preset: 'cash' },

@@ -60,6 +60,7 @@ const orderInput = (
 ) => ({
   clientId: s.clientId,
   concreteTypeId: s.typeId,
+  dischargeMethod: 'GOULOTTE',
   volumeL,
   deliveryDate: '2026-06-15',
   plan: { preset },

@@ -55,6 +55,7 @@ async function scene() {
 const input = (s: { typeId: string; clientId: string }, extra: Record<string, unknown> = {}) => ({
   clientId: s.clientId,
   concreteTypeId: s.typeId,
+  dischargeMethod: 'GOULOTTE',
   volumeL: 10_000,
   deliveryDate: '2026-06-05',
   plan: { preset: 'cash' },

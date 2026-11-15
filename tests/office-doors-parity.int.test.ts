@@ -101,6 +101,7 @@ describe('create_order (SQL, office) equals the domain functions (TS, owner)', (
           const input = {
             clientId: s.clientId,
             concreteTypeId: s.typeId,
+            dischargeMethod: 'GOULOTTE',
             volumeL,
             deliveryDate: '2026-06-20',
             plan,
@@ -128,6 +129,7 @@ describe('create_order (SQL, office) equals the domain functions (TS, owner)', (
     const base = {
       clientId: s.clientId,
       concreteTypeId: s.typeId,
+      dischargeMethod: 'GOULOTTE',
       volumeL: 10_000,
       deliveryDate: '2026-06-20',
     };

@@ -100,7 +100,6 @@ export const ACTOR_FIRST_DOORS = [
   'public.confirm_receipt_at_plant_lines',
   'public.create_invoice',
   'public.create_invoice_from_deliveries',
-  'public.create_order',
   'public.create_pump_job',
   'public.create_quote',
   'public.create_supplier_invoice',

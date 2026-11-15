@@ -59,6 +59,8 @@ export const planOrderParams = z
       .optional(),
     plan: z.enum(PLAN_PRESETS).optional(),
     price: AMOUNT_REF.optional(),
+    /** D239 d: required, no default: the model asks the person when the question does not say it. */
+    discharge: z.enum(['GOULOTTE', 'POMPE']),
   })
   .strict();
 
@@ -119,6 +121,8 @@ export type StoredDraft =
       site: string | null;
       plan: (typeof PLAN_PRESETS)[number];
       unitPriceCentimes: number | null;
+      /** Absent on a draft stored before T17: it is refused as stale, never completed with a default. */
+      discharge?: 'GOULOTTE' | 'POMPE';
     }
   | {
       action: 'record_payment';
@@ -147,7 +151,7 @@ export interface CardField {
   /** Latin text (codes, numbers, dates) to be shown left to right inside Arabic. */
   ltr?: boolean;
   /** The value is one of a closed list the screen translates (a plan, a payment method, a reason, a volume). */
-  enumOf?: 'plan' | 'method' | 'reason' | 'volume';
+  enumOf?: 'plan' | 'method' | 'reason' | 'volume' | 'discharge';
 }
 
 /** What a human reads before confirming (SPEC-assistant §7): what will be created, every figure computed by code. */

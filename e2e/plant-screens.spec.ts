@@ -58,6 +58,7 @@ test('the order and purchase forms ask for the plant once two are active, and th
   await page.getByTestId('order-client').selectOption({ index: 1 });
   await page.getByTestId('order-type').selectOption({ label: 'B25 · Béton B25' });
   await page.getByTestId('order-volume').fill('4');
+  await page.getByTestId('order-method').selectOption('GOULOTTE');
   await page.getByTestId('order-preset').selectOption('advance50');
   await page.getByTestId('order-save').click();
   await expect(page.getByTestId('order-saved')).toHaveCount(0); // no plant chosen: nothing is saved

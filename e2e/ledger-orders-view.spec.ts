@@ -14,6 +14,7 @@ test('the owner enters an order at another price, reads it in the list and the d
   await page.getByTestId('order-client').selectOption({ index: 1 });
   await page.getByTestId('order-type').selectOption({ label: 'B25 · Béton B25' });
   await page.getByTestId('order-volume').fill('5');
+  await page.getByTestId('order-method').selectOption('GOULOTTE');
   await page.getByTestId('order-preset').selectOption('advance50');
   // A reason is mandatory with a price.
   await page.getByTestId('order-override-price').fill('700,00');

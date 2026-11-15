@@ -59,6 +59,7 @@ async function scene(price = 78_000) {
 const input = (s: { typeId: string; clientId: string }, extra: Record<string, unknown> = {}) => ({
   clientId: s.clientId,
   concreteTypeId: s.typeId,
+  dischargeMethod: 'GOULOTTE',
   volumeL: 120_000,
   deliveryDate: '2026-06-15',
   plan: { preset: 'custom', items: [] as unknown[] },
@@ -129,10 +130,35 @@ describe('createOrder (AC-LED-01)', () => {
     );
   });
 
+  it('T17 G7: the method of the input is recorded on the order, by the office door and by the owner path; a missing method is refused', async () => {
+    const s = await scene();
+    for (const [user, method] of [
+      [users.office, 'POMPE'],
+      [users.owner, 'GOULOTTE'],
+    ] as const) {
+      const made = await createOrder(
+        app,
+        user,
+        input(s, { dischargeMethod: method, plan: { preset: 'cash' } }),
+        { today: TODAY },
+      );
+      if (!made.ok) throw new Error(made.error);
+      expect((await orderRows(made.value.id)).order).toMatchObject({ discharge_method: method });
+    }
+    const { dischargeMethod: _omitted, ...without } = input(s, { plan: { preset: 'cash' } });
+    void _omitted;
+    for (const user of [users.office, users.owner])
+      expect(await createOrder(app, user, without, { today: TODAY })).toEqual({
+        ok: false,
+        error: 'INVALID',
+      });
+  });
+
   it('the price is resolved for the client: a client override beats the list price', async () => {
     const s = await scene();
     const o = await createClientOverride(app, users.owner, {
       concreteTypeId: s.typeId,
+      dischargeMethod: 'GOULOTTE',
       clientId: s.clientId,
       priceHtPerM3Centimes: 70_000,
       effectiveFrom: '2026-02-01',

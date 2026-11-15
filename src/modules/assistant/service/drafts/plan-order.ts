@@ -27,6 +27,7 @@ async function orderInput(ctx: ExecContext, d: PlanOrder) {
     (t) => t.code.toUpperCase() === d.type.toUpperCase(),
   );
   if (!client || !type) return null;
+  if (!d.discharge) return null;
   let siteId: string | null = null;
   if (d.site) {
     const site = await siteByCode(ctx, d.site);
@@ -41,6 +42,7 @@ async function orderInput(ctx: ExecContext, d: PlanOrder) {
       siteId,
       zoneId: null,
       concreteTypeId: type.id,
+      dischargeMethod: d.discharge,
       volumeL: d.volumeL,
       deliveryDate: d.date,
       plan: { preset: d.plan },
@@ -55,7 +57,7 @@ export const planOrder: DraftTool<typeof planOrderParams> = {
   name: 'plan_order',
   kind: 'draft',
   description:
-    'Prepares an order for a client (code), a concrete type code (like B25), a volume in m³, a delivery date (YYYY-MM-DD), optionally a site code and a payment plan (cash, advance50, installments3, cheque30). A price only if the person stated one, as the reference of the question. The person checks and confirms; nothing is created before.',
+    'Prepares an order for a client (code), a concrete type code (like B25), a volume in m³, a delivery date (YYYY-MM-DD), the discharge method (GOULOTTE or POMPE: required, never assumed: ask the person when the question does not say it), optionally a site code and a payment plan (cash, advance50, installments3, cheque30). A price only if the person stated one, as the reference of the question. The person checks and confirms; nothing is created before.',
   params: planOrderParams,
   roles: ['owner', 'office'],
   permissions: ['orders.write'],
@@ -78,6 +80,7 @@ export const planOrder: DraftTool<typeof planOrderParams> = {
       site: a.site ?? null,
       plan: a.plan ?? 'cash',
       unitPriceCentimes,
+      discharge: a.discharge,
     };
     const resolved = await orderInput(ctx, stored);
     if (!resolved) return err('NOT_FOUND');
@@ -92,6 +95,7 @@ export const planOrder: DraftTool<typeof planOrderParams> = {
         { key: 'volume', value: `${litresToM3(stored.volumeL)} m³`, ltr: true },
         { key: 'date', value: stored.date, ltr: true },
         ...(stored.site ? [{ key: 'site', value: stored.site, ltr: true }] : []),
+        { key: 'discharge', value: a.discharge, enumOf: 'discharge' as const },
         { key: 'plan', value: stored.plan, enumOf: 'plan' as const },
       ],
       rows: [],

@@ -285,6 +285,8 @@ const W = {
   ],
   tomorrow: ['demain', 'غدا', 'غدّا', 'ghda', 'ghadda'],
   afterTomorrow: ['apres demain', 'après-demain', 'après demain', 'بعد غد', 'ba3d ghda'],
+  pump: ['pompe', 'مضخة', 'بومب', 'bomba', 'pompa'],
+  chute: ['goulotte', 'مزلاج', 'غولوط', 'goulot'],
   today: ['aujourd', 'ce jour', 'اليوم', 'lyoum', 'lyom'],
 } as const;
 
@@ -384,8 +386,11 @@ export function routeQuestion(text: string, offered: readonly string[], env: Rou
       ...(component(q) === 'Ciment' ? { unit: 't' } : {}),
       ...(q.amounts[0] ? { unit_price: q.amounts[0] } : {}),
     });
-  if (client && q.m3 !== null && q.types[0] && q.has(...W.order))
+  // D239 d: the discharge method is never assumed. A question that does not say it gets no draft (the person is asked).
+  const discharge = q.has(...W.pump) ? 'POMPE' : q.has(...W.chute) ? 'GOULOTTE' : null;
+  if (client && q.m3 !== null && q.types[0] && q.has(...W.order) && discharge)
     return call('plan_order', {
+      discharge,
       client,
       type: q.types[0],
       m3: q.m3,

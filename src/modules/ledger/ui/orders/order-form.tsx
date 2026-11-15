@@ -6,6 +6,7 @@ import { formatCentimes, parseCentimes } from '@/lib/money';
 import { parseMilliQty } from '@/lib/quantity';
 import { formatPercentBp, parsePercentBp } from '../../domain/percent';
 import { PLAN_METHODS, type PlanMethod } from '../../domain/plan';
+import { DISCHARGE_METHODS, type DischargeMethod } from '../../domain/order';
 import { PLAN_PRESETS, type PlanPreset } from '../../domain/plan-presets';
 import type { Effect } from '../../domain/effects';
 import type { OrderError, OrderPreview } from '../../service/order-service';
@@ -68,6 +69,8 @@ export function OrderForm({
   const [siteId, setSiteId] = useState('');
   const [zoneId, setZoneId] = useState('');
   const [typeId, setTypeId] = useState(initial?.typeId ?? types[0]?.id ?? '');
+  // D239 d: no default. The person must choose one of the two.
+  const [method, setMethod] = useState<DischargeMethod | ''>('');
   const [volume, setVolume] = useState(initial?.volumeM3 ?? '');
   const [delivery, setDelivery] = useState(today);
   const [overridePrice, setOverridePrice] = useState('');
@@ -117,6 +120,7 @@ export function OrderForm({
       PLAN_INVALID: t('planInvalid'),
       DELIVERY_BEFORE_ORDER: t('deliveryBeforeOrder'),
       FORBIDDEN_OVERRIDE: t('forbiddenOverride'),
+      METHOD_REQUIRED: t('discharge.required'),
       CONFLICT: t('conflict'),
     })[error] ?? t('error');
 
@@ -146,12 +150,14 @@ export function OrderForm({
       plan = { preset, items };
     } else plan = { preset };
     if (plants.length > 1 && !plantId) return null;
+    if (method === '') return null;
     return {
       clientId,
       ...(plantId ? { plantId } : {}),
       siteId: siteId || null,
       zoneId: zoneId || null,
       concreteTypeId: typeId,
+      dischargeMethod: method,
       volumeL: litres.value,
       deliveryDate: delivery,
       plan,
@@ -194,6 +200,7 @@ export function OrderForm({
     setSiteId('');
     setZoneId('');
     setVolume('');
+    setMethod('');
     setPreview(null);
     setMessage(null);
   }
@@ -312,6 +319,24 @@ export function OrderForm({
             {types.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.code} · {c.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block">
+          <span className="field-label">{t('discharge.label')}</span>
+          <select
+            name="dischargeMethod"
+            required
+            value={method}
+            onChange={(e) => setMethod(e.target.value as DischargeMethod | '')}
+            className={INPUT}
+            data-testid="order-method"
+          >
+            <option value="">{t('discharge.choose')}</option>
+            {DISCHARGE_METHODS.map((m) => (
+              <option key={m} value={m}>
+                {t(`discharge.${m}`)}
               </option>
             ))}
           </select>

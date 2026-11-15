@@ -40,6 +40,7 @@ test('the owner enters the legal identity, invoices a delivered order, prints it
   await page.getByTestId('order-client').selectOption({ index: 1 });
   await page.getByTestId('order-type').selectOption({ label: 'B25 · Béton B25' });
   await page.getByTestId('order-volume').fill('6');
+  await page.getByTestId('order-method').selectOption('GOULOTTE');
   await page.getByTestId('order-preset').selectOption('cash');
   await page.getByTestId('order-save').click();
   const code = /CMD-\d{4}-\d{5}/.exec(

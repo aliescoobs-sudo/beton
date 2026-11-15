@@ -31,6 +31,7 @@ test('office enters orders blind: AC-LED-10 timing, a custom plan, a refused pla
   await page.getByTestId('order-client').selectOption({ index: 1 });
   await page.getByTestId('order-type').selectOption({ label: 'B25 · Béton B25' });
   await page.getByTestId('order-volume').fill('10');
+  await page.getByTestId('order-method').selectOption('GOULOTTE');
   await page.getByTestId('order-preset').selectOption('advance50');
   await page.getByTestId('order-save').click();
   await expect(page.getByTestId('order-saved')).toContainText('CMD-');
@@ -58,6 +59,7 @@ test('office enters orders blind: AC-LED-10 timing, a custom plan, a refused pla
   await page.getByTestId('order-client').selectOption({ index: 1 });
   await page.getByTestId('order-type').selectOption({ label: 'B25 · Béton B25' });
   await page.getByTestId('order-volume').fill('7,5');
+  await page.getByTestId('order-method').selectOption('GOULOTTE');
   await page.getByTestId('order-preset').selectOption('custom');
   const values = page.getByTestId('order-row-value');
   await values.nth(0).fill('30');
@@ -76,6 +78,7 @@ test('office enters orders blind: AC-LED-10 timing, a custom plan, a refused pla
   await page.getByTestId('order-client').selectOption({ index: 1 });
   await page.getByTestId('order-type').selectOption({ label: 'B25 · Béton B25' });
   await page.getByTestId('order-volume').fill('5');
+  await page.getByTestId('order-method').selectOption('GOULOTTE');
   await page.getByTestId('order-preset').selectOption('custom');
   await page.getByTestId('order-row-value').nth(0).fill('30');
   await page.getByTestId('order-row-value').nth(1).fill('30');
@@ -91,6 +94,7 @@ test('the owner previews the amounts computed by the server', async ({ page }) =
   await page.getByTestId('order-client').selectOption({ index: 1 });
   await page.getByTestId('order-type').selectOption({ label: 'B25 · Béton B25' });
   await page.getByTestId('order-volume').fill('10');
+  await page.getByTestId('order-method').selectOption('GOULOTTE');
   await page.getByTestId('order-preview-button').click();
   await expect(page.getByTestId('preview-ht')).toContainText('8 200,00');
   await expect(page.getByTestId('preview-ttc')).toContainText('9 840,00');
