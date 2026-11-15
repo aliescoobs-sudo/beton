@@ -1,0 +1,89 @@
+/*
+ * KAYAS design tokens: the ONE place for colour, spacing, radius, type scale and focus ring (T18-UI, decision 244).
+ * Brand tokens win over the interactive prototype's colours (docs/ui/v3 uses hex values of an older study; none is copied).
+ * Forêt = structure, headings, primary buttons; Citron = small accents only (never text on white, never a status colour);
+ * Graphite = text; Craie = background; about 60 neutral / 30 structure / 10 accent. Status colours keep their accessible
+ * red / amber / green and always come with a text label. Dark mode below is derived from the same tokens.
+ * src/ui/brand-contrast.test.ts reads this file and measures every text/background pair, light and dark.
+ */
+@theme {
+  --color-forest: #01592b;
+  --color-citron: #9ada02;
+  --color-graphite: #292929;
+  --color-craie: #f5f5f5;
+  --color-canvas: #f5f5f5;
+  --color-surface: #ffffff;
+  --color-band: #e2e9e5;
+  --color-ink: #292929;
+  --color-heading: #01592b;
+  --color-structure: #01592b;
+  --color-muted: #5a5f5c;
+  --color-rule: #bfc4c0;
+  --color-field: #7d827e;
+  --color-focus: #01592b;
+  --color-signal: #d23a1e;
+  --color-danger: #b3301a;
+  --color-ok: #2f6b4f;
+  --color-amber: #c08a12;
+  --color-sim: #5b45a8;
+  --color-sim-past: #c9ccc8;
+  --color-status-paid: #2e7d4f;
+  --color-status-ontrack: #2f6db5;
+  --color-status-due: #c9a227;
+  --color-status-late: #c0392b;
+  --color-status-cancelled: #8a8f98;
+  /* KAYAS fonts, self-hosted from /fonts (SIL OFL, licence texts shipped beside them; no external request, CSP unchanged). Inter comes
+     first: it owns every Latin letter, digit and unit (including m³, which Noto lacks), and has no Arabic, so Arabic falls through to
+     Noto Naskh Arabic. Deliberate substitution of the guide's Apple fonts (Helvetica Neue, Geeza Pro): same look on Android and Apple. */
+  --font-sans: 'KAYAS Inter', 'KAYAS Naskh', system-ui, sans-serif;
+  --font-display: var(--font-sans);
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --radius-control: 6px;
+  --radius-card: 6px;
+
+  /* Spacing: base 8 px (brand guide). */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --gutter: 1.5rem;
+  --page-margin: 1rem;
+  --touch-target: 2.75rem;
+
+  /* Type scale: body 16 px / line-height 1.5; headings and captions step from it. */
+  --text-caption: 0.8125rem;
+  --text-small: 0.875rem;
+  --text-body: 1rem;
+  --text-h3: 1.125rem;
+  --text-h2: 1.5rem;
+  --text-h1: 2.25rem;
+  --leading-body: 1.5;
+  --leading-heading: 1.2;
+
+  /* Focus ring: 3 px, offset 2 px, colour from --color-focus (Citron on Forêt bands and in dark mode). */
+  --focus-width: 3px;
+  --focus-offset: 2px;
+}
+
+/* Dark mode, derived from the same tokens: Graphite is the surface, Craie the text, Citron stays the accent, Forêt keeps the
+   header band (white on Forêt 8.5:1). Forêt text on a dark surface would fail, so headings and focus switch to Craie and Citron. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-canvas: #1c1c1c;
+    --color-surface: #292929;
+    --color-band: #343434;
+    --color-ink: #f5f5f5;
+    --color-heading: #f5f5f5;
+    --color-structure: #9ada02;
+    --color-muted: #b8bcb9;
+    --color-rule: #4a4d4b;
+    --color-field: #8e938f;
+    --color-focus: #9ada02;
+    --color-danger: #ff7a5c;
+    --color-ok: #6fcf97;
+    --color-sim-past: #444746;
+  }
+}

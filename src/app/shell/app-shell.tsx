@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { Brand, cn } from '@/ui';
 import { findCurrent } from './drawer-model';
+import { BottomBar } from './bottom-bar';
 import { MobileDrawer } from './mobile-drawer';
 import type { NavGroup } from './nav-model';
 
@@ -17,6 +18,8 @@ interface ShellLabels {
   search: string;
   searchPlaceholder: string;
   noMatch: string;
+  skip: string;
+  bottomNav: string;
 }
 
 /**
@@ -81,6 +84,13 @@ export function AppShell({
 
   return (
     <div className="flex min-h-dvh flex-col">
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:fixed focus:start-2 focus:top-2 focus:z-[80] focus:bg-surface focus:px-4 focus:py-2 focus:text-ink"
+        data-testid="skip-link"
+      >
+        {labels.skip}
+      </a>
       <header className="on-forest bg-forest text-white">
         <div className="mx-auto flex w-full max-w-[1240px] items-stretch gap-1 px-3 md:gap-4 md:px-8">
           <Link href={homeHref} className="flex items-center" aria-label={labels.brand}>
@@ -190,7 +200,19 @@ export function AppShell({
         />
       )}
 
-      <main className="mx-auto w-full max-w-[1240px] flex-1 px-4 py-8 md:px-8 md:py-10">{children}</main>
+      <main
+        id="main"
+        tabIndex={-1}
+        className="mx-auto w-full max-w-[1240px] flex-1 px-4 py-8 pb-24 focus:outline-none md:px-8 md:py-10 md:pb-10"
+      >
+        {children}
+      </main>
+      <BottomBar
+        groups={groups}
+        currentGroupId={currentGroup?.id}
+        homeHref={homeHref}
+        label={labels.bottomNav}
+      />
     </div>
   );
 }

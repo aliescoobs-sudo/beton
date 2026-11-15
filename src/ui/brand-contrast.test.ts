@@ -2,10 +2,10 @@ import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 
-// KAYAS brand contrast (WCAG 2.x): every text/background pair the UI actually uses, light and dark, read from src/app/globals.css.
+// KAYAS brand contrast (WCAG 2.x): every text/background pair the UI actually uses, light and dark, read from src/app/tokens.css.
 // Thresholds: 4.5:1 for body text, 3:1 for large text and non-text indicators. White on Citron (1.69:1) must fail, and no class list
 // may put white text on a Citron fill.
-const css = readFileSync('src/app/globals.css', 'utf8');
+const css = readFileSync('src/app/tokens.css', 'utf8');
 
 function tokens(block: string): Record<string, string> {
   const out: Record<string, string> = {};
@@ -15,7 +15,7 @@ function tokens(block: string): Record<string, string> {
 const themeStart = css.indexOf('@theme {');
 const darkStart = css.indexOf('@media (prefers-color-scheme: dark)');
 const light = tokens(css.slice(themeStart, darkStart));
-const dark = { ...light, ...tokens(css.slice(darkStart, css.indexOf('@layer base'))) };
+const dark = { ...light, ...tokens(css.slice(darkStart, css.length)) };
 
 const channel = (hex: string, i: number) => parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16) / 255;
 const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);

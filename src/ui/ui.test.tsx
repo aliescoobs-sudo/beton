@@ -4,7 +4,8 @@ import { describe, expect, it } from 'vitest';
 import { Button, EmptyState, Money, PageHeader, StatusPill, Table, Td, Th } from './index';
 
 describe('design tokens', () => {
-  const css = readFileSync('src/app/globals.css', 'utf8');
+  const tokensCss = readFileSync('src/app/tokens.css', 'utf8');
+  const css = `${tokensCss}\n${readFileSync('src/app/globals.css', 'utf8')}`;
   it.each([
     ['forest', '#01592b'],
     ['citron', '#9ada02'],
@@ -52,6 +53,25 @@ describe('design tokens', () => {
         /SIL OPEN FONT LICENSE/i,
       );
     }
+  });
+
+  it('one tokens file carries spacing, radius, the type scale (body 16 px, line height 1.5) and the focus ring; globals reads it', () => {
+    for (const name of [
+      '--space-4',
+      '--radius-control',
+      '--text-body',
+      '--leading-body',
+      '--focus-width',
+      '--touch-target',
+    ])
+      expect(tokensCss).toContain(`${name}:`);
+    expect(tokensCss).toContain('--text-body: 1rem;');
+    expect(tokensCss).toContain('--leading-body: 1.5;');
+    const globals = readFileSync('src/app/globals.css', 'utf8');
+    expect(globals).toContain("@import './tokens.css'");
+    expect(globals).toContain('prefers-reduced-motion: reduce');
+    // no colour value is declared outside the tokens file except the fixed button hover and the overlay scrim
+    expect(globals.replace(/\/\*[\s\S]*?\*\//g, '').match(/--color-[a-z-]+:/g)).toBeNull();
   });
 
   it('components use logical properties only (no left/right/margin-left in globals.css)', () => {

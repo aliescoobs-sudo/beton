@@ -44,7 +44,7 @@ export function UserMenu({
         aria-expanded={open}
         aria-label={menuLabel}
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2.5 px-1 py-1 hover:bg-white/10 md:px-2"
+        className="flex min-h-11 min-w-11 items-center gap-2.5 px-1 py-1 hover:bg-white/10 md:px-2"
       >
         <span className="hidden text-start leading-tight sm:block">
           <span className="block text-sm font-medium">{name}</span>
