@@ -26,6 +26,7 @@ export const SENSITIVE_ACTIONS = [
   'cancellation.policy',
   'cancellation.cancel_order',
   'dayclose.force',
+  'payments.approve',
 ] as const;
 
 export type SensitiveAction = (typeof SENSITIVE_ACTIONS)[number];

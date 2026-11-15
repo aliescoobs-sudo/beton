@@ -7,6 +7,7 @@ import { formatCentimes } from '@/lib/money';
 import { StepUpDialog } from '@/modules/platform-security/ui/step-up-dialog';
 import { Button, StatusPill } from '@/ui';
 import type { ApprovalCard } from '../../service/approval-service';
+import type { PaymentRequestView } from '../../service/payment-control-service';
 
 type Result = { ok: true } | { ok: false; error: string };
 type Pending = () => Promise<Result>;
@@ -17,13 +18,17 @@ type Pending = () => Promise<Result>;
  */
 export function ApprovalsInbox({
   cards,
+  payments = [],
   actions,
 }: {
   cards: ApprovalCard[];
+  /** T19-close B (D247): outgoing payments above the upper limit, waiting for the owner. */
+  payments?: PaymentRequestView[];
   actions: {
     confirmPrice: (input: { orderId: string }) => Promise<Result>;
     confirmBulk: (orderIds: string[]) => Promise<Result>;
     release: (input: { orderId: string }) => Promise<Result>;
+    decidePayment?: (input: { id: string; decision: 'approve' | 'reject' }) => Promise<Result>;
   };
 }) {
   const t = useTranslations('ledger.approvals');
@@ -50,7 +55,7 @@ export function ApprovalsInbox({
           {message}
         </p>
       )}
-      {cards.length === 0 && (
+      {cards.length === 0 && payments.length === 0 && (
         <p className="text-sm text-muted" data-testid="approvals-none">
           {t('none')}
         </p>
@@ -110,6 +115,63 @@ export function ApprovalsInbox({
           </li>
         ))}
       </ul>
+      {payments.length > 0 && actions.decidePayment && (
+        <section className="space-y-3" aria-labelledby="approvals-payments" data-testid="approvals-payments">
+          <h2 id="approvals-payments" className="text-lg">
+            {t('payments.title')}
+          </h2>
+          <ul className="space-y-3">
+            {payments.map((p) => (
+              <li key={p.id} className="card space-y-2 p-4" data-testid={`approval-payment-${p.id}`}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <StatusPill status="late">{t('payments.kind')}</StatusPill>
+                  <span className="font-medium">{p.supplierName}</span>
+                  <bdi dir="ltr">{p.supplierCode}</bdi>
+                </div>
+                <p className="text-sm">
+                  {t(`payments.method.${p.method}`)}
+                  {p.number && (
+                    <>
+                      {' '}
+                      <bdi dir="ltr">{p.number}</bdi>
+                    </>
+                  )}
+                  {p.bank && <> · {p.bank}</>}
+                  {p.writtenDate && (
+                    <>
+                      {' · '}
+                      {t('payments.dated')} <bdi dir="ltr">{p.writtenDate}</bdi>
+                    </>
+                  )}{' '}
+                  · <bdi dir="ltr">{formatCentimes(p.amountCentimes)} MAD</bdi>
+                </p>
+                <p className="text-sm text-muted">
+                  {t('payments.preparedBy', { name: p.preparedBy ?? '—', date: p.createdAt })}
+                  {p.note ? ` · ${p.note}` : ''}
+                </p>
+                <p className="text-sm">{t('payments.willApprove')}</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    onClick={() => void run(() => actions.decidePayment!({ id: p.id, decision: 'approve' }))}
+                    data-testid={`approve-payment-${p.id}`}
+                  >
+                    {t('payments.approve')}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => void run(() => actions.decidePayment!({ id: p.id, decision: 'reject' }))}
+                    data-testid={`reject-payment-${p.id}`}
+                  >
+                    {t('payments.reject')}
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {retry && (
         <StepUpDialog
           onVerified={() => {

@@ -5,6 +5,7 @@ import {
   decidePayment,
   issueInstrument,
   listDueTomorrow,
+  listPaymentApprovals,
   listPaymentRequests,
   listSmallPaymentsForReview,
   preparePayment,
@@ -138,5 +139,39 @@ describe('J-1', () => {
       (await listDueTomorrow(app, user('office_purchases'), '2026-12-05')).map((x) => x.number),
     ).not.toContain(number);
     await expect(listDueTomorrow(app, user('office_sales'), '2026-12-02')).rejects.toThrow();
+  });
+});
+
+describe("the owner's approvals inbox (T19-close B)", () => {
+  it('lists only what waits for the owner above the upper limit, drops it once decided, and is closed to the office roles', async () => {
+    const big = await prepare('office_purchases', 9000);
+    const middle = await prepare('office_purchases', 2000);
+    const small = await prepare('office_purchases', 300); // a request below the small limit needs no decision
+    const waiting = (await listPaymentApprovals(app, user('owner'))).map((r) => r.id);
+    expect(waiting).toContain(big.id);
+    expect(waiting).not.toContain(middle.id);
+    expect(waiting).not.toContain(small.id);
+    expect((await listPaymentApprovals(app, user('app_admin'))).map((r) => r.id)).toContain(big.id);
+    // the inbox card carries what the owner decides on
+    const card = (await listPaymentApprovals(app, user('owner'))).find((r) => r.id === big.id)!;
+    expect(card).toMatchObject({
+      amountCentimes: 900_000,
+      method: 'cheque',
+      number: big.number,
+      level: 'owner',
+    });
+    // the Responsable and the Assistante cannot open it
+    await expect(listPaymentApprovals(app, user('office_sales'))).rejects.toThrow();
+    await expect(listPaymentApprovals(app, user('office_purchases'))).rejects.toThrow();
+    // approve from the inbox: the card leaves, the payment can be issued; reject: the card leaves, it cannot
+    expect((await decidePayment(app, user('owner'), { id: big.id, decision: 'approve' })).ok).toBe(true);
+    expect((await listPaymentApprovals(app, user('owner'))).map((r) => r.id)).not.toContain(big.id);
+    expect((await pay('office_purchases', 9000, { requestId: big.id, number: big.number })).ok).toBe(true);
+    const other = await prepare('office_purchases', 8000);
+    expect((await decidePayment(app, user('owner'), { id: other.id, decision: 'reject' })).ok).toBe(true);
+    expect((await listPaymentApprovals(app, user('owner'))).map((r) => r.id)).not.toContain(other.id);
+    expect((await pay('office_purchases', 8000, { requestId: other.id, number: other.number })).ok).toBe(
+      false,
+    );
   });
 });

@@ -239,6 +239,7 @@ export {
   decidePayment,
   type DueTomorrow,
   listDueTomorrow,
+  listPaymentApprovals,
   listPaymentRequests,
   listSmallPaymentsForReview,
   type PaymentControlError,

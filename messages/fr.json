@@ -1540,7 +1540,17 @@
       "release": "Libérer la commande",
       "done": "Décision enregistrée.",
       "error": "Action refusée.",
-      "readOnly": "Lecture seule : {count} carte(s) en attente."
+      "readOnly": "Lecture seule : {count} carte(s) en attente.",
+      "payments": {
+        "title": "Paiements sortants à approuver",
+        "kind": "Paiement sortant",
+        "method": { "cash": "Espèces", "cheque": "Chèque", "lcn": "LCN", "transfer": "Virement" },
+        "dated": "daté du",
+        "preparedBy": "Préparé par {name} le {date}",
+        "willApprove": "Approuver autorise l'émission de ce paiement, au-dessus du seuil haut. Rejeter l'arrête : il ne pourra pas être émis.",
+        "approve": "Approuver le paiement",
+        "reject": "Rejeter le paiement"
+      }
     },
     "disclosure": {
       "link": "Demander un chiffre",

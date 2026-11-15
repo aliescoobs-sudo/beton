@@ -1,14 +1,14 @@
 'use server';
 
 import { getPool } from '@/lib/db/pools';
-import { confirmOrderPrice, confirmPricesInBulk, releaseOrderHold } from '@/modules/ledger';
+import { confirmOrderPrice, confirmPricesInBulk, decidePayment, releaseOrderHold } from '@/modules/ledger';
 import { authorize, ForbiddenError, withStepUp } from '@/modules/platform-security';
 import { currentAuthState } from '@/modules/platform-security/next';
 
 type Failure = { ok: false; error: string };
 
 async function decide<T>(
-  action: 'prices.confirm' | 'orders.release_hold',
+  action: 'prices.confirm' | 'orders.release_hold' | 'payments.approve',
   run: (
     user: Parameters<typeof confirmOrderPrice>[1],
   ) => Promise<{ ok: true; value: T } | { ok: false; error: string }>,
@@ -43,5 +43,15 @@ export async function releaseHoldAction(input: unknown): Promise<{ ok: true } | 
   const i = (input ?? {}) as { orderId?: string; note?: string };
   return decide('orders.release_hold', (user) =>
     releaseOrderHold(getPool('app'), user, { orderId: String(i.orderId), note: i.note ?? null }),
+  );
+}
+
+// @permission approvals.decide (owner, app_admin) + sensitive action payments.approve: approve or reject an outgoing payment above the upper limit (the door refuses the preparer)
+export async function decidePaymentApprovalAction(input: unknown): Promise<{ ok: true } | Failure> {
+  const i = (input ?? {}) as { id?: unknown; decision?: unknown };
+  // only the owner's two decisions are offered here; validating the middle band stays with the Responsable on the request page
+  if (i.decision !== 'approve' && i.decision !== 'reject') return { ok: false, error: 'INVALID' };
+  return decide('payments.approve', (user) =>
+    decidePayment(getPool('app'), user, { id: i.id, decision: i.decision }),
   );
 }

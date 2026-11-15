@@ -131,6 +131,20 @@ export async function listPaymentRequests(
   }));
 }
 
+/**
+ * The owner's inbox entry (T19-close B, D247): the outgoing payments ABOVE the upper limit that wait for the owner's approval. Owner and app_admin only
+ * (`approvals.decide`); the doors check the actor again and the owner never decides on their own preparation.
+ */
+export async function listPaymentApprovals(
+  appPool: pg.Pool,
+  actor: SessionUser,
+): Promise<PaymentRequestView[]> {
+  await require(appPool, actor, 'approvals.decide');
+  return (await listPaymentRequests(appPool, actor)).filter(
+    (r) => r.state === 'prepared' && r.level === 'owner',
+  );
+}
+
 export interface DueTomorrow {
   id: string;
   supplierCode: string;
