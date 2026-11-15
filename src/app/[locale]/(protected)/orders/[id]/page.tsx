@@ -5,6 +5,7 @@ import { getPool } from '@/lib/db/pools';
 import { RelatedDocuments } from '@/modules/ledger/ui/related/related-documents';
 import { getOrderDetail, getRelatedDocuments } from '@/modules/ledger';
 import { CancelOrder } from '@/modules/ledger/ui/orders/cancel-order';
+import { listGridInForce } from '@/modules/master-data';
 import { formatM3 } from '@/modules/operations/ui/format';
 import { can, recordMoneyView } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/next';
@@ -35,6 +36,10 @@ export default async function OrderDetailPage({
   const detail = await getOrderDetail(pool, user, id, { today });
   if (!detail) notFound();
   const { order: o } = detail;
+  // D239: the grid is a reference next to the order's own price; D242: a legacy NULL method is "not recorded", never GOULOTTE.
+  const grid = (await listGridInForce(pool, user, o.orderDate)).find(
+    (g) => g.classCode === o.typeCode && g.method === o.dischargeMethod,
+  );
   const t = await getTranslations('ledger.orderDetail');
   const states = await getTranslations('ledger.itemStates');
   return (
@@ -82,6 +87,30 @@ export default async function OrderDetailPage({
               {o.reason && <span className="ms-2 text-sm text-muted">({o.reason})</span>}
             </dd>
           </div>
+          <div>
+            <dt className="field-label">{t('dischargeMethod')}</dt>
+            <dd data-testid="order-method-value" data-method={o.dischargeMethod ?? 'none'}>
+              {o.dischargeMethod
+                ? t(`methodNames.${o.dischargeMethod as 'GOULOTTE' | 'POMPE'}`)
+                : t('methodNotRecorded')}
+            </dd>
+          </div>
+          {grid && (
+            <div>
+              <dt className="field-label">{t('gridReference')}</dt>
+              <dd data-testid="order-grid-price">
+                <Money centimes={grid.priceCentimes} suffix={t('perM3')} />
+                {grid.isAssumption && (
+                  <span className="ms-2 text-sm text-muted">({t('gridAssumption')})</span>
+                )}
+                {grid.priceCentimes !== o.unitPriceHtCentimes && (
+                  <span className="ms-2 text-sm text-muted" data-testid="order-grid-differs">
+                    ({t('gridDiffers')})
+                  </span>
+                )}
+              </dd>
+            </div>
+          )}
           <div>
             <dt className="field-label">{t('totals')}</dt>
             <dd>

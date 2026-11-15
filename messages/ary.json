@@ -431,7 +431,23 @@
         "GOULOTTE": "غولوط (الخلاطة بوحدها)",
         "POMPE": "بومب (الخلاطة + كاميون البومب)",
         "required": "اختار طريقة التفريغ: غولوط ولا بومب."
+      },
+      "grid": {
+        "reference": "ثمن الشبكة (مرجع غير: ما كيحدّدش ثمن الطلبية)",
+        "assumption": "قيمة مفترضة",
+        "differs": "مختلف على ثمن الطلبية"
       }
+    },
+    "orderDetail": {
+      "dischargeMethod": "طريقة التفريغ",
+      "methodNotRecorded": "الطريقة ما تسجلاتش",
+      "methodNames": {
+        "GOULOTTE": "غولوط",
+        "POMPE": "بومب"
+      },
+      "gridReference": "ثمن الشبكة (مرجع)",
+      "gridAssumption": "قيمة مفترضة",
+      "gridDiffers": "مختلف على ثمن الطلبية"
     }
   }
 }

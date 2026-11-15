@@ -1,7 +1,7 @@
 import type pg from 'pg';
 import { z } from 'zod';
 import { err, ok, type Result } from '@/lib/result';
-import { inRequest, isMalformedId, require, type SessionUser } from '@/modules/platform-security';
+import { can, inRequest, isMalformedId, require, type SessionUser } from '@/modules/platform-security';
 
 /**
  * T16 G5 (SPEC-cost-margin §9, §11): the data screens of the cost rates, the fuel norms, the delivered transport of a purchase price and the selling price grid.
@@ -254,4 +254,42 @@ export async function replacePriceGrid(appPool: pg.Pool, actor: SessionUser, inp
     v.effectiveFrom,
     v.reason,
   ]);
+}
+
+/** One grid price in force: what the grid says for a class and a method on a date (a reference, never the price of an order, D239). */
+export interface GridPriceInForce {
+  classCode: string;
+  method: string;
+  priceCentimes: number;
+  isAssumption: boolean;
+}
+
+/**
+ * The grid price in force on `today` for every (class, method), for the roles that may read it as the official selling price (owner, app_admin, office_sales).
+ * Any other role gets an empty list (no door call). The grid is INFORMATIONAL (D239): nothing here is written into `selling_price`.
+ */
+export async function listGridInForce(
+  appPool: pg.Pool,
+  actor: SessionUser,
+  today: string,
+): Promise<GridPriceInForce[]> {
+  if (!can(actor.role, 'grid.read')) return [];
+  const rows = await inRequest(appPool, actor, (tx) =>
+    tx.query<{ c: string; m: string; p: string; d: string; a: boolean }>(
+      `select o_class_code c, o_method m, o_price_centimes::text p, to_char(o_effective_from, 'YYYY-MM-DD') d, o_is_assumption a from public.price_grid_list()`,
+    ),
+  );
+  const best = new Map<string, { c: string; m: string; p: string; d: string; a: boolean }>();
+  for (const r of rows.rows) {
+    if (r.d > today) continue;
+    const key = `${r.c}|${r.m}`;
+    const cur = best.get(key);
+    if (!cur || r.d > cur.d) best.set(key, r);
+  }
+  return [...best.values()].map((r) => ({
+    classCode: r.c,
+    method: r.m,
+    priceCentimes: Number(r.p),
+    isAssumption: r.a,
+  }));
 }

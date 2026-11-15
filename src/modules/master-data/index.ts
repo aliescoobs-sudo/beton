@@ -166,6 +166,7 @@ export {
   COST_RATE_KEYS,
   DISCHARGE_METHODS,
   FUEL_KINDS,
+  listGridInForce,
   loadCostScreen,
   replaceCostRate,
   replaceFuelNorm,
@@ -173,4 +174,5 @@ export {
   replacePurchaseTransport,
   type CostError,
   type CostScreen,
+  type GridPriceInForce,
 } from './service/cost-service';

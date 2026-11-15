@@ -689,6 +689,11 @@
         "GOULOTTE": "مزلاج (الخلاطة وحدها)",
         "POMPE": "مضخة (الخلاطة + شاحنة المضخة)",
         "required": "اختر طريقة التفريغ: مزلاج أو مضخة."
+      },
+      "grid": {
+        "reference": "سعر الشبكة (مرجع فقط: لا يحدد سعر الطلبية)",
+        "assumption": "قيمة مفترضة",
+        "differs": "مختلف عن سعر الطلبية"
       }
     },
     "accounts": {
@@ -1036,7 +1041,16 @@
       "reasonRequired": "السبب إجباري.",
       "alreadyReversed": "هذه الطلبية ملغاة من قبل.",
       "windowClosed": "انتهت مهلة الإلغاء.",
-      "error": "تعذر تنفيذ الإجراء."
+      "error": "تعذر تنفيذ الإجراء.",
+      "dischargeMethod": "طريقة التفريغ",
+      "methodNotRecorded": "الطريقة غير مسجلة",
+      "methodNames": {
+        "GOULOTTE": "مزلاج",
+        "POMPE": "مضخة"
+      },
+      "gridReference": "سعر الشبكة (مرجع)",
+      "gridAssumption": "قيمة مفترضة",
+      "gridDiffers": "مختلف عن سعر الطلبية"
     },
     "purchases": {
       "link": "المشتريات",

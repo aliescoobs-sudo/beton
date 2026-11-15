@@ -689,6 +689,11 @@
         "GOULOTTE": "Goulotte (toupie seule)",
         "POMPE": "Pompe (toupie + camion pompe)",
         "required": "Choisissez le mode de déchargement : goulotte ou pompe."
+      },
+      "grid": {
+        "reference": "Prix de la grille (référence : il ne fixe pas le prix de la commande)",
+        "assumption": "valeur supposée",
+        "differs": "différent du prix de la commande"
       }
     },
     "accounts": {
@@ -1036,7 +1041,16 @@
       "reasonRequired": "Le motif est obligatoire.",
       "alreadyReversed": "Cette commande est déjà annulée.",
       "windowClosed": "Délai d'annulation dépassé.",
-      "error": "Action impossible."
+      "error": "Action impossible.",
+      "dischargeMethod": "Mode de déchargement",
+      "methodNotRecorded": "mode non enregistré",
+      "methodNames": {
+        "GOULOTTE": "Goulotte",
+        "POMPE": "Pompe"
+      },
+      "gridReference": "Prix de la grille (référence)",
+      "gridAssumption": "valeur supposée",
+      "gridDiffers": "différent du prix de la commande"
     },
     "purchases": {
       "link": "Achats",

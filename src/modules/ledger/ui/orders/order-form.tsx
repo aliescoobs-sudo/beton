@@ -19,6 +19,14 @@ export interface OrderFormClient {
   defaultZoneId: string | null;
 }
 
+/** The grid price in force of a class and a method: a REFERENCE only (D239), never the price of the order. */
+export interface OrderFormGridPrice {
+  classCode: string;
+  method: string;
+  priceCentimes: number;
+  isAssumption: boolean;
+}
+
 export type CreateOrderActionResult =
   | { ok: true; code: string; effects: Effect[] }
   | { ok: false; error: OrderError | 'UNAUTHENTICATED' | 'FORBIDDEN' };
@@ -44,6 +52,7 @@ export function OrderForm({
   zones,
   types,
   plants = [],
+  grid = [],
   today,
   createAction,
   previewAction,
@@ -55,6 +64,8 @@ export function OrderForm({
   types: { id: string; code: string; label: string }[];
   /** The active plants to choose from; empty when there is only one (or the user is bound to a plant). */
   plants?: { id: string; name: string }[];
+  /** The grid prices in force, for a role that may read them (owner, app_admin, office_sales); empty otherwise. */
+  grid?: OrderFormGridPrice[];
   today: string;
   createAction: (input: unknown) => Promise<CreateOrderActionResult>;
   /** Present only for a role that may read money. */
@@ -92,6 +103,8 @@ export function OrderForm({
       (c) => q === '' || c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q),
     );
   }, [clients, search]);
+  const typeCode = types.find((c) => c.id === typeId)?.code;
+  const gridPrice = grid.find((g) => g.classCode === typeCode && g.method === method);
   const clientSites = sites.filter((s) => s.clientId === clientId);
 
   const percentSum = rows.every((r) => r.kind === 'percent')
@@ -341,6 +354,15 @@ export function OrderForm({
             ))}
           </select>
         </label>
+        {gridPrice && (
+          <p className="text-sm text-muted" data-testid="order-grid-price">
+            {t('grid.reference')} :{' '}
+            <span dir="ltr">
+              <bdi>{formatCentimes(gridPrice.priceCentimes)}</bdi> MAD
+            </span>
+            {gridPrice.isAssumption && <span className="ms-1">({t('grid.assumption')})</span>}
+          </p>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
             <span className="field-label">{t('volume')}</span>
@@ -517,6 +539,19 @@ export function OrderForm({
             <dd dir="ltr" className="text-end">
               <bdi>{formatCentimes(preview.unitPriceHtCentimes)}</bdi> MAD
             </dd>
+            {gridPrice && (
+              <>
+                <dt className="text-muted">{t('grid.reference')}</dt>
+                <dd dir="ltr" className="text-end text-muted" data-testid="preview-grid">
+                  <bdi>{formatCentimes(gridPrice.priceCentimes)}</bdi> MAD
+                  {gridPrice.priceCentimes !== preview.unitPriceHtCentimes && (
+                    <span className="ms-1" data-testid="preview-grid-differs">
+                      ({t('grid.differs')})
+                    </span>
+                  )}
+                </dd>
+              </>
+            )}
             <dt>{t('totalHt')}</dt>
             <dd dir="ltr" className="text-end" data-testid="preview-ht">
               <bdi>{formatCentimes(preview.totalHtCentimes)}</bdi> MAD

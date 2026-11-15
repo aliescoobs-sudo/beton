@@ -4,6 +4,7 @@ import { getPool } from '@/lib/db/pools';
 import { getQuote } from '@/modules/ledger';
 import { OrderForm } from '@/modules/ledger/ui/orders/order-form';
 import {
+  listGridInForce,
   listSelectableClients,
   listSelectableConcreteTypes,
   listSiteOptions,
@@ -36,6 +37,7 @@ export default async function NewOrderPage({
     getRequestClock(),
   ]);
   // An order made from a quote starts from it (owner and support read quotes); a person still reviews and saves.
+  const grid = await listGridInForce(pool, user, clock.today());
   const quote = quoteId && can(user.role, 'quotes.read') ? await getQuote(pool, user, quoteId) : null;
   const t = await getTranslations('ledger.orders');
   return (
@@ -56,6 +58,7 @@ export default async function NewOrderPage({
             ? []
             : plants.filter((p) => p.status === 'active').map((p) => ({ id: p.id, name: p.name }))
         }
+        grid={grid}
         today={clock.today()}
         initial={
           quote

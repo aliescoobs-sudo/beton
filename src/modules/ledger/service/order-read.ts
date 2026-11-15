@@ -9,6 +9,8 @@ export interface OrderRow {
   clientCode: string;
   clientName: string;
   typeCode: string;
+  /** GOULOTTE or POMPE; null for a legacy order ("method not recorded", D242: never counted as GOULOTTE). */
+  dischargeMethod: string | null;
   volumeL: number;
   deliveredL: number;
   orderDate: string;
@@ -37,6 +39,7 @@ export async function listOrders(
       client_code: string;
       client_name: string;
       type_code: string;
+      discharge_method: string | null;
       volume_l: number;
       delivered_l: string;
       order_date: string;
@@ -47,7 +50,7 @@ export async function listOrders(
       invoiced: boolean;
       cancelled: boolean;
     }>(
-      `select o.id, o.code, o.client_id, c.code as client_code, c.name as client_name, t.code as type_code, o.volume_l,
+      `select o.id, o.code, o.client_id, c.code as client_code, c.name as client_name, t.code as type_code, o.discharge_method, o.volume_l,
               coalesce((select sum(g.volume_l) from delivered_load g where g.order_id = o.id), 0)::text as delivered_l,
               to_char(o.order_date, 'YYYY-MM-DD') as order_date, to_char(o.delivery_date, 'YYYY-MM-DD') as delivery_date,
               o.total_ttc_centimes::text as total,
@@ -76,6 +79,7 @@ export async function listOrders(
     clientCode: r.client_code,
     clientName: r.client_name,
     typeCode: r.type_code,
+    dischargeMethod: r.discharge_method,
     volumeL: r.volume_l,
     deliveredL: Number(r.delivered_l),
     orderDate: r.order_date,
