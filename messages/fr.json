@@ -725,6 +725,7 @@
         "poNumber": "N° de commande du client",
         "notAvailable": "Pas encore disponible : ce champ n’est pas encore enregistré.",
         "poRequired": "Ce client exige le numéro de sa commande (BC) : saisissez-le à l'étape Livraison.",
+        "poTag": "BC obligatoire",
         "poHint": "Obligatoire pour un client marqué « BC obligatoire » ; repris sur le BL et la facture.",
         "commercial": "Commercial"
       }

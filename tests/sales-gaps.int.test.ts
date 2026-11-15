@@ -11,6 +11,7 @@ import {
   listClientAliases,
   listInstruments,
   listOrderExtras,
+  listPoRequiredClientIds,
   setClientTerms,
 } from '../src/modules/ledger';
 import type { SessionUser } from '../src/modules/platform-security/auth/session-gate';
@@ -87,6 +88,9 @@ describe('the client PO number and the commercial', () => {
       poRequired: true,
       priceBasis: 'TTC',
     });
+    // the order form learns it before the person saves: the flag is readable by the order-entry roles
+    for (const role of ['office_sales', 'owner'] as const)
+      expect(await listPoRequiredClientIds(app, user(role))).toContain(clientId);
     expect(await order('office_sales')).toEqual({ ok: false, error: 'PO_REQUIRED' }); // blind path
     expect(await order('owner')).toEqual({ ok: false, error: 'PO_REQUIRED' }); // owner path
     expect((await order('office_sales', { clientPo: `BC2-${marker}` })).ok).toBe(true);
@@ -99,6 +103,7 @@ describe('the client PO number and the commercial', () => {
     expect(
       (await setClientTerms(app, user('owner'), { clientId, poRequired: false, priceBasis: 'HT' })).ok,
     ).toBe(true);
+    expect(await listPoRequiredClientIds(app, user('owner'))).not.toContain(clientId);
   });
 
   it("who may set the terms; a bad basis is refused; set_order_extra only for the caller's own order", async () => {

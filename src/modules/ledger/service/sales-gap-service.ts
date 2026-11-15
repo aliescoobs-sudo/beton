@@ -128,3 +128,11 @@ export async function getClientTerms(
   );
   return rows[0] ? { poRequired: rows[0].po_required, priceBasis: rows[0].price_basis } : null;
 }
+
+/** The ids of the clients that require their purchase-order number on every order (the order form says so before the person saves). */
+export async function listPoRequiredClientIds(appPool: pg.Pool, actor: SessionUser): Promise<string[]> {
+  const { rows } = await inRequest(appPool, actor, (tx) =>
+    tx.query<{ id: string }>('select id from client where po_required'),
+  );
+  return rows.map((r) => r.id);
+}

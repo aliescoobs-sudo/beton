@@ -17,6 +17,10 @@ export interface OrderFormClient {
   code: string;
   name: string;
   defaultZoneId: string | null;
+  /** The client's purchase-order number is mandatory on its orders (T19 item 4). */
+  poRequired?: boolean;
+  /** Alternate names of the client: the search matches them too. */
+  aliases?: string[];
 }
 
 /** The grid price in force of a class and a method: a REFERENCE only (D239), never the price of the order. */
@@ -106,9 +110,21 @@ export function OrderForm({
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
     return clients.filter(
-      (c) => q === '' || c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q),
+      (c) =>
+        q === '' ||
+        c.name.toLowerCase().includes(q) ||
+        c.code.toLowerCase().includes(q) ||
+        (c.aliases ?? []).some((a) => a.toLowerCase().includes(q)),
     );
   }, [clients, search]);
+  // what the search matched when it is an alternate name, so the person sees why a client is listed
+  const aliasHit = (c: OrderFormClient) => {
+    const q = search.trim().toLowerCase();
+    if (q === '' || c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q)) return null;
+    return (c.aliases ?? []).find((a) => a.toLowerCase().includes(q)) ?? null;
+  };
+  const chosenClient = clients.find((c) => c.id === clientId);
+  const poIsRequired = chosenClient?.poRequired === true;
   const typeCode = types.find((c) => c.id === typeId)?.code;
   const gridPrice = grid.find((g) => g.classCode === typeCode && g.method === method);
   const clientSites = sites.filter((s) => s.clientId === clientId);
@@ -171,6 +187,7 @@ export function OrderForm({
     } else plan = { preset };
     if (plants.length > 1 && !plantId) return null;
     if (method === '') return null;
+    if (poIsRequired && clientPo.trim() === '') return null;
     return {
       clientId,
       ...(plantId ? { plantId } : {}),
@@ -192,6 +209,7 @@ export function OrderForm({
     event.preventDefault();
     setMessage(null);
     setPreview(null);
+    if (poIsRequired && clientPo.trim() === '') return setMessage(t('flow.poRequired'));
     const input = build();
     if (!input || !clientId) return setMessage(t('invalid'));
     setBusy(true);
@@ -208,6 +226,7 @@ export function OrderForm({
 
   async function showPreview() {
     setMessage(null);
+    if (poIsRequired && clientPo.trim() === '') return setMessage(t('flow.poRequired'));
     const input = build();
     if (!input || !clientId || !previewAction) return setMessage(t('invalid'));
     const result = await previewAction(input);
@@ -228,6 +247,8 @@ export function OrderForm({
 
   function next() {
     if (step === 1 && !linesComplete()) return setMessage(t('invalid'));
+    // a client that requires its PO number: the person cannot reach the summary without it
+    if (step === 2 && poIsRequired && clientPo.trim() === '') return setMessage(t('flow.poRequired'));
     goTo((step + 1) as 2 | 3);
   }
 
@@ -319,11 +340,22 @@ export function OrderForm({
                   {visible.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.code} · {c.name}
+                      {aliasHit(c) ? ` (${aliasHit(c)})` : ''}
+                      {c.poRequired ? ` · ${t('flow.poTag')}` : ''}
                     </option>
                   ))}
                 </select>
               </label>
             </div>
+            {poIsRequired && (
+              <p
+                role="status"
+                className="text-sm font-medium sm:col-span-2"
+                data-testid="order-po-required-note"
+              >
+                {t('flow.poRequired')}
+              </p>
+            )}
             <label className="block">
               <span className="field-label">{t('type')}</span>
               <select
@@ -473,10 +505,15 @@ export function OrderForm({
               </span>
             </label>
             <label className="block">
-              <span className="field-label">{t('flow.poNumber')}</span>
+              <span className="field-label">
+                {t('flow.poNumber')}
+                {poIsRequired ? ' *' : ''}
+              </span>
               <input
                 dir="ltr"
                 maxLength={60}
+                required={poIsRequired}
+                aria-required={poIsRequired}
                 value={clientPo}
                 onChange={(e) => setClientPo(e.target.value)}
                 className={INPUT}

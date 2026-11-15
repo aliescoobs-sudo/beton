@@ -1,7 +1,7 @@
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { getRequestClock } from '@/app/request-clock';
 import { getPool } from '@/lib/db/pools';
-import { getQuote } from '@/modules/ledger';
+import { getQuote, listClientAliases, listPoRequiredClientIds } from '@/modules/ledger';
 import { OrderForm } from '@/modules/ledger/ui/orders/order-form';
 import {
   listGridInForce,
@@ -38,6 +38,12 @@ export default async function NewOrderPage({
   ]);
   // An order made from a quote starts from it (owner and support read quotes); a person still reviews and saves.
   const grid = await listGridInForce(pool, user, clock.today());
+  // T19-close C: which clients require their PO number, and the alternate names the search also matches (a role without the alias door searches by name and code only)
+  const poRequired = new Set(await listPoRequiredClientIds(pool, user).catch(() => [] as string[]));
+  const aliasesOf = new Map<string, string[]>();
+  for (const a of await listClientAliases(pool, user).catch(() => [])) {
+    aliasesOf.set(a.clientId, [...(aliasesOf.get(a.clientId) ?? []), a.alias]);
+  }
   const quote = quoteId && can(user.role, 'quotes.read') ? await getQuote(pool, user, quoteId) : null;
   const t = await getTranslations('ledger.orders');
   return (
@@ -49,6 +55,8 @@ export default async function NewOrderPage({
           code: c.code,
           name: c.name,
           defaultZoneId: c.defaultZoneId,
+          poRequired: poRequired.has(c.id),
+          aliases: aliasesOf.get(c.id) ?? [],
         }))}
         sites={sites}
         zones={zones.map((z) => ({ id: z.id, name: z.name }))}

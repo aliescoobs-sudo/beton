@@ -254,6 +254,7 @@ export {
   type ClientTerms,
   getClientTerms,
   listClientAliases,
+  listPoRequiredClientIds,
   listOrderExtras,
   type OrderExtra,
   type SalesGapError,

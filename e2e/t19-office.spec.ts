@@ -1,6 +1,12 @@
 import { mkdirSync } from 'node:fs';
 import { expect, type Page, test } from '@playwright/test';
-import { E2E_MD, loginAndEnrol } from './fixtures';
+import pg from 'pg';
+import { E2E_DATABASE } from '../scripts/db-bootstrap';
+import { addClientAlias, setClientTerms } from '../src/modules/ledger';
+import { createClient } from '../src/modules/master-data';
+import { testEnv } from '../tests/db-env';
+import { realSessionUser } from '../tests/helpers/actors';
+import { E2E_MD, loginAndEnrol, loginOwner } from './fixtures';
 
 // T19 (D245, D247): the two office roles read the money of THEIR side only, on the new screens. fr and ar, desktop and phone.
 // Screenshots (docs/ui/screenshots) only with UI_SCREENSHOTS=1. Fictitious data only.
@@ -111,3 +117,46 @@ for (const [locale, key] of [
     ]);
   });
 }
+
+// T19-close C: the order form says when the chosen client requires its PO number (the field is then mandatory) and its client search matches aliases.
+test('the order form searches by alias and makes the PO number mandatory for a client that requires it (French)', async ({
+  page,
+}) => {
+  const env = testEnv(E2E_DATABASE);
+  const app = new pg.Pool({ connectionString: env.DATABASE_URL_APP, max: 2 });
+  try {
+    const owner = await realSessionUser(env.DATABASE_URL_MIGRATOR, 'owner');
+    const tag = Math.random().toString(36).slice(2, 8).toUpperCase();
+    const created = await createClient(app, owner, { name: `Chantier BC E2E ${tag}`, kind: 'company' });
+    if (!created.ok) throw new Error(created.error);
+    const clientId = created.value.client.id;
+    const alias = `Surnom BC ${tag}`;
+    expect((await addClientAlias(app, owner, { clientId, alias })).ok).toBe(true);
+    expect((await setClientTerms(app, owner, { clientId, poRequired: true, priceBasis: 'HT' })).ok).toBe(
+      true,
+    );
+
+    await loginOwner(page, 'fr');
+    await page.goto('/fr/orders/new');
+    // an alias finds the client, and the list says which alias matched
+    await page.getByTestId('order-client-search').fill(alias);
+    const option = page.getByTestId('order-client').locator('option', { hasText: `Chantier BC E2E ${tag}` });
+    await expect(option).toHaveCount(1);
+    await expect(option).toContainText(alias);
+    await page.getByTestId('order-client').selectOption(clientId);
+    await expect(page.getByTestId('order-po-required-note')).toContainText('exige le numéro');
+    await page.getByTestId('order-volume').fill('5');
+    await page.getByTestId('order-method').selectOption('GOULOTTE');
+    // the delivery step does not let the person go on without the PO number
+    await page.getByTestId('order-next').click();
+    await expect(page.getByTestId('order-po')).toHaveAttribute('required', '');
+    await page.getByTestId('order-next').click();
+    await expect(page.getByTestId('order-message')).toContainText('exige le numéro');
+    await expect(page.getByTestId('order-step-delivery')).toBeVisible();
+    await page.getByTestId('order-po').fill(`BC-E2E-${tag}`);
+    await page.getByTestId('order-next').click();
+    await expect(page.getByTestId('order-save')).toBeVisible();
+  } finally {
+    await app.end();
+  }
+});
