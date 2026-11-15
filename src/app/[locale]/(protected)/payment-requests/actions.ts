@@ -10,7 +10,7 @@ import {
   preparePayment,
   type PaymentControlError,
 } from '@/modules/ledger';
-import { authorize } from '@/modules/platform-security';
+import { authorize, withStepUp } from '@/modules/platform-security';
 import { currentAuthState } from '@/modules/platform-security/next';
 
 type Answer =
@@ -18,7 +18,13 @@ type Answer =
   | {
       ok: false;
       error:
-        PaymentControlError | 'UNAUTHENTICATED' | 'FORBIDDEN' | 'NOT_FOUND' | 'CONTROL_REQUIRED' | 'INVALID';
+        | PaymentControlError
+        | 'UNAUTHENTICATED'
+        | 'FORBIDDEN'
+        | 'NOT_FOUND'
+        | 'CONTROL_REQUIRED'
+        | 'INVALID'
+        | 'REENROL_REQUIRED';
     };
 
 // @permission payments.prepare (owner, app_admin, office_purchases): prepare an outgoing payment (nothing is issued)
@@ -38,7 +44,18 @@ export async function preparePaymentAction(input: unknown): Promise<Answer> {
 export async function decidePaymentAction(input: unknown): Promise<Answer> {
   const allowed = await authorize('payments.decide', { getState: currentAuthState, appPool: getPool('app') });
   if (!allowed.ok) return { ok: false, error: allowed.reason };
-  const r = await decidePayment(getPool('app'), allowed.user, input);
+  let r = await decidePayment(getPool('app'), allowed.user, input);
+  // T19c A: the database door asks for the fresh second factor on an approval above the upper limit (below it nothing changes); the same
+  // decision is then run again behind the step-up, and a stale factor goes back to the page as STEP_UP_REQUIRED (the dialog opens, the page retries).
+  if (!r.ok && r.error === 'STEP_UP_REQUIRED') {
+    const guarded = await withStepUp(
+      'payments.approve',
+      (user) => decidePayment(getPool('app'), user, input),
+      { getState: currentAuthState },
+    );
+    if (!guarded.ok) return { ok: false, error: guarded.error };
+    r = guarded.value;
+  }
   if (!r.ok) return r;
   revalidatePath('/[locale]/payment-requests', 'page');
   return { ok: true };

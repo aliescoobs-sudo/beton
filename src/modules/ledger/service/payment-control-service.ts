@@ -9,7 +9,7 @@ import { can, inRequest, require, type SessionUser } from '@/modules/platform-se
  * (middle band) or approved by the owner (above the upper limit), then issued carrying the request id; nobody decides on their own preparation.
  */
 export type RequestState = 'prepared' | 'validated' | 'approved' | 'rejected' | 'issued';
-export type PaymentControlError = 'INVALID' | 'NOT_ALLOWED' | 'REFUSED';
+export type PaymentControlError = 'INVALID' | 'NOT_ALLOWED' | 'REFUSED' | 'STEP_UP_REQUIRED';
 
 export interface PaymentRequestView {
   id: string;
@@ -54,6 +54,9 @@ async function run<T>(
     return ok(await inRequest(appPool, actor, fn));
   } catch (error) {
     const code = (error as { code?: string }).code;
+    // the door of T19c A: an approval above the upper limit without the fresh second factor (the mark `app.step_up`)
+    if (code === '42501' && /fresh second factor/.test((error as Error).message ?? ''))
+      return err<PaymentControlError>('STEP_UP_REQUIRED');
     if (code === '42501') return err<PaymentControlError>('NOT_ALLOWED');
     if (code === '23514' || code === '23503') return err<PaymentControlError>('REFUSED');
     throw error;

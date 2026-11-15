@@ -12,6 +12,7 @@ import {
 } from '../src/modules/ledger';
 import type { SessionUser } from '../src/modules/platform-security/auth/session-gate';
 import type { Role } from '../src/modules/platform-security/domain/permissions';
+import { inRequest } from '../src/modules/platform-security';
 import { testEnv } from './db-env';
 import { moneyMaster } from './helpers/ledger-fixtures';
 import { v1Actors } from './helpers/v1-actors';
@@ -25,6 +26,7 @@ let done: () => Promise<void>;
 let supplierId = '';
 const TODAY = '2026-12-02';
 const user = (role: Role) => ({ id: ids[role], role }) as unknown as SessionUser;
+const stepped = (role: Role) => ({ ...user(role), stepUpVerified: true }) as unknown as SessionUser;
 const n = () => `OC${randomUUID().replace(/-/g, '').slice(0, 9)}`;
 beforeAll(async () => {
   const v = await v1Actors(app, env.DATABASE_URL_MIGRATOR, marker);
@@ -106,7 +108,7 @@ describe('the three bands', () => {
     expect((await decidePayment(app, user('office_sales'), { id, decision: 'validate' })).ok).toBe(false);
     expect((await decidePayment(app, user('office_sales'), { id, decision: 'approve' })).ok).toBe(false);
     expect((await pay('office_purchases', 6000, { requestId: id, number })).ok).toBe(false);
-    expect((await decidePayment(app, user('owner'), { id, decision: 'approve' })).ok).toBe(true);
+    expect((await decidePayment(app, stepped('owner'), { id, decision: 'approve' })).ok).toBe(true);
     expect((await pay('office_purchases', 6000, { requestId: id, number })).ok).toBe(true);
     // a rejected request can never be issued
     const rej = await prepare('office_purchases', 7000);
@@ -164,7 +166,7 @@ describe("the owner's approvals inbox (T19-close B)", () => {
     await expect(listPaymentApprovals(app, user('office_sales'))).rejects.toThrow();
     await expect(listPaymentApprovals(app, user('office_purchases'))).rejects.toThrow();
     // approve from the inbox: the card leaves, the payment can be issued; reject: the card leaves, it cannot
-    expect((await decidePayment(app, user('owner'), { id: big.id, decision: 'approve' })).ok).toBe(true);
+    expect((await decidePayment(app, stepped('owner'), { id: big.id, decision: 'approve' })).ok).toBe(true);
     expect((await listPaymentApprovals(app, user('owner'))).map((r) => r.id)).not.toContain(big.id);
     expect((await pay('office_purchases', 9000, { requestId: big.id, number: big.number })).ok).toBe(true);
     const other = await prepare('office_purchases', 8000);
@@ -173,5 +175,47 @@ describe("the owner's approvals inbox (T19-close B)", () => {
     expect((await pay('office_purchases', 8000, { requestId: other.id, number: other.number })).ok).toBe(
       false,
     );
+  });
+});
+
+describe('the second factor sits in the database door (T19c A)', () => {
+  it('an approval above the upper limit without the fresh factor fails from the service (request page and inbox path), from a direct door call, for owner and app_admin; the request stays prepared', async () => {
+    const { id, number } = await prepare('office_purchases', 6500);
+    for (const role of ['owner', 'app_admin'] as const) {
+      const r = await decidePayment(app, user(role), { id, decision: 'approve' });
+      expect(r).toMatchObject({ ok: false, error: 'STEP_UP_REQUIRED' });
+    }
+    // a direct call of the door, with no step-up mark in the transaction
+    const direct = await inRequest(app, user('owner'), (tx) =>
+      tx.query('select public.decide_outgoing_payment($1, $2, $3)', [id, 'approve', null]),
+    ).then(
+      () => 'allowed',
+      (e: { code?: string; message?: string }) => `${e.code} ${e.message}`,
+    );
+    expect(direct).toMatch(/^42501 .*fresh second factor/);
+    expect(await stateOf('owner', id)).toBe('prepared');
+    expect((await pay('office_purchases', 6500, { requestId: id, number })).ok).toBe(false);
+    // with the factor it goes through, and the payment can be issued
+    expect((await decidePayment(app, stepped('owner'), { id, decision: 'approve' })).ok).toBe(true);
+    expect((await pay('office_purchases', 6500, { requestId: id, number })).ok).toBe(true);
+  });
+
+  it('an app_admin approval carries the factor too; the Responsable is still refused for a different reason', async () => {
+    const { id } = await prepare('office_purchases', 5500);
+    expect((await decidePayment(app, stepped('office_sales'), { id, decision: 'approve' })).ok).toBe(false);
+    expect((await decidePayment(app, stepped('app_admin'), { id, decision: 'approve' })).ok).toBe(true);
+  });
+
+  it('below the upper limit nothing changes: validate (Responsable), approve and reject need no factor, and a rejection above the limit needs none', async () => {
+    const mid = await prepare('office_purchases', 2500);
+    expect((await decidePayment(app, user('office_sales'), { id: mid.id, decision: 'validate' })).ok).toBe(
+      true,
+    );
+    const mid2 = await prepare('office_purchases', 2600);
+    expect((await decidePayment(app, user('owner'), { id: mid2.id, decision: 'approve' })).ok).toBe(true);
+    const mid3 = await prepare('office_purchases', 2700);
+    expect((await decidePayment(app, user('owner'), { id: mid3.id, decision: 'reject' })).ok).toBe(true);
+    const big = await prepare('office_purchases', 9100);
+    expect((await decidePayment(app, user('owner'), { id: big.id, decision: 'reject' })).ok).toBe(true);
   });
 });

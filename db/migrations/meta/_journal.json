@@ -1226,6 +1226,13 @@
       "when": 1795275432023,
       "tag": "0251_opening_complete",
       "breakpoints": true
+    },
+    {
+      "idx": 252,
+      "version": "7",
+      "when": 1795361832023,
+      "tag": "0252_approval_step_up_door",
+      "breakpoints": true
     }
   ]
 }
