@@ -53,7 +53,7 @@ DECLARE
 BEGIN
   FOREACH t IN ARRAY ARRAY['money_account', 'opening_balance', 'ledger_opening', 'opening_party_balance', 'sales_order',
                            'payment_plan_item', 'payment_instrument', 'instrument_event', 'allocation', 'purchase',
-                           'purchase_line', 'purchase_plan_item', 'stock_threshold', 'invoice', 'invoice_line', 'delivery', 'delivery_return', 'stock_movement',
+                           'purchase_line', 'purchase_plan_item', 'stock_threshold', 'stock_count_tolerance', 'invoice', 'invoice_line', 'delivery', 'delivery_return', 'stock_movement',
                            'company_profile', 'quote', 'driver', 'trip_plan', 'trip_event', 'fuel_fill', 'fuel_purchase',
                            'delivery_loss', 'delivery_delivered'] LOOP
     EXECUTE format('GRANT SELECT, INSERT ON public.%I TO belgobeton_seed', t);

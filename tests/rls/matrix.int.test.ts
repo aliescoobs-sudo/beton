@@ -1177,6 +1177,31 @@ const FIXTURES: Record<
     seed: async (tx, actor) => insertQuote(tx, actor, await orderMaster(app, actors.owner, marker)),
     visible: `select q.created_by::text as owner from quote q join client c on c.id = q.client_id where c.name = 'fx' || $1`,
   },
+  stock_count_tolerance: {
+    // Only set_stock_count_tolerance() writes it (owner, app_admin). The row is for one component of its own: a default would change every other suite's tolerance.
+    writers: ['owner'],
+    seed: async (tx, actor) => {
+      const pm = await purchaseMaster(app, actors.owner, marker);
+      return tx.query(`select public.set_stock_count_tolerance(null, $1, 150, 0, date '2001-01-02', $2)`, [
+        pm.componentId,
+        `matrix ${actor}`,
+      ]);
+    },
+    visible: `select t.created_by::text as owner from stock_count_tolerance t join component c on c.id = t.component_id
+                where c.name_fr = 'ps' || $1`,
+  },
+  stock_count: {
+    // Only propose_stock_count() writes it, for a plant manager (an account of the actor-role kind, not a policy-role actor): the matrix has no such writer.
+    // The doors' own tests (tests/t15-stock-count.int.test.ts) prove who reads which plant's counts.
+    writers: [],
+    seed: async () => undefined as never,
+    visible: `select created_by::text as owner from stock_count where reason = 'matrix ' || $1`,
+  },
+  stock_count_decision: {
+    writers: [],
+    seed: async () => undefined as never,
+    visible: `select decided_by::text as owner from stock_count_decision where reason = 'matrix ' || $1`,
+  },
   company_profile: {
     writers: ['owner'],
     seed: (tx, actor) =>

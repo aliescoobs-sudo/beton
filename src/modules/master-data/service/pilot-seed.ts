@@ -146,6 +146,21 @@ export async function seedPilotMasterData(systemPool: pg.Pool, env: SeedGuardEnv
           [c.fr, c.ar, c.unit],
         );
       }
+      // SPEC-stock-engine-gaps §4, D237: the count tolerance is DATA flagged as an assumption: 200 bp by default, 0 for the admixture (counted by container).
+      await tx.query(
+        `insert into stock_count_tolerance (plant_id, component_id, tolerance_bp, floor_qty, effective_from, is_assumption, created_by, reason)
+         select null, null, 200, 0, date '2000-01-01', true, $1, 'assumption A1: 2 % default tolerance, to confirm with the owner'
+          where not exists (select 1 from stock_count_tolerance where plant_id is null and component_id is null and effective_from = date '2000-01-01')`,
+        [SYSTEM_ACTOR_ID],
+      );
+      await tx.query(
+        `insert into stock_count_tolerance (plant_id, component_id, tolerance_bp, floor_qty, effective_from, is_assumption, created_by, reason)
+         select null, c.id, 0, 0, date '2000-01-01', true, $1, 'assumption A1: admixture counted by container, no tolerance, to confirm with the owner'
+           from component c
+          where lower(c.name_fr) = 'adjuvant'
+            and not exists (select 1 from stock_count_tolerance t where t.plant_id is null and t.component_id = c.id and t.effective_from = date '2000-01-01')`,
+        [SYSTEM_ACTOR_ID],
+      );
       for (const [component, label, factor] of PURCHASE_UNITS) {
         await tx.query(
           `insert into purchase_unit (id, component_id, label, factor_to_base)

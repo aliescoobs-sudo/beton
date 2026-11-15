@@ -2898,6 +2898,8 @@
       "loss_recorded": "Perte enregistrée",
       "receipt_rejected": "Livraison reçue avec une quantité refusée",
       "receipt_variance": "Écart entre le comptage de la centrale et la réception du bureau",
+      "stock_count_variance": "Comptage hors tolérance à décider",
+      "stock_count_decided": "Décision sur un comptage de stock",
       "transfer": "Transfert entre centrales",
       "day_close_blocking": "Clôture de journée bloquée",
       "document_request": "Demande de document",

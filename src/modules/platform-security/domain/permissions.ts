@@ -343,6 +343,8 @@ export const PERMISSIONS = {
   // The opening stock of a component (entered once, with a date), and the low-stock threshold per component
   // The owner corrects the stock after a physical count (a movement with a reason)
   'stock.count': ['owner', 'app_admin'],
+  // T15 (SPEC-stock-engine-gaps §5): the plant manager proposes a count of his own plant; in tolerance it posts, out of tolerance the owner decides
+  'stock.count.propose': ['plant_manager'],
   'stock.opening': MANAGERS,
   'stock.threshold': MANAGERS,
   // Receiving a purchase puts its stocked lines into the stock; quantities only, no amount

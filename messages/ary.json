@@ -126,6 +126,8 @@
       "loss_recorded": "تسجّلات خسارة",
       "receipt_rejected": "جات سلعة وفيها كمية مرفوضة",
       "receipt_variance": "فرق بين اللي عدات المحطة واللي سجّل المكتب",
+      "stock_count_variance": "جرد خارج الحد كيتسنى القرار",
+      "stock_count_decided": "قرار على جرد السلعة",
       "transfer": "تحويل بين المحطتين",
       "day_close_blocking": "سدّان النهار واقف",
       "document_request": "طلب وثيقة",

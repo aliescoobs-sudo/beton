@@ -1964,6 +1964,61 @@ export const TABLE_ACCESS = {
     exception:
       'operations O5: low-stock threshold per component in base units (insert-only, the latest row is in force). Owner and partner write; owner, partner, plant and support read; no money.',
   },
+  stock_count_tolerance: {
+    kind: 'rls',
+    seed: 'insert',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'none',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'T15 (SPEC-stock-engine-gaps §4, D237): the count tolerance in basis points and an absolute floor, per plant and component or as a default; versioned and insert-only (the most specific row in force wins); the seed row is flagged as an assumption. Written only by set_stock_count_tolerance (owner, app_admin). Quantities only, no money; a plant manager reads the default and his plant.',
+  },
+  stock_count: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'none',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'T15 (SPEC-stock-engine-gaps §4-5): one row per stock count of a plant (counted, theoretical, variance, ratio in basis points, the tolerance snapshot). Written only by propose_stock_count (the plant manager of that plant); insert-only. Quantities only: no price, no valuation.',
+  },
+  stock_count_decision: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'none',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'T15 (SPEC-stock-engine-gaps §5): the decision of the owner or app_admin on a count out of tolerance (accept posts the adjustment, reject asks a recount), with a reason. Written only by decide_stock_count; insert-only, one per count.',
+  },
   company_profile: {
     kind: 'rls',
     seed: 'insert',

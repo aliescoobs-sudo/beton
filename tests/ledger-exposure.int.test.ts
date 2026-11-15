@@ -193,6 +193,9 @@ describe('functions the application role can execute', () => {
     'public.set_client_credit_limit(p_client uuid, p_limit bigint)',
     'public.confirm_receipt_at_plant(p_purchase uuid, p_note text)',
     'public.confirm_receipt_at_plant_lines(p_purchase uuid, p_note text, p_lines jsonb)', // C3: the plant (checked inside)
+    'public.set_stock_count_tolerance(p_plant uuid, p_component uuid, p_tolerance_bp integer, p_floor bigint, p_effective date, p_reason text)', // T15: owner, app_admin (checked inside)
+    'public.propose_stock_count(p_component uuid, p_counted bigint, p_category text, p_reason text)', // T15: the plant manager of the plant (checked inside); quantities only
+    'public.decide_stock_count(p_count uuid, p_accept boolean, p_reason text)', // T15: owner, app_admin (checked inside)
     'public.receipt_states(p_since date)', // C3: quantities and states, no price
     'public.stock_arrived_pending(p_plant uuid)', // C3: quantities per component
     'public.set_order_pumped_by_code(p_code text, p_pumped boolean)',

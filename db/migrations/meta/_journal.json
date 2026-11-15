@@ -1065,6 +1065,13 @@
       "when": 1793806272023,
       "tag": "0228_purge_staging",
       "breakpoints": true
+    },
+    {
+      "idx": 229,
+      "version": "7",
+      "when": 1793806332023,
+      "tag": "0229_stock_count_tolerance",
+      "breakpoints": true
     }
   ]
 }

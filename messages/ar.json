@@ -2868,6 +2868,8 @@
       "loss_recorded": "تم تسجيل خسارة",
       "receipt_rejected": "تم استلام توريد مع كمية مرفوضة",
       "receipt_variance": "فرق بين عدّ المحطة واستلام المكتب",
+      "stock_count_variance": "جرد خارج التسامح ينتظر القرار",
+      "stock_count_decided": "قرار بخصوص جرد المخزون",
       "transfer": "تحويل بين المحطتين",
       "day_close_blocking": "إقفال اليوم متوقف",
       "document_request": "طلب مستند",
