@@ -68,7 +68,9 @@ Ask for small, testable tasks, with security and the rules engine first, UI and 
 
 ## T19 follow-up (15 Nov 2026): what comes next for the 1 Dec go-live
 - **T19b** (D246): the historical posting path for Jan-Nov (source = historical_import, batch id) and the importer kinds for Ventes, Encaissements, Achats, Paiements, Charges; cash count with variance; bank reconciliation; monthly close and lock; daily checklist; monthly owner table.
-- **Finish T19 partials** (see docs/reviews/T19-REPORT.md): per-invoice aging and loans/leasing/opening stock in the opening importer; the order form showing that a client requires its PO and searching by alias; HT/TTC basis in the ledger; owner approvals-inbox entry for outgoing payments above the upper limit; charges feeding the finance entries.
-- **Owner decisions on Monday 16 Nov**: the two payment-control limits (1 000 and 5 000 MAD, parameters on the settings screen); whether a private individual's building-site address counts as a "personal address" (D249 scan exception).
+- **T19b, charges feed the finance entries** (decided 15 Nov): charges must feed `finance_entry` from 1 Dec, together with the monthly owner table.
+- **Read the opening detail** (T19-close A stored it): statements, reminders and an aging view that read the per-invoice open items instead of the single line; the loan and leasing instalments in the cash forecast and the J-1 style due list; the same handover-day rule for cheques in transit.
+- **Still partial from T19**: HT/TTC basis in the ledger; owner approval above the upper limit has no second-factor mark in the database door (SECURITY-DEBT); reminder log PDF; Excel export of charges.
+- **Owner decisions on Monday 16 Nov**: the two payment-control limits (1 000 and 5 000 MAD, parameters on the settings screen); whether a private individual's building-site address counts as a "personal address" (D249): the four `_enc` columns stay allow-listed meanwhile and the question for the lawyer is in SECURITY-DEBT.
 - **T20** (D251): the fictitious realistic twin seed.
 - **Final audit**: every row of docs/SECURITY-DEBT.md dated 2026-11-15 under T19; run the data-scope scan and the office-money-read tests again.
