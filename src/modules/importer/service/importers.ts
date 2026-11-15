@@ -210,6 +210,17 @@ export const COLUMNS = {
     bank: ['bank', 'banque'],
     amount: ['amount', 'montant'],
     written: ['written', 'date', 'date cheque', 'date chèque', 'date ecriture', 'date écrite', 'date lcn'],
+    // T19c C (D246): the due date (an LCN falls due on another date than the one written) and the day the cheque was received (default: the opening date, never the import day)
+    due: ['due', 'due date', 'echeance', 'échéance', 'date echeance', 'date échéance'],
+    received: [
+      'received',
+      'date reception',
+      'date réception',
+      'date de reception',
+      'date de réception',
+      'reçu le',
+      'recu le',
+    ],
   },
   // A component and, when given, the purchase unit it is bought in (e.g. "sac 50 kg" = 50000 g).
   components: {
@@ -323,7 +334,7 @@ export const REQUIRED_FIELDS: Record<ImportKind, string[]> = {
   pumps: ['code', 'plate'],
   selling_prices: ['type', 'price', 'from'],
   opening_balances: ['party', 'code', 'amount'],
-  cheques_in_transit: ['client', 'method', 'number', 'amount', 'written'],
+  cheques_in_transit: ['client', 'method', 'number', 'amount'],
   components: ['nameFr', 'unit'],
   recipes: ['type', 'component', 'qty', 'from'],
   invoice_sequence: ['year', 'last'],
@@ -839,6 +850,8 @@ async function plan(
     for (const i of (await listInstruments(appPool, actor)).filter((x) => x.direction === 'in'))
       haveByKey.set(`${i.partyId}|${(i.number ?? '').toLowerCase()}|${(i.bank ?? '').toLowerCase()}`, i);
     const have = { has: (k: string) => haveByKey.has(k) };
+    const openingDate =
+      (await getOpeningState(appPool, actor)).openingDate ?? ctx.openingDate ?? OPENING_DATE;
     const seen = new Set<string>();
     for (const { row, values: v } of records) {
       const clientId = clients.get(v.client.trim().toLowerCase());
@@ -848,7 +861,13 @@ async function plan(
           ? 'lcn'
           : null;
       const amount = parseImportAmount(v.amount);
-      const written = toIsoDate(v.written, ctx.dateFormat);
+      // D246 (T19c C): a cheque or LCN in transit carries the dates of the sheet: written, due and the day it was received (default: the opening date, never the import day)
+      const writtenIso = v.written.trim() ? toIsoDate(v.written, ctx.dateFormat) : null;
+      const dueIso = v.due.trim() ? toIsoDate(v.due, ctx.dateFormat) : null;
+      const receivedIso = v.received.trim() ? toIsoDate(v.received, ctx.dateFormat) : openingDate;
+      const written = writtenIso ?? dueIso;
+      // a cheque falls due on the date written on it: a due date is kept only when it differs
+      const due = written && dueIso && dueIso !== written ? dueIso : null;
       const label = `${v.number} ${v.client}`;
       const key = `${clientId}|${v.number.toLowerCase()}|${v.bank.toLowerCase()}`;
       if (ambClients.has(v.client.trim().toLowerCase())) planned.push({ row, label, error: AMBIGUOUS });
@@ -861,11 +880,20 @@ async function plan(
           label,
           error: `amount in MAD: ${amount.ok ? 'must be above zero' : amount.reason}`,
         });
-      else if (!written)
+      else if (!written || (v.written.trim() && !writtenIso) || (v.due.trim() && !dueIso) || !receivedIso)
         planned.push({
           row,
           label,
-          error: `date not understood or ambiguous (expected ${ctx.dateFormat ?? 'dmy'})`,
+          error: `written, due or reception date missing, not understood or ambiguous (expected ${ctx.dateFormat ?? 'dmy'}); the written date or the due date is required`,
+        });
+      else if (due !== null && due < written)
+        planned.push({ row, label, error: 'the due date is before the date written on the paper' });
+      else if (receivedIso > openingDate)
+        planned.push({
+          row,
+          label,
+          error:
+            'received after the opening date: it is not an opening row, enter it as a receipt in the application',
         });
       else if (have.has(key)) {
         const e = haveByKey.get(key)!;
@@ -873,6 +901,7 @@ async function plan(
           ['amount', amount.value, e.amountCentimes],
           ['type', method, e.method],
           ['written date', written, e.writtenDate],
+          ['due date', due, e.dueDate],
         ]);
         planned.push(d.length ? { row, label, error: conflictMessage(d) } : { row, label, exists: true });
       } else if (seen.has(key)) planned.push({ row, label, error: 'twice in the file' });
@@ -893,7 +922,7 @@ async function plan(
                 bank: nul(v.bank),
                 writtenDate: written,
               },
-              { today: ctx.today ?? realClock.now().toISOString().slice(0, 10), source: 'opening_30_11' },
+              { today: receivedIso, source: 'opening_30_11', dueDate: due },
             );
             return r.ok ? null : fail(r);
           },

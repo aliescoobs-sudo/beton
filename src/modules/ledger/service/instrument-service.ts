@@ -234,7 +234,7 @@ export async function receiveInstrument(
   appPool: pg.Pool,
   actor: SessionUser,
   input: unknown,
-  deps: { today: string; source?: 'opening_30_11' },
+  deps: { today: string; source?: 'opening_30_11'; dueDate?: string | null },
 ): Promise<Result<InstrumentRef, InstrumentError>> {
   await require(appPool, actor, 'instruments.write');
   const parsed = parseReceiveInput(input);
@@ -246,6 +246,8 @@ export async function receiveInstrument(
     { ...parsed.value, partyId: parsed.value.clientId },
     deps.today,
     deps.source ?? null,
+    null,
+    deps.dueDate ?? null,
   );
 }
 

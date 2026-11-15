@@ -369,3 +369,96 @@ describe('issued cheques carry the dates of the sheet', () => {
     expect(noDate.counts.error).toBe(1);
   });
 });
+
+describe('received cheques in transit carry the dates of the sheet (T19c C)', () => {
+  const head = ['Client', 'Type', 'Numéro', 'Banque', 'Montant', 'Date', 'Échéance', 'Date de réception'];
+  // the reception day must not be after the opening date (the shared test database may hold any opening date): the day before it
+  const before = () => {
+    const d = new Date(`${opening}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() - 1);
+    return d.toISOString().slice(0, 10);
+  };
+  const after = () => {
+    const d = new Date(`${opening}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + 1);
+    return d.toISOString().slice(0, 10);
+  };
+  const dmy = (iso: string) => `${iso.slice(8)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
+  it('keeps written date, due date and the reception day (the opening date, never the import day); totals control, idempotent, owner only, rejection report', async () => {
+    const cli = `Client effets reçus ${tag}`;
+    await run(
+      'clients',
+      [
+        ['Nom', 'Type'],
+        [cli, 'société'],
+      ],
+      true,
+    );
+    const rows = [
+      head,
+      [cli, 'chèque', `RC${tag}1`, 'BMCE', '2 000,00', '20/12/2026', '', ''],
+      [cli, 'LCN', `RL${tag}2`, 'BMCE', '3 500,50', '01/11/2026', '31/12/2026', dmy(before())],
+    ];
+    const dry = await run('cheques_in_transit', rows, false);
+    expect(dry.counts).toMatchObject({ new: 2, error: 0 });
+    expect(dry.totals).toMatchObject({
+      rows: 2,
+      writable: 2,
+      fileCentimes: 550_050,
+      writableCentimes: 550_050,
+    });
+    expect(formatReport(dry)).toContain('TOTALS CONTROL');
+    const real = await run('cheques_in_transit', rows, true);
+    expect(real.counts).toMatchObject({ created: 2, failed: 0 });
+    const list = (await listInstruments(app, owner)).filter((i) => i.partyName === cli);
+    const cheque = list.find((i) => i.number === `RC${tag}1`)!;
+    const lcn = list.find((i) => i.number === `RL${tag}2`)!;
+    expect([cheque.writtenDate, cheque.dueDate, cheque.receivedDate]).toEqual(['2026-12-20', null, opening]);
+    expect([lcn.writtenDate, lcn.dueDate, lcn.receivedDate]).toEqual(['2026-11-01', '2026-12-31', before()]);
+    expect(lcn.events[0]).toMatchObject({ event: 'received', atDate: before() });
+    const marks = await migrator.query(
+      `select distinct source from payment_instrument where number in ($1, $2)`,
+      [`RC${tag}1`, `RL${tag}2`],
+    );
+    expect(marks.rows).toEqual([{ source: 'opening_30_11' }]);
+    // idempotent; a changed due date on a loaded paper blocks the file instead of being skipped
+    expect((await run('cheques_in_transit', rows, true)).counts).toMatchObject({ exists: 2, created: 0 });
+    const changed = await run(
+      'cheques_in_transit',
+      [head, [cli, 'LCN', `RL${tag}2`, 'BMCE', '3 500,50', '01/11/2026', '31/01/2027', dmy(before())]],
+      false,
+    );
+    expect(changed.counts.error).toBe(1);
+    // an Échéance-only sheet works; the rejection report names the rows that are refused and nothing is written
+    const only = await run(
+      'cheques_in_transit',
+      [
+        ['Client', 'Type', 'Numéro', 'Banque', 'Montant', 'Échéance'],
+        [cli, 'chèque', `RC${tag}3`, 'BMCE', '10', '15/01/2027'],
+      ],
+      true,
+    );
+    expect(only.counts).toMatchObject({ created: 1 });
+    const bad = await run(
+      'cheques_in_transit',
+      [
+        head,
+        [cli, 'LCN', `RL${tag}4`, 'BMCE', '10', '01/12/2026', '01/11/2026', ''], // due before written
+        [cli, 'chèque', `RC${tag}5`, 'BMCE', '10', '01/12/2026', '', dmy(after())], // received after the opening date
+        [cli, 'chèque', `RC${tag}6`, 'BMCE', '10', '', '', ''], // no date at all
+        [cli, 'chèque', `RC${tag}7`, 'BMCE', '10', 'pas une date', '', ''],
+      ],
+      true,
+    );
+    expect(bad.counts.error).toBe(4);
+    expect(bad.rows.filter((r) => r.status === 'error').map((r) => r.row)).toEqual([2, 3, 4, 5]);
+    const left = await migrator.query(`select count(*)::int n from payment_instrument where number like $1`, [
+      `R%${tag}%`,
+    ]);
+    expect(left.rows[0].n).toBe(3); // RC1, RL2, RC3: nothing of the refused file
+    // only the owner or app_admin write opening rows
+    await expect(
+      runImport('cheques_in_transit', readSheet(buildXlsx(rows)), ctx(true, office)),
+    ).rejects.toThrow();
+  });
+});
