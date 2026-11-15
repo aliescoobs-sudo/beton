@@ -203,3 +203,4 @@ export {
   type PumpCheckKind,
   type PumpCheckRow,
 } from './service/pump-check-service';
+export { loadFuelCheck, type FuelCheckError, type FuelCheckRow } from './service/fuel-check-service';

@@ -283,6 +283,7 @@ describe('T16 G5: the A1 seed is data, flagged as an assumption, and nothing els
     expect(Object.fromEntries(rates.map((r) => [r.k, Number(r.v)]))).toEqual({
       delivery_other_per_m3: 2125,
       diesel_per_l: 1700,
+      fuel_variance_threshold_bp: 1000, // T17 G11: 10 % (basis points)
       overhead_per_m3: 3000,
       plant_per_m3: 4000,
       pump_per_m3: 4000,

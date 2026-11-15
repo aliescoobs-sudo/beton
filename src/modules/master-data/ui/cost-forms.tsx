@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl';
 import { type FormEvent, useState } from 'react';
 import { parseCentimes } from '@/lib/money';
 import { Button } from '@/ui';
-import { parseLitresToMl } from '../domain/cost-input';
+import { parseLitresToMl, parsePercentToBp } from '../domain/cost-input';
 
 type Answer = { ok: true } | { ok: false; error: string };
 type Replace = (input: unknown) => Promise<Answer>;
@@ -120,6 +120,43 @@ export function CostForms({
         {common}
         <Button type="submit" small>
           {t('replaceRate')}
+        </Button>
+      </form>
+
+      <form
+        className="form-band mb-3 flex flex-wrap items-end gap-2"
+        data-testid="costs-threshold-form"
+        onSubmit={(e) =>
+          submit(
+            e,
+            (d) => {
+              const bp = parsePercentToBp(text(d, 'pct'));
+              return bp === null
+                ? null
+                : {
+                    key: 'fuel_variance_threshold_bp',
+                    valueCentimes: bp,
+                    effectiveFrom: text(d, 'from'),
+                    plantId: null,
+                    sourceNote: text(d, 'source'),
+                    reason: text(d, 'reason'),
+                  };
+            },
+            replaceRate,
+          )
+        }
+      >
+        <div className="basis-full">
+          <span className="field-label">{t('fuelThreshold.title')}</span>
+          <p className="text-sm">{t('fuelThreshold.hint')}</p>
+        </div>
+        <label className="block">
+          <span className="field-label">{t('fuelThreshold.valuePct')}</span>
+          <input name="pct" required inputMode="decimal" dir="ltr" className="input num mt-1 w-28" />
+        </label>
+        {common}
+        <Button type="submit" small>
+          {t('fuelThreshold.replace')}
         </Button>
       </form>
 

@@ -3345,12 +3345,14 @@
         "delivery_other_per_m3": "Livraison hors carburant par m³",
         "pump_per_m3": "Pompe par m³",
         "plant_per_m3": "Centrale par m³",
-        "overhead_per_m3": "Frais généraux par m³"
+        "overhead_per_m3": "Frais généraux par m³",
+        "fuel_variance_threshold_bp": "Seuil d'écart carburant"
       }
     },
     "units": {
       "centimes_per_l": "MAD/L",
-      "centimes_per_m3": "MAD/m³"
+      "centimes_per_m3": "MAD/m³",
+      "bp": "%"
     },
     "kinds": {
       "mixer": "Toupie",
@@ -3389,6 +3391,12 @@
       "NOT_ALLOWED": "Action non autorisée",
       "NOT_AFTER_LAST_VERSION": "La date doit être postérieure à la dernière version",
       "FORBIDDEN": "Action non autorisée"
+    },
+    "fuelThreshold": {
+      "title": "Seuil d'écart carburant",
+      "hint": "Un camion est signalé quand le carburant servi dépasse l'attendu de plus de ce pourcentage.",
+      "valuePct": "Seuil (%)",
+      "replace": "Remplacer le seuil"
     }
   },
   "margins": {
@@ -3467,6 +3475,43 @@
         "title": "BL en goulotte un jour de pompe du même client",
         "note": "À vérifier : le mode du BL est peut-être faux."
       }
+    }
+  },
+  "fuelCheck": {
+    "link": "Contrôle carburant",
+    "title": "Contrôle carburant",
+    "intro": "Litres réellement servis à chaque camion, comparés à la norme (litres par voyage pour les toupies, litres par heure de pompage pour les pompes). Réservé au propriétaire et à l'administrateur. Un écart au-dessus du seuil est signalé ; le seuil se règle sur la page Coûts.",
+    "assumedThreshold": "Le seuil d'écart est une valeur supposée : à remplacer sur la page Coûts.",
+    "from": "Du",
+    "to": "Au",
+    "plant": "Centrale",
+    "apply": "Appliquer",
+    "invalid": "Période refusée (401 jours au plus).",
+    "none": "Aucun voyage ni plein sur cette période.",
+    "month": "Mois",
+    "truck": "Camion",
+    "basis": "Base",
+    "units": "Voyages ou missions",
+    "expected": "Attendu (L)",
+    "measured": "Servi (L)",
+    "variance": "Écart (L)",
+    "variancePct": "Écart",
+    "threshold": "Seuil",
+    "state": "État",
+    "flagged": "Écart au-dessus du seuil",
+    "ok": "Dans le seuil",
+    "noNorm": "{count, plural, one {# voyage sans norme} other {# voyages sans norme}}",
+    "noThreshold": "Pas de seuil",
+    "kinds": {
+      "mixer": "toupie",
+      "pump": "pompe",
+      "external": "externe",
+      "hauler": "transport"
+    },
+    "bases": {
+      "trips": "voyages",
+      "hours": "heures de pompage",
+      "none": "pleins seulement"
     }
   }
 }

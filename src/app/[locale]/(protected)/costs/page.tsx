@@ -1,7 +1,7 @@
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { formatCentimes } from '@/lib/money';
 import { getPool } from '@/lib/db/pools';
-import { formatMl, loadCostScreen } from '@/modules/master-data';
+import { formatBp, formatMl, loadCostScreen } from '@/modules/master-data';
 import { CostForms } from '@/modules/master-data/ui/cost-forms';
 import { requirePagePermission } from '@/modules/platform-security/next';
 import { EmptyState, PageHeader, StatusPill, Table, Td, Th } from '@/ui';
@@ -62,7 +62,8 @@ export default async function CostsPage({ params }: { params: Promise<{ locale: 
                 <Td>{t(`rates.keys.${r.key}` as never)}</Td>
                 <Td>
                   <bdi dir="ltr">
-                    {formatCentimes(r.valueCentimes)} {t(`units.${r.unit}` as never)}
+                    {r.unit === 'bp' ? formatBp(r.valueCentimes) : formatCentimes(r.valueCentimes)}{' '}
+                    {t(`units.${r.unit}` as never)}
                   </bdi>
                 </Td>
                 <Td>

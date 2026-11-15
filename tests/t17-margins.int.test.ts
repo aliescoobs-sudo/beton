@@ -8,6 +8,7 @@ import {
   marginsOf,
   salePriceCentimes,
   costBlocks,
+  mulDivRound,
 } from '../src/modules/operations/domain/cost-arithmetic';
 import { listGridInForce } from '../src/modules/master-data';
 import type { SessionUser } from '../src/modules/platform-security/auth/session-gate';
@@ -460,5 +461,172 @@ describe('T17 G10: the pump check', () => {
     expect(listed).toContain(a.blNo);
     expect(await flag(served.id)).toBe(false);
     expect(listed).not.toContain(served.blNo);
+  });
+});
+
+describe('T17 G11: the fuel check', () => {
+  const J1 = '2026-01-01';
+  const J2 = '2026-01-31';
+  const check = (u: U, plant: string | null = null) =>
+    call(u, `select * from public.fuel_check($1, $2, $3)`, [J1, J2, plant]).then((r) => r.rows as LRow[]);
+  const fill = (truck: string, day: string, ml: number, plant = w.plantA) =>
+    w.sup(
+      `insert into fuel_fill (id, truck_id, filled_on, litres_ml, source, plant_id, created_by) values (gen_random_uuid(), $1, $2, $3, 'tank', $4, $5)`,
+      [truck, day, ml, plant, w.owner.id],
+    );
+  const rowOf = async (u: U, truck: string) => (await check(u)).find((r) => r.o_truck_id === truck);
+
+  beforeAll(async () => {
+    // truck B (plant B): three loads in January, each with the mixer norm of the A1 seed (22 L per trip) frozen in its snapshot
+    for (const day of ['2026-01-12', '2026-01-13', '2026-01-14'])
+      await loadOf(fxB25P, 1000, 'GOULOTTE', day, w.truckB, w.plantB);
+    await fill(w.truckB, '2026-01-10', 50_000, w.plantB);
+    await fill(w.truckB, '2026-01-20', 30_000, w.plantB);
+    // truck N (a hired truck): a norm of its own from 20 January only, so the load of the 12th has none
+    await call(
+      w.owner,
+      `select public.set_fuel_norm(null, $1, 22000, null, null, '2026-01-20', 'fictitious norm', 'fictitious test norm')`,
+      [w.truckN],
+    );
+    await loadOf(fxB25P, 1000, 'GOULOTTE', '2026-01-12', w.truckN, w.plantA);
+    await loadOf(fxB25P, 1000, 'GOULOTTE', '2026-01-25', w.truckN, w.plantA);
+    await fill(w.truckN, '2026-01-15', 60_000);
+    // truck A: pumping hours, a per-hour norm of 30 L, one job pumping 2,5 hours on the 15th, 80 L filled
+    await call(
+      w.owner,
+      `select public.set_fuel_norm(null, $1, null, 30000, null, '2026-01-01', 'fictitious norm', 'fictitious test norm')`,
+      [w.truckA],
+    );
+    const job = (
+      await w.sup<{ id: string }>(
+        `insert into pump_job (id, job_date, pump_id, operator_id, client_id, site_label, plant_id, created_by) values (gen_random_uuid(), '2026-01-15', $1, $2, $3, 'chantier fictif', $4, $5) returning id`,
+        [w.truckA, w.driverA, w.scene.clientId, w.plantA, w.owner.id],
+      )
+    )[0]!;
+    for (const [step, at, m3] of [
+      ['pumping_started', '2026-01-15T08:00:00Z', null],
+      ['pumping_ended', '2026-01-15T10:30:00Z', 20],
+    ] as const)
+      await w.sup(
+        `insert into pump_job_event (id, job_id, step, at, m3_pumped, client_key, created_by) values (gen_random_uuid(), $1, $2, $3, $4, $5, $6)`,
+        [job.id, step, at, m3, `${marker}-${step}`, w.owner.id],
+      );
+    await fill(w.truckA, '2026-01-16', 80_000);
+  });
+
+  it('expected litres are the frozen norm of each live trip; measured are the fills; the variance is in basis points of the expected, above the threshold it is flagged', async () => {
+    const r = (await rowOf(w.owner, w.truckB))!;
+    expect(r).toMatchObject({
+      o_month: '2026-01',
+      o_basis: 'trips',
+      o_units: 3,
+      o_no_norm_units: 0,
+      o_fills: 2,
+      o_expected_ml: '66000',
+      o_measured_ml: '80000',
+      o_variance_ml: '14000',
+      o_variance_bp: 2121, // 14 000 / 66 000 = 21,21 %
+      o_threshold_bp: 1000,
+      o_threshold_assumption: true,
+      o_flagged: true,
+    });
+    // the same integer arithmetic as the twin
+    expect(mulDivRound(14_000n * 10_000n, 66_000n)).toBe(2121n);
+  });
+
+  it('a trip with no norm gives no variance and no flag (the expected figure would be a part); a pump is expected by its pumping hours', async () => {
+    const n = (await rowOf(w.owner, w.truckN))!;
+    expect(n).toMatchObject({
+      o_units: 2,
+      o_no_norm_units: 1,
+      o_expected_ml: null,
+      o_variance_ml: null,
+      o_variance_bp: null,
+      o_flagged: false,
+      o_measured_ml: '60000',
+    });
+    const p = (await rowOf(w.owner, w.truckA))!;
+    // 30 000 ml per hour x 9 000 s / 3 600 = 75 000 ml; 80 000 filled: +5 000 = 666 bp, under the 10 % threshold
+    expect(p).toMatchObject({
+      o_basis: 'hours',
+      o_units: 1,
+      o_expected_ml: '75000',
+      o_measured_ml: '80000',
+      o_variance_ml: '5000',
+      o_variance_bp: 667,
+      o_flagged: false,
+    });
+    expect(mulDivRound(5_000n * 10_000n, 75_000n)).toBe(667n);
+  });
+
+  it('the owner edits the threshold through set_cost_rate (a new row, no longer an assumption); a plant threshold wins over the all-plants one', async () => {
+    await call(
+      w.owner,
+      `select public.set_cost_rate('fuel_variance_threshold_bp', 3000, '2026-01-02', $1, 'fictitious threshold', 'fictitious test threshold')`,
+      [w.plantB],
+    );
+    const r = (await rowOf(w.owner, w.truckB))!;
+    expect(r).toMatchObject({
+      o_threshold_bp: 3000,
+      o_threshold_assumption: false,
+      o_flagged: false,
+      o_variance_bp: 2121,
+    });
+    // a threshold is 1 to 10 000 bp and the unit follows the key
+    expect(
+      await code(() =>
+        call(
+          w.owner,
+          `select public.set_cost_rate('fuel_variance_threshold_bp', 0, '2026-02-02', $1, 'fictitious', 'fictitious test')`,
+          [w.plantB],
+        ),
+      ),
+    ).toBe('23514');
+    expect(
+      await code(() =>
+        call(
+          w.owner,
+          `select public.set_cost_rate('fuel_variance_threshold_bp', 20000, '2026-02-02', $1, 'fictitious', 'fictitious test')`,
+          [w.plantB],
+        ),
+      ),
+    ).toBe('23514');
+    expect(
+      (
+        await w.sup<{ u: string }>(
+          `select unit u from cost_rate where rate_key = 'fuel_variance_threshold_bp' and plant_id = $1`,
+          [w.plantB],
+        )
+      )[0]!.u,
+    ).toBe('bp');
+    // every other role is refused on the threshold write too
+    for (const u of [w.pmA, w.purchases, w.sales, w.accountant, w.partner, w.support, w.driverUserA])
+      expect(
+        await code(() =>
+          call(
+            u,
+            `select public.set_cost_rate('fuel_variance_threshold_bp', 1500, '2026-03-02', null, 'fictitious', 'fictitious test')`,
+          ),
+        ),
+        u.role,
+      ).toBe('42501');
+  });
+
+  it('owner and app_admin read; every other role is refused (42501); no actor, nothing written; a bad period is 23514; the plant filter narrows', async () => {
+    expect((await check(w.appAdmin)).length).toBeGreaterThan(0);
+    for (const u of [w.pmA, w.purchases, w.sales, w.accountant, w.partner, w.support, w.driverUserA])
+      expect(await code(() => check(u)), u.role).toBe('42501');
+    expect(
+      await noActorOffenders(app, `select * from public.fuel_check('2026-01-01', '2026-01-31', null)`, [], {
+        plantManager: w.pmA.id,
+        driver: w.driverUserA.id,
+      }),
+    ).toEqual([]);
+    expect(
+      await code(() => call(w.owner, `select * from public.fuel_check('2026-01-01', '2027-12-31', null)`)),
+    ).toBe('23514');
+    expect(
+      (await check(w.owner, w.plantB)).every((r) => r.o_plant_code !== null && r.o_truck_id === w.truckB),
+    ).toBe(true);
   });
 });

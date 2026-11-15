@@ -415,6 +415,12 @@ const GROUPS: GroupDef[] = [
         allowed: 'costs.manage',
       },
       {
+        path: '/fuel-check',
+        labelKey: 'fuelCheck.link',
+        testId: 'fuel-check-link',
+        allowed: 'fuel_check.read',
+      },
+      {
         path: '/margins',
         labelKey: 'margins.link',
         testId: 'margins-link',

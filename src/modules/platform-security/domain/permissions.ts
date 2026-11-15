@@ -355,6 +355,8 @@ export const PERMISSIONS = {
   'bl_margins.read': ['owner', 'app_admin'],
   // T17 G10 (D243): the pump check (POMPE BLs with no pump job, pump jobs with no POMPE BL, GOULOTTE BLs on a pump day): quantities and references only, no cost; the plant manager sees his plant only (the door binds it)
   'pump_check.read': ['owner', 'app_admin', 'plant_manager'],
+  // T17 G11 (SPEC-cost-margin §8): measured litres against the norm, per truck and month; owner and app_admin only (the threshold is a cost parameter edited on /costs)
+  'fuel_check.read': ['owner', 'app_admin'],
   'grid.read': ['owner', 'app_admin', 'office_sales'],
   'reorder.create': ['plant_manager'],
   'reorder.read': ['owner', 'app_admin', 'plant', 'plant_manager', 'office_purchases'],

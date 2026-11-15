@@ -31,6 +31,8 @@ const COST_RATES: readonly (readonly [string, number, string])[] = [
   ['pump_per_m3', 4_000, 'assumption A1: pump about 40 DH/m3 (invented)'],
   ['plant_per_m3', 4_000, 'assumption A1: plant about 40 DH/m3 (invented)'],
   ['overhead_per_m3', 3_000, 'assumption A1: overheads about 30 DH/m3 (invented)'],
+  // the fuel check flags a truck-month whose measured litres exceed the expected ones by more than this (basis points: 1 000 = 10 %)
+  ['fuel_variance_threshold_bp', 1_000, 'assumption A1: flag a fuel variance above 10 % (invented)'],
 ];
 
 /** A mixer burns about 22 L per 30 km round trip of 8 m3 (assumption A1), in millilitres. */
@@ -90,7 +92,7 @@ export async function seedCostAssumptions(tx: Tx): Promise<void> {
   for (const [key, value, note] of COST_RATES) {
     await tx.query(
       `insert into cost_rate (rate_key, unit, value_centimes, effective_from, plant_id, is_assumption, source_note, reason, created_by)
-       select $1, case when $1 = 'diesel_per_l' then 'centimes_per_l' else 'centimes_per_m3' end, $2, $3, null, true, $4, $5, $6
+       select $1, case $1 when 'diesel_per_l' then 'centimes_per_l' when 'fuel_variance_threshold_bp' then 'bp' else 'centimes_per_m3' end, $2, $3, null, true, $4, $5, $6
         where not exists (select 1 from cost_rate r where r.rate_key = $1 and r.plant_id is null)`,
       [key, value, A1_FROM, note, `${A1}: to replace by the real value`, by],
     );

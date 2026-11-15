@@ -213,6 +213,7 @@ describe('functions the application role can execute', () => {
     'public.bl_margin_list(p_from date, p_to date, p_plant uuid, p_class uuid, p_method text, p_client uuid, p_scope text, p_limit integer)', // T17 G9: owner, app_admin (per-BL margins from the snapshot)
     'public.margin_summary(p_group text, p_from date, p_to date, p_plant uuid, p_class uuid, p_method text, p_client uuid)', // T17 G9: owner, app_admin (aggregated margins)
     'public.pump_check(p_from date, p_to date, p_plant uuid)', // T17 G10: owner, app_admin, the plant manager of his own plant (references and quantities, no cost)
+    'public.fuel_check(p_from date, p_to date, p_plant uuid)', // T17 G11: owner, app_admin (litres and basis points, no money)
     'public.cost_rates_list()', // T16 G5: owner, app_admin
     'public.fuel_norms_list()', // T16 G5: owner, app_admin
     'public.purchase_transports_list()', // T16 G5: owner, app_admin

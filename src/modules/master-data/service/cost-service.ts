@@ -16,6 +16,8 @@ export const COST_RATE_KEYS = [
   'pump_per_m3',
   'plant_per_m3',
   'overhead_per_m3',
+  // T17 G11: the fuel check threshold, in basis points of the expected litres (1000 = 10 %); the value column holds basis points, not centimes
+  'fuel_variance_threshold_bp',
 ] as const;
 export const FUEL_KINDS = ['mixer', 'pump', 'external', 'hauler'] as const;
 export const DISCHARGE_METHODS = ['GOULOTTE', 'POMPE'] as const;

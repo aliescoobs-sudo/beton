@@ -1128,6 +1128,13 @@
       "when": 1794065832023,
       "tag": "0237_pump_check",
       "breakpoints": true
+    },
+    {
+      "idx": 238,
+      "version": "7",
+      "when": 1794152232023,
+      "tag": "0238_fuel_check",
+      "breakpoints": true
     }
   ]
 }
