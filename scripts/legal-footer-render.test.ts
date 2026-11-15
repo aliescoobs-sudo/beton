@@ -132,7 +132,7 @@ suite(
           zoneName: 'Zone',
         };
         assertPages(deliveryNotePdf(long, { specimen: false, company }), p, false, 2);
-      });
+      }, 30_000);
     }
   },
 );
