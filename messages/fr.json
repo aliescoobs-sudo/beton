@@ -3438,5 +3438,35 @@
     "bl": "BL",
     "date": "Date",
     "reversal": "annulation"
+  },
+  "pumpCheck": {
+    "link": "Contrôle pompe",
+    "title": "Contrôle pompe",
+    "intro": "Par jour et par centrale : ce qui ne s'accorde pas entre les BL (mode pompe ou goulotte) et les missions de la pompe. Références et quantités seulement.",
+    "from": "Du",
+    "to": "Au",
+    "plant": "Centrale",
+    "apply": "Appliquer",
+    "invalid": "Période refusée (93 jours au plus).",
+    "none": "Rien à signaler sur cette période.",
+    "day": "Jour",
+    "client": "Client",
+    "bl": "BL",
+    "site": "Chantier",
+    "volume": "m³",
+    "kinds": {
+      "pompe_bl_no_job": {
+        "title": "BL en mode pompe sans mission de pompe",
+        "note": "Le coût de pompe de ces BL est à zéro et leur snapshot est incomplet."
+      },
+      "job_no_pompe_bl": {
+        "title": "Missions de pompe sans BL en mode pompe",
+        "note": "Même jour et même centrale : aucun BL en mode pompe ne correspond."
+      },
+      "goulotte_bl_with_job": {
+        "title": "BL en goulotte un jour de pompe du même client",
+        "note": "À vérifier : le mode du BL est peut-être faux."
+      }
+    }
   }
 }

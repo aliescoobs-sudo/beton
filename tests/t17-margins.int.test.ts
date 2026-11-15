@@ -51,12 +51,11 @@ async function loadOf(
   method: 'GOULOTTE' | 'POMPE' | null,
   loadDate = D1,
   truck = w.truckA,
+  plant = w.plantA,
 ) {
   const master = { ...base, typeId: fx.typeId, sellingPriceId: fx.priceId, clientId: w.scene.clientId };
-  const o = await w.asOwnerIn(w.plantA, (tx) =>
-    insertOrder(tx, w.owner.id, master, '2026-06-02', null, method),
-  );
-  const d = await w.asOwnerIn(w.plantA, (tx) =>
+  const o = await w.asOwnerIn(plant, (tx) => insertOrder(tx, w.owner.id, master, '2026-06-02', null, method));
+  const d = await w.asOwnerIn(plant, (tx) =>
     insertDelivery(
       tx,
       w.owner.id,
@@ -71,10 +70,15 @@ async function loadOf(
   return { order: o.id, id: row[0]!.id, blNo: d.blNo };
 }
 /** A pump job of the world's client on a day (the pump truck is a truck of plant A, the operator a driver). */
-const pumpJob = (day: string, client: string | null = w.scene.clientId, pump = w.truckA) =>
+const pumpJob = (
+  day: string,
+  plant: string | null = null,
+  client: string | null = w.scene.clientId,
+  pump = w.truckA,
+) =>
   w.sup(
-    `insert into pump_job (id, job_date, pump_id, operator_id, client_id, site_label, created_by) values (gen_random_uuid(), $1, $2, $3, $4, 'chantier fictif', $5)`,
-    [day, pump, w.driverA, client, w.owner.id],
+    `insert into pump_job (id, job_date, pump_id, operator_id, client_id, site_label, plant_id, created_by) values (gen_random_uuid(), $1, $2, $3, $4, 'chantier fictif', $5, $6)`,
+    [day, pump, w.driverA, client, plant, w.owner.id],
   );
 
 beforeAll(async () => {
@@ -358,5 +362,103 @@ describe('T17 G9: the margin read doors', () => {
         await noActorOffenders(app, sql, [], { plantManager: w.pmA.id, driver: w.driverUserA.id }),
       ).toEqual([]);
     }
+  });
+});
+
+describe('T17 G10: the pump check', () => {
+  const P1 = '2026-02-12';
+  const P2 = '2026-02-13';
+  const P3 = '2026-02-14';
+  const check = (u: U, plant: string | null = null, from = P1, to = P3) =>
+    call(u, `select * from public.pump_check($1, $2, $3)`, [from, to, plant]).then((r) => r.rows as LRow[]);
+  let a: { id: string; blNo: string };
+  let c: { id: string; blNo: string };
+  let bOnly: { id: string; blNo: string };
+  let mismatch: { id: string; blNo: string };
+
+  beforeAll(async () => {
+    // plant A: (a) a POMPE BL with no job on P1; (b) a job with no POMPE BL on P2; (c) a GOULOTTE BL on P3 where a job exists for the same client
+    a = await loadOf(fxB25P, 5000, 'POMPE', P1);
+    await pumpJob(P2, w.plantA);
+    c = await loadOf(fxB20G, 6000, 'GOULOTTE', P3);
+    await pumpJob(P3, w.plantA);
+    // not counted: a cancelled POMPE BL with no job, a BL with no method recorded
+    const gone = await loadOf(fxB25P, 2000, 'POMPE', P1);
+    const done = await cancelLoad(
+      app,
+      w.owner as unknown as SessionUser,
+      { deliveryId: gone.id, reason: 'fictitious cancel' },
+      { today: P1 },
+    );
+    expect(done.ok).toBe(true);
+    await loadOf(fxB20G, 1000, null, P1);
+    // plant B: its own POMPE BL with no job (the plant manager of A must never see it)
+    bOnly = await loadOf(fxB25P, 7000, 'POMPE', P1, w.truckB, w.plantB);
+    // a historical mismatch: a BL of an order of plant A whose own plant is B (the whole tuple is not plant A's)
+    mismatch = await loadOf(fxB25P, 3000, 'POMPE', P1);
+    await w.sup(`update delivery set plant_id = $2 where id = $1`, [mismatch.id, w.plantB], ['delivery']);
+  });
+
+  it('lists the three kinds per day and plant, for the owner; cancelled loads and loads with no method are not counted', async () => {
+    const rows = await check(w.owner, w.plantA);
+    const of = (k: string) => rows.filter((r) => r.o_kind === k);
+    expect(of('pompe_bl_no_job').map((r) => r.o_bl_no)).toContain(a.blNo);
+    expect(of('pompe_bl_no_job').every((r) => r.o_plant_id === w.plantA)).toBe(true);
+    expect(of('job_no_pompe_bl')).toHaveLength(2); // the job of P2 and the job of P3: no POMPE BL on those days
+    expect(of('goulotte_bl_with_job').map((r) => r.o_bl_no)).toEqual([c.blNo]);
+    // the cancelled BL and the legacy one are in no list: the BLs of (a) are `a` and the mismatched one only
+    expect(of('pompe_bl_no_job')).toHaveLength(2);
+    const bothPlants = await check(w.owner, null);
+    expect(bothPlants.some((r) => r.o_bl_no === bOnly.blNo && r.o_plant_id === w.plantB)).toBe(true);
+    expect((await check(w.appAdmin, w.plantA)).length).toBe(rows.length);
+  });
+
+  it('a plant manager sees his own plant only, whatever plant he asks for, and never a BL whose own plant is another', async () => {
+    const mine = await check(w.pmA);
+    expect(mine.every((r) => r.o_plant_id === w.plantA)).toBe(true);
+    expect(mine.map((r) => r.o_bl_no)).toContain(a.blNo);
+    expect(mine.map((r) => r.o_bl_no)).not.toContain(bOnly.blNo);
+    expect(mine.map((r) => r.o_bl_no)).not.toContain(mismatch.blNo);
+    expect((await check(w.pmA, w.plantB)).map((r) => r.o_bl_no)).toEqual(mine.map((r) => r.o_bl_no));
+    const theirs = await check(w.pmB);
+    expect(theirs.map((r) => r.o_bl_no)).toContain(bOnly.blNo);
+    expect(theirs.every((r) => r.o_plant_id === w.plantB)).toBe(true);
+    expect(JSON.stringify(theirs)).not.toContain(a.blNo);
+  });
+
+  it('every other role is refused (42501); a request with no admitted actor is refused with nothing written', async () => {
+    for (const u of [w.purchases, w.sales, w.accountant, w.partner, w.support, w.driverUserA])
+      expect(await code(() => check(u)), u.role).toBe('42501');
+    expect(
+      await noActorOffenders(app, `select * from public.pump_check('2026-02-12', '2026-02-14', null)`, [], {
+        plantManager: w.pmA.id,
+        driver: w.driverUserA.id,
+      }),
+    ).toEqual([]);
+  });
+
+  it('carries no cost figure, and a period over 93 days or reversed is a business error (23514)', async () => {
+    const rows = await check(w.owner, w.plantA);
+    expect(rows.length).toBeGreaterThan(0);
+    for (const k of Object.keys(rows[0]!)) expect(k).not.toMatch(/cost|price|margin|centimes|amount/);
+    expect(await code(() => check(w.owner, null, '2026-01-01', '2026-06-30'))).toBe('23514');
+    expect(await code(() => check(w.owner, null, P3, P1))).toBe('23514');
+  });
+
+  it('the snapshot flag and the check use one definition of "a pump job": a POMPE BL is flagged pump_job_missing exactly when the check lists it', async () => {
+    const served = await loadOf(fxB25P, 1000, 'POMPE', P2); // a job of the same client and plant exists on P2
+    const flag = async (id: string) =>
+      (
+        await w.sup<{ k: string[] }>(`select missing_keys k from bl_cost_snapshot where delivery_id = $1`, [
+          id,
+        ])
+      )[0]!.k.includes('pump_job_missing');
+    const listed = (await check(w.owner, w.plantA))
+      .filter((r) => r.o_kind === 'pompe_bl_no_job')
+      .map((r) => r.o_bl_no);
+    expect(await flag(a.id)).toBe(true);
+    expect(listed).toContain(a.blNo);
+    expect(await flag(served.id)).toBe(false);
+    expect(listed).not.toContain(served.blNo);
   });
 });

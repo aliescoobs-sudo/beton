@@ -353,6 +353,8 @@ export const PERMISSIONS = {
   // T17 G8 (D239): the selling-price GRID as a reference next to an order's price. A selling price, not a cost: office_sales reads it (door price_grid_list); no cost figure comes with it
   // T17 G9 (SPEC-cost-margin §9, §10): the margin read doors and the /margins screen: costs, margins and snapshots are owner and app_admin only (D236)
   'bl_margins.read': ['owner', 'app_admin'],
+  // T17 G10 (D243): the pump check (POMPE BLs with no pump job, pump jobs with no POMPE BL, GOULOTTE BLs on a pump day): quantities and references only, no cost; the plant manager sees his plant only (the door binds it)
+  'pump_check.read': ['owner', 'app_admin', 'plant_manager'],
   'grid.read': ['owner', 'app_admin', 'office_sales'],
   'reorder.create': ['plant_manager'],
   'reorder.read': ['owner', 'app_admin', 'plant', 'plant_manager', 'office_purchases'],
