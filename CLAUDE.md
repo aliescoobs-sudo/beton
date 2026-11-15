@@ -6,3 +6,4 @@
 - No AI action without human confirmation. Pseudonymize data before any AI call.
 - Pilot uses fake data only. Never commit secrets; use environment variables.
 - Business vocabulary follows docs/DOMAIN.md (m³, recette, LCN, échéance...).
+- Security debt: from now on every shortcut or deferred hardening gets one row in docs/SECURITY-DEBT.md (date, area, what, why, what the final audit must verify). No per-task independent review until the final audit. Existing controls (RLS, SECURITY DEFINER doors, audit chain, TOTP, origin check, rate limits) are never removed or weakened. Fictitious data only.
