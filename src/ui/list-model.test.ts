@@ -63,3 +63,11 @@ describe('hrefWith', () => {
     expect(hrefWith('/fr/orders', {}, { page: 2 })).toBe('/fr/orders?page=2');
   });
 });
+
+import { readFileSync } from 'node:fs';
+describe('CSP', () => {
+  it('the list kit and error state set no inline style attribute (style-src has no unsafe-inline)', () => {
+    for (const f of ['src/ui/list-kit.tsx', 'src/ui/error-state.tsx', 'src/app/shell/bottom-bar.tsx'])
+      expect(readFileSync(f, 'utf8'), f).not.toMatch(/\bstyle=\{/);
+  });
+});

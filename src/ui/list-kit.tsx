@@ -87,12 +87,11 @@ export function StatusChips({
             aria-current={on ? 'true' : undefined}
             data-chip={c.value || 'all'}
             className={cn(
-              'inline-flex min-h-11 items-center gap-1.5 border-2 px-3 text-sm font-medium md:min-h-9',
+              'inline-flex min-h-11 items-center gap-1.5 rounded-[6px] border-2 px-3 text-sm font-medium md:min-h-9',
               on
                 ? 'border-forest bg-forest text-white'
                 : 'border-rule bg-surface text-ink hover:border-structure',
             )}
-            style={{ borderRadius: 'var(--radius-control)' }}
           >
             {on && <span aria-hidden="true">✓</span>}
             {c.label}
