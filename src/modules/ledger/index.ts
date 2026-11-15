@@ -205,3 +205,10 @@ export {
   type ReminderError,
   type ReminderView,
 } from './service/reminder-service';
+export {
+  COUNTER_PREFIXES,
+  type CounterError,
+  type CounterPrefix,
+  getDocCounter,
+  setDocCounter,
+} from './service/counter-service';

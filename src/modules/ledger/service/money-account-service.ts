@@ -87,7 +87,7 @@ export async function setOpeningBalance(
   try {
     await inRequest(appPool, actor, (tx) =>
       tx.query(
-        `insert into opening_balance (id, account_id, as_of, amount_centimes, note, created_by) values ($1, $2, $3, $4, $5, $6)`,
+        `insert into opening_balance (id, account_id, as_of, amount_centimes, note, created_by, source) values ($1, $2, $3, $4, $5, $6, 'opening_30_11')`,
         [id, v.accountId, v.asOf, v.amountCentimes, v.note ?? null, actor.id],
       ),
     );

@@ -121,8 +121,8 @@ describe('arguments and refusals', () => {
   });
   it('writes editable mapping files and never overwrites one', () => {
     const d = join(dir, 'init');
-    expect(cli(['--init-mapping', d]).out.match(/written/g)).toHaveLength(11);
-    expect(cli(['--init-mapping', d]).out.match(/kept/g)).toHaveLength(11);
+    expect(cli(['--init-mapping', d]).out.match(/written/g)).toHaveLength(14);
+    expect(cli(['--init-mapping', d]).out.match(/kept/g)).toHaveLength(14);
     expect(readdirSync(d)).toContain('clients.json');
   });
 });

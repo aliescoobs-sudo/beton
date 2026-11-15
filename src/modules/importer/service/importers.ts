@@ -31,11 +31,18 @@ import {
 import {
   addPartyOpeningBalance,
   enterOpeningDate,
+  COUNTER_PREFIXES,
+  getDocCounter,
   getInvoiceSequence,
   getOpeningState,
+  issueInstrument,
   listInstruments,
+  listMoneyAccounts,
   receiveInstrument,
+  setDocCounter,
   setInvoiceSequence,
+  setOpeningBalance,
+  type CounterPrefix,
 } from '@/modules/ledger';
 import type { SessionUser } from '@/modules/platform-security';
 import { type DateFormat, type Sheet, toIsoDate, toRecords } from '../domain/sheet';
@@ -80,6 +87,10 @@ export const IMPORT_KINDS = [
   'components',
   'recipes',
   'invoice_sequence',
+  // T19 item 3 (D246): the rest of the opening position at 30 Nov
+  'doc_counters',
+  'account_balances',
+  'cheques_issued',
 ] as const;
 export type ImportKind = (typeof IMPORT_KINDS)[number];
 
@@ -96,6 +107,11 @@ export interface ImportReport {
   /** A missing column makes the whole file unusable: nothing is read further. */
   missingColumns: string[];
   counts: { new: number; exists: number; error: number; created: number; failed: number };
+  /**
+   * D246 totals control, before anything is written: rows read, rows that would be written, and (for a sheet of amounts) the MAD sum of the file
+   * and of the rows that would be written, in centimes. The operator compares them with the Excel closing figures; nothing but counts and sums is kept.
+   */
+  totals: { rows: number; writable: number; fileCentimes: number | null; writableCentimes: number | null };
 }
 
 interface Planned {
@@ -203,6 +219,28 @@ export const COLUMNS = {
     year: ['year', 'annee', 'année', 'exercice'],
     last: ['last', 'dernier numero', 'dernier numéro', 'dernier numero de facture', 'numero', 'numéro'],
   },
+  // The last number of each paper or Excel series (CMD, BL, ACH, FA): the next document is last + 1 (forward only).
+  doc_counters: {
+    prefix: ['prefix', 'prefixe', 'préfixe', 'serie', 'série', 'type'],
+    year: ['year', 'annee', 'année', 'exercice'],
+    last: ['last', 'dernier numero', 'dernier numéro', 'numero', 'numéro'],
+  },
+  // The opening balance of a cash or bank account (by its label) on the opening date.
+  account_balances: {
+    account: ['account', 'compte', 'caisse', 'banque', 'label', 'libelle', 'libellé'],
+    asOf: ['as of', 'date', 'au', 'date solde'],
+    amount: ['amount', 'montant', 'solde'],
+    note: ['note', 'remarque', 'commentaire'],
+  },
+  // Cheques and LCN we ISSUED and that are not cleared yet (outstanding): supplier, number, bank, amount, written (due) date.
+  cheques_issued: {
+    supplier: ['supplier', 'fournisseur', 'code fournisseur', 'tiers', 'code'],
+    method: ['method', 'type', 'mode', 'nature'],
+    number: ['number', 'numero', 'numéro', 'n°', 'no', 'numero cheque', 'numéro chèque'],
+    bank: ['bank', 'banque'],
+    amount: ['amount', 'montant'],
+    written: ['written', 'date', 'echeance', 'échéance', 'date cheque', 'date chèque', 'date lcn'],
+  },
 } as const satisfies Record<ImportKind, Record<string, readonly string[]>>;
 
 /** A record with every column of its kind present (an empty cell is ''), so a field is a string, never undefined. */
@@ -228,6 +266,9 @@ export const REQUIRED_FIELDS: Record<ImportKind, string[]> = {
   components: ['nameFr', 'unit'],
   recipes: ['type', 'component', 'qty', 'from'],
   invoice_sequence: ['year', 'last'],
+  doc_counters: ['prefix', 'year', 'last'],
+  account_balances: ['account', 'asOf', 'amount'],
+  cheques_issued: ['supplier', 'method', 'number', 'amount', 'written'],
 };
 
 const KIND_ALIASES: Record<string, string> = {
@@ -262,7 +303,7 @@ async function plan(
   kind: ImportKind,
   sheet: Sheet,
   ctx: Ctx,
-): Promise<{ planned: Planned[]; missing: string[] }> {
+): Promise<{ planned: Planned[]; missing: string[]; amounts?: Map<number, number> }> {
   const {
     records: rawRecords,
     missing,
@@ -785,7 +826,7 @@ async function plan(
                 bank: nul(v.bank),
                 writtenDate: written,
               },
-              { today: ctx.today ?? realClock.now().toISOString().slice(0, 10) },
+              { today: ctx.today ?? realClock.now().toISOString().slice(0, 10), source: 'opening_30_11' },
             );
             return r.ok ? null : fail(r);
           },
@@ -821,6 +862,166 @@ async function plan(
               return r.ok ? null : fail(r);
             },
           });
+      }
+    }
+  } else if (kind === 'doc_counters') {
+    const records = rawRecords.map((r) => ({ row: r.row, values: full('doc_counters', r.values) }));
+    const seen = new Set<string>();
+    for (const { row, values: v } of records) {
+      const prefix = v.prefix.trim().toUpperCase() as CounterPrefix;
+      const year = parseWholeNumber(v.year, 2000, 2999);
+      const last = parseWholeNumber(v.last, 1, 99_999_999);
+      const label = `${v.prefix} ${v.year}: ${v.last}`;
+      if (!COUNTER_PREFIXES.includes(prefix))
+        planned.push({ row, label, error: `series must be ${COUNTER_PREFIXES.join(', ')}` });
+      else if (!year.ok) planned.push({ row, label, error: `year: ${year.reason}` });
+      else if (!last.ok) planned.push({ row, label, error: `last number: ${last.reason}` });
+      else if (seen.has(`${prefix}|${year.value}`))
+        planned.push({ row, label, error: 'this series and year twice in the file' });
+      else {
+        seen.add(`${prefix}|${year.value}`);
+        const now = await getDocCounter(appPool, actor, prefix, year.value);
+        if (now !== null && now === last.value) planned.push({ row, label, exists: true });
+        else if (now !== null && now > last.value)
+          planned.push({
+            row,
+            label,
+            error: `numbers up to ${now} are already issued: a counter only moves forward`,
+          });
+        else
+          planned.push({
+            row,
+            label,
+            apply: async () => {
+              const r = await setDocCounter(appPool, actor, { prefix, year: year.value, last: last.value });
+              return r.ok ? null : fail(r);
+            },
+          });
+      }
+    }
+  } else if (kind === 'account_balances') {
+    const records = rawRecords.map((r) => ({ row: r.row, values: full('account_balances', r.values) }));
+    const accounts = await listMoneyAccounts(appPool, actor);
+    const byLabel = new Map(accounts.map((a) => [a.label.trim().toLowerCase(), a] as const));
+    const seen = new Set<string>();
+    for (const { row, values: v } of records) {
+      const account = byLabel.get(v.account.trim().toLowerCase());
+      const amount = parseImportAmount(v.amount);
+      const asOf = toIsoDate(v.asOf, ctx.dateFormat);
+      const label = v.account;
+      if (!account)
+        planned.push({
+          row,
+          label,
+          error: 'unknown cash or bank account (exact label): create it on the accounts screen first',
+        });
+      else if (!amount.ok) planned.push({ row, label, error: `amount in MAD: ${amount.reason}` });
+      else if (!asOf)
+        planned.push({
+          row,
+          label,
+          error: `date not understood or ambiguous (expected ${ctx.dateFormat ?? 'dmy'})`,
+        });
+      else if (seen.has(account.id)) planned.push({ row, label, error: 'this account twice in the file' });
+      else if (account.opening) {
+        seen.add(account.id);
+        const d = differences([
+          ['amount', amount.value, account.opening.amountCentimes],
+          ['date', asOf, account.opening.asOf],
+        ]);
+        planned.push(d.length ? { row, label, error: conflictMessage(d) } : { row, label, exists: true });
+      } else {
+        seen.add(account.id);
+        planned.push({
+          row,
+          label,
+          apply: async () => {
+            const r = await setOpeningBalance(appPool, actor, {
+              accountId: account.id,
+              asOf,
+              amountCentimes: amount.value,
+              note: nul(v.note) ?? null,
+            });
+            return r.ok ? null : fail(r);
+          },
+        });
+      }
+    }
+  } else if (kind === 'cheques_issued') {
+    const records = rawRecords.map((r) => ({ row: r.row, values: full('cheques_issued', r.values) }));
+    const supplierList = await listSuppliers(appPool, actor);
+    const suppliers = new Map<string, string>();
+    for (const x of supplierList) {
+      suppliers.set(x.code.toLowerCase(), x.id);
+      suppliers.set(x.name.trim().toLowerCase(), x.id);
+    }
+    const ambSuppliers = ambiguousKeys(supplierList, (x) => [
+      x.code.toLowerCase(),
+      x.name.trim().toLowerCase(),
+    ]);
+    const haveByKey = new Map<string, Awaited<ReturnType<typeof listInstruments>>[number]>();
+    for (const i of (await listInstruments(appPool, actor)).filter((x) => x.direction === 'out'))
+      haveByKey.set(`${i.partyId}|${(i.number ?? '').toLowerCase()}|${(i.bank ?? '').toLowerCase()}`, i);
+    const seen = new Set<string>();
+    for (const { row, values: v } of records) {
+      const supplierId = suppliers.get(v.supplier.trim().toLowerCase());
+      const m = v.method.trim().toLowerCase();
+      const method = ['cheque', 'chèque', 'check'].includes(m)
+        ? 'cheque'
+        : ['lcn', 'effet'].includes(m)
+          ? 'lcn'
+          : null;
+      const amount = parseImportAmount(v.amount);
+      const written = toIsoDate(v.written, ctx.dateFormat);
+      const label = `${v.number} ${v.supplier}`;
+      const key = `${supplierId}|${v.number.toLowerCase()}|${v.bank.toLowerCase()}`;
+      if (ambSuppliers.has(v.supplier.trim().toLowerCase())) planned.push({ row, label, error: AMBIGUOUS });
+      else if (!supplierId) planned.push({ row, label, error: 'unknown supplier (code or exact name)' });
+      else if (!method) planned.push({ row, label, error: 'type must be cheque or lcn' });
+      else if (!v.number.trim()) planned.push({ row, label, error: 'the cheque or LCN number is required' });
+      else if (!amount.ok || amount.value <= 0)
+        planned.push({
+          row,
+          label,
+          error: `amount in MAD: ${amount.ok ? 'must be above zero' : amount.reason}`,
+        });
+      else if (!written)
+        planned.push({
+          row,
+          label,
+          error: `date not understood or ambiguous (expected ${ctx.dateFormat ?? 'dmy'})`,
+        });
+      else if (haveByKey.has(key)) {
+        const e = haveByKey.get(key)!;
+        const d = differences([
+          ['amount', amount.value, e.amountCentimes],
+          ['type', method, e.method],
+          ['written date', written, e.writtenDate],
+        ]);
+        planned.push(d.length ? { row, label, error: conflictMessage(d) } : { row, label, exists: true });
+      } else if (seen.has(key)) planned.push({ row, label, error: 'twice in the file' });
+      else {
+        seen.add(key);
+        planned.push({
+          row,
+          label,
+          apply: async () => {
+            const r = await issueInstrument(
+              appPool,
+              actor,
+              {
+                supplierId,
+                method,
+                amountCentimes: amount.value,
+                number: v.number,
+                bank: nul(v.bank),
+                writtenDate: written,
+              },
+              { today: ctx.today ?? realClock.now().toISOString().slice(0, 10), source: 'opening_30_11' },
+            );
+            return r.ok ? null : fail(r);
+          },
+        });
       }
     }
   } else {
@@ -936,7 +1137,14 @@ async function plan(
       }
     }
   }
-  return { planned, missing: [] };
+  // D246 totals control: the MAD amount of each row that has an amount column (the same parser as the rows themselves)
+  const amounts = new Map<number, number>();
+  if ('amount' in COLUMNS[kind])
+    for (const r of rawRecords) {
+      const a = parseImportAmount(r.values.amount ?? '');
+      if (a.ok) amounts.set(r.row, a.value);
+    }
+  return { planned, missing: [], amounts };
 }
 
 /**
@@ -967,7 +1175,7 @@ export async function runImport(
   // it wrote to (blind entry); an office role now reads its own side, so the refusal is stated here, not left to a side effect.
   if (ctx.apply && ctx.actor.role !== 'owner' && ctx.actor.role !== 'app_admin')
     throw new Error('the importer writes for the owner and app_admin only');
-  const { planned, missing } = await plan(kind, sheet, ctx);
+  const { planned, missing, amounts } = await plan(kind, sheet, ctx);
   const rows: ImportRow[] = planned.map((p) =>
     p.error
       ? { row: p.row, status: 'error', label: p.label, message: p.error }
@@ -986,7 +1194,16 @@ export async function runImport(
       if (failure) break; // stop at the first refusal: what was written is listed, a re-run continues from here
     }
   }
-  return { kind, dryRun: !ctx.apply || hasError, rows, missingColumns: missing, counts: tally(rows) };
+  const hasAmounts = amounts !== undefined && amounts.size > 0;
+  const totals = {
+    rows: planned.length,
+    writable: planned.filter((p) => p.apply).length,
+    fileCentimes: hasAmounts ? [...amounts.values()].reduce((a, b) => a + b, 0) : null,
+    writableCentimes: hasAmounts
+      ? planned.filter((p) => p.apply).reduce((a, p) => a + (amounts.get(p.row) ?? 0), 0)
+      : null,
+  };
+  return { kind, dryRun: !ctx.apply || hasError, rows, missingColumns: missing, counts: tally(rows), totals };
 }
 
 export function formatReport(report: ImportReport): string {
@@ -995,6 +1212,11 @@ export function formatReport(report: ImportReport): string {
     `${report.dryRun ? 'DRY RUN (nothing written)' : 'IMPORT DONE'}: ${report.kind}`,
     report.missingColumns.length ? `Missing columns: ${report.missingColumns.join(', ')}` : '',
     `new ${c.new} · already there ${c.exists} · errors ${c.error} · created ${c.created} · failed ${c.failed}`,
+    `TOTALS CONTROL: ${report.totals.rows} row(s) read, ${report.totals.writable} to write` +
+      (report.totals.fileCentimes === null
+        ? ''
+        : `; file ${(report.totals.fileCentimes / 100).toFixed(2)} MAD, to write ${((report.totals.writableCentimes ?? 0) / 100).toFixed(2)} MAD`) +
+      ' (compare with the Excel closing figures before applying)',
     ...report.rows
       .filter((r) => r.status === 'error' || r.status === 'failed')
       .map((r) => `  line ${r.row} ${r.label}: ${r.message}`),

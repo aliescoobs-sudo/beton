@@ -17,6 +17,9 @@ export const MAPPING_KINDS = [
   'opening_balances',
   'cheques_in_transit',
   'invoice_sequence',
+  'doc_counters',
+  'account_balances',
+  'cheques_issued',
 ] as const;
 export type MappingKind = (typeof MAPPING_KINDS)[number];
 
@@ -36,6 +39,9 @@ export const APPLY_ORDER: readonly MappingKind[] = [
   'opening_balances',
   'cheques_in_transit',
   'invoice_sequence',
+  'doc_counters',
+  'account_balances',
+  'cheques_issued',
 ];
 
 const headerNames = z

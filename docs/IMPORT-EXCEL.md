@@ -21,7 +21,7 @@ One `.xlsx` with **one sheet per kind**. Sheets are applied in this order whatev
 
 `Types` → `Composants` → `Recettes` → `Clients` → `Fournisseurs` → `Camions` → `Pompes` → `Prix` → `Soldes` → `Cheques` → `Facture`
 
-Those are the built-in sheet names (kind in parentheses): Types (`concrete_types`), Composants (`components`), Recettes (`recipes`), Clients (`clients`), Fournisseurs (`suppliers`), Camions (`trucks`), Pompes (`pumps`), Prix (`selling_prices`), Soldes (`opening_balances`), Cheques (`cheques_in_transit`), Facture (`invoice_sequence`). A sheet nobody maps is left alone and listed in the report. A CSV counts as one sheet called `csv` (map it with `"sheet": "*"`).
+Those are the built-in sheet names (kind in parentheses): Types (`concrete_types`), Composants (`components`), Recettes (`recipes`), Clients (`clients`), Fournisseurs (`suppliers`), Camions (`trucks`), Pompes (`pumps`), Prix (`selling_prices`), Soldes (`opening_balances`), Cheques (`cheques_in_transit`), Facture (`invoice_sequence`), Compteurs (`doc_counters`), Comptes (`account_balances`), ChequesEmis (`cheques_issued`). A sheet nobody maps is left alone and listed in the report. A CSV counts as one sheet called `csv` (map it with `"sheet": "*"`).
 
 Fields per kind (`*` = required; the others may be absent). The names in brackets are the headers accepted **by default**, case and accents ignored; a mapping file replaces them.
 - **concrete_types**: `code*` [code, type, classe], `label*` [label, libellé, désignation, nom]
@@ -35,6 +35,12 @@ Fields per kind (`*` = required; the others may be absent). The names in bracket
 - **opening_balances**: `party*` (client/fournisseur), `code*` (the party's code **or its exact name**), `amount*` (positive; what the party owes us / we owe them), `reference`. The opening date of the books is entered once (`--opening-date YYYY-MM-DD` if none is set yet)
 - **cheques_in_transit**: `client*` (code or exact name), `method*` (chèque / LCN), `number*`, `bank`, `amount*`, `written*` (date on the cheque). Each becomes an instrument *received*, not deposited, not allocated; the duplicate key is client + number + bank
 - **invoice_sequence** (the **last 2026 invoice number**): `year*`, `last*`. The next invoice is `last + 1`; the number only moves forward (a lower or used number is refused; the same number is "already there")
+
+- **doc_counters** (T19, D246: numbering continues from the paper or Excel series): `prefix*` (CMD, BL, ACH or FA), `year*`, `last*`. The next document of that series and year is `last + 1`; forward only
+- **account_balances** (T19, D246: the cash and bank opening): `account*` (the exact label of an existing cash or bank account), `asOf*` (the opening date), `amount*` (MAD, may be negative), `note`
+- **cheques_issued** (T19, D246: cheques and LCN we issued and that are not cleared): `supplier*` (code or exact name), `method*` (chèque / LCN), `number*`, `bank`, `amount*`, `written*` (the date on the cheque = its due date). Each becomes an instrument *issued*; the duplicate key is supplier + number + bank
+
+Every row of the opening position (balances, cheques in transit and issued) is stored with `source = 'opening_30_11'`; only the owner and app_admin can set it, and the tables are insert-only, so such a row is corrected by a reversing entry, never edited. The dry run prints a TOTALS CONTROL (rows read, rows to write, MAD of the file and of the rows to write): compare it with the Excel closing figures before `--apply`. A file already applied is recognised by its hash.
 
 ## 3. Commands
 ```

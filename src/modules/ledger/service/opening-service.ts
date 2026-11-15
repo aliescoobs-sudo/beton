@@ -62,8 +62,9 @@ export async function addPartyOpeningBalance(
   try {
     await inRequest(appPool, actor, (tx) =>
       tx.query(
-        `insert into opening_party_balance (id, client_id, supplier_id, amount_centimes, reference, created_by)
-         values ($1, $2, $3, $4, $5, $6)`,
+        // D246: every row of the opening position is marked; the age of the debt is unknown until the sheet carries it per invoice
+        `insert into opening_party_balance (id, client_id, supplier_id, amount_centimes, reference, created_by, source, aging_unknown)
+         values ($1, $2, $3, $4, $5, $6, 'opening_30_11', true)`,
         [id, v.clientId ?? null, v.supplierId ?? null, v.amountCentimes, v.reference ?? null, actor.id],
       ),
     );

@@ -105,6 +105,8 @@ async function enter(
     allocateToClient?: boolean | null;
   },
   today: string,
+  /** D246: set by the opening importer only (the database refuses it for any other role). */
+  source: 'opening_30_11' | null = null,
 ): Promise<Result<InstrumentRef, InstrumentError>> {
   const id = randomUUID();
   let coveredCentimes = 0;
@@ -112,8 +114,8 @@ async function enter(
     await inRequest(appPool, actor, async (tx) => {
       await tx.query(
         `insert into payment_instrument (id, direction, method, amount_centimes, client_id, supplier_id, number, bank,
-                                         written_date, received_date, created_by)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+                                         written_date, received_date, created_by, source)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
         [
           id,
           direction,
@@ -126,6 +128,7 @@ async function enter(
           v.writtenDate,
           today,
           actor.id,
+          source,
         ],
       );
       await insertEvent(tx, actor, {
@@ -222,12 +225,19 @@ export async function receiveInstrument(
   appPool: pg.Pool,
   actor: SessionUser,
   input: unknown,
-  deps: { today: string },
+  deps: { today: string; source?: 'opening_30_11' },
 ): Promise<Result<InstrumentRef, InstrumentError>> {
   await require(appPool, actor, 'instruments.write');
   const parsed = parseReceiveInput(input);
   if (!parsed.ok) return err('INVALID');
-  return enter(appPool, actor, 'in', { ...parsed.value, partyId: parsed.value.clientId }, deps.today);
+  return enter(
+    appPool,
+    actor,
+    'in',
+    { ...parsed.value, partyId: parsed.value.clientId },
+    deps.today,
+    deps.source ?? null,
+  );
 }
 
 /** A payment to a supplier is handed over. */
@@ -235,12 +245,19 @@ export async function issueInstrument(
   appPool: pg.Pool,
   actor: SessionUser,
   input: unknown,
-  deps: { today: string },
+  deps: { today: string; source?: 'opening_30_11' },
 ): Promise<Result<InstrumentRef, InstrumentError>> {
   await require(appPool, actor, 'instruments.write');
   const parsed = parseIssueInput(input);
   if (!parsed.ok) return err('INVALID');
-  return enter(appPool, actor, 'out', { ...parsed.value, partyId: parsed.value.supplierId }, deps.today);
+  return enter(
+    appPool,
+    actor,
+    'out',
+    { ...parsed.value, partyId: parsed.value.supplierId },
+    deps.today,
+    deps.source ?? null,
+  );
 }
 
 /** The owner confirms the money reached (or left) an account on a date. Writes the one signed movement (trigger). */

@@ -1156,6 +1156,20 @@
       "when": 1794411432023,
       "tag": "0241_client_reminder_fix",
       "breakpoints": true
+    },
+    {
+      "idx": 242,
+      "version": "7",
+      "when": 1794497832023,
+      "tag": "0242_opening_sources_counters",
+      "breakpoints": true
+    },
+    {
+      "idx": 243,
+      "version": "7",
+      "when": 1794584232023,
+      "tag": "0243_opening_guard_all",
+      "breakpoints": true
     }
   ]
 }
