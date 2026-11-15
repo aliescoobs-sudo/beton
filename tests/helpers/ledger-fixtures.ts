@@ -373,14 +373,16 @@ export async function insertDelivery(
   year = 2026,
   /** The moment of loading (a timestamp); now() when absent. Fixtures use it as a marker the matrix can find them by. */
   loadedAt: string | null = null,
+  /** T16: the load date (default 2026-06-01); the recette of the scene is in force from 2000. */
+  loadDate = '2026-06-01',
 ): Promise<{ id: string; blNo: string }> {
   const id = randomUUID();
   const blNo = (await tx.query<{ n: string }>(`select public.next_doc_number('BL', $1, 5) as n`, [year]))
     .rows[0]?.n as string;
   await tx.query(
     `insert into delivery (id, bl_no, order_id, truck_id, volume_l, load_date, loaded_at, recette_id, created_by)
-     values ($1, $2, $3, $4, $5, '2026-06-01', coalesce($8::timestamptz, now()), $6, $7)`,
-    [id, blNo, scene.orderId, scene.truckId, volumeL, scene.recetteId, actorId, loadedAt],
+     values ($1, $2, $3, $4, $5, $9, coalesce($8::timestamptz, now()), $6, $7)`,
+    [id, blNo, scene.orderId, scene.truckId, volumeL, scene.recetteId, actorId, loadedAt, loadDate],
   );
   // The stock the load takes out, from the recette in force (what the service does), or the commit is refused.
   const lines = await tx.query<{ component_id: string; qty_per_m3: string }>(
@@ -393,8 +395,8 @@ export async function insertDelivery(
   ).filter((x) => x.qtyBase !== 0)) {
     await tx.query(
       `insert into stock_movement (id, component_id, movement_date, qty_base, source, source_id, created_by)
-       values (gen_random_uuid(), $1, '2026-06-01', $2, 'delivery', $3, $4)`,
-      [q.componentId, -q.qtyBase, id, actorId],
+       values (gen_random_uuid(), $1, $5, $2, 'delivery', $3, $4)`,
+      [q.componentId, -q.qtyBase, id, actorId, loadDate],
     );
   }
   return { id, blNo };

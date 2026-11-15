@@ -306,7 +306,7 @@ describe('T16 G5: the A1 seed is data, flagged as an assumption, and nothing els
               max(l.qty_per_m3) filter (where c.name_fr like 'FX CPJ 55%')::text cement,
               max(l.qty_per_m3) filter (where c.name_fr like 'FX EAU%')::text water
          from concrete_type t join recette r on r.concrete_type_id = t.id join recette_line l on l.recette_id = r.id join component c on c.id = l.component_id
-        where t.code like 'FXB%' group by t.code, t.label order by t.code`,
+        where t.code like 'FXB%' and r.version = 1 group by t.code, t.label order by t.code`,
     );
     expect(lines.map((r) => [r.label, Number(r.n), r.cement, r.water])).toEqual([
       ['FX-B20-G', 7, '300000', '170'],

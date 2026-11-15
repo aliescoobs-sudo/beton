@@ -2121,6 +2121,18 @@ export const TABLE_ACCESS = {
     reason:
       'T16 G5 (SPEC-cost-margin §5): the transport that makes a purchase price a delivered-to-plant price, versioned, doors-only because purchase_price is read by the purchasing office and a transport cost is a cost figure. Written by set_purchase_price_transport, read by purchase_transports_list (owner, app_admin).',
   },
+  bl_cost_snapshot: {
+    kind: 'doors_only',
+    insertOnly: true,
+    reason:
+      'T16 G6 (SPEC-cost-margin §7, D236): the cost frozen at the creation of a BL (recette version, rates and prices with their version ids, the five blocks in centimes), insert-only, reversing on cancel. Written only by the AFTER INSERT trigger of delivery (SECURITY DEFINER, same transaction); no request role reads it: the margin read doors are T17 (owner, app_admin).',
+  },
+  bl_cost_snapshot_line: {
+    kind: 'doors_only',
+    insertOnly: true,
+    reason:
+      'T16 G6: the lines of a cost snapshot (dose, quantity, purchase price and transport with their version ids, the cost of the line). Same rules as bl_cost_snapshot.',
+  },
   company_profile: {
     kind: 'rls',
     seed: 'insert',

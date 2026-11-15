@@ -421,6 +421,8 @@ const COST_TABLES = [
   'cost_rate',
   'fuel_norm',
   'purchase_price_transport',
+  'bl_cost_snapshot',
+  'bl_cost_snapshot_line',
 ] as const;
 describe('T16: cost and price-grid tables are doors-only (money-visibility matrix extension)', () => {
   it('belgobeton_app and belgobeton_system hold no privilege at all on any of them', async () => {

@@ -1100,6 +1100,13 @@
       "when": 1793806572023,
       "tag": "0233_cost_rates_fuel_norms",
       "breakpoints": true
+    },
+    {
+      "idx": 234,
+      "version": "7",
+      "when": 1793806632023,
+      "tag": "0234_bl_cost_snapshot",
+      "breakpoints": true
     }
   ]
 }
