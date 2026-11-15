@@ -190,6 +190,7 @@ export {
   type OpeningError,
   type OpeningState,
 } from './service/opening-service';
+export { type AgingParty, type AgingReport, agingSides, agingToCsv, getAging } from './service/aging-service';
 export {
   type AccountRow,
   getClientStatement,

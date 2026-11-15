@@ -162,6 +162,12 @@ export const PERMISSIONS = {
   // The database enforces the side (migration 0239, policies on ctx.actor_role()); these keys gate the routes and services the same way.
   'statements.client': [...MONEY_READ, 'office_sales'],
   'statements.supplier': [...MONEY_READ, 'office_purchases'],
+  // T19c B2 (D245): the aging screen (buckets past due) of each side, read by the roles that read that side's statements (support does not need it)
+  'aging.client': ['owner', 'app_admin', 'office_sales'],
+  'aging.supplier': ['owner', 'app_admin', 'office_purchases'],
+  // T19c B3: the 30/60/90 day cash forecast; each office role sees its own side, the owner (and app_admin) both with the net line
+  'forecast.client': ['owner', 'app_admin', 'office_sales'],
+  'forecast.supplier': ['owner', 'app_admin', 'office_purchases'],
   // The opening state: the date and what clients and suppliers owe on it (owner enters once)
   'opening.read': MONEY_READ,
   'opening.write': MONEY_WRITE,

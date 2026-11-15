@@ -196,6 +196,12 @@ const GROUPS: GroupDef[] = [
         allowed: 'money_accounts.read',
       },
       {
+        path: '/aging',
+        labelKey: 'ledger.aging.link',
+        testId: 'aging-link',
+        allowed: (role) => can(role, 'aging.client') || can(role, 'aging.supplier'),
+      },
+      {
         path: '/reminders',
         labelKey: 'ledger.reminders.link',
         testId: 'reminders-link',

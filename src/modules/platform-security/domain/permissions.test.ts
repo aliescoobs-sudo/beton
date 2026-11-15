@@ -184,3 +184,17 @@ describe('permission matrix (SPEC-platform-security §4)', () => {
     }
   });
 });
+
+describe('T19c B2/B3: aging and forecast are side-scoped (D245)', () => {
+  it('owner and app_admin read both sides; the Responsable clients only; the Assistante suppliers only; nobody else', () => {
+    for (const role of USER_ROLES) {
+      const both = role === 'owner' || role === 'app_admin';
+      expect(can(role, 'aging.client'), `${role} aging.client`).toBe(both || role === 'office_sales');
+      expect(can(role, 'aging.supplier'), `${role} aging.supplier`).toBe(both || role === 'office_purchases');
+      expect(can(role, 'forecast.client'), `${role} forecast.client`).toBe(both || role === 'office_sales');
+      expect(can(role, 'forecast.supplier'), `${role} forecast.supplier`).toBe(
+        both || role === 'office_purchases',
+      );
+    }
+  });
+});

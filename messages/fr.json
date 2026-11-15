@@ -1545,7 +1545,12 @@
       "payments": {
         "title": "Paiements sortants à approuver",
         "kind": "Paiement sortant",
-        "method": { "cash": "Espèces", "cheque": "Chèque", "lcn": "LCN", "transfer": "Virement" },
+        "method": {
+          "cash": "Espèces",
+          "cheque": "Chèque",
+          "lcn": "LCN",
+          "transfer": "Virement"
+        },
         "dated": "daté du",
         "preparedBy": "Préparé par {name} le {date}",
         "willApprove": "Approuver autorise l'émission de ce paiement, au-dessus du seuil haut. Rejeter l'arrête : il ne pourra pas être émis.",
@@ -1720,6 +1725,32 @@
         "validate": "Validation par un autre",
         "owner": "Approbation du propriétaire"
       }
+    },
+    "aging": {
+      "link": "Échéancier des retards",
+      "title": "Retards de paiement (aging)",
+      "intro": "Ce qui est dû, par ancienneté de retard, à la date du {date}. « Non échu » = pas encore en retard.",
+      "plant": "Centrale",
+      "allPlants": "Toutes les centrales",
+      "plantNote": "Filtre centrale : seules les commandes et achats de cette centrale sont comptés ; la position d’ouverture n’a pas de centrale et n’y figure pas.",
+      "side": {
+        "client": "Clients : ce qu’ils nous doivent",
+        "supplier": "Fournisseurs : ce que nous leur devons"
+      },
+      "export": "Exporter en CSV",
+      "none": "Rien en attente.",
+      "noneHint": "Aucun solde ouvert pour ce filtre.",
+      "party": "Tiers",
+      "bucket": {
+        "current": "Non échu",
+        "d1_30": "1 à 30 j",
+        "d31_60": "31 à 60 j",
+        "d61_90": "61 à 90 j",
+        "d90plus": "Plus de 90 j",
+        "unknown": "Échéance inconnue"
+      },
+      "total": "Total",
+      "totalRow": "Total général"
     }
   },
   "operations": {

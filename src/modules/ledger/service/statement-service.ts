@@ -26,7 +26,11 @@ export interface PartyData {
 const COUNTED: readonly LineStatus[] = ['received', 'deposited', 'issued', 'cleared'];
 
 /** Everything a statement is made of, for the given parties, in four queries (owner and support read these tables). */
-async function loadParties(tx: Tx, kind: PartyKind, ids: readonly string[]): Promise<Map<string, PartyData>> {
+export async function loadParties(
+  tx: Tx,
+  kind: PartyKind,
+  ids: readonly string[],
+): Promise<Map<string, PartyData>> {
   const data = new Map<string, PartyData>(ids.map((id) => [id, { lines: [], due: [], opening: [] }]));
   const col = kind === 'client' ? 'client_id' : 'supplier_id';
   const opening = await tx.query<{ party: string; id: string; amount: string; date: string }>(
