@@ -60,6 +60,11 @@ export const E2E_MD = {
   recetteAdminAr: { email: 'e2e-re-admin-ar@kayas.test', name: 'مدير الوصفات' },
   recettePlant: { email: 'e2e-re-plant@kayas.test', name: 'Centrale Recettes' },
   orderOffice: { email: 'e2e-or-office@kayas.test', name: 'Bureau Commandes' },
+  // T18-UI look-and-feel spec: office and plant manager, one per language, each enrolled once by the spec
+  t18OfficeFr: { email: 'e2e-t18-office-fr@kayas.test', name: 'Bureau T18' },
+  t18OfficeAr: { email: 'e2e-t18-office-ar@kayas.test', name: 'مكتب T18' },
+  t18PlantFr: { email: 'e2e-t18-plant-fr@kayas.test', name: 'Centrale T18' },
+  t18PlantAr: { email: 'e2e-t18-plant-ar@kayas.test', name: 'مركز T18' },
   orderOfficeAr: { email: 'e2e-or-office-ar@kayas.test', name: 'مكتب الطلبيات' },
   orderAdmin: { email: 'e2e-or-admin@kayas.test', name: 'Admin Commandes' },
   orderPlant: { email: 'e2e-or-plant@kayas.test', name: 'Centrale Commandes' },
