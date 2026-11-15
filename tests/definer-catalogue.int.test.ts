@@ -503,6 +503,8 @@ describe('R19-01 (d): the sweep with real targets — the exact refusal, nothing
       'public.attach_supplier_invoice_file(p_file)': 'a stored file id: supplier-invoice file suites',
       'public.driver_attach_bl_photo(p_file)': 'a stored file id: driver-bl-photo.int.test.ts',
       'public.create_order(p_site)': 'a client site: order suites',
+      'public.create_order_with_method(p_site)':
+        'idem: the real order is made in tests/t16-method-price-grid.int.test.ts',
       'public.decide_cancellation(p_case)':
         'a cancellation case needs a rotation in a stage: cancellations.int.test.ts',
       'public.driver_ack_redirect(p_case)': 'idem',

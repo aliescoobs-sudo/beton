@@ -201,6 +201,12 @@ describe('functions the application role can execute', () => {
     'public.register_sms_sender(p_phone_hash text, p_phone_enc text, p_driver uuid, p_truck uuid, p_valid_from date, p_reason_code text, p_note text)', // T15 G3: owner, app_admin; a sealed number and a keyed hash only
     'public.end_sms_sender(p_id uuid, p_valid_to date, p_end_reason_code text)', // T15 G3: owner, app_admin
     'public.sms_senders_list()', // T15 G3: owner, app_admin; the number is returned sealed
+    'public.create_order_with_method(p_client uuid, p_site uuid, p_zone uuid, p_type uuid, p_volume_l integer, p_delivery date, p_today date, p_brought_by uuid, p_quote uuid, p_plan jsonb, p_vat_default integer, p_method text)', // T16 G4: create_order plus the discharge method; same rules, the actor is checked first
+    'audit.is_cost_table(p_table text)', // T16 G4: names the cost tables for the audit visibility policy; answers a boolean
+    'public.set_price_grid(p_class uuid, p_method text, p_price_centimes bigint, p_effective_from date, p_reason text)', // T16 G4: owner, app_admin (checked inside)
+    'public.set_class_method_recette(p_class uuid, p_method text, p_plant uuid, p_recette uuid, p_effective_from date, p_reason text)', // T16 G4: owner, app_admin
+    'public.price_grid_list()', // T16 G4: owner, app_admin, office_sales (the official selling price)
+    'public.class_method_recette_list()', // T16 G4: owner, app_admin
     'public.mark_reorder_seen(p_request uuid)', // T15: office_purchases, owner, app_admin
     'public.link_reorder_to_purchase(p_request uuid, p_purchase_code text)', // T15: office_purchases, owner, app_admin; the whole tuple is checked
     'public.cancel_reorder_request(p_request uuid, p_reason text)', // T15: the plant manager of the plant, owner, app_admin

@@ -411,3 +411,28 @@ describe('support is read-only everywhere (DECISIONS 81)', () => {
     ).rejects.toThrow(/does not match/);
   });
 });
+
+// T16 (SPEC-cost-margin §9, D236): the cost and price-grid tables. The application login has NO privilege on them (not even SELECT, so a read is refused 42501 for every role,
+// the owner included: they are read only through the owner/app_admin doors), nothing is updated or deleted, and their audit rows (they hold the figures) are visible to the
+// owner roles only. Extended by every T16 group; the final audit verifies this list is complete (docs/SECURITY-DEBT.md).
+const COST_TABLES = ['price_grid', 'class_method_recette'] as const;
+describe('T16: cost and price-grid tables are doors-only (money-visibility matrix extension)', () => {
+  it('belgobeton_app and belgobeton_system hold no privilege at all on any of them', async () => {
+    for (const t of COST_TABLES) {
+      const r = await migrator.query<{ app: boolean; sys: boolean }>(
+        `select has_table_privilege('belgobeton_app', $1, 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE') as app,
+                has_table_privilege('belgobeton_system', $1, 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE') as sys`,
+        [`public.${t}`],
+      );
+      expect(r.rows[0], t).toEqual({ app: false, sys: false });
+    }
+  });
+
+  it('every one is a registered cost table (audit visibility) and is registered doors-only', async () => {
+    for (const t of COST_TABLES) {
+      const r = await migrator.query<{ c: boolean }>(`select audit.is_cost_table($1) as c`, [t]);
+      expect(r.rows[0]!.c, t).toBe(true);
+      expect(TABLE_ACCESS[t].kind, t).toBe('doors_only');
+    }
+  });
+});

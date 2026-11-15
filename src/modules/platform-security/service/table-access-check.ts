@@ -10,6 +10,7 @@ export interface TableAccessViolation {
     | 'rls_not_forced'
     | 'audit_trigger_missing'
     | 'app_role_has_access'
+    | 'system_role_has_access'
     | 'delete_granted'
     | 'update_granted'
     | 'seed_role_overreach'
@@ -28,12 +29,14 @@ export async function findTableAccessViolations(
     app_access: boolean;
     app_delete: boolean;
     app_update: boolean;
+    system_access: boolean;
   }>(`
     select c.relname as name, c.relrowsecurity as rls, c.relforcerowsecurity as forced,
            exists (select 1 from pg_trigger t where t.tgrelid = c.oid and t.tgname = 'audit_capture') as audited,
            has_table_privilege('belgobeton_app', c.oid, 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE') as app_access,
            has_table_privilege('belgobeton_app', c.oid, 'DELETE, TRUNCATE') as app_delete,
-           has_table_privilege('belgobeton_app', c.oid, 'UPDATE') as app_update
+           has_table_privilege('belgobeton_app', c.oid, 'UPDATE') as app_update,
+           has_table_privilege('belgobeton_system', c.oid, 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE') as system_access
       from pg_class c join pg_namespace n on n.oid = c.relnamespace
      where n.nspname = 'public' and c.relkind in ('r', 'p')`);
 
@@ -44,6 +47,13 @@ export async function findTableAccessViolations(
     if (!rule) violations.push({ table: t.name, problem: 'not_registered' });
     else if (rule.kind === 'auth_only') {
       if (t.app_access) violations.push({ table: t.name, problem: 'app_role_has_access' });
+    } else if (rule.kind === 'doors_only') {
+      // T16: no request login touches it; only the doors do (forced RLS, audited, never updated or deleted)
+      if (t.app_access) violations.push({ table: t.name, problem: 'app_role_has_access' });
+      if (t.system_access) violations.push({ table: t.name, problem: 'system_role_has_access' });
+      if (!t.rls) violations.push({ table: t.name, problem: 'rls_disabled' });
+      if (!t.forced) violations.push({ table: t.name, problem: 'rls_not_forced' });
+      if (!t.audited) violations.push({ table: t.name, problem: 'audit_trigger_missing' });
     } else {
       if (!t.rls) violations.push({ table: t.name, problem: 'rls_disabled' });
       if (rule.force && !t.forced) violations.push({ table: t.name, problem: 'rls_not_forced' });

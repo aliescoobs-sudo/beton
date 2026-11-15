@@ -38,6 +38,20 @@ interface AuthOnlyTable {
 }
 
 /**
+ * T16: a table that NO request role touches directly (the application and system logins hold no privilege, so a direct read or write is refused 42501 for every role,
+ * the owner included). It is read and written only by reviewed SECURITY DEFINER doors that check the actor's role. RLS is forced and the audit trigger is attached;
+ * the audit rows of such a table are hidden from everyone but the owner roles (audit.is_cost_table).
+ */
+interface DoorsOnlyTable {
+  kind: 'doors_only';
+  reason: string;
+  /** Versioned or sealed records: nothing is updated or deleted, whoever asks. */
+  insertOnly: true;
+  /** The pilot seed role may insert here (db/seed/seed-role.sql); the system login never does. */
+  seed?: 'insert';
+}
+
+/**
  * Every table in the public schema, with its access rule. The meta-test (tests/rls/meta.int.test.ts) fails for a
  * table missing here or not matching its rule; the matrix test reads `read` to check RLS for every role.
  * Later modules add their business tables as `{ kind: 'rls', force: true, audited: true, read: … }`.
@@ -2072,6 +2086,20 @@ export const TABLE_ACCESS = {
     exception:
       'T15 G3 (SPEC-sms-channel §4, D235): which phone number belongs to which driver and vehicle. The number is sealed (phone_enc, re-sealed by crypto:rotate: belgobeton_system may update only that column) and looked up by a keyed hash. Written only by register_sms_sender and end_sms_sender (owner, app_admin, with a typed reason); end-dated, never deleted. Read by owner and app_admin only. No message is received or parsed here.',
   },
+  price_grid: {
+    kind: 'doors_only',
+    insertOnly: true,
+    seed: 'insert',
+    reason:
+      'T16 G4 (SPEC-cost-margin §4, D236): the selling price per class and discharge method, versioned, flagged is_assumption. Written by set_price_grid (owner, app_admin), read by price_grid_list (owner, app_admin, office_sales).',
+  },
+  class_method_recette: {
+    kind: 'doors_only',
+    insertOnly: true,
+    seed: 'insert',
+    reason:
+      'T16 G4 (SPEC-cost-margin §3, D236): which recette the plant batches for a class and a discharge method, versioned. Written by set_class_method_recette, read by class_method_recette_list (owner, app_admin).',
+  },
   company_profile: {
     kind: 'rls',
     seed: 'insert',
@@ -2121,7 +2149,7 @@ export const TABLE_ACCESS = {
     kind: 'auth_only',
     reason: 'Staged re-enrolment (DECISIONS 77): encrypted secret and codes',
   },
-} as const satisfies Record<string, RlsTable | AuthOnlyTable>;
+} as const satisfies Record<string, RlsTable | AuthOnlyTable | DoorsOnlyTable>;
 
 export type TableName = keyof typeof TABLE_ACCESS;
 
