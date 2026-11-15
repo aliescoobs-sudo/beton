@@ -309,6 +309,12 @@ const GROUPS: GroupDef[] = [
         allowed: 'receipts.read',
       },
       {
+        path: '/reorders',
+        labelKey: 'operations.reorders.link',
+        testId: 'reorders-link',
+        allowed: 'reorder.read',
+      },
+      {
         path: '/stock',
         labelKey: 'operations.stock.link',
         testId: 'stock-link',

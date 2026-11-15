@@ -1202,6 +1202,18 @@ const FIXTURES: Record<
     seed: async () => undefined as never,
     visible: `select decided_by::text as owner from stock_count_decision where reason = 'matrix ' || $1`,
   },
+  reorder_request: {
+    // Only create_reorder_request (a plant manager) and the system actor's job write it; no policy-role actor of this matrix can call them.
+    // tests/t15-reorder.int.test.ts proves who reads which plant's requests.
+    writers: [],
+    seed: async () => undefined as never,
+    visible: `select created_by::text as owner from reorder_request where reason = 'matrix ' || $1`,
+  },
+  reorder_request_event: {
+    writers: [],
+    seed: async () => undefined as never,
+    visible: `select created_by::text as owner from reorder_request_event where reason = 'matrix ' || $1`,
+  },
   company_profile: {
     writers: ['owner'],
     seed: (tx, actor) =>

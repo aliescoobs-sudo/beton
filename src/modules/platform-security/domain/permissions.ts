@@ -345,6 +345,10 @@ export const PERMISSIONS = {
   'stock.count': ['owner', 'app_admin'],
   // T15 (SPEC-stock-engine-gaps §5): the plant manager proposes a count of his own plant; in tolerance it posts, out of tolerance the owner decides
   'stock.count.propose': ['plant_manager'],
+  // T15 (SPEC-stock-engine-gaps §6): the plant manager asks for a component of his plant; office_purchases reads every request and links it to a purchase (quantities only)
+  'reorder.create': ['plant_manager'],
+  'reorder.read': ['owner', 'app_admin', 'plant', 'plant_manager', 'office_purchases'],
+  'reorder.handle': ['owner', 'app_admin', 'office_purchases'],
   'stock.opening': MANAGERS,
   'stock.threshold': MANAGERS,
   // Receiving a purchase puts its stocked lines into the stock; quantities only, no amount

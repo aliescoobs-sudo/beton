@@ -199,6 +199,7 @@
       "auth__session_absolute_hours": "Durée maximale d'une session (heures)",
       "auth__step_up_minutes": "Âge maximal du code 2FA pour une action sensible (minutes)",
       "clock__job__morning_recompute": "Recalcul du matin",
+      "clock__job__reorder_auto": "Demandes de réapprovisionnement automatiques",
       "clock__job__daily_brief": "Brief quotidien",
       "clock__job__due_reminders": "Rappels d'échéances",
       "clock__job__day_close": "Clôture de la journée",
@@ -1682,7 +1683,10 @@
         "available": "Disponible pour la production",
         "documented": "Documenté (bureau)"
       },
-      "fileKinds": { "weighbridge_ticket": "Ticket de pesée", "delivery_note": "Bon de livraison" },
+      "fileKinds": {
+        "weighbridge_ticket": "Ticket de pesée",
+        "delivery_note": "Bon de livraison"
+      },
       "expected": "Attendu",
       "errors": {
         "INVALID": "Saisie invalide.",
@@ -1726,7 +1730,11 @@
           "en_route": "En route",
           "returning": "Retour en cours"
         },
-        "level": { "none": "Dans les temps", "watch": "À surveiller", "critical": "Retard prévu" },
+        "level": {
+          "none": "Dans les temps",
+          "watch": "À surveiller",
+          "critical": "Retard prévu"
+        },
         "planned": "Prévu {load} → retour {back}",
         "projected": "Retour prévu {back}",
         "delay": "écart {min} min",
@@ -1764,7 +1772,11 @@
           "return": "Retour",
           "turnaround": "Remise en route"
         },
-        "source": { "history": "historique", "override": "imposé", "default": "plan" },
+        "source": {
+          "history": "historique",
+          "override": "imposé",
+          "default": "plan"
+        },
         "estimateMinutes": "Minutes",
         "estimateSave": "Imposer",
         "statsTitle": "Retards des 14 derniers jours",
@@ -1890,7 +1902,11 @@
         "declared": "chauffeur",
         "order": "commande"
       },
-      "by": { "driver": "Chauffeur", "plant": "Centrale", "admin": "Administration" },
+      "by": {
+        "driver": "Chauffeur",
+        "plant": "Centrale",
+        "admin": "Administration"
+      },
       "implicit": "déduit",
       "declared": "déclaré par le chauffeur · BL à faire",
       "corrected": "corrigé",
@@ -2099,6 +2115,41 @@
       "times": "Chargement → arrivée → retour",
       "step": "Étape",
       "planned": "Planifiée"
+    },
+    "reorders": {
+      "link": "Réapprovisionnement",
+      "title": "Demandes de réapprovisionnement",
+      "intro": "Le chef de centrale demande un composant ; les achats voient la demande, la marquent vue et la convertissent en lui liant un achat existant. Quantités seulement, aucun prix.",
+      "none": "Aucune demande.",
+      "plant": "Centrale",
+      "component": "Composant",
+      "qty": "Quantité",
+      "qtyHint": "Quantité (kg ou L)",
+      "neededBy": "Besoin pour le",
+      "reason": "Motif",
+      "state": "État",
+      "actions": "Actions",
+      "auto": "automatique",
+      "create": "Demander",
+      "markSeen": "Vue",
+      "convert": "Convertir",
+      "purchaseCode": "Code de l'achat",
+      "cancel": "Annuler",
+      "cancelReason": "Motif de l'annulation",
+      "states": {
+        "open": "Ouverte",
+        "seen": "Vue",
+        "ordered": "Commandée",
+        "cancelled": "Annulée"
+      },
+      "errors": {
+        "INVALID": "Demande invalide.",
+        "NOT_FOUND": "Introuvable.",
+        "NOT_ALLOWED": "Non autorisé.",
+        "ALREADY_OPEN": "Une demande est déjà ouverte pour ce composant.",
+        "NOT_OPEN": "La demande n'est plus ouverte.",
+        "FORBIDDEN": "Non autorisé."
+      }
     }
   },
   "effects": {
@@ -2730,7 +2781,11 @@
     "idle": "Au repos à la centrale.",
     "waitLoad": "En attente du chargement par la centrale.",
     "stage": {
-      "by": { "driver": "Chauffeur", "plant": "Centrale", "admin": "Administration" },
+      "by": {
+        "driver": "Chauffeur",
+        "plant": "Centrale",
+        "admin": "Administration"
+      },
       "implicit": "déduit",
       "declared": "à confirmer par la centrale",
       "pending": "en attente d'envoi",
@@ -2898,6 +2953,7 @@
       "loss_recorded": "Perte enregistrée",
       "receipt_rejected": "Livraison reçue avec une quantité refusée",
       "receipt_variance": "Écart entre le comptage de la centrale et la réception du bureau",
+      "reorder_request": "Demande de réapprovisionnement",
       "stock_count_variance": "Comptage hors tolérance à décider",
       "stock_count_decided": "Décision sur un comptage de stock",
       "transfer": "Transfert entre centrales",

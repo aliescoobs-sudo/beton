@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { dailyCron, JOB_CATALOGUE } from './job-catalogue';
 
 describe('job catalogue', () => {
-  it('lists the four daily jobs in chronological order', () => {
+  it('lists the five daily jobs in chronological order', () => {
     expect(JOB_CATALOGUE.map((j) => j.key)).toEqual([
       'morning-recompute',
+      'reorder-auto',
       'daily-brief',
       'due-reminders',
       'day-close',

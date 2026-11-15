@@ -19,7 +19,7 @@ export type JobRegistry = ReadonlyMap<string, JobHandler>;
 
 /** Logged no-ops until the owning modules exist (T23). */
 export function stubJobRegistry(): Map<JobKey, JobHandler> {
-  return new Map(
+  const registry = new Map<JobKey, JobHandler>(
     JOB_CATALOGUE.map(({ key }) => [
       key,
       async ({ businessDate }: JobContext) => {
@@ -27,6 +27,15 @@ export function stubJobRegistry(): Map<JobKey, JobHandler> {
       },
     ]),
   );
+  // T15: the one job with a real body. The whole rule (threshold, level, one open request per plant and component) is in the database door, run as the system actor.
+  registry.set('reorder-auto', async ({ tx, businessDate, jobKey }: JobContext) => {
+    const { rows } = await tx.query<{ n: number }>(
+      'select public.create_auto_reorder_requests($1::date) as n',
+      [businessDate],
+    );
+    getLogger().info('job ran', { job: jobKey, businessDate, created: rows[0]?.n ?? 0 });
+  });
+  return registry;
 }
 
 export type JobRunOutcome = 'ran' | 'skipped' | 'failed';

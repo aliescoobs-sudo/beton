@@ -25,6 +25,7 @@ export const NOTIFICATION_CATALOGUE = {
   loss_recorded: { severity: 'important', link: '/cancellations' },
   receipt_rejected: { severity: 'important', link: '/receipts' },
   receipt_variance: { severity: 'important', link: '/receipts' },
+  reorder_request: { severity: 'important', link: '/stock' },
   stock_count_variance: { severity: 'important', link: '/stock' },
   stock_count_decided: { severity: 'important', link: '/stock' },
   transfer: { severity: 'info', link: '/transfers' },

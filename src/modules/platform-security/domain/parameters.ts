@@ -38,6 +38,11 @@ export const PARAMETERS = {
     schema: minutesOfDay,
     description: 'Morning recompute (HH:MM)',
   },
+  'clock.job.reorder_auto': {
+    default: '06:40',
+    schema: minutesOfDay,
+    description: 'Automatic reorder requests (HH:MM)',
+  },
   'clock.job.daily_brief': { default: '07:00', schema: minutesOfDay, description: 'Daily brief (HH:MM)' },
   'clock.job.due_reminders': {
     default: '07:05',

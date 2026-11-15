@@ -196,6 +196,12 @@ describe('functions the application role can execute', () => {
     'public.set_stock_count_tolerance(p_plant uuid, p_component uuid, p_tolerance_bp integer, p_floor bigint, p_effective date, p_reason text)', // T15: owner, app_admin (checked inside)
     'public.propose_stock_count(p_component uuid, p_counted bigint, p_category text, p_reason text)', // T15: the plant manager of the plant (checked inside); quantities only
     'public.decide_stock_count(p_count uuid, p_accept boolean, p_reason text)', // T15: owner, app_admin (checked inside)
+    'public.create_reorder_request(p_component uuid, p_qty bigint, p_needed_by date, p_reason text)', // T15: the plant manager of the plant; quantities only
+    'public.reorder_requests_list()', // T15: quantities, states and the purchase code; the roles that read requests (checked inside)
+    'public.mark_reorder_seen(p_request uuid)', // T15: office_purchases, owner, app_admin
+    'public.link_reorder_to_purchase(p_request uuid, p_purchase_code text)', // T15: office_purchases, owner, app_admin; the whole tuple is checked
+    'public.cancel_reorder_request(p_request uuid, p_reason text)', // T15: the plant manager of the plant, owner, app_admin
+    'public.reorder_threshold_qty(p_consumed bigint, p_window integer, p_lead integer, p_safety integer)', // T15: a pure formula (no table), kept equal to the TS domain function by a test
     'public.receipt_states(p_since date)', // C3: quantities and states, no price
     'public.stock_arrived_pending(p_plant uuid)', // C3: quantities per component
     'public.set_order_pumped_by_code(p_code text, p_pumped boolean)',

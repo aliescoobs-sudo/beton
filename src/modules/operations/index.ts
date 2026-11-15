@@ -186,3 +186,13 @@ export {
   type TimingBoard,
 } from './service/timing-service';
 export * from './domain/trip-timing';
+export {
+  cancelReorderRequest,
+  createReorderRequest,
+  linkReorderToPurchase,
+  listReorderRequests,
+  markReorderSeen,
+  type ReorderError,
+  type ReorderRequest,
+  type ReorderState,
+} from './service/reorder-service';

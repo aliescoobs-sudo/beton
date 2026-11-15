@@ -1072,6 +1072,13 @@
       "when": 1793806332023,
       "tag": "0229_stock_count_tolerance",
       "breakpoints": true
+    },
+    {
+      "idx": 230,
+      "version": "7",
+      "when": 1793806392023,
+      "tag": "0230_reorder_request",
+      "breakpoints": true
     }
   ]
 }

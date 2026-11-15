@@ -2019,6 +2019,42 @@ export const TABLE_ACCESS = {
     exception:
       'T15 (SPEC-stock-engine-gaps §5): the decision of the owner or app_admin on a count out of tolerance (accept posts the adjustment, reject asks a recount), with a reason. Written only by decide_stock_count; insert-only, one per count.',
   },
+  reorder_request: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'none',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'T15 (SPEC-stock-engine-gaps §6): a request for a component of a plant (quantity in base units, needed-by date, reason, auto flag with the level and threshold the daily job saw). Written only by create_reorder_request (the plant manager) and create_auto_reorder_requests (the system actor); insert-only; one open request per plant and component. Quantities only: no price, no balance. A plant manager reads his plant; office_purchases reads every plant (by actor role, not by policy role).',
+  },
+  reorder_request_event: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'all',
+      office: 'none',
+      plant: 'all',
+      system: 'none',
+      anonymous: 'none',
+      support: 'all',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    insertOnly: true,
+    exception:
+      'T15 (SPEC-stock-engine-gaps §6): the insert-only status history of a request (open, seen, ordered with its purchase, cancelled with a reason); the state is the latest event. Written only by the reorder doors. Quantities and a purchase reference only.',
+  },
   company_profile: {
     kind: 'rls',
     seed: 'insert',

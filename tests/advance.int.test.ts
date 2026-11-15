@@ -80,11 +80,11 @@ describe('advance (T24)', () => {
     const perDay = JOB_CATALOGUE.length;
     expect(result.failed).toBe(false);
     expect(result.ran.every((r) => r.outcome === 'ran')).toBe(true);
-    // D1 07:05 + 20:00, D2 and D3 in full, D4 06:30 + 07:00
-    expect(result.ran).toHaveLength(2 + 2 * perDay + 2);
+    // D1 07:05 + 20:00, D2 and D3 in full, D4 06:30 + 06:40 + 07:00
+    expect(result.ran).toHaveLength(2 + 2 * perDay + 3);
     const keys = result.ran.map((r) => r.jobKey);
     expect(keys.slice(0, 2)).toEqual(['due-reminders', 'day-close']);
-    expect(keys.slice(2, 6)).toEqual(JOB_CATALOGUE.map((j) => j.key));
+    expect(keys.slice(2, 2 + perDay)).toEqual(JOB_CATALOGUE.map((j) => j.key));
 
     // Rewind the clock (test-only reset) and advance over the same instants: every run is skipped.
     await resetSimClock();
