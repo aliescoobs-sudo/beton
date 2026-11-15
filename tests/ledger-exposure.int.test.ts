@@ -211,6 +211,8 @@ describe('functions the application role can execute', () => {
     'public.set_fuel_norm(p_truck_kind text, p_truck uuid, p_per_trip_ml bigint, p_per_hour_ml bigint, p_per_km_ml bigint, p_effective_from date, p_source_note text, p_reason text)', // T16 G5: owner, app_admin
     'public.set_purchase_price_transport(p_price uuid, p_transport_centimes bigint, p_source_note text, p_reason text)', // T16 G5: owner, app_admin
     'public.bl_margin_list(p_from date, p_to date, p_plant uuid, p_class uuid, p_method text, p_client uuid, p_scope text, p_limit integer)', // T17 G9: owner, app_admin (per-BL margins from the snapshot)
+    'public.log_client_reminder(p_client uuid, p_note text)', // T19 item 2 (D245): owner, app_admin, office_sales; a note, nothing is sent
+    'public.client_reminder_list(p_client uuid, p_limit integer)', // T19 item 2 (D245): same three roles
     'public.margin_summary(p_group text, p_from date, p_to date, p_plant uuid, p_class uuid, p_method text, p_client uuid)', // T17 G9: owner, app_admin (aggregated margins)
     'public.pump_check(p_from date, p_to date, p_plant uuid)', // T17 G10: owner, app_admin, the plant manager of his own plant (references and quantities, no cost)
     'public.fuel_check(p_from date, p_to date, p_plant uuid)', // T17 G11: owner, app_admin (litres and basis points, no money)

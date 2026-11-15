@@ -21,7 +21,10 @@ export default async function StatementPage({
   const { locale, kind, id } = await params;
   setRequestLocale(locale);
   if (kind !== 'client' && kind !== 'supplier') notFound();
-  const user = await requirePagePermission(locale, 'statements.read');
+  const user = await requirePagePermission(
+    locale,
+    kind === 'client' ? 'statements.client' : 'statements.supplier',
+  );
   const pool = getPool('app');
   await recordMoneyView(pool, user, `screen:statement-${kind}`);
   const raw = await searchParams;

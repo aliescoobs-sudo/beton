@@ -14,7 +14,7 @@ export async function getCashPosition(
   actor: SessionUser,
   accountId?: string,
 ): Promise<CashPosition> {
-  await require(appPool, actor, 'cash.read');
+  await require(appPool, actor, 'cash.view');
   const data = await inRequest(appPool, actor, async (tx) => {
     const accounts = await tx.query<{
       id: string;

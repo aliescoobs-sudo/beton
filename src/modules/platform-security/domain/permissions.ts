@@ -158,11 +158,17 @@ export const PERMISSIONS = {
   'money_accounts.write': MONEY_WRITE,
   // Account statements of clients and suppliers (owner and support; each view is audited for support)
   'statements.read': MONEY_READ,
+  // D245 (D-A, T19): each office role reads the money of its OWN side: office_sales the client side, office_purchases the supplier side.
+  // The database enforces the side (migration 0239, policies on ctx.actor_role()); these keys gate the routes and services the same way.
+  'statements.client': [...MONEY_READ, 'office_sales'],
+  'statements.supplier': [...MONEY_READ, 'office_purchases'],
   // The opening state: the date and what clients and suppliers owe on it (owner enters once)
   'opening.read': MONEY_READ,
   'opening.write': MONEY_WRITE,
   // Payment instruments, money account entries
   'instruments.read': MONEY_READ,
+  'instruments.read_in': [...MONEY_READ, 'office_sales'],
+  'instruments.read_out': [...MONEY_READ, 'office_purchases'],
   'instruments.write': BLIND_WRITE,
   // Deposit, clear, bounce, regularize, dispute and cancel confirm money: the owner's
   'instruments.manage': MONEY_WRITE,
@@ -372,6 +378,11 @@ export const PERMISSIONS = {
   // Derived figures
   'margins.read': MONEY_READ,
   'cash.read': MONEY_READ,
+  // D245: the cash accounts (never a bank account) for the Assistante; the day's cash movements and the running balance
+  'cash.view': [...MONEY_READ, 'office_purchases'],
+  // D245: the client reminder (relance) log: read and write by the Responsable, the owner and app_admin
+  'reminders.read': ['owner', 'app_admin', 'office_sales'],
+  'reminders.write': ['owner', 'app_admin', 'office_sales'],
   // The accountant's files for a period (owner and support; every download is audited as an export)
   'accounting.export': [...MONEY_READ, 'accountant'],
   // The money facts of "what did this action change" (ledger L35): the roles that read money

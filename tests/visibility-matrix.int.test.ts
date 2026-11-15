@@ -37,8 +37,18 @@ beforeAll(async () => {
 
 describe('balances and aggregates (§16.1)', () => {
   const others = USER_ROLES.filter((r) => !balanceRoles.has(r) && r !== 'partner');
-  it('the matrix names only owner, app_admin and support for balances', () => {
-    expect([...balanceRoles].sort()).toEqual(['app_admin', 'owner', 'support']);
+  it('the matrix names owner, app_admin and support, plus each office role on its own side only (D245)', () => {
+    expect([...balanceRoles].sort()).toEqual([
+      'app_admin',
+      'office_purchases',
+      'office_sales',
+      'owner',
+      'support',
+    ]);
+    for (const row of VISIBILITY_MATRIX) {
+      const offices = row.balances.filter((r) => r.startsWith('office'));
+      if (offices.length) expect(offices, row.item).toEqual([row.officeSide]);
+    }
   });
   it.each(others)('%s reads zero rows of every money table (accountant: invoices only)', async (role) => {
     for (const t of MONEY) {
@@ -57,7 +67,7 @@ describe('balances and aggregates (§16.1)', () => {
       ).rejects.toMatchObject({ code: '42501' });
     }
   });
-  it('the two offices read a client standing as two flags and no figure', async () => {
+  it('the two offices read a client standing as two flags and no figure (the door itself; D245 gives them statements by role side elsewhere)', async () => {
     for (const role of ['office_sales', 'office_purchases'] as const) {
       const { fields } = await as(role, (tx) =>
         tx.query(`select * from public.client_balance_status(current_date)`),

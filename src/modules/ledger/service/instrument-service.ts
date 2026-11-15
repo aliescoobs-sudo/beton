@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type pg from 'pg';
 import { centimes, negateCentimes } from '@/lib/money';
 import { err, ok, type Result } from '@/lib/result';
-import { inRequest, isMalformedId, require, type SessionUser } from '@/modules/platform-security';
+import { can, inRequest, isMalformedId, require, type SessionUser } from '@/modules/platform-security';
 import { isEarly, isPostDated } from '../domain/instrument-dates';
 import {
   type DepositInput,
@@ -551,7 +551,9 @@ interface InstrumentRow {
 
 /** The instruments with their events, newest first. Owner and support only (the page records the support view). */
 export async function listInstruments(appPool: pg.Pool, actor: SessionUser): Promise<InstrumentView[]> {
-  await require(appPool, actor, 'instruments.read');
+  // D245: the owner and support read both directions, each office role its own side (the database filters the rows)
+  if (!can(actor.role, 'instruments.read_in') && !can(actor.role, 'instruments.read_out'))
+    await require(appPool, actor, 'instruments.read');
   const { rows } = await inRequest(appPool, actor, (tx) =>
     tx.query<InstrumentRow>(
       `select i.id, i.direction, i.method, i.amount_centimes::text, coalesce(i.client_id, i.supplier_id) as party_id,

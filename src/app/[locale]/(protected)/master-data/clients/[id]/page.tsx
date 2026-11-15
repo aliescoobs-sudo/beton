@@ -42,7 +42,7 @@ export default async function ClientPage({ params }: { params: Promise<{ locale:
       >
         {t('back')}
       </Link>
-      {can(user.role, 'statements.read') && (
+      {can(user.role, 'statements.client') && (
         <Link
           href={`/${locale}/statements/client/${id}`}
           className="mb-2 ms-4 inline-block text-sm underline"

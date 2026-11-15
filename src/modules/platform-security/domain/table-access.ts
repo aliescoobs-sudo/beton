@@ -2107,6 +2107,12 @@ export const TABLE_ACCESS = {
     reason:
       'T16 G5 (SPEC-cost-margin §5, D236, D237): the versioned cost rates (diesel, delivery, pump, plant, overheads), flagged is_assumption. Written by set_cost_rate (owner, app_admin), read by cost_rates_list (owner, app_admin).',
   },
+  client_reminder: {
+    kind: 'doors_only',
+    insertOnly: true,
+    reason:
+      'T19 item 2 (D245): the client reminder (relance) log: a note that somebody reminded a client of money owed; no message is sent. Written by log_client_reminder, read by client_reminder_list (owner, app_admin, office_sales).',
+  },
   fuel_norm: {
     kind: 'doors_only',
     insertOnly: true,

@@ -116,7 +116,7 @@ Each AC has one proving test named in the table at the end of the batch.
 - AC-PROD-33 `docs/RUNBOOK.md` covers install, update, backup, restore, key rotation, incident and rollback.
 
 ## Information-visibility matrix (§16.1)
-Four rights per money item, stated separately. Entering or printing never grants a balance or an aggregate. Source: `src/modules/platform-security/domain/visibility-matrix.ts` (this table is printed from it and a unit test fails when they differ); the balance column is proved in the database by `tests/visibility-matrix.int.test.ts`. Known exceptions: office_sales prints invoices with amounts; office_purchases enters supplier invoices and payments; the accountant exports HT, VAT and TTC; reference prices are visible to internal non-field roles (`public.reference_prices`).
+Four rights per money item, stated separately. Entering or printing never grants a balance or an aggregate. Source: `src/modules/platform-security/domain/visibility-matrix.ts` (this table is printed from it and a unit test fails when they differ); the balance column is proved in the database by `tests/visibility-matrix.int.test.ts`. D245 (T19): office_sales reads the CLIENT side and office_purchases the SUPPLIER side and the cash accounts, each audited, nothing else. Known exceptions: office_sales prints invoices with amounts; office_purchases enters supplier invoices and payments; the accountant exports HT, VAT and TTC; reference prices are visible to internal non-field roles (`public.reference_prices`).
 
 | Item | Enters | Sees in a document | Sees balances and aggregates | Exports |
 |---|---|---|---|---|
@@ -125,7 +125,12 @@ Four rights per money item, stated separately. Entering or printing never grants
 | Sales invoices and avoirs | owner, app_admin, office, office_sales | owner, app_admin, office_sales, accountant, support | owner, app_admin, support | owner, app_admin, accountant, support |
 | Supplier invoices and purchase prices | owner, app_admin, office, office_purchases | owner, app_admin, office_purchases, support | owner, app_admin, support | owner, app_admin, accountant, support |
 | Payments in and out (cash, cheque, LCN) | owner, app_admin, office, office_sales, office_purchases | owner, app_admin, support | owner, app_admin, support | — |
+| Payments in (client side: receipts, cheques, LCN) | — | owner, app_admin, support, office_sales | owner, app_admin, support, office_sales | — |
+| Payments out (supplier side) | — | owner, app_admin, support, office_purchases | owner, app_admin, support, office_purchases | — |
 | Client and supplier balances | — | owner, app_admin, support | owner, app_admin, support | — |
+| Client balances and statements | — | owner, app_admin, support, office_sales | owner, app_admin, support, office_sales | owner, app_admin, support, office_sales |
+| Supplier balances and statements | — | owner, app_admin, support, office_purchases | owner, app_admin, support, office_purchases | owner, app_admin, support, office_purchases |
+| Cash accounts (the cash, never a bank account) | — | owner, app_admin, support, office_purchases | owner, app_admin, support, office_purchases | — |
 | Cash, bank, treasury, forecast | owner, app_admin | owner, app_admin, support | owner, app_admin, support | — |
 | Fuel purchases (amounts) | owner, app_admin | owner, app_admin, support | owner, app_admin, support | — |
 

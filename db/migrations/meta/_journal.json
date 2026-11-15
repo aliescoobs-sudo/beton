@@ -1135,6 +1135,20 @@
       "when": 1794152232023,
       "tag": "0238_fuel_check",
       "breakpoints": true
+    },
+    {
+      "idx": 239,
+      "version": "7",
+      "when": 1794238632023,
+      "tag": "0239_office_money_read",
+      "breakpoints": true
+    },
+    {
+      "idx": 240,
+      "version": "7",
+      "when": 1794325032023,
+      "tag": "0240_client_reminder",
+      "breakpoints": true
     }
   ]
 }

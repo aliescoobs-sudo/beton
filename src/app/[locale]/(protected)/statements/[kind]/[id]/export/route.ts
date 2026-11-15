@@ -9,7 +9,7 @@ import {
 import { authorize, recordMoneyExport } from '@/modules/platform-security';
 import { currentAuthState } from '@/modules/platform-security/next';
 
-// @permission statements.read (owner, support): the CSV of one statement; every export is audited
+// @permission statements.client | statements.supplier (owner, support; office_sales the client side, office_purchases the supplier side, D245): the CSV of one statement; every export is audited
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ locale: string; kind: string; id: string }> },
@@ -18,7 +18,10 @@ export async function GET(
   const notFound = () => new Response('Not found', { status: 404 });
   if (kind !== 'client' && kind !== 'supplier') return notFound();
   const pool = getPool('app');
-  const allowed = await authorize('statements.read', { getState: currentAuthState, appPool: pool });
+  const allowed = await authorize(kind === 'client' ? 'statements.client' : 'statements.supplier', {
+    getState: currentAuthState,
+    appPool: pool,
+  });
   if (!allowed.ok) return notFound();
   const q = new URL(request.url).searchParams;
   const filter = parseStatementFilter({

@@ -6,7 +6,7 @@ import type { Role } from '../domain/permissions';
 import { recordAuditEvent } from './audit-service';
 
 /**
- * DECISIONS 81: every view of a money screen by the support role is audited ('view' on the screen's name). The
+ * DECISIONS 81 and 245: every view of a money screen by the support role or an office role is audited ('view' on the screen's name). The
  * database cannot log plain reads, so each money page calls this before it reads anything. Other roles that can reach a
  * money screen (the owner) are not logged: the audit log would only grow.
  */
@@ -15,7 +15,8 @@ export async function recordMoneyView(
   actor: { id: string; role: Role },
   screen: string,
 ): Promise<void> {
-  if (actor.role !== 'support') return;
+  // D245 (D-A): every money read by an office role is audited too (they read only their own side, but each view is on the record)
+  if (actor.role !== 'support' && actor.role !== 'office_sales' && actor.role !== 'office_purchases') return;
   await withRlsContext(
     pool,
     { userId: actor.id, role: actor.role, requestId: uuidv7(realClock.now()) },

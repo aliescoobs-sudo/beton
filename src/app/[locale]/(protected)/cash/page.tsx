@@ -9,7 +9,7 @@ import { Card, Money, PageHeader, Table, Th } from '@/ui';
 export default async function CashPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  const user = await requirePagePermission(locale, 'cash.read');
+  const user = await requirePagePermission(locale, 'cash.view');
   const pool = getPool('app');
   await recordMoneyView(pool, user, 'screen:cash-position');
   const position = await getCashPosition(pool, user);

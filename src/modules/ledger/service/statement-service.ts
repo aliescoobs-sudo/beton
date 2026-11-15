@@ -1,7 +1,7 @@
 import type pg from 'pg';
 import { centimes } from '@/lib/money';
 import { BUSINESS_TIME_ZONE } from '@/modules/clock';
-import { inRequest, require, type SessionUser } from '@/modules/platform-security';
+import { can, inRequest, require, type SessionUser } from '@/modules/platform-security';
 import { loadInvoicePayments } from './invoice-service';
 import {
   buildStatement,
@@ -264,7 +264,7 @@ async function statementOf(
   filter: StatementFilter,
   today: string,
 ): Promise<PartyStatement | null> {
-  await require(appPool, actor, 'statements.read');
+  await require(appPool, actor, kind === 'client' ? 'statements.client' : 'statements.supplier');
   return inRequest(appPool, actor, async (tx) => {
     const table = kind === 'client' ? 'client' : 'supplier';
     const party = await tx.query<{ id: string; code: string; name: string }>(
@@ -326,10 +326,14 @@ export async function listAccounts(
   actor: SessionUser,
   deps: { today: string },
 ): Promise<AccountRow[]> {
-  await require(appPool, actor, 'statements.read');
+  // D245: each role lists the side it may read (the database refuses the other side's rows anyway)
+  const sides = (['client', 'supplier'] as const).filter((k) =>
+    can(actor.role, k === 'client' ? 'statements.client' : 'statements.supplier'),
+  );
+  if (sides.length === 0) await require(appPool, actor, 'statements.read');
   return inRequest(appPool, actor, async (tx) => {
     const rows: AccountRow[] = [];
-    for (const kind of ['client', 'supplier'] as const) {
+    for (const kind of sides) {
       const parties = await tx.query<{ id: string; code: string; name: string }>(
         `select id, code, name from ${kind} where status = 'active' order by lower(name)`,
       );

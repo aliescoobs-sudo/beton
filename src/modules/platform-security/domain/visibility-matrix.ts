@@ -16,6 +16,11 @@ export interface VisibilityRow {
   /** Sees balances and aggregates over the item. */
   balances: readonly Role[];
   exports: readonly Role[];
+  /**
+   * D245 (D-A): the ONE office role that may read this item's balances because it is the money of its own side
+   * (office_sales: the client side; office_purchases: the supplier side and the cash accounts). Anything else is a violation.
+   */
+  officeSide?: 'office_sales' | 'office_purchases';
   keys?: {
     enters?: keyof typeof PERMISSIONS;
     balances?: keyof typeof PERMISSIONS;
@@ -78,12 +83,57 @@ export const VISIBILITY_MATRIX: readonly VisibilityRow[] = [
     keys: { enters: 'instruments.write', balances: 'instruments.read' },
   },
   {
+    item: 'Payments in (client side: receipts, cheques, LCN)',
+    enters: [],
+    inDocument: [...BAL, 'office_sales'],
+    balances: [...BAL, 'office_sales'],
+    exports: [],
+    officeSide: 'office_sales',
+    keys: { balances: 'instruments.read_in' },
+  },
+  {
+    item: 'Payments out (supplier side)',
+    enters: [],
+    inDocument: [...BAL, 'office_purchases'],
+    balances: [...BAL, 'office_purchases'],
+    exports: [],
+    officeSide: 'office_purchases',
+    keys: { balances: 'instruments.read_out' },
+  },
+  {
     item: 'Client and supplier balances',
     enters: [],
     inDocument: BAL,
     balances: BAL,
     exports: [],
     keys: { balances: 'statements.read' },
+  },
+  {
+    item: 'Client balances and statements',
+    enters: [],
+    inDocument: [...BAL, 'office_sales'],
+    balances: [...BAL, 'office_sales'],
+    exports: [...BAL, 'office_sales'],
+    officeSide: 'office_sales',
+    keys: { balances: 'statements.client' },
+  },
+  {
+    item: 'Supplier balances and statements',
+    enters: [],
+    inDocument: [...BAL, 'office_purchases'],
+    balances: [...BAL, 'office_purchases'],
+    exports: [...BAL, 'office_purchases'],
+    officeSide: 'office_purchases',
+    keys: { balances: 'statements.supplier' },
+  },
+  {
+    item: 'Cash accounts (the cash, never a bank account)',
+    enters: [],
+    inDocument: [...BAL, 'office_purchases'],
+    balances: [...BAL, 'office_purchases'],
+    exports: [],
+    officeSide: 'office_purchases',
+    keys: { balances: 'cash.view' },
   },
   {
     item: 'Cash, bank, treasury, forecast',
@@ -108,8 +158,8 @@ const roleSet = (r: readonly Role[]) => [...r].sort();
 /** Violations of the rules of §16.1; the unit test expects none. */
 export function matrixViolations(rows: readonly VisibilityRow[] = VISIBILITY_MATRIX): string[] {
   const out: string[] = [];
-  const bal = new Set<Role>(BAL);
   for (const row of rows) {
+    const bal = new Set<Role>(row.officeSide ? [...BAL, row.officeSide] : BAL);
     for (const r of row.balances)
       if (!bal.has(r)) out.push(`${row.item}: ${r} sees balances, only owner, app_admin and support may`);
     for (const r of row.exports)
@@ -117,6 +167,9 @@ export function matrixViolations(rows: readonly VisibilityRow[] = VISIBILITY_MAT
         out.push(`${row.item}: ${r} exports, only the accountant besides the money roles`);
     for (const r of row.enters)
       if (!bal.has(r) && row.balances.includes(r)) out.push(`${row.item}: entering gives ${r} the balance`);
+    // D245: the office exception is only ever ONE role, on its own side
+    if (row.officeSide && row.balances.some((r) => r.startsWith('office') && r !== row.officeSide))
+      out.push(`${row.item}: only ${row.officeSide} may read this side`);
     for (const [right, key] of Object.entries(row.keys ?? {})) {
       const list = (row as unknown as Record<string, readonly Role[]>)[right] ?? [];
       const perm = PERMISSIONS[key as keyof typeof PERMISSIONS] as readonly Role[];

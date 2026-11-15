@@ -16,7 +16,7 @@ Fictitious data only. UI only: no migration, no door, no permission change. Deci
 
 **F. Accessibility / phone.** Skip link, `main` landmark, SVG bell replaces an emoji, 44 px for menu, user menu, bell and bottom bar (asserted in e2e), visible 3 px focus ring from tokens, `prefers-reduced-motion` rule, aria labels on nav landmarks and icon controls.
 
-**G. Brand.** No visible BELGOBETON: the existing `scripts/brand-guard.test.ts` (UI, manifests, PDFs) stays green; remaining hits are internal database role names, allowed legacy. Descriptor stays separate text. No external request: `e2e/t18-ui.spec.ts` records every request on owner, office, plant and driver screens.
+**G. Brand.** No visible trace of the former product name: the existing `scripts/brand-guard.test.ts` (UI, manifests, PDFs) stays green; remaining hits are internal database role names, allowed legacy. Descriptor stays separate text. No external request: `e2e/t18-ui.spec.ts` records every request on owner, office, plant and driver screens.
 
 ## Prototype elements with no backend yet
 - Wished delivery hour and client PO number (order step 2): disabled with note.

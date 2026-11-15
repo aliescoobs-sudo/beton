@@ -963,6 +963,10 @@ export async function runImport(
   sheet: Sheet,
   ctx: Ctx & { apply: boolean },
 ): Promise<ImportReport> {
+  // The importer is the owner's (owner and app_admin). Until D245 an office account was stopped only because it could not read the table
+  // it wrote to (blind entry); an office role now reads its own side, so the refusal is stated here, not left to a side effect.
+  if (ctx.apply && ctx.actor.role !== 'owner' && ctx.actor.role !== 'app_admin')
+    throw new Error('the importer writes for the owner and app_admin only');
   const { planned, missing } = await plan(kind, sheet, ctx);
   const rows: ImportRow[] = planned.map((p) =>
     p.error

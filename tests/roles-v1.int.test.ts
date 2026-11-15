@@ -139,20 +139,30 @@ describe('default deny and money (AC-PROD-09, 10, 13, 14)', () => {
     ).rejects.toThrow();
   });
 
-  it('app_admin reads exactly what the owner reads on the money tables; office_sales and office_purchases read none', async () => {
-    for (const t of [
-      'payment_instrument',
-      'invoice',
-      'sales_order',
-      'purchase',
-      'money_movement',
-      'fuel_purchase',
-    ]) {
-      const ownerRows = (await as('owner', (tx) => tx.query(`select 1 from "${t}"`), owner.id)).rowCount;
-      const adminRows = (await as('app_admin', (tx) => tx.query(`select 1 from "${t}"`))).rowCount;
-      expect(adminRows, t).toBe(ownerRows);
+  it('app_admin reads exactly what the owner reads on the money tables; each office role reads only its own side (D245)', async () => {
+    // [table, SQL filter that picks the rows of the side, who may read that side]
+    const SIDES: [string, string, readonly string[]][] = [
+      ['payment_instrument', `direction = 'in'`, ['office_sales']],
+      ['payment_instrument', `direction = 'out'`, ['office_purchases']],
+      ['invoice', 'true', ['office_sales']],
+      ['sales_order', 'true', ['office_sales']],
+      ['purchase', 'true', ['office_purchases']],
+      [
+        'money_movement',
+        `account_id in (select id from money_account where kind = 'cash')`,
+        ['office_purchases'],
+      ],
+      ['money_movement', `account_id in (select id from money_account where kind = 'bank')`, []],
+      ['fuel_purchase', 'true', []],
+    ];
+    for (const [t, filter, readers] of SIDES) {
+      const q = `select 1 from "${t}" where ${filter}`;
+      const ownerRows = (await as('owner', (tx) => tx.query(q), owner.id)).rowCount;
+      expect((await as('app_admin', (tx) => tx.query(q))).rowCount, t).toBe(ownerRows);
       for (const r of ['office_sales', 'office_purchases'] as const) {
-        expect((await as(r, (tx) => tx.query(`select 1 from "${t}"`))).rowCount, `${r} ${t}`).toBe(0);
+        const rows = (await as(r, (tx) => tx.query(q))).rowCount;
+        if (readers.includes(r)) expect(rows, `${r} ${t} ${filter}`).toBe(ownerRows);
+        else expect(rows, `${r} ${t} ${filter}`).toBe(0);
       }
     }
   });

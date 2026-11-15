@@ -7,7 +7,7 @@ import { InstrumentActions } from '@/modules/ledger/ui/instruments/instrument-ac
 import { InstrumentAllocate } from '@/modules/ledger/ui/instruments/instrument-allocate';
 import { InstrumentsTable } from '@/modules/ledger/ui/instruments/instruments-table';
 import { can, recordMoneyView } from '@/modules/platform-security';
-import { requirePagePermission } from '@/modules/platform-security/next';
+import { requireAnyPagePermission } from '@/modules/platform-security/next';
 import { PageHeader } from '@/ui';
 import {
   allocateToInvoiceAction,
@@ -23,7 +23,11 @@ import {
 export default async function InstrumentsPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  const user = await requirePagePermission(locale, 'instruments.read');
+  const user = await requireAnyPagePermission(locale, [
+    'instruments.read',
+    'instruments.read_in',
+    'instruments.read_out',
+  ]);
   const pool = getPool('app');
   await recordMoneyView(pool, user, 'screen:instruments');
   const editable = can(user.role, 'instruments.manage');

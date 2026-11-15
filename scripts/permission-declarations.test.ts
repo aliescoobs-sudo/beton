@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 // SPEC §4 layer 1, "default deny": every entry point states who may use it. A page, server action or API route
 // without a guard call or an explicit `@permission` marker fails here.
 const read = (file: string) => readFileSync(file, 'utf8');
-const GUARD = /requirePagePermission\(|authorize\(|@permission\s+\S+/;
+const GUARD = /requirePagePermission\(|requireAnyPagePermission\(|authorize\(|@permission\s+\S+/;
 
 describe('every entry point declares its permission', () => {
   it.each(globSync('src/app/**/(protected)/**/page.tsx'))('protected page %s', (file) => {
