@@ -53,6 +53,13 @@ No CIN, birth-date or health field exists. The four `_enc` delivery-site address
 ## Tests
 Unit and integration (`pnpm test`): green except `scripts/release-binding.test.ts` "--recover clears a stale git index lock", which fails only inside the full parallel run (it passes alone every time; it needs a quiet machine). Role sweep and the permission, definer and exposure catalogues were updated for the new doors, none was weakened. New suites: `tests/office-money-read`, `charges`, `outgoing-control`, `opening-t19`, `sales-gaps` (integration) and `scripts/data-scope-scan.test.ts`.
 
+## End-to-end (one full run, alone on the machine, after T19)
+217 passed, 3 failed, 4 not run (they follow a failure in the same serial file). The three failures were test-side and are fixed and re-run green by file (reserved-roles 9/9, role-negatives and master-price-override 14/14 with the other two):
+- `master-price-override`: its `B25` option selector matched the extra fixture classes `FXB25G/FXB25P` made by earlier T17 suites; now `^B25 `.
+- `role-negatives` (office PDF/export targets): by D245 the Responsable now legitimately reads client statements (PDF and CSV); the test now asserts that, and still refuses her everything else and the Assistante and legacy office all of it.
+- `reserved-roles` (partner sweep): the sweep's own positive control, a valid admin, exports the new charges register, an audited export that the "no business write" counter saw; `export:charges` is excluded from that counter.
+The T18-UI failure found earlier (inline `style` on status chips blocked by the CSP once lists had data) was fixed in commit 9ca5db7 and covered by a unit guard. The full run was NOT repeated after these test-only fixes.
+
 ## Riskiest points for the final audit
 1. The side split of D-A is enforced by additive RLS policies on `ctx.actor_role()` that expose whole rows (prices included) of the client-side and supplier-side tables; reads are audited at page level, not in the database.
 2. The outgoing-payment gate is a trigger with a bypass for owner/app_admin/system and parameter limits editable without a second person; verify no other `out` insert path exists and the limits are the owner's.

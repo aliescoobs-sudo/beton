@@ -19,7 +19,7 @@ test('the owner gives a client a price override with a reason, in French', async
   await page.getByTestId(`client-${name}`).getByRole('link', { name }).click();
 
   const form = page.getByTestId('override-new');
-  const b25 = await form.locator('option', { hasText: 'B25' }).getAttribute('value');
+  const b25 = await form.locator('option', { hasText: /^B25 / }).getAttribute('value');
   await form.locator('select[name=concreteTypeId]').selectOption(b25 as string);
   await form.locator('input[name=price]').fill('880');
   await form.locator('input[name=effectiveFrom]').fill(date);

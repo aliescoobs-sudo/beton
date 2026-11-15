@@ -255,7 +255,10 @@ test('office roles: the known PDF and export targets (a real invoice, quote, sta
     ).toBe(true);
     for (const [label, url] of targets) {
       const r = await send(who.cookie, 'GET', url);
-      if (!denied(r)) leaks.push(`${role}: ${label} (${url}) -> ${r.status}`);
+      // D245: the Responsable (office_sales) reads the CLIENT side, statements included; everything else stays refused to every office role
+      const ownSide = role === 'office_sales' && label.startsWith('client statement');
+      if (ownSide) expect(reached(r), `${role}: its own side, ${label}`).toBe(true);
+      else if (!denied(r)) leaks.push(`${role}: ${label} (${url}) -> ${r.status}`);
     }
   }
   expect(leaks).toEqual([]);
