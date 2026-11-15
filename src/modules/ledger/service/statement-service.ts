@@ -2,6 +2,7 @@ import type pg from 'pg';
 import { centimes } from '@/lib/money';
 import { BUSINESS_TIME_ZONE } from '@/modules/clock';
 import { can, inRequest, require, type SessionUser } from '@/modules/platform-security';
+import { type OpenEntry, type OpeningItem, splitOpening } from '../domain/opening-items';
 import { loadInvoicePayments } from './invoice-service';
 import {
   buildStatement,
@@ -15,33 +16,77 @@ import {
 type Tx = pg.PoolClient;
 export type PartyKind = 'client' | 'supplier';
 
-interface PartyData {
+export interface PartyData {
   lines: StatementLine[];
   due: DueItem[];
+  /** The opening position still open after the unallocated credit: per-invoice entries when the party has items, plus the "no detail" remainder (T19c B1). */
+  opening: OpenEntry[];
 }
 
 const COUNTED: readonly LineStatus[] = ['received', 'deposited', 'issued', 'cleared'];
 
 /** Everything a statement is made of, for the given parties, in four queries (owner and support read these tables). */
 async function loadParties(tx: Tx, kind: PartyKind, ids: readonly string[]): Promise<Map<string, PartyData>> {
-  const data = new Map<string, PartyData>(ids.map((id) => [id, { lines: [], due: [] }]));
+  const data = new Map<string, PartyData>(ids.map((id) => [id, { lines: [], due: [], opening: [] }]));
   const col = kind === 'client' ? 'client_id' : 'supplier_id';
   const opening = await tx.query<{ party: string; id: string; amount: string; date: string }>(
     `select b.${col} as party, b.id, b.amount_centimes::text as amount, to_char(lo.opening_date, 'YYYY-MM-DD') as date
        from opening_party_balance b cross join ledger_opening lo where b.${col} = any($1)`,
     [ids],
   );
+  // T19c B1: a party with per-invoice open items shows THOSE (one line per invoice, plus one "no detail" line for what the items do not cover);
+  // a party without shows its single opening line. Never both for the same debt: the lines always add up to the party's opening line.
+  const itemRows = await tx.query<{
+    o_party: string;
+    o_invoice_number: string;
+    o_invoice_date: string;
+    o_due_date: string;
+    o_balance: string;
+  }>(
+    `select o_party, o_invoice_number, to_char(o_invoice_date, 'YYYY-MM-DD') as o_invoice_date, to_char(o_due_date, 'YYYY-MM-DD') as o_due_date,
+            o_balance::text from public.opening_items_read($1, $2::uuid[])`,
+    [kind, ids],
+  );
+  const itemsOf = new Map<string, OpeningItem[]>();
+  for (const r of itemRows.rows)
+    itemsOf.set(r.o_party, [
+      ...(itemsOf.get(r.o_party) ?? []),
+      {
+        invoiceNumber: r.o_invoice_number,
+        invoiceDate: r.o_invoice_date,
+        dueDate: r.o_due_date,
+        balanceCentimes: Number(r.o_balance),
+      },
+    ]);
+  const lineOf = new Map<string, number>();
   for (const r of opening.rows) {
-    data.get(r.party)?.lines.push({
-      id: `opening-${r.id}`,
-      section: 'commercial',
-      date: r.date,
-      type: 'opening',
-      code: null,
-      status: 'booked',
-      amountCentimes: centimes(Number(r.amount)),
-      counted: true,
-    });
+    const amount = Number(r.amount);
+    lineOf.set(r.party, amount);
+    const items = itemsOf.get(r.party) ?? [];
+    const detailed = items.reduce((t, i) => t + i.balanceCentimes, 0);
+    items.forEach((i, n) =>
+      data.get(r.party)?.lines.push({
+        id: `opening-item-${r.id}-${n}`,
+        section: 'commercial',
+        date: r.date,
+        type: 'opening',
+        code: i.invoiceNumber,
+        status: 'booked',
+        amountCentimes: centimes(i.balanceCentimes),
+        counted: true,
+      }),
+    );
+    if (amount - detailed > 0)
+      data.get(r.party)?.lines.push({
+        id: `opening-${r.id}`,
+        section: 'commercial',
+        date: r.date,
+        type: 'opening',
+        code: null,
+        status: 'booked',
+        amountCentimes: centimes(amount - detailed),
+        counted: true,
+      });
   }
   if (kind === 'client') {
     const orders = await tx.query<{
@@ -127,8 +172,14 @@ async function loadParties(tx: Tx, kind: PartyKind, ids: readonly string[]): Pro
         counted: true,
       });
     }
-    const items = await tx.query<{ client_id: string; due: string; amount: string; covered: string }>(
-      `select o.client_id, to_char(i.due_date, 'YYYY-MM-DD') as due, i.amount_centimes::text as amount,
+    const items = await tx.query<{
+      client_id: string;
+      due: string;
+      amount: string;
+      covered: string;
+      plant_id: string | null;
+    }>(
+      `select o.client_id, o.plant_id, to_char(i.due_date, 'YYYY-MM-DD') as due, i.amount_centimes::text as amount,
               coalesce((select sum(a.amount_centimes) from allocation a where a.payment_plan_item_id = i.id), 0)::text as covered
          from payment_plan_item i join sales_order o on o.id = i.order_id
         where o.client_id = any($1) and i.reverses_id is null and o.reverses_id is null
@@ -140,6 +191,7 @@ async function loadParties(tx: Tx, kind: PartyKind, ids: readonly string[]): Pro
         dueDate: i.due,
         amountCentimes: centimes(Number(i.amount)),
         coveredCentimes: centimes(Number(i.covered)),
+        plantId: i.plant_id,
       });
     }
   }
@@ -202,8 +254,14 @@ async function loadParties(tx: Tx, kind: PartyKind, ids: readonly string[]): Pro
         counted: true,
       });
     }
-    const pitems = await tx.query<{ supplier_id: string; due: string; amount: string; covered: string }>(
-      `select p.supplier_id, to_char(i.due_date, 'YYYY-MM-DD') as due, i.amount_centimes::text as amount,
+    const pitems = await tx.query<{
+      supplier_id: string;
+      due: string;
+      amount: string;
+      covered: string;
+      plant_id: string | null;
+    }>(
+      `select p.supplier_id, p.plant_id, to_char(i.due_date, 'YYYY-MM-DD') as due, i.amount_centimes::text as amount,
               coalesce((select sum(a.amount_centimes) from allocation a where a.purchase_plan_item_id = i.id), 0)::text as covered
          from purchase_plan_item i join purchase p on p.id = i.purchase_id
         where p.supplier_id = any($1) and i.reverses_id is null and p.reverses_id is null
@@ -215,6 +273,7 @@ async function loadParties(tx: Tx, kind: PartyKind, ids: readonly string[]): Pro
         dueDate: i.due,
         amountCentimes: centimes(Number(i.amount)),
         coveredCentimes: centimes(Number(i.covered)),
+        plantId: i.plant_id,
       });
     }
   }
@@ -226,15 +285,21 @@ async function loadParties(tx: Tx, kind: PartyKind, ids: readonly string[]): Pro
     amount: string;
     date: string;
     state: LineStatus;
+    allocated: string;
   }>(
     `select i.id, i.${col} as party, i.number, i.method, i.amount_centimes::text as amount,
-            to_char(i.received_date, 'YYYY-MM-DD') as date, last.event as state
+            to_char(i.received_date, 'YYYY-MM-DD') as date, last.event as state,
+            coalesce((select sum(a.amount_centimes) from allocation a where a.instrument_id = i.id), 0)::text as allocated
        from payment_instrument i
        cross join lateral (select e.event from instrument_event e where e.instrument_id = i.id order by e.seq desc limit 1) last
       where i.${col} = any($1) and i.direction = $2`,
     [ids, kind === 'client' ? 'in' : 'out'],
   );
+  // the credit no plan item took: what the party paid (counted) minus what the allocations already spent on plan items
+  const credit = new Map<string, number>();
   for (const p of instruments.rows) {
+    if (COUNTED.includes(p.state))
+      credit.set(p.party, (credit.get(p.party) ?? 0) + Math.max(0, Number(p.amount) - Number(p.allocated)));
     data.get(p.party)?.lines.push({
       id: `payment-${p.id}`,
       section: 'financial',
@@ -245,6 +310,22 @@ async function loadParties(tx: Tx, kind: PartyKind, ids: readonly string[]): Pro
       amountCentimes: centimes(-Number(p.amount)),
       counted: COUNTED.includes(p.state),
     });
+  }
+  // the opening position that is still open: the credit goes to the oldest opening items first (the rule is in the domain), then to the "no detail" part
+  for (const [party, line] of lineOf) {
+    const d = data.get(party);
+    if (!d) continue;
+    const split = splitOpening(line, itemsOf.get(party) ?? [], credit.get(party) ?? 0);
+    d.opening.push(...split.items);
+    if (split.remainderCentimes > 0)
+      d.opening.push({ dueDate: null, openCentimes: split.remainderCentimes, origin: 'opening_line' });
+    const raw = new Map((itemsOf.get(party) ?? []).map((i) => [i.invoiceNumber, i.balanceCentimes]));
+    for (const e of split.items)
+      d.due.push({
+        dueDate: e.dueDate as string,
+        amountCentimes: centimes(raw.get(e.invoiceNumber as string) ?? e.openCentimes),
+        coveredCentimes: centimes((raw.get(e.invoiceNumber as string) ?? e.openCentimes) - e.openCentimes),
+      });
   }
   return data;
 }

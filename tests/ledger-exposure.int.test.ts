@@ -233,6 +233,7 @@ describe('functions the application role can execute', () => {
     'public.client_alias_list(p_client uuid)', // T19 item 4 (ADMIN-GAP A2, A4, A5): client PO, aliases, client terms; actor first
     'public.order_client_pos(p_codes text[])', // T19 item 4: the PO numbers of orders by code, for the invoice an office role prints
     'public.add_opening_open_item(p_client uuid, p_supplier uuid, p_invoice_number text, p_invoice_date date, p_due_date date, p_amount bigint, p_balance bigint)', // T19-close A (D246): owner, app_admin
+    'public.opening_items_read(p_kind text, p_ids uuid[])', // T19c B1: the per-invoice items to statements, reminders and aging; owner, app_admin, support, and each office role for its own side
     'public.opening_open_item_list(p_kind text, p_limit integer)', // T19-close A: owner, app_admin
     'public.add_opening_obligation(p_kind text, p_lender text, p_reference text)', // T19-close A: owner, app_admin
     'public.add_opening_instalment(p_obligation uuid, p_due date, p_amount bigint)', // T19-close A: owner, app_admin

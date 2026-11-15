@@ -48,6 +48,8 @@ export interface DueItem {
   dueDate: string;
   amountCentimes: Centimes;
   coveredCentimes: Centimes;
+  /** The plant of the order or purchase it belongs to (the aging screen filters on it); an opening item has none. */
+  plantId?: string | null;
 }
 
 export interface StatementFilter {
