@@ -39,6 +39,9 @@ const orderInputSchema = z.object({
   volumeL: z.number().int().min(1).max(100_000_000),
   deliveryDate: date,
   broughtByUserId: z.uuid().nullable().default(null),
+  /** T19 item 4: the client's own purchase-order number (mandatory when the client is flagged po_required: the database refuses the order without it) and the commercial of the order. */
+  clientPo: z.string().trim().min(1).max(60).nullish(),
+  commercial: z.string().trim().min(1).max(80).nullish(),
   priceOverride: priceOverride.nullish(),
   /** The quote this order is made from (the owner converts a quote through the order form). */
   quoteId: z.uuid().nullish(),

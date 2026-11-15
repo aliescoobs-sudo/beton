@@ -36,6 +36,7 @@ import {
   getInvoiceSequence,
   getOpeningState,
   issueInstrument,
+  listClientAliases,
   listInstruments,
   listMoneyAccounts,
   receiveInstrument,
@@ -767,6 +768,9 @@ async function plan(
       clients.set(c.code.toLowerCase(), c.id);
       clients.set(c.name.trim().toLowerCase(), c.id);
     }
+    // T19 item 4: a client may also be named by one of its aliases (an alias is unique and never another client's name)
+    for (const a of await listClientAliases(appPool, actor))
+      clients.set(a.alias.trim().toLowerCase(), a.clientId);
     const ambClients = ambiguousKeys(clientList, (c) => [c.code.toLowerCase(), c.name.trim().toLowerCase()]);
     const haveByKey = new Map<string, Awaited<ReturnType<typeof listInstruments>>[number]>();
     for (const i of (await listInstruments(appPool, actor)).filter((x) => x.direction === 'in'))
@@ -1054,6 +1058,8 @@ async function plan(
       suppliers.set(x.code.toLowerCase(), x.id);
       suppliers.set(x.name.trim().toLowerCase(), x.id);
     }
+    for (const a of await listClientAliases(appPool, actor))
+      clients.set(a.alias.trim().toLowerCase(), a.clientId);
     const ambClients = ambiguousKeys(clientList, (c) => [c.code.toLowerCase(), c.name.trim().toLowerCase()]);
     const ambSuppliers = ambiguousKeys(supplierList, (x) => [
       x.code.toLowerCase(),

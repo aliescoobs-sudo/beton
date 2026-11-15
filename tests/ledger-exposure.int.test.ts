@@ -215,6 +215,23 @@ describe('functions the application role can execute', () => {
     'public.client_reminder_list(p_client uuid, p_limit integer)', // T19 item 2 (D245): same three roles
     'public.set_doc_counter(p_prefix text, p_year integer, p_last integer)', // T19 item 3 (D246): owner, app_admin, forward only
     'public.get_doc_counter(p_prefix text, p_year integer)', // T19 item 3: owner, app_admin
+    'public.record_charge(p_date date, p_beneficiary text, p_category text, p_ht bigint, p_vat bigint, p_mode text, p_document_ref text, p_note text)', // T19 item 6 (D245, D247): the charges register doors, actor first
+    'public.decide_charge(p_id uuid, p_decision text, p_note text)', // T19 item 6 (D245, D247): the charges register doors, actor first
+    'public.mark_charge_paid(p_id uuid)', // T19 item 6 (D245, D247): the charges register doors, actor first
+    'public.add_charge_document(p_id uuid, p_ref text)', // T19 item 6 (D245, D247): the charges register doors, actor first
+    'public.reverse_charge(p_id uuid, p_reason text)', // T19 item 6 (D245, D247): the charges register doors, actor first
+    'public.charge_list(p_from date, p_to date, p_limit integer)', // T19 item 6 (D245, D247): the charges register doors, actor first
+    'public.prepare_outgoing_payment(p_supplier uuid, p_method text, p_amount bigint, p_number text, p_bank text, p_written date, p_note text)', // T19 item 5 (D247): outgoing payment control doors, actor first
+    'public.decide_outgoing_payment(p_id uuid, p_decision text, p_note text)', // T19 item 5 (D247): outgoing payment control doors, actor first
+    'public.outgoing_payment_requests(p_limit integer)', // T19 item 5 (D247): outgoing payment control doors, actor first
+    'public.outgoing_due_tomorrow(p_date date)', // T19 item 5 (D247): outgoing payment control doors, actor first
+    'public.small_outgoing_review(p_date date)', // T19 item 5 (D247): outgoing payment control doors, actor first
+    'public.set_order_extra(p_order uuid, p_client_po text, p_commercial text)', // T19 item 4 (ADMIN-GAP A2, A4, A5): client PO, aliases, client terms; actor first
+    'public.order_extras(p_orders uuid[])', // T19 item 4 (ADMIN-GAP A2, A4, A5): client PO, aliases, client terms; actor first
+    'public.set_client_terms(p_client uuid, p_po_required boolean, p_price_basis text)', // T19 item 4 (ADMIN-GAP A2, A4, A5): client PO, aliases, client terms; actor first
+    'public.add_client_alias(p_client uuid, p_alias text)', // T19 item 4 (ADMIN-GAP A2, A4, A5): client PO, aliases, client terms; actor first
+    'public.client_alias_list(p_client uuid)', // T19 item 4 (ADMIN-GAP A2, A4, A5): client PO, aliases, client terms; actor first
+    'public.order_client_pos(p_codes text[])', // T19 item 4: the PO numbers of orders by code, for the invoice an office role prints
     'public.margin_summary(p_group text, p_from date, p_to date, p_plant uuid, p_class uuid, p_method text, p_client uuid)', // T17 G9: owner, app_admin (aggregated margins)
     'public.pump_check(p_from date, p_to date, p_plant uuid)', // T17 G10: owner, app_admin, the plant manager of his own plant (references and quantities, no cost)
     'public.fuel_check(p_from date, p_to date, p_plant uuid)', // T17 G11: owner, app_admin (litres and basis points, no money)

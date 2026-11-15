@@ -39,6 +39,7 @@ export function invoicePdf(doc: InvoiceDocument, ctx: PdfContext): Uint8Array {
     ['Date', i.invoiceDate],
     ['Échéance', `${i.dueDate} (${doc.termDays} jours)`],
     ['Commandes', i.orderCodes.join(', ')],
+    ...(doc.clientPos.length ? ([['N° commande client', doc.clientPos.join(', ')]] as const) : []),
     ...(doc.creditNoteOfNumber ? ([['Annule la facture', doc.creditNoteOfNumber]] as const) : []),
     ...(i.reason ? ([['Motif', i.reason]] as const) : []),
   ]);

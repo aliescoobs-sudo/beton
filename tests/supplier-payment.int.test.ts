@@ -73,7 +73,8 @@ describe('a supplier payment covers the plan items of a purchase (AC-LED-16)', (
     expect((await getPurchaseDetail(app, users.owner, s.purchase.id))?.purchase.totalTtcCentimes).toBe(
       5_220_000,
     );
-    const r = await pay(users.office, s.supplierId, 3_000_000, s.purchase.code);
+    // D247: an outgoing payment from 1 000 MAD up carries a validated request for an office role; the owner issues at any amount
+    const r = await pay(users.owner, s.supplierId, 3_000_000, s.purchase.code);
     if (!r.ok) throw new Error(r.error);
     expect(await covered(s.purchase.id)).toEqual([2_610_000, 390_000]);
     const detail = (await listPurchases(app, users.owner)).find((p) => p.id === s.purchase.id);
@@ -86,7 +87,8 @@ describe('a supplier payment covers the plan items of a purchase (AC-LED-16)', (
 
   it('office sees no money in the effects; the owner sees the payable covered', async () => {
     const a = await scene();
-    const office = await pay(users.office, a.supplierId, 1_000_000, a.purchase.code);
+    // below the small limit (1 000 MAD) the office still enters a payment directly
+    const office = await pay(users.office, a.supplierId, 90_000, a.purchase.code);
     if (!office.ok) throw new Error(office.error);
     expect(office.value.effects).toEqual([{ kind: 'document', document: 'payment', code: 'transfer' }]);
     const b = await scene();
@@ -105,7 +107,7 @@ describe('a supplier payment covers the plan items of a purchase (AC-LED-16)', (
     const before = (
       await inCtx(users.owner, (tx) => tx.query('select count(*)::int as n from payment_instrument'))
     ).rows[0].n;
-    expect(await pay(users.office, a.supplierId, 1_000_000, b.purchase.code)).toEqual({
+    expect(await pay(users.office, a.supplierId, 90_000, b.purchase.code)).toEqual({
       ok: false,
       error: 'NOTHING_TO_ALLOCATE',
     });

@@ -60,6 +60,7 @@ export function PaymentForm({
       DUPLICATE: t('duplicate'),
       NOTHING_TO_ALLOCATE: t('nothingToAllocate'),
       CONFLICT: t('conflict'),
+      CONTROL_REQUIRED: t('controlRequired'),
     })[error] ?? t('error');
 
   async function submit(event: FormEvent<HTMLFormElement>) {

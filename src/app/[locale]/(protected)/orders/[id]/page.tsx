@@ -3,7 +3,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { getRequestClock } from '@/app/request-clock';
 import { getPool } from '@/lib/db/pools';
 import { RelatedDocuments } from '@/modules/ledger/ui/related/related-documents';
-import { getOrderDetail, getRelatedDocuments } from '@/modules/ledger';
+import { getOrderDetail, getRelatedDocuments, listOrderExtras } from '@/modules/ledger';
 import { CancelOrder } from '@/modules/ledger/ui/orders/cancel-order';
 import { listGridInForce } from '@/modules/master-data';
 import { formatM3 } from '@/modules/operations/ui/format';
@@ -40,6 +40,7 @@ export default async function OrderDetailPage({
   const grid = (await listGridInForce(pool, user, o.orderDate)).find(
     (g) => g.classCode === o.typeCode && g.method === o.dischargeMethod,
   );
+  const extra = (await listOrderExtras(pool, user, [id])).get(id);
   const t = await getTranslations('ledger.orderDetail');
   const states = await getTranslations('ledger.itemStates');
   return (
@@ -86,6 +87,16 @@ export default async function OrderDetailPage({
               <Money centimes={o.unitPriceHtCentimes} suffix={t('perM3')} />
               {o.reason && <span className="ms-2 text-sm text-muted">({o.reason})</span>}
             </dd>
+          </div>
+          <div>
+            <dt className="field-label">{t('clientPo')}</dt>
+            <dd data-testid="order-client-po">
+              {extra?.clientPo ? <bdi dir="ltr">{extra.clientPo}</bdi> : '—'}
+            </dd>
+          </div>
+          <div>
+            <dt className="field-label">{t('commercial')}</dt>
+            <dd>{extra?.commercial ?? '—'}</dd>
           </div>
           <div>
             <dt className="field-label">{t('dischargeMethod')}</dt>

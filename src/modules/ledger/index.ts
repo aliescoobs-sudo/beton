@@ -212,3 +212,39 @@ export {
   getDocCounter,
   setDocCounter,
 } from './service/counter-service';
+export {
+  addChargeDocument,
+  CHARGE_CATEGORIES,
+  CHARGE_MODES,
+  type ChargeError,
+  type ChargeStatus,
+  type ChargeView,
+  chargesToCsv,
+  decideCharge,
+  listCharges,
+  markChargePaid,
+  recordCharge,
+} from './service/charge-service';
+export {
+  decidePayment,
+  type DueTomorrow,
+  listDueTomorrow,
+  listPaymentRequests,
+  listSmallPaymentsForReview,
+  type PaymentControlError,
+  type PaymentRequestView,
+  preparePayment,
+  type RequestState,
+  type SmallPaymentReview,
+} from './service/payment-control-service';
+export {
+  addClientAlias,
+  type ClientAlias,
+  type ClientTerms,
+  getClientTerms,
+  listClientAliases,
+  listOrderExtras,
+  type OrderExtra,
+  type SalesGapError,
+  setClientTerms,
+} from './service/sales-gap-service';

@@ -2107,6 +2107,42 @@ export const TABLE_ACCESS = {
     reason:
       'T16 G5 (SPEC-cost-margin §5, D236, D237): the versioned cost rates (diesel, delivery, pump, plant, overheads), flagged is_assumption. Written by set_cost_rate (owner, app_admin), read by cost_rates_list (owner, app_admin).',
   },
+  outgoing_payment_request: {
+    kind: 'doors_only',
+    insertOnly: true,
+    reason:
+      'T19 item 5 (D247): an outgoing payment PREPARED by the Assistante before it can be issued: supplier, method, amount, number, bank, due date. Written by prepare_outgoing_payment, read by outgoing_payment_requests. The instrument insert of a non-owner role must carry a validated (or approved) request (trigger outgoing_payment_gate).',
+  },
+  outgoing_payment_request_event: {
+    kind: 'doors_only',
+    insertOnly: true,
+    reason:
+      'T19 item 5: prepared, validated, approved, rejected: written by prepare_outgoing_payment and decide_outgoing_payment (nobody decides on their own preparation; the Responsable validates the middle band, the owner approves above the upper limit).',
+  },
+  order_extra: {
+    kind: 'doors_only',
+    insertOnly: true,
+    reason:
+      'T19 item 4 (ADMIN-GAP A4, A5): the client purchase-order number and the commercial of an order, written by set_order_extra in the same transaction as the order (a deferred trigger refuses an order of a po_required client without its PO), read by order_extras. The BL and the invoice show the PO of their order.',
+  },
+  client_alias: {
+    kind: 'doors_only',
+    insertOnly: true,
+    reason:
+      "T19 item 4 (ADMIN-GAP A5): alternate names of ONE client (unique, never another client's name). Written by add_client_alias, read by client_alias_list; the importer and the search use them.",
+  },
+  charge: {
+    kind: 'doors_only',
+    insertOnly: true,
+    reason:
+      'T19 item 6 (D245, D247): the charges register: beneficiary, category, HT / VAT / TTC, payment mode, supporting document. Written by record_charge, read by charge_list (office_purchases, owner, app_admin; office_sales only what waits for its validation). The finance schema is not touched.',
+  },
+  charge_event: {
+    kind: 'doors_only',
+    insertOnly: true,
+    reason:
+      'T19 item 6: the events of a charge (recorded, validated, approved, rejected, paid, document_added, reversed); the status is the last one. Written by the charge doors only (decide_charge: nobody decides on their own preparation).',
+  },
   client_reminder: {
     kind: 'doors_only',
     insertOnly: true,

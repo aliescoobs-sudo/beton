@@ -238,7 +238,9 @@
       "assistant__questions_per_day": "Assistant : questions par utilisateur et par jour",
       "assistant__budget_usd_month": "Assistant : budget mensuel en dollars américains entiers (à 100 %, il ne répond plus que par les outils)",
       "match_qty_tolerance_bp": "Écart de quantité toléré sur une facture fournisseur, facturé contre reçu ou contre commandé (points de base : 100 = 1 %)",
-      "match_price_tolerance_bp": "Écart de prix unitaire toléré sur une facture fournisseur, facturé contre commandé (points de base : 50 = 0,5 %)"
+      "match_price_tolerance_bp": "Écart de prix unitaire toléré sur une facture fournisseur, facturé contre commandé (points de base : 50 = 0,5 %)",
+      "payments__small_expense_max_centimes": "Paiement : seuil bas, sous lequel une petite dépense est saisie sans validation (centimes TTC)",
+      "payments__owner_approval_min_centimes": "Paiement : seuil haut, au-dessus duquel le propriétaire approuve avant émission (centimes TTC)"
     },
     "restartNote": "Les heures des tâches planifiées ne sont prises en compte qu'après un redémarrage du serveur."
   },
@@ -290,7 +292,22 @@
       "error": "Action refusée.",
       "archive": "Archiver le client",
       "archivedBadge": "Archivé",
-      "archivedNotice": "Client archivé : il n'est plus proposé pour les nouvelles commandes, son historique reste consultable."
+      "archivedNotice": "Client archivé : il n'est plus proposé pour les nouvelles commandes, son historique reste consultable.",
+      "sales": {
+        "title": "Ventes : noms alternatifs et conditions",
+        "aliases": "Autres noms du client",
+        "noAlias": "Aucun autre nom.",
+        "newAlias": "Nouveau nom alternatif",
+        "add": "Ajouter",
+        "terms": "Conditions",
+        "poRequired": "Le numéro de commande du client (BC) est obligatoire sur ses commandes",
+        "priceBasis": "Base de prix convenue",
+        "priceBasisHint": "HT ou TTC : indiqué ici ; le grand livre reste en HT.",
+        "save": "Enregistrer",
+        "aliasAdded": "Nom alternatif ajouté.",
+        "termsSaved": "Conditions enregistrées.",
+        "refused": "Refusé (nom déjà utilisé, ou droits insuffisants)."
+      }
     },
     "sites": {
       "title": "Chantiers",
@@ -706,7 +723,10 @@
         "back": "Retour",
         "hour": "Heure souhaitée",
         "poNumber": "N° de commande du client",
-        "notAvailable": "Pas encore disponible : ce champ n’est pas encore enregistré."
+        "notAvailable": "Pas encore disponible : ce champ n’est pas encore enregistré.",
+        "poRequired": "Ce client exige le numéro de sa commande (BC) : saisissez-le à l'étape Livraison.",
+        "poHint": "Obligatoire pour un client marqué « BC obligatoire » ; repris sur le BL et la facture.",
+        "commercial": "Commercial"
       }
     },
     "accounts": {
@@ -792,7 +812,8 @@
         "lcn": "LCN",
         "transfer": "Virement"
       },
-      "purchaseCode": "Code de l'achat ou de la facture fournisseur (pour le rattacher)"
+      "purchaseCode": "Code de l'achat ou de la facture fournisseur (pour le rattacher)",
+      "controlRequired": "Ce paiement dépasse le seuil de contrôle : préparez-le sur « Paiements à valider », il sera validé par une autre personne avant l'émission."
     },
     "instruments": {
       "title": "Paiements et titres",
@@ -1073,7 +1094,9 @@
       },
       "gridReference": "Prix de la grille (référence)",
       "gridAssumption": "valeur supposée",
-      "gridDiffers": "différent du prix de la commande"
+      "gridDiffers": "différent du prix de la commande",
+      "clientPo": "N° de commande du client",
+      "commercial": "Commercial"
     },
     "purchases": {
       "link": "Achats",
@@ -1571,6 +1594,121 @@
       "never": "Jamais",
       "recent": "Dernières relances",
       "none": "Aucune relance notée."
+    },
+    "charges": {
+      "link": "Charges",
+      "title": "Registre des charges",
+      "intro": "Loyer, électricité, assurances, entretien… : bénéficiaire, catégorie, HT / TVA / TTC, mode de paiement, justificatif. Au-dessus du seuil bas, une autre personne valide ; au-dessus du seuil haut, le propriétaire approuve. Un paiement sans justificatif est signalé.",
+      "introValidator": "Les charges qui attendent votre validation (une autre personne a préparé la dépense).",
+      "date": "Date",
+      "beneficiary": "Bénéficiaire",
+      "category": "Catégorie",
+      "mode": "Mode de paiement",
+      "ht": "HT (MAD)",
+      "vat": "TVA (MAD)",
+      "ttc": "TTC",
+      "documentRef": "Référence du justificatif",
+      "documentHint": "Facture, reçu, quittance. Vide = signalé « sans justificatif ».",
+      "note": "Note",
+      "save": "Enregistrer la charge",
+      "recorded": "Charge enregistrée.",
+      "refused": "Refusé.",
+      "none": "Aucune charge enregistrée.",
+      "statusCol": "État",
+      "preparedBy": "Préparée par",
+      "actions": "Actions",
+      "noDocument": "Sans justificatif",
+      "noDocumentBanner": "{count, plural, one {# charge sans justificatif} other {# charges sans justificatif}} : à régulariser.",
+      "validate": "Valider",
+      "approve": "Approuver",
+      "reject": "Rejeter",
+      "pay": "Marquer payée",
+      "addDocument": "Ajouter",
+      "validatedMsg": "Validée.",
+      "approvedMsg": "Approuvée.",
+      "rejectedMsg": "Rejetée.",
+      "paidMsg": "Marquée payée.",
+      "documentAdded": "Justificatif ajouté.",
+      "status": {
+        "recorded": "Enregistrée",
+        "pending_validation": "À valider",
+        "pending_approval": "À approuver (propriétaire)",
+        "validated": "Validée",
+        "approved": "Approuvée",
+        "paid": "Payée",
+        "rejected": "Rejetée",
+        "reversed": "Annulée"
+      },
+      "categories": {
+        "rent": "Loyer",
+        "electricity_water": "Eau et électricité",
+        "telecom": "Téléphone et internet",
+        "insurance": "Assurances",
+        "maintenance": "Entretien",
+        "transport": "Transport",
+        "taxes_fees": "Impôts et taxes",
+        "bank_fees": "Frais bancaires",
+        "supplies": "Fournitures",
+        "other": "Autre"
+      },
+      "modes": {
+        "cash": "Espèces",
+        "cheque": "Chèque",
+        "transfer": "Virement",
+        "card": "Carte"
+      }
+    },
+    "paymentRequests": {
+      "link": "Paiements à valider",
+      "title": "Paiements sortants : préparation, validation, émission",
+      "intro": "Préparez le paiement : il n'est pas émis. En dessous du seuil bas il est saisi directement ; au-dessus, une autre personne le valide ; au-dessus du seuil haut, le propriétaire l'approuve. Ensuite vous l'émettez.",
+      "introValidator": "Les paiements qui attendent votre validation (préparés par une autre personne).",
+      "supplier": "Fournisseur",
+      "method": "Mode",
+      "amount": "Montant TTC (MAD)",
+      "writtenDate": "Échéance (date du chèque)",
+      "number": "Numéro",
+      "bank": "Banque",
+      "note": "Note",
+      "prepare": "Préparer le paiement",
+      "prepared": "Paiement préparé.",
+      "refused": "Refusé.",
+      "none": "Aucun paiement préparé.",
+      "date": "Préparé le",
+      "control": "Contrôle",
+      "stateCol": "État",
+      "preparedBy": "Préparé par",
+      "actions": "Actions",
+      "validate": "Valider",
+      "approve": "Approuver",
+      "reject": "Rejeter",
+      "issue": "Émettre",
+      "validatedMsg": "Validé.",
+      "approvedMsg": "Approuvé.",
+      "rejectedMsg": "Rejeté.",
+      "issuedMsg": "Paiement émis.",
+      "dueTomorrow": "J-1 : chèques et LCN à échéance demain",
+      "dueTomorrowNone": "Aucun titre émis n'arrive à échéance demain.",
+      "smallReview": "Revue du propriétaire : petits paiements du jour",
+      "smallNone": "Aucun petit paiement saisi par le bureau aujourd'hui.",
+      "methods": {
+        "cheque": "Chèque",
+        "lcn": "LCN",
+        "transfer": "Virement",
+        "cash": "Espèces"
+      },
+      "states": {
+        "prepared": "Préparé",
+        "validated": "Validé",
+        "approved": "Approuvé",
+        "issued": "Émis",
+        "rejected": "Rejeté"
+      },
+      "levels": {
+        "small": "Aucun",
+        "validate": "Validation par un autre",
+        "owner": "Approbation du propriétaire"
+      }
     }
   },
   "operations": {

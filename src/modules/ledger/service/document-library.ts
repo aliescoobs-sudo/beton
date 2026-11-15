@@ -132,7 +132,13 @@ export async function getInvoiceForPrint(
     const advanceCentimes = Number(r.advance_centimes);
     const totalTtc = Number(r.total_ttc_centimes);
     const dayMs = 86_400_000;
+    const pos = await inRequest(appPool, actor, (tx) =>
+      tx.query<{ o_client_po: string }>('select o_client_po from public.order_client_pos($1::text[])', [
+        r.order_codes,
+      ]),
+    );
     return {
+      clientPos: [...new Set(pos.rows.map((x) => x.o_client_po))].sort(),
       invoice: {
         id: r.id,
         number: r.number,

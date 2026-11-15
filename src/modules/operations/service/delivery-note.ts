@@ -15,6 +15,8 @@ export interface DeliveryNote {
   volumeL: number;
   cancelled: boolean;
   orderCode: string;
+  /** T19 item 4: the client's own purchase-order number of the order, when one was entered (shown on the BL). */
+  clientPo: string | null;
   clientCode: string;
   /** Null for plant: it sees the client code only. */
   clientName: string | null;
@@ -59,7 +61,13 @@ export async function getDeliveryNote(
     );
     const r = rows[0];
     if (!r) return null;
+    const po = await inRequest(appPool, actor, (tx) =>
+      tx.query<{ o_client_po: string }>('select o_client_po from public.order_client_pos($1::text[])', [
+        [r.order_code],
+      ]),
+    );
     return {
+      clientPo: po.rows[0]?.o_client_po ?? null,
       blNo: r.bl_no,
       loadDate: r.load_date,
       loadedAt: r.loaded_at.toISOString(),

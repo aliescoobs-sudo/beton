@@ -51,6 +51,19 @@ export const PARAMETERS = {
   },
   'clock.job.day_close': { default: '20:00', schema: minutesOfDay, description: 'Day close (HH:MM)' },
   // Ledger (DECISIONS 66; plan decisions 8): configurable, never hard-coded. Each document stores the VAT rate in force.
+  // D247 (D-C, T19): outgoing payment control, PROVISIONAL (the owner confirms on 16 Nov 2026). Amounts in centimes (100000 = 1 000,00 MAD).
+  'payments.small_expense_max_centimes': {
+    default: 100_000,
+    schema: z.number().int().min(0).max(100_000_000),
+    description:
+      "Below this amount (centimes TTC) a small expense is recorded with its receipt and shown in the owner's daily review; from it, a different user must validate before issue",
+  },
+  'payments.owner_approval_min_centimes': {
+    default: 500_000,
+    schema: z.number().int().min(0).max(100_000_000),
+    description:
+      'Above this amount (centimes TTC) the owner approves in the application before the payment is issued',
+  },
   vat_rate_bp: {
     default: 2000,
     schema: z.number().int().min(0).max(2500),

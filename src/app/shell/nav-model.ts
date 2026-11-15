@@ -125,6 +125,18 @@ const GROUPS: GroupDef[] = [
     id: 'purchases',
     items: [
       {
+        path: '/payment-requests',
+        labelKey: 'ledger.paymentRequests.link',
+        testId: 'payment-requests-link',
+        allowed: (role) => can(role, 'payments.prepare') || can(role, 'payments.decide'),
+      },
+      {
+        path: '/charges',
+        labelKey: 'ledger.charges.link',
+        testId: 'charges-link',
+        allowed: (role) => can(role, 'charges.read') || can(role, 'charges.decide'),
+      },
+      {
         path: '/purchases/new',
         labelKey: 'ledger.purchases.newLink',
         testId: 'purchases-new-link',

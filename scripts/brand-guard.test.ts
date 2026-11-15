@@ -84,6 +84,7 @@ describe('tier 1: the user-visible surface never says BELGOBETON', () => {
         advanceCentimes: 0,
         netToPayCentimes: 0,
         termDays: 30,
+        clientPos: [],
       } as unknown as Parameters<typeof invoicePdf>[0],
       { company, specimen: false },
     );
@@ -94,6 +95,7 @@ describe('tier 1: the user-visible surface never says BELGOBETON', () => {
         loadDate: 'd',
         loadedAt: '2026-11-07T08:00:00Z',
         orderCode: 'o',
+        clientPo: null,
         clientName: 'c',
         clientCode: 'c',
         siteLabel: 's',

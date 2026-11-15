@@ -255,9 +255,10 @@ describe('the lifecycle through the service and the database (AC-LED-04)', () =>
   });
 
   it('an outgoing cheque cleared is a negative movement', async () => {
+    // D247: from 1 000 MAD an office role needs a validated request; the owner issues at any amount
     const r = await issueInstrument(
       app,
-      users.office,
+      users.owner,
       {
         method: 'cheque',
         amountCentimes: 300_000,

@@ -381,6 +381,15 @@ export const PERMISSIONS = {
   // D245: the cash accounts (never a bank account) for the Assistante; the day's cash movements and the running balance
   'cash.view': [...MONEY_READ, 'office_purchases'],
   // D245: the client reminder (relance) log: read and write by the Responsable, the owner and app_admin
+  // D245/D247 (T19 item 6): the charges register: the Assistante records and pays; the Responsable validates the middle band; the owner approves the upper band
+  // D247 (T19 item 5): outgoing payments are PREPARED by the Assistante, VALIDATED by another user (the Responsable) or APPROVED by the owner, then issued
+  'payments.prepare': ['owner', 'app_admin', 'office_purchases'],
+  'payments.decide': ['owner', 'app_admin', 'office_sales'],
+  // T19 item 4: how a client's orders are made (its PO number mandatory, HT or TTC basis)
+  'client_terms.write': ['owner', 'app_admin', 'office_sales'],
+  'charges.read': ['owner', 'app_admin', 'office_purchases'],
+  'charges.write': ['owner', 'app_admin', 'office_purchases'],
+  'charges.decide': ['owner', 'app_admin', 'office_sales'],
   'reminders.read': ['owner', 'app_admin', 'office_sales'],
   'reminders.write': ['owner', 'app_admin', 'office_sales'],
   // The accountant's files for a period (owner and support; every download is audited as an export)

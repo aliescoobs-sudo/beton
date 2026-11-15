@@ -495,6 +495,12 @@ describe('R19-01 (d): the sweep with real targets — the exact refusal, nothing
     }
     // The kinds below have no cheap fixture: each is exercised with a real row by its own suite (reason beside it); the sweep still sends the door a valid shape.
     const KNOWN_WITHOUT_TARGET: Record<string, string> = {
+      'public.set_order_extra(p_order)': 'an order of the caller: tests/sales-gaps.int.test.ts',
+      'public.decide_charge(p_id)': 'a charge needs a recorded charge: tests/charges.int.test.ts',
+      'public.mark_charge_paid(p_id)': 'idem: tests/charges.int.test.ts',
+      'public.reverse_charge(p_id)': 'idem: tests/charges.int.test.ts',
+      'public.decide_outgoing_payment(p_id)':
+        'a prepared outgoing payment request: tests/outgoing-control.int.test.ts',
       'finance.link_state(p_id)':
         'a finance link id: the finance module has its own suite (finance.int.test.ts)',
       'public.allocate_to_invoice(p_invoice)':

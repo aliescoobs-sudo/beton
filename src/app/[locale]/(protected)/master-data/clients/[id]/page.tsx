@@ -9,12 +9,15 @@ import {
   listSites,
   listZones,
 } from '@/modules/master-data';
+import { getClientTerms, listClientAliases } from '@/modules/ledger';
+import { ClientSalesPanel } from '@/modules/ledger/ui/clients/client-sales-panel';
 import { ClientDetail } from '@/modules/master-data/ui/clients/client-detail';
 import { OverridesPanel } from '@/modules/master-data/ui/selling-prices/overrides-panel';
 import { SitesPanel } from '@/modules/master-data/ui/sites/sites-panel';
 import { can, recordMoneyView } from '@/modules/platform-security';
 import { requirePagePermission } from '@/modules/platform-security/next';
 import { PageHeader } from '@/ui';
+import { addAliasAction, setTermsAction } from './sales-actions';
 
 export default async function ClientPage({ params }: { params: Promise<{ locale: string; id: string }> }) {
   const { locale, id } = await params;
@@ -31,6 +34,10 @@ export default async function ClientPage({ params }: { params: Promise<{ locale:
     showOverrides ? listSellingPrices(getPool('app'), user, { clientId: id }) : Promise.resolve([]),
   ]);
   if (!client) notFound();
+  const [aliases, terms] = await Promise.all([
+    can(user.role, 'parties.write') ? listClientAliases(getPool('app'), user, id) : Promise.resolve([]),
+    getClientTerms(getPool('app'), user, id),
+  ]);
   const typeCode = new Map(types.map((type) => [type.id, type.code]));
   const t = await getTranslations('masterData.clients');
   const tStatements = await getTranslations('ledger.statements');
@@ -93,6 +100,16 @@ export default async function ClientPage({ params }: { params: Promise<{ locale:
         }))}
         zones={zones.map(({ id: zoneId, name }) => ({ id: zoneId, name }))}
       />
+      {can(user.role, 'parties.write') && terms && (
+        <ClientSalesPanel
+          clientId={client.id}
+          aliases={aliases.map((a) => a.alias)}
+          terms={terms}
+          canEditTerms={can(user.role, 'client_terms.write')}
+          addAlias={addAliasAction}
+          setTerms={setTermsAction}
+        />
+      )}
       {showOverrides && (
         <OverridesPanel
           clientId={client.id}

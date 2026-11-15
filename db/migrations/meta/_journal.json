@@ -1170,6 +1170,55 @@
       "when": 1794584232023,
       "tag": "0243_opening_guard_all",
       "breakpoints": true
+    },
+    {
+      "idx": 244,
+      "version": "7",
+      "when": 1794670632023,
+      "tag": "0244_charges_register",
+      "breakpoints": true
+    },
+    {
+      "idx": 245,
+      "version": "7",
+      "when": 1794757032023,
+      "tag": "0245_outgoing_payment_control",
+      "breakpoints": true
+    },
+    {
+      "idx": 246,
+      "version": "7",
+      "when": 1794843432023,
+      "tag": "0246_payment_control_level_internal",
+      "breakpoints": true
+    },
+    {
+      "idx": 247,
+      "version": "7",
+      "when": 1794929832023,
+      "tag": "0247_sales_gaps",
+      "breakpoints": true
+    },
+    {
+      "idx": 248,
+      "version": "7",
+      "when": 1795016232023,
+      "tag": "0248_order_extras_by_code",
+      "breakpoints": true
+    },
+    {
+      "idx": 249,
+      "version": "7",
+      "when": 1795102632023,
+      "tag": "0249_client_terms_update_policy",
+      "breakpoints": true
+    },
+    {
+      "idx": 250,
+      "version": "7",
+      "when": 1795189032023,
+      "tag": "0250_order_extras_partner",
+      "breakpoints": true
     }
   ]
 }

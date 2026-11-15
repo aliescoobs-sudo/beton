@@ -196,9 +196,10 @@ describe('a supplier statement', () => {
       );
       return id;
     });
+    // D247: 1 500 MAD is above the small limit: the owner issues it (an office role would need a validated request)
     const paid = await issueInstrument(
       app,
-      users.office,
+      users.owner,
       { method: 'transfer', amountCentimes: 150_000, supplierId: s },
       { today: '2026-06-02' },
     );

@@ -84,6 +84,9 @@ export function OrderForm({
   // D239 d: no default. The person must choose one of the two.
   const [method, setMethod] = useState<DischargeMethod | ''>('');
   const [volume, setVolume] = useState(initial?.volumeM3 ?? '');
+  // T19 item 4: the client's own order number (mandatory for a client flagged "PO required": the database says so) and the commercial of the order
+  const [clientPo, setClientPo] = useState('');
+  const [commercial, setCommercial] = useState('');
   const [delivery, setDelivery] = useState(today);
   const [overridePrice, setOverridePrice] = useState('');
   const [overrideReason, setOverrideReason] = useState('');
@@ -137,6 +140,7 @@ export function OrderForm({
       DELIVERY_BEFORE_ORDER: t('deliveryBeforeOrder'),
       FORBIDDEN_OVERRIDE: t('forbiddenOverride'),
       METHOD_REQUIRED: t('discharge.required'),
+      PO_REQUIRED: t('flow.poRequired'),
       CONFLICT: t('conflict'),
     })[error] ?? t('error');
 
@@ -176,6 +180,8 @@ export function OrderForm({
       dischargeMethod: method,
       volumeL: litres.value,
       deliveryDate: delivery,
+      ...(clientPo.trim() ? { clientPo: clientPo.trim() } : {}),
+      ...(commercial.trim() ? { commercial: commercial.trim() } : {}),
       plan,
       ...(override ? { priceOverride: override } : {}),
       ...(initial ? { quoteId: initial.quoteId } : {}),
@@ -233,6 +239,8 @@ export function OrderForm({
     setSiteId('');
     setZoneId('');
     setVolume('');
+    setClientPo('');
+    setCommercial('');
     setMethod('');
     setPreview(null);
     setMessage(null);
@@ -468,14 +476,23 @@ export function OrderForm({
               <span className="field-label">{t('flow.poNumber')}</span>
               <input
                 dir="ltr"
-                disabled
-                aria-describedby="order-po-note"
+                maxLength={60}
+                value={clientPo}
+                onChange={(e) => setClientPo(e.target.value)}
                 className={INPUT}
                 data-testid="order-po"
               />
-              <span id="order-po-note" className="field-hint">
-                {t('flow.notAvailable')}
-              </span>
+              <span className="field-hint">{t('flow.poHint')}</span>
+            </label>
+            <label className="block">
+              <span className="field-label">{t('flow.commercial')}</span>
+              <input
+                maxLength={80}
+                value={commercial}
+                onChange={(e) => setCommercial(e.target.value)}
+                className={INPUT}
+                data-testid="order-commercial"
+              />
             </label>
           </div>
         </section>

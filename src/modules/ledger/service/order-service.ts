@@ -28,6 +28,7 @@ export type OrderError =
   | 'DELIVERY_BEFORE_ORDER'
   | 'FORBIDDEN_OVERRIDE'
   | 'METHOD_REQUIRED'
+  | 'PO_REQUIRED'
   | 'CONFLICT';
 
 /**
@@ -45,6 +46,7 @@ export const dbFailure = (error: unknown): OrderError => {
   const { code, message } = error as { code?: string; message?: string };
   if (code === '23514') {
     if (/discharge method/.test(message ?? '')) return 'METHOD_REQUIRED';
+    if (/client PO/.test(message ?? '')) return 'PO_REQUIRED';
     if (/client is not active/.test(message ?? '')) return 'CLIENT_ARCHIVED';
     if (/concrete type is not active/.test(message ?? '')) return 'TYPE_INACTIVE';
     if (/price is not the one in force/.test(message ?? '')) return 'NO_PRICE';
@@ -217,6 +219,7 @@ export async function createOrder(
       const prepared = await prepareOrder(tx, v, deps.today, can(actor.role, 'orders.price_override'));
       if (!prepared.ok) return prepared;
       const created = await insertOrderRows(tx, actor, v, prepared.value, deps.today);
+      await writeOrderExtra(tx, created.id, v);
       const client = await tx.query<{ code: string }>('select code from client where id = $1', [v.clientId]);
       const effects: Effect[] = [
         { kind: 'document', document: 'order', code: created.code },
@@ -232,6 +235,16 @@ export async function createOrder(
   } catch (error) {
     return err(dbFailure(error));
   }
+}
+
+/** T19 item 4: the PO and the commercial of the order, in the SAME transaction (a deferred trigger refuses a po_required client's order without its PO). */
+async function writeOrderExtra(tx: pg.PoolClient, orderId: string, v: OrderInput): Promise<void> {
+  if (!orderId || (!v.clientPo && !v.commercial)) return;
+  await tx.query('select public.set_order_extra($1, $2, $3)', [
+    orderId,
+    v.clientPo ?? null,
+    v.commercial ?? null,
+  ]);
 }
 
 async function createOrderBlind(
@@ -276,6 +289,7 @@ async function createOrderBlind(
       );
       const code = made.rows[0]?.code;
       if (!code) return err('INVALID');
+      await writeOrderExtra(tx, made.rows[0]?.id ?? '', v);
       const effects: Effect[] = [
         { kind: 'document', document: 'order', code },
         { kind: 'scheduled', code, date: v.deliveryDate },

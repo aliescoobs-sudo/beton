@@ -30,7 +30,8 @@ export type InstrumentError =
   | 'CONFLICT'
   | 'NOTHING_TO_ALLOCATE'
   | 'WINDOW_CLOSED'
-  | 'COVERING_INVALID';
+  | 'COVERING_INVALID'
+  | 'CONTROL_REQUIRED';
 
 /** What a write returns to the caller: the identity, never an amount (office enters blind, DECISIONS 81). */
 export interface InstrumentRef {
@@ -43,6 +44,8 @@ export function instrumentFailure(error: unknown): InstrumentError {
   const e = error as { code?: string; message?: string; constraint?: string };
   const message = e.message ?? '';
   if (e.code === '23514') {
+    // D247: an outgoing payment from the middle band up needs a validated (or approved) request
+    if (/outgoing payment|the request/.test(message)) return 'CONTROL_REQUIRED';
     if (/illegal transition/.test(message)) return 'ILLEGAL_TRANSITION';
     if (/window is closed/.test(message)) return 'WINDOW_CLOSED';
     if (/covering instrument/.test(message)) return 'COVERING_INVALID';
@@ -107,6 +110,8 @@ async function enter(
   today: string,
   /** D246: set by the opening importer only (the database refuses it for any other role). */
   source: 'opening_30_11' | null = null,
+  /** D247: the validated request this outgoing payment carries (the database refuses a payment of the middle band or above without one). */
+  controlRequestId: string | null = null,
 ): Promise<Result<InstrumentRef, InstrumentError>> {
   const id = randomUUID();
   let coveredCentimes = 0;
@@ -114,8 +119,8 @@ async function enter(
     await inRequest(appPool, actor, async (tx) => {
       await tx.query(
         `insert into payment_instrument (id, direction, method, amount_centimes, client_id, supplier_id, number, bank,
-                                         written_date, received_date, created_by, source)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+                                         written_date, received_date, created_by, source, control_request_id)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
         [
           id,
           direction,
@@ -129,6 +134,7 @@ async function enter(
           today,
           actor.id,
           source,
+          controlRequestId,
         ],
       );
       await insertEvent(tx, actor, {
@@ -245,7 +251,7 @@ export async function issueInstrument(
   appPool: pg.Pool,
   actor: SessionUser,
   input: unknown,
-  deps: { today: string; source?: 'opening_30_11' },
+  deps: { today: string; source?: 'opening_30_11'; requestId?: string },
 ): Promise<Result<InstrumentRef, InstrumentError>> {
   await require(appPool, actor, 'instruments.write');
   const parsed = parseIssueInput(input);
@@ -257,6 +263,7 @@ export async function issueInstrument(
     { ...parsed.value, partyId: parsed.value.supplierId },
     deps.today,
     deps.source ?? null,
+    deps.requestId ?? null,
   );
 }
 

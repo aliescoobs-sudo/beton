@@ -62,6 +62,7 @@ export function invoiceDoc(groups: number): Parameters<typeof invoicePdf>[0] {
     advanceCentimes: 0,
     netToPayCentimes: 148147,
     termDays: 30,
+    clientPos: [],
   } as unknown as Parameters<typeof invoicePdf>[0];
 }
 export const note = {
@@ -70,6 +71,7 @@ export const note = {
   loadDate: '2026-11-07',
   loadedAt: '2026-11-07T08:30:00.000Z',
   orderCode: 'CMD-1',
+  clientPo: null,
   clientName: 'Client Fictif',
   clientCode: 'CL-01',
   siteLabel: 'Chantier',

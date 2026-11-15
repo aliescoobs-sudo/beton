@@ -321,6 +321,8 @@ export interface InvoiceDocument {
   netToPayCentimes: number;
   /** Whole days from the invoice date to the due date (the law 69-21 term printed on the document). */
   termDays: number;
+  /** T19 item 4: the client's own purchase-order numbers of the orders billed, printed on the document (empty when none was entered). */
+  clientPos: string[];
 }
 
 /**
@@ -366,8 +368,19 @@ export async function getInvoiceDocument(
            from invoice i where i.id = $1`,
         [invoiceId],
       );
+      const orderIds = await tx.query<{ id: string }>(
+        `select distinct d.order_id as id from invoice_line l join delivery d on d.id = l.delivery_id where l.invoice_id = $1`,
+        [invoiceId],
+      );
+      const extra = await tx.query<{ o_client_po: string | null }>(
+        'select o_client_po from public.order_extras($1::uuid[])',
+        [orderIds.rows.map((r) => r.id)],
+      );
       return {
         invoice,
+        clientPos: [
+          ...new Set(extra.rows.map((r) => r.o_client_po).filter((p): p is string => Boolean(p))),
+        ].sort(),
         creditNoteOfNumber: meta.rows[0]?.credited ?? null,
         termDays: Number(meta.rows[0]?.term ?? 0),
         groups: groupInvoiceLines(

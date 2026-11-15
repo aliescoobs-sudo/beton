@@ -16,6 +16,7 @@ export function deliveryNotePdf(
     ['Date', note.loadDate],
     ['Chargé à', note.loadedAt.slice(11, 16)],
     ['Commande', note.orderCode],
+    ...(note.clientPo ? ([['N° commande client', note.clientPo]] as const) : []),
     ['Client', note.clientName ? `${note.clientName} (${note.clientCode})` : note.clientCode],
     ['Chantier', [note.siteLabel, note.zoneName].filter(Boolean).join(' — ') || '—'],
     ['Béton', `${note.typeCode} ${note.typeLabel}`],
