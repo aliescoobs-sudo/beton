@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import type { TodayOpsView } from '@/modules/rules-engine';
+import { Card } from '@/ui';
 import { AlertsList } from './alerts-list';
 import { formatDate, ltr, m3Text } from './format';
 import { StockSummary } from './stock-summary';
@@ -11,6 +12,33 @@ export async function OpsToday({ view, locale }: { view: TodayOpsView; locale: s
   return (
     <div className="space-y-10" data-testid="ops-today">
       <p className="text-sm text-muted">{t('ops.noMoney')}</p>
+      <section aria-label={t('ops.kpi.title')} data-testid="ops-kpis">
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Card>
+            <p className="field-label">{t('ops.kpi.loads')}</p>
+            <p className="mt-1 text-3xl font-bold">
+              <bdi dir="ltr">{view.loads.length}</bdi>
+            </p>
+          </Card>
+          <Card>
+            <p className="field-label">{t('ops.kpi.volume')}</p>
+            <p className="mt-1 text-3xl font-bold">
+              <bdi dir="ltr">{m3Text(view.loads.reduce((sum, l) => sum + l.remainingL, 0))}</bdi>
+            </p>
+          </Card>
+          <Card className={view.alerts.length > 0 ? 'border-s-4 border-status-late' : undefined}>
+            <p className="field-label">{t('ops.kpi.alerts')}</p>
+            <p className="mt-1 text-3xl font-bold">
+              {view.alerts.length > 0 && (
+                <span aria-hidden="true" className="me-2 text-status-late">
+                  ▲
+                </span>
+              )}
+              <bdi dir="ltr">{view.alerts.length}</bdi>
+            </p>
+          </Card>
+        </div>
+      </section>
       <section aria-labelledby="ops-loads">
         <h2 id="ops-loads" className="mb-3 text-xl">
           {t('ops.loads')}

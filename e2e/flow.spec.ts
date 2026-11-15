@@ -4,7 +4,7 @@ import { E2E_DATABASE } from '../scripts/db-bootstrap';
 import { testEnv } from '../tests/db-env';
 import { realSessionUser } from '../tests/helpers/actors';
 import { createLoad, markDelivered } from '../src/modules/operations';
-import { E2E_MD, goNav, loginAndEnrol, loginOwner, logout, moneySafeSuffix } from './fixtures';
+import { E2E_MD, goNav, loginAndEnrol, loginOwner, logout, moneySafeSuffix, orderStep } from './fixtures';
 
 // operations O6 + ledger L35: one action, its effect end to end. order -> load -> stock down -> invoice -> cheque -> cash,
 // and after every step the panel says what it changed. The owner sees the money facts, office sees none.
@@ -31,6 +31,7 @@ async function newOrder(page: Page, m3: string) {
   await page.getByTestId('order-type').selectOption({ label: 'B25 · Béton B25' });
   await page.getByTestId('order-volume').fill(m3);
   await page.getByTestId('order-method').selectOption('GOULOTTE');
+  await orderStep(page, 3);
   await page.getByTestId('order-preset').selectOption('cash');
   await page.getByTestId('order-save').click();
   const saved = page.getByTestId('order-saved');

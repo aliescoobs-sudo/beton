@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { E2E_MD, goNav, loginAndEnrol, loginOwner, logout } from './fixtures';
+import { E2E_MD, goNav, loginAndEnrol, loginOwner, logout, orderStep } from './fixtures';
 
 // ledger L31 (AC-LED-23): a quote is priced at the price in force, has no ledger effect, and becomes an order only when a human
 // saves the prefilled order form. Office enters quotes blind.
@@ -31,6 +31,7 @@ test('the owner makes a quote, reads it, converts it into an order that a human 
   await expect(page).toHaveURL(/\/fr\/orders\/new\?quote=/);
   await expect(page.getByTestId('order-volume')).toHaveValue('5');
   await page.getByTestId('order-method').selectOption('GOULOTTE');
+  await orderStep(page, 3);
   await page.getByTestId('order-preset').selectOption('cash');
   await page.getByTestId('order-save').click();
   const order = /CMD-\d{4}-\d{5}/.exec(

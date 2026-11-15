@@ -22,7 +22,9 @@
       "sub": "Pages du groupe",
       "finance": "Trésorerie",
       "noMatch": "Aucune page ne correspond.",
-      "section": "Section"
+      "section": "Section",
+      "skip": "Aller au contenu",
+      "bottom": "Raccourcis"
     },
     "dashboard": {
       "action": "Commencer par les clients",
@@ -694,6 +696,17 @@
         "reference": "Prix de la grille (référence : il ne fixe pas le prix de la commande)",
         "assumption": "valeur supposée",
         "differs": "différent du prix de la commande"
+      },
+      "flow": {
+        "steps": "Étapes de la commande",
+        "lines": "Panier",
+        "delivery": "Livraison",
+        "summary": "Récapitulatif",
+        "next": "Continuer",
+        "back": "Retour",
+        "hour": "Heure souhaitée",
+        "poNumber": "N° de commande du client",
+        "notAvailable": "Pas encore disponible : ce champ n’est pas encore enregistré."
       }
     },
     "accounts": {
@@ -2486,7 +2499,13 @@
       "loadLine": "{order} · {client} · {type} · reste {m3} m³ · {date}",
       "stockAlerts": "Alertes de stock",
       "noStockAlerts": "Aucune rupture ni niveau bas annoncé sur la période.",
-      "noMoney": "Cet écran ne montre aucun montant."
+      "noMoney": "Cet écran ne montre aucun montant.",
+      "kpi": {
+        "title": "En bref",
+        "loads": "Chargements à faire",
+        "volume": "Volume restant à livrer",
+        "alerts": "Alertes stock"
+      }
     },
     "brief": {
       "cash": "Encaissé {real}, total avec non encaissé {total}.",
@@ -2524,6 +2543,15 @@
       "note": "Note (facultatif)",
       "confirmed": "Excédent confirmé.",
       "error": "Confirmation impossible."
+    },
+    "five": {
+      "title": "L’essentiel en cinq secondes",
+      "alerts": "À traiter maintenant",
+      "black": "Jour noir : {amount} manquants le {date}",
+      "overdue": "Retards clients : {amount}",
+      "excess": "{count, plural, one {# excédent de chargement à confirmer} other {# excédents de chargement à confirmer}}",
+      "alertsCount": "{count, plural, one {# alerte ouverte} other {# alertes ouvertes}}",
+      "see": "Voir"
     }
   },
   "related": {
@@ -3513,5 +3541,25 @@
       "hours": "heures de pompage",
       "none": "pleins seulement"
     }
+  },
+  "list": {
+    "loading": "Chargement…",
+    "errorTitle": "Cet écran n’a pas pu s’afficher",
+    "errorBody": "Rien n’a été modifié. Réessayez ; si le problème continue, prévenez le support en donnant l’heure.",
+    "retry": "Réessayer",
+    "apply": "Filtrer",
+    "reset": "Réinitialiser",
+    "filters": "Filtres",
+    "status": "Statut",
+    "statusAll": "Tous",
+    "prev": "Précédent",
+    "next": "Suivant",
+    "pageNav": "Pagination",
+    "range": "{from}–{to} sur {total}",
+    "export": "Exporter en Excel",
+    "noMatch": "Aucun résultat pour ces filtres.",
+    "noMatchHint": "Élargissez ou réinitialisez les filtres.",
+    "sortBy": "Trier par {column}",
+    "search": "Recherche"
   }
 }

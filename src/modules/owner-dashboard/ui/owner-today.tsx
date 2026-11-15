@@ -32,6 +32,36 @@ export async function OwnerToday({
 }) {
   const t = await getTranslations('dashboard');
   const overdueTotal = sumCentimes(view.overdue.map((o) => o.amount));
+  // Red cards only for a real problem: each one is a fact the engine already computed, linked to its section below. Never decoration.
+  const alertCards = [
+    ...(view.black
+      ? [
+          {
+            id: 'black',
+            href: '#sec-black',
+            text: t('five.black', {
+              amount: moneyText(view.black.shortfall),
+              date: formatDay(view.black.date, locale),
+            }),
+          },
+        ]
+      : []),
+    ...(overdueTotal > 0
+      ? [
+          {
+            id: 'overdue',
+            href: '#sec-overdue',
+            text: t('five.overdue', { amount: moneyText(overdueTotal) }),
+          },
+        ]
+      : []),
+    ...(view.excesses.length > 0
+      ? [{ id: 'excess', href: '#sec-excess', text: t('five.excess', { count: view.excesses.length }) }]
+      : []),
+    ...(view.alerts.length > 0
+      ? [{ id: 'alerts', href: '#sec-alerts', text: t('five.alertsCount', { count: view.alerts.length }) }]
+      : []),
+  ];
   const decisions = Object.values(view.decisions)
     .flat()
     .sort((a, b) => b.decidedOn.localeCompare(a.decidedOn))
@@ -54,16 +84,9 @@ export async function OwnerToday({
         {t('asOf', { date: formatDate(view.today) })} · {t('freshness')}
       </p>
 
-      <section aria-labelledby="sec-brief">
-        <h2 id="sec-brief" className="mb-3 text-xl">
-          {t('sections.brief')}
-        </h2>
-        <Brief view={view} locale={locale} />
-      </section>
-
-      <section aria-labelledby="sec-cash">
-        <h2 id="sec-cash" className="mb-3 text-xl">
-          {t('sections.cash')}
+      <section aria-labelledby="sec-five" data-testid="five-seconds">
+        <h2 id="sec-five" className="mb-3 text-xl">
+          {t('five.title')}
         </h2>
         <div className="grid gap-4 sm:grid-cols-3">
           {[
@@ -73,7 +96,7 @@ export async function OwnerToday({
           ].map((c) => (
             <Card key={c.id} data-testid={`cash-${c.id}`}>
               <p className="field-label">{t(`cash.${c.id}`)}</p>
-              <p className="mt-1 text-2xl font-semibold">
+              <p className="mt-1 text-3xl font-bold">
                 <Money centimes={c.value} />
               </p>
               <p className="mt-1 text-sm text-muted">{t(`cash.${c.id}Hint`)}</p>
@@ -85,6 +108,37 @@ export async function OwnerToday({
             {t('cash.details')}
           </Link>
         </p>
+        {alertCards.length > 0 && (
+          <div className="mt-4" data-testid="red-alerts">
+            <h3 className="sr-only">{t('five.alerts')}</h3>
+            <ul className="grid gap-3 sm:grid-cols-2">
+              {alertCards.map((c) => (
+                <li
+                  key={c.id}
+                  className="border-s-4 border-status-late bg-surface p-3"
+                  data-testid={`red-${c.id}`}
+                >
+                  <a href={c.href} className="flex items-center justify-between gap-3 font-semibold">
+                    <span>
+                      <span aria-hidden="true" className="me-2 text-status-late">
+                        ▲
+                      </span>
+                      {c.text}
+                    </span>
+                    <span className="shrink-0 text-sm underline">{t('five.see')}</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </section>
+
+      <section aria-labelledby="sec-brief">
+        <h2 id="sec-brief" className="mb-3 text-xl">
+          {t('sections.brief')}
+        </h2>
+        <Brief view={view} locale={locale} />
       </section>
 
       <section aria-labelledby="sec-forecast">

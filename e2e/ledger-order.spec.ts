@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 import pg from 'pg';
 import { E2E_DATABASE } from '../scripts/db-bootstrap';
 import { testEnv } from '../tests/db-env';
-import { E2E_MD, goNav, loginAndEnrol, loginOwner } from './fixtures';
+import { E2E_MD, goNav, loginAndEnrol, loginOwner, orderStep } from './fixtures';
 
 // ledger L4: order entry. Office enters blind (DECISIONS 81): no price, no amount, only the code it saved.
 test.describe.configure({ mode: 'serial' });
@@ -32,6 +32,7 @@ test('office enters orders blind: AC-LED-10 timing, a custom plan, a refused pla
   await page.getByTestId('order-type').selectOption({ label: 'B25 · Béton B25' });
   await page.getByTestId('order-volume').fill('10');
   await page.getByTestId('order-method').selectOption('GOULOTTE');
+  await orderStep(page, 3);
   await page.getByTestId('order-preset').selectOption('advance50');
   await page.getByTestId('order-save').click();
   await expect(page.getByTestId('order-saved')).toContainText('CMD-');
@@ -60,6 +61,7 @@ test('office enters orders blind: AC-LED-10 timing, a custom plan, a refused pla
   await page.getByTestId('order-type').selectOption({ label: 'B25 · Béton B25' });
   await page.getByTestId('order-volume').fill('7,5');
   await page.getByTestId('order-method').selectOption('GOULOTTE');
+  await orderStep(page, 3);
   await page.getByTestId('order-preset').selectOption('custom');
   const values = page.getByTestId('order-row-value');
   await values.nth(0).fill('30');
@@ -79,6 +81,7 @@ test('office enters orders blind: AC-LED-10 timing, a custom plan, a refused pla
   await page.getByTestId('order-type').selectOption({ label: 'B25 · Béton B25' });
   await page.getByTestId('order-volume').fill('5');
   await page.getByTestId('order-method').selectOption('GOULOTTE');
+  await orderStep(page, 3);
   await page.getByTestId('order-preset').selectOption('custom');
   await page.getByTestId('order-row-value').nth(0).fill('30');
   await page.getByTestId('order-row-value').nth(1).fill('30');
@@ -95,6 +98,7 @@ test('the owner previews the amounts computed by the server', async ({ page }) =
   await page.getByTestId('order-type').selectOption({ label: 'B25 · Béton B25' });
   await page.getByTestId('order-volume').fill('10');
   await page.getByTestId('order-method').selectOption('GOULOTTE');
+  await orderStep(page, 3);
   await page.getByTestId('order-preview-button').click();
   await expect(page.getByTestId('preview-ht')).toContainText('8 200,00');
   await expect(page.getByTestId('preview-ttc')).toContainText('9 840,00');

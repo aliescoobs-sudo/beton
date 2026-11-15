@@ -4,7 +4,7 @@ import { E2E_DATABASE } from '../scripts/db-bootstrap';
 import { testEnv } from '../tests/db-env';
 import { realSessionUser } from '../tests/helpers/actors';
 import { createLoad, markDelivered } from '../src/modules/operations';
-import { goNav, loginOwner } from './fixtures';
+import { goNav, loginOwner, orderStep } from './fixtures';
 
 // ledger L29 + L30 + L19 + L32: our legal identity on the documents, the invoice as a printable document (print audited),
 // the legal deadlines, and the accountant's files.
@@ -41,6 +41,7 @@ test('the owner enters the legal identity, invoices a delivered order, prints it
   await page.getByTestId('order-type').selectOption({ label: 'B25 · Béton B25' });
   await page.getByTestId('order-volume').fill('6');
   await page.getByTestId('order-method').selectOption('GOULOTTE');
+  await orderStep(page, 3);
   await page.getByTestId('order-preset').selectOption('cash');
   await page.getByTestId('order-save').click();
   const code = /CMD-\d{4}-\d{5}/.exec(

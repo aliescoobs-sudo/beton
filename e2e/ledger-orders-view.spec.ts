@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { E2E_MD, goNav, loginAndEnrol, loginOwner, logout } from './fixtures';
+import { E2E_MD, goNav, loginAndEnrol, loginOwner, logout, orderStep } from './fixtures';
 
 // ledger L6 + L7 (+ the cancel button of L5): the owner's orders list and detail, a price override with its reason, the
 // state of each échéance, the cancellation. Office has neither the link nor the page.
@@ -15,6 +15,7 @@ test('the owner enters an order at another price, reads it in the list and the d
   await page.getByTestId('order-type').selectOption({ label: 'B25 · Béton B25' });
   await page.getByTestId('order-volume').fill('5');
   await page.getByTestId('order-method').selectOption('GOULOTTE');
+  await orderStep(page, 3);
   await page.getByTestId('order-preset').selectOption('advance50');
   // A reason is mandatory with a price.
   await page.getByTestId('order-override-price').fill('700,00');

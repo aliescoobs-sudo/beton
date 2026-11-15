@@ -303,3 +303,8 @@ export async function loginOwner(page: Page, locale: string): Promise<void> {
   await expect(page).toHaveURL(`/${locale}`);
   save(state.key);
 }
+
+/** The order form is three steps (T18-UI D: lines, delivery, summary): jump to one. The fields keep their test ids; only their step changed. */
+export async function orderStep(page: Page, step: 1 | 2 | 3) {
+  await page.getByTestId(`order-step-${step}`).click();
+}

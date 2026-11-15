@@ -3,7 +3,7 @@ import pg from 'pg';
 import { E2E_DATABASE } from '../scripts/db-bootstrap';
 import { withRlsContext } from '../src/lib/db/rls-context';
 import { testEnv } from '../tests/db-env';
-import { E2E_MD, loginAndEnrol, loginOwner, logout } from './fixtures';
+import { E2E_MD, loginAndEnrol, loginOwner, logout, orderStep } from './fixtures';
 
 // C4.4: the screens added in C3 that only integration tests covered: the plant picker on the order and purchase forms, the receipt
 // states with the variance flag, and the reference price per plant. Two plants are active for this file only; they are archived
@@ -52,17 +52,22 @@ test('the order and purchase forms ask for the plant once two are active, and th
   await loginAndEnrol(page, 'fr', E2E_MD.psOffice.email);
 
   await page.goto('/fr/orders/new');
+  await orderStep(page, 2); // the plant is asked on the delivery step
   await expect(page.getByTestId('order-plant')).toBeVisible();
   await expect(page.getByTestId('order-plant').locator('option')).toHaveCount(3); // the prompt and the two plants
+  await orderStep(page, 1);
   await page.getByTestId('order-client-search').fill('Atlas');
   await page.getByTestId('order-client').selectOption({ index: 1 });
   await page.getByTestId('order-type').selectOption({ label: 'B25 · Béton B25' });
   await page.getByTestId('order-volume').fill('4');
   await page.getByTestId('order-method').selectOption('GOULOTTE');
+  await orderStep(page, 3);
   await page.getByTestId('order-preset').selectOption('advance50');
   await page.getByTestId('order-save').click();
   await expect(page.getByTestId('order-saved')).toHaveCount(0); // no plant chosen: nothing is saved
+  await orderStep(page, 2);
   await page.getByTestId('order-plant').selectOption({ label: a.name });
+  await orderStep(page, 3);
   await page.getByTestId('order-save').click();
   await expect(page.getByTestId('order-saved')).toContainText('CMD-');
   const code = /CMD-\d{4}-\d{5}/.exec((await page.getByTestId('order-saved').textContent()) ?? '')![0];
