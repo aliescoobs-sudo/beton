@@ -4,6 +4,10 @@ Written 2026-11-02, rewritten 2026-11-03 (C2) after the independent review `docs
 
 > Every `docker compose` command below is written `./scripts/ops/dc.sh …`. The wrapper passes `-f docker-compose.prod.yml --env-file .env.ops.prod`; a bare `docker compose` in a clean shell or a cron job cannot read the compose file. Maintenance scripts run with plain node through `./scripts/ops/ops.sh <script> [args]` (no pnpm, no download, the container has no network).
 
+## Chosen production target (D250, 15 Nov 2026)
+
+The production host will be a NEW OVH VPS in Europe, never the staging VPS (rule 8). This supersedes the Infomaniak and Canada mentions below and in `REAL-DATA-GATES.md` (G11/G12); those texts are updated when the host is ordered, and the CNDP declaration must name the real provider and location. No code or staging script changes for this.
+
 ## 0. Before anything
 - [ ] The **CNDP declaration** is filed (employees, clients, suppliers, drivers) **including the declaration of the transfer of data to Switzerland (Infomaniak)** and the hosting and processing terms with the provider. No real personal data is entered before. Driver geolocation is not in V1.
 - [ ] The independent **security review** of Codex has run on the final `main` (portals stay off until it has).
