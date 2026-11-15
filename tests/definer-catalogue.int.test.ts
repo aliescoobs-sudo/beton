@@ -509,6 +509,8 @@ describe('R19-01 (d): the sweep with real targets — the exact refusal, nothing
       'public.redirect_candidates(p_case)': 'idem',
       'public.transfer_pickup(p_id)': 'a plant transfer needs stock: transfers suite',
       'public.transfer_receive(p_id)': 'idem',
+      'public.end_sms_sender(p_id)':
+        'a registered sender needs a driver and a sealed number: tests/t15-vehicle-registry.int.test.ts',
     };
     const unexplained = [...noTarget].filter(
       (x) => !Object.keys(KNOWN_WITHOUT_TARGET).some((k) => x.startsWith(k)),

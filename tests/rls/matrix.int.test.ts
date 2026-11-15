@@ -1214,6 +1214,12 @@ const FIXTURES: Record<
     seed: async () => undefined as never,
     visible: `select created_by::text as owner from reorder_request_event where reason = 'matrix ' || $1`,
   },
+  sms_sender: {
+    // Only register_sms_sender() writes it (owner, app_admin); the doors' own tests (tests/t15-vehicle-registry.int.test.ts) prove who reads it.
+    writers: [],
+    seed: async () => undefined as never,
+    visible: `select created_by::text as owner from sms_sender where note = 'matrix ' || $1`,
+  },
   company_profile: {
     writers: ['owner'],
     seed: (tx, actor) =>

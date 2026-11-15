@@ -2055,6 +2055,23 @@ export const TABLE_ACCESS = {
     exception:
       'T15 (SPEC-stock-engine-gaps §6): the insert-only status history of a request (open, seen, ordered with its purchase, cancelled with a reason); the state is the latest event. Written only by the reorder doors. Quantities and a purchase reference only.',
   },
+  sms_sender: {
+    kind: 'rls',
+    read: {
+      owner: 'all',
+      partner: 'none',
+      office: 'none',
+      plant: 'none',
+      system: 'all',
+      anonymous: 'none',
+      support: 'none',
+    },
+    force: true,
+    audited: true,
+    noDelete: true,
+    exception:
+      'T15 G3 (SPEC-sms-channel §4, D235): which phone number belongs to which driver and vehicle. The number is sealed (phone_enc, re-sealed by crypto:rotate: belgobeton_system may update only that column) and looked up by a keyed hash. Written only by register_sms_sender and end_sms_sender (owner, app_admin, with a typed reason); end-dated, never deleted. Read by owner and app_admin only. No message is received or parsed here.',
+  },
   company_profile: {
     kind: 'rls',
     seed: 'insert',

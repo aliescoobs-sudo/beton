@@ -145,3 +145,18 @@ export {
   type TruckError,
 } from './service/truck-service';
 export { datesInRange, isTruckAvailable } from './domain/truck-availability';
+export {
+  maskPhone,
+  normalizePhoneE164,
+  phoneLookupHash,
+  SMS_SENDER_END_REASONS,
+  SMS_SENDER_REASONS,
+} from './domain/sms-phone';
+export {
+  endSmsSender,
+  listSmsSenders,
+  registerSmsSender,
+  setTruckGpsUnit,
+  type SmsSender,
+  type SmsSenderError,
+} from './service/sms-sender-service';

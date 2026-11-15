@@ -11,7 +11,7 @@ In: grammar and code table, sender-to-vehicle mapping, ambiguity state machine, 
 Out: the gateway phone setup procedure, SMS replies billing, the GPS provider integration itself, WhatsApp.
 
 ## 3. Message grammar
-Plain text received at the gateway. Normalisation (pure function): trim, Unicode NFKC (Arabic-Indic and full-width digits → ASCII), collapse whitespace, ignore case, strip trailing punctuation. Grammar:
+Plain text received at the gateway. Normalisation (pure function): trim, Unicode NFKC (full-width digits → ASCII) plus an explicit map of Arabic-Indic and Persian digits (NFKC does not convert them; corrected in T15 G3, `normalizePhoneE164` does the same for numbers), collapse whitespace, ignore case, strip trailing punctuation. Grammar:
 `message := code [SP minutes] [SP free_text]`; `code := 0..7`; `minutes := 1..3 digits` (only meaningful for 6, 1–600). Anything else (empty, letters first, code > 7, two codes) → **unparseable** → inbox.
 | Code | MIXER | PUMP | HAULER (truck 13) |
 |---|---|---|---|

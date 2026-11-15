@@ -198,6 +198,9 @@ describe('functions the application role can execute', () => {
     'public.decide_stock_count(p_count uuid, p_accept boolean, p_reason text)', // T15: owner, app_admin (checked inside)
     'public.create_reorder_request(p_component uuid, p_qty bigint, p_needed_by date, p_reason text)', // T15: the plant manager of the plant; quantities only
     'public.reorder_requests_list()', // T15: quantities, states and the purchase code; the roles that read requests (checked inside)
+    'public.register_sms_sender(p_phone_hash text, p_phone_enc text, p_driver uuid, p_truck uuid, p_valid_from date, p_reason_code text, p_note text)', // T15 G3: owner, app_admin; a sealed number and a keyed hash only
+    'public.end_sms_sender(p_id uuid, p_valid_to date, p_end_reason_code text)', // T15 G3: owner, app_admin
+    'public.sms_senders_list()', // T15 G3: owner, app_admin; the number is returned sealed
     'public.mark_reorder_seen(p_request uuid)', // T15: office_purchases, owner, app_admin
     'public.link_reorder_to_purchase(p_request uuid, p_purchase_code text)', // T15: office_purchases, owner, app_admin; the whole tuple is checked
     'public.cancel_reorder_request(p_request uuid, p_reason text)', // T15: the plant manager of the plant, owner, app_admin

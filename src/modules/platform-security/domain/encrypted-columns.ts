@@ -37,6 +37,14 @@ export const ENCRYPTED_COLUMNS = [
     keyring: 'FIELD_ENCRYPTION_KEYS',
     pool: 'system',
   },
+  // T15 G3: the driver phone numbers of the SMS channel (looked up by a keyed hash, never by the clear number).
+  {
+    table: 'sms_sender',
+    column: 'phone_enc',
+    idColumn: 'id',
+    keyring: 'FIELD_ENCRYPTION_KEYS',
+    pool: 'system',
+  },
   // The phone app's addresses (R4, R6): an instruction's address, a pump job's site address, the address a redirect sends a load to.
   {
     table: 'trip_instruction',

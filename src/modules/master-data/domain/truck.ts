@@ -28,10 +28,15 @@ export function formatCapacityM3(litres: number): string {
   return decimals ? `${whole},${decimals}` : `${whole}`;
 }
 
-export const TRUCK_KINDS = ['mixer', 'pump', 'external'] as const;
+export const TRUCK_KINDS = ['mixer', 'pump', 'external', 'hauler'] as const;
 export type TruckKind = (typeof TRUCK_KINDS)[number];
-/** The prefix of the code per kind: T1 (mixer), P1 (pump truck), X1 (hired external truck). */
-export const TRUCK_CODE_PREFIX: Record<TruckKind, string> = { mixer: 'T', pump: 'P', external: 'X' };
+/** The prefix of the code per kind: T1 (mixer), P1 (pump truck), X1 (hired external truck), H1 (hauler of sand and gravel). */
+export const TRUCK_CODE_PREFIX: Record<TruckKind, string> = {
+  mixer: 'T',
+  pump: 'P',
+  external: 'X',
+  hauler: 'H',
+};
 export const STOPPED_DECISIONS = ['repair_use', 'repair_sell', 'sell_as_is'] as const;
 export type StoppedDecision = (typeof STOPPED_DECISIONS)[number];
 /** How a hired truck is paid; the rate itself is money and lives with finance (REQUIREMENTS-V1 §2). */
@@ -83,7 +88,7 @@ const truckInputSchema = z
     code: z
       .string()
       .transform((value) => value.trim().toUpperCase())
-      .pipe(z.string().regex(/^[TPX][0-9]{1,3}$/)),
+      .pipe(z.string().regex(/^[TPXH][0-9]{1,3}$/)),
     plate: plateField,
     capacityL: capacityField.default(DEFAULT_TRUCK_CAPACITY_L),
     kind: z.enum(TRUCK_KINDS).default('mixer'),

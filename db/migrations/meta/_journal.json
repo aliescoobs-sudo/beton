@@ -1079,6 +1079,13 @@
       "when": 1793806392023,
       "tag": "0230_reorder_request",
       "breakpoints": true
+    },
+    {
+      "idx": 231,
+      "version": "7",
+      "when": 1793806452023,
+      "tag": "0231_vehicle_registry",
+      "breakpoints": true
     }
   ]
 }
