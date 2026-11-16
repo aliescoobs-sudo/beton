@@ -7,6 +7,14 @@ import { TRAINING_TEST_DATABASE, ensureRoles, recreateDatabase } from '../script
 import { runMigrations } from '../scripts/db-migrate';
 import { seedTraining } from '../scripts/seed-training';
 import { seedTwin } from '../scripts/seed/twin/index';
+import {
+  getAging,
+  getCashForecast,
+  getCashPosition,
+  listCharges,
+  listPaymentApprovals,
+} from '../src/modules/ledger';
+import { inRequest } from '../src/modules/platform-security';
 import { getFuelTankLevels, loadFuelCheck } from '../src/modules/operations';
 import { realSessionUser } from './helpers/actors';
 import { testEnv } from './db-env';
@@ -332,5 +340,117 @@ describe('item 4: stock, receipts, fuel and counts', () => {
       await app.end();
     }
     expect(await count(`select count(*) as n from fuel_fill`)).toBeGreaterThan(150);
+  });
+});
+
+describe('item 3: the money', () => {
+  const withOwner = async <T>(
+    fn: (app: pg.Pool, owner: Awaited<ReturnType<typeof realSessionUser>>) => Promise<T>,
+  ): Promise<T> => {
+    const owner = await realSessionUser(env.DATABASE_URL_MIGRATOR, 'owner');
+    const app = new pg.Pool({ connectionString: env.DATABASE_URL_APP, max: 2 });
+    try {
+      return await fn(app, owner);
+    } finally {
+      await app.end();
+    }
+  };
+
+  it('has payments by cash, cheque, LCN and transfer from clients, and cheques, LCN and transfers to suppliers', async () => {
+    for (const method of ['cash', 'cheque', 'lcn', 'transfer'])
+      expect(
+        await count(`select count(*) as n from payment_instrument where direction = 'in' and method = $1`, [
+          method,
+        ]),
+      ).toBeGreaterThan(5);
+    for (const method of ['cheque', 'lcn', 'transfer'])
+      expect(
+        await count(`select count(*) as n from payment_instrument where direction = 'out' and method = $1`, [
+          method,
+        ]),
+      ).toBeGreaterThan(5);
+    // advances and instalments: plan items of those methods are covered
+    expect(
+      await count(
+        `select count(*) as n from payment_plan_item i where i.method = 'advance' and exists (select 1 from allocation a where a.payment_plan_item_id = i.id)`,
+      ),
+    ).toBeGreaterThan(5);
+    expect(
+      await count(
+        `select count(*) as n from payment_plan_item i where i.method = 'installment' and exists (select 1 from allocation a where a.payment_plan_item_id = i.id)`,
+      ),
+    ).toBeGreaterThan(5);
+  });
+
+  it('has one bounced cheque, one credit nobody allocated, and issued paper with written and due dates', async () => {
+    expect(await count(`select count(*) as n from instrument_event where event = 'bounced'`)).toBe(1);
+    expect(
+      await count(
+        `select count(*) as n from payment_instrument i where i.direction = 'in' and not exists (select 1 from allocation a where a.instrument_id = i.id)`,
+      ),
+    ).toBe(1);
+    expect(
+      await count(
+        `select count(*) as n from payment_instrument where direction = 'out' and method in ('cheque', 'lcn') and written_date is not null and due_date is not null and due_date >= written_date`,
+      ),
+    ).toBeGreaterThan(20);
+  });
+
+  it('spreads client balances over the aging buckets and has cheques due in the next 1 to 10 days', async () => {
+    await withOwner(async (app, owner) => {
+      const clients = await getAging(app, owner, 'client', { today: '2026-11-15' });
+      expect(clients.total.current).toBeGreaterThan(0);
+      expect(clients.total.d1_30).toBeGreaterThan(0);
+      expect(clients.total.d31_60).toBeGreaterThan(0);
+      expect(clients.parties.length).toBeGreaterThanOrEqual(15);
+      const suppliers = await getAging(app, owner, 'supplier', { today: '2026-11-15' });
+      expect(suppliers.total.current + suppliers.total.d1_30 + suppliers.total.d31_60).toBeGreaterThan(0);
+      const forecast = await getCashForecast(app, owner, { today: '2026-11-15' });
+      const soon = forecast.items.filter(
+        (i) => i.side === 'in' && i.dueDate >= '2026-11-16' && i.dueDate <= '2026-11-25',
+      );
+      expect(soon.length).toBeGreaterThanOrEqual(5);
+      expect(forecast.items.filter((i) => i.side === 'out').length).toBeGreaterThan(5);
+    });
+  });
+
+  it('has one outgoing payment above the upper limit in the owner approvals inbox, and one in the middle band', async () => {
+    await withOwner(async (app, owner) => {
+      const inbox = await listPaymentApprovals(app, owner);
+      expect(inbox).toHaveLength(1);
+      expect(inbox[0]!.amountCentimes).toBeGreaterThan(500_000);
+    });
+    expect(await count(`select count(*) as n from outgoing_payment_request`)).toBe(2);
+  });
+
+  it('has charges with and without a supporting document, small ones paid', async () => {
+    expect(await count(`select count(*) as n from charge where document_ref is null`)).toBeGreaterThanOrEqual(
+      3,
+    );
+    expect(
+      await count(`select count(*) as n from charge where document_ref is not null`),
+    ).toBeGreaterThanOrEqual(8);
+    await withOwner(async (app, owner) => {
+      const list = await listCharges(app, owner, {
+        from: '2026-08-01',
+        to: '2026-11-30',
+        limit: 100,
+      } as never);
+      expect(JSON.stringify(list).length).toBeGreaterThan(500);
+    });
+  });
+
+  it('never lets a cash or bank account go below zero, on any day', async () => {
+    await withOwner(async (app, owner) => {
+      const position = await getCashPosition(app, owner);
+      for (const a of position.accounts) expect(Number(a.real)).toBeGreaterThanOrEqual(0);
+      const lows = await inRequest(app, owner, (tx) =>
+        tx.query(
+          `select m.account_id, m.movement_date, o.amount_centimes + sum(sum(m.amount_centimes)) over (partition by m.account_id order by m.movement_date) as run
+             from money_movement m join opening_balance o on o.account_id = m.account_id group by m.account_id, m.movement_date, o.amount_centimes`,
+        ),
+      );
+      expect(lows.rows.filter((r) => Number(r.run) < 0)).toEqual([]);
+    });
   });
 });
