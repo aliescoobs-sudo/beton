@@ -1,4 +1,6 @@
+import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { scanRepo } from '../../data-scope-scan.ts';
 import { FAKE_ICE, FAKE_PHONE, fakeIce, fakePhone } from './data.ts';
 import { TWIN_ANCHOR, databaseName, productionLooking, twinEnvProblem } from './guard.ts';
 
@@ -28,7 +30,7 @@ describe('the twin seed guard (T20)', () => {
     ['real data', { REAL_DATA: true }],
     ['not a training instance', { TRAINING_MODE: false }],
     ['a production database name', { DATABASE_URL_MIGRATOR: 'postgres://u:p@db:5432/kayas_production' }],
-    ['a "prod" database name', { DATABASE_URL_MIGRATOR: 'postgres://u:p@db:5432/belgobeton-prod' }],
+    ['a "prod" database name', { DATABASE_URL_MIGRATOR: 'postgres://u:p@db:5432/kayas-prod' }],
     ['a live database name', { DATABASE_URL_MIGRATOR: 'postgres://u:p@db:5432/live' }],
     ['a production host', { APP_BASE_URL: 'https://prod.example.test' }],
     [
@@ -62,5 +64,28 @@ describe('the twin seed guard (T20)', () => {
       expect(fakeIce(n)).toMatch(FAKE_ICE);
       expect(fakeIce(n)).toHaveLength(15);
     }
+  });
+});
+
+describe('the twin seed holds no real-looking identifier (T20, D249)', () => {
+  const sources = readdirSync('scripts/seed/twin')
+    .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
+    .map((f) => [f, readFileSync(`scripts/seed/twin/${f}`, 'utf8')] as const);
+
+  it('has no Moroccan mobile or international number, no CIN-shaped code, no birth date field, no 15-digit ICE that is not in the fake range', () => {
+    expect(sources.length).toBeGreaterThan(8);
+    for (const [file, text] of sources) {
+      expect(text, `${file}: a dialable phone number`).not.toMatch(/\b0[567]\d{8}\b|\+212|\b00212/);
+      expect(text, `${file}: a CIN-shaped code`).not.toMatch(/['"`][A-Z]{1,2}\d{5,7}['"`]/);
+      expect(text, `${file}: a 15-digit identifier outside the fake range`).not.toMatch(
+        /\b(?!0{10})\d{15}\b/,
+      );
+    }
+  });
+
+  it('is scanned by the data-scope scan, and the scan finds nothing blocking', () => {
+    const { all, blocking } = scanRepo();
+    expect(blocking).toEqual([]);
+    expect(all.length).toBeGreaterThan(0);
   });
 });

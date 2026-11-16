@@ -1,6 +1,6 @@
 /**
  * Data-scope scan (D249, T19 item 7). KAYAS must NOT store national ID numbers (CIN), birth dates, health data, personal addresses or
- * other sensitive personal data. This scans every migration (column names), the pilot seed and the importer fixtures for field names
+ * other sensitive personal data. This scans every migration (column names), the pilot seed, the twin seed (T20) and the importer fixtures for field names
  * that look like one. A finding is an error unless it is in ALLOW with a reason. The allow-list holds BUSINESS identifiers only
  * (ICE, IF, RC, plates, company phone, a company's or site's address). Nothing is dropped silently: every finding is printed.
  *
@@ -133,6 +133,8 @@ export function scanRepo(root = '.'): { all: Finding[]; blocking: Finding[] } {
     ...walk(join(root, 'db'), /\.sql$/),
     join(root, 'src/modules/master-data/service/pilot-seed.ts'),
     join(root, 'src/modules/importer/fixtures.ts'),
+    // T20: the fictitious twin seed (its parties, its sheets and its SQL) is scanned like the pilot seed.
+    ...walk(join(root, 'scripts/seed/twin'), /\.ts$/).filter((f) => !/\.test\.ts$/.test(f)),
   ];
   const all = files.flatMap((f) => {
     const text = readFileSync(f, 'utf8');

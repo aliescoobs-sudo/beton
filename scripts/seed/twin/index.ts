@@ -14,6 +14,7 @@ import {
 import { buildHistory } from './history.ts';
 import { buildSales } from './sales.ts';
 import { buildMoney } from './money.ts';
+import { buildOpening } from './opening.ts';
 import { buildStock } from './stock.ts';
 import { buildStructure } from './structure.ts';
 
@@ -67,6 +68,7 @@ export async function seedTwin(opts: TwinSeedOptions): Promise<TwinSeedResult> {
     await buildHistory(ctx, world);
     await buildStock(ctx, world);
     await buildMoney(ctx, world);
+    await buildOpening(ctx, world);
     await pools.migrator.query('insert into public.twin_seed_marker (anchor, prng_seed) values ($1, $2)', [
       anchor,
       TWIN_PRNG_SEED,

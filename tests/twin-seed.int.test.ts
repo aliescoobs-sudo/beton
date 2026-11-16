@@ -11,9 +11,14 @@ import {
   getAging,
   getCashForecast,
   getCashPosition,
+  getOpeningState,
   listCharges,
+  listOpeningObligations,
+  listOpeningOpenItems,
   listPaymentApprovals,
 } from '../src/modules/ledger';
+import { verifyAuditChain } from '../src/modules/platform-security/service/audit-chain';
+import { FAKE_ICE } from '../scripts/seed/twin/data';
 import { inRequest } from '../src/modules/platform-security';
 import { getFuelTankLevels, loadFuelCheck } from '../src/modules/operations';
 import { realSessionUser } from './helpers/actors';
@@ -284,7 +289,8 @@ describe('item 4: stock, receipts, fuel and counts', () => {
            from stock_movement group by plant_id, component_id, movement_date) x where lvl < 0`,
     );
     expect(lows.rows).toEqual([]);
-    expect(await count(`select count(*) as n from stock_movement where source = 'opening'`)).toBe(12);
+    // 12 openings of the history period (Aug 31) and 6 counted on 30 Nov and loaded by the importer (item 5)
+    expect(await count(`select count(*) as n from stock_movement where source = 'opening'`)).toBe(18);
     // consumption comes from the BLs (the stock engine), not from the seed
     expect(
       await count(`select count(*) as n from stock_movement where source = 'delivery' and qty_base < 0`),
@@ -452,5 +458,154 @@ describe('item 3: the money', () => {
       );
       expect(lows.rows.filter((r) => Number(r.run) < 0)).toEqual([]);
     });
+  });
+});
+
+describe('item 5: the opening position loaded for 30 Nov through the importer', () => {
+  const withOwner = async <T>(
+    fn: (app: pg.Pool, owner: Awaited<ReturnType<typeof realSessionUser>>) => Promise<T>,
+  ): Promise<T> => {
+    const owner = await realSessionUser(env.DATABASE_URL_MIGRATOR, 'owner');
+    const app = new pg.Pool({ connectionString: env.DATABASE_URL_APP, max: 2 });
+    try {
+      return await fn(app, owner);
+    } finally {
+      await app.end();
+    }
+  };
+
+  it('has the opening date, per-invoice items for clients and suppliers, and one party known only by its single line', async () => {
+    await withOwner(async (app, owner) => {
+      const state = await getOpeningState(app, owner);
+      expect(state.openingDate).toBe('2026-11-30');
+      const items = await listOpeningOpenItems(app, owner);
+      expect(items.length).toBeGreaterThanOrEqual(20);
+      expect(new Set(items.map((i) => i.partyName)).size).toBeGreaterThanOrEqual(10);
+      const unknown = state.parties.filter((p) => p.agingUnknown);
+      expect(unknown).toHaveLength(2);
+      expect(unknown.map((p) => p.partyName).sort()).toEqual([
+        'Coopérative Ketama Équipement (fictif)',
+        'Pièces Mixer Nord (fictif)',
+      ]);
+    });
+    expect(await count(`select count(*) as n from opening_open_item where source <> 'opening_30_11'`)).toBe(
+      0,
+    );
+  });
+
+  it('has a loan and a leasing with their instalment schedule', async () => {
+    await withOwner(async (app, owner) => {
+      const obligations = await listOpeningObligations(app, owner);
+      expect(obligations).toHaveLength(2);
+      expect(JSON.stringify(obligations).match(/PRET-INV-01|LEASING-MX-02/g)?.length).toBeGreaterThanOrEqual(
+        2,
+      );
+    });
+    expect(await count(`select count(*) as n from opening_obligation_instalment`)).toBe(30);
+  });
+
+  it('has the opening stock of the small components counted on 30 Nov, in both plants', async () => {
+    expect(
+      await count(
+        `select count(*) as n from stock_movement where source = 'opening' and movement_date = '2026-11-30'`,
+      ),
+    ).toBe(6);
+  });
+
+  it('fills every aging bucket of the client side, from current to 90+ and the single line with no due date', async () => {
+    await withOwner(async (app, owner) => {
+      const t = (await getAging(app, owner, 'client', { today: '2026-11-15' })).total;
+      for (const bucket of ['current', 'd1_30', 'd31_60', 'd61_90', 'd90plus', 'unknown'] as const)
+        expect(t[bucket], bucket).toBeGreaterThan(0);
+      const s = (await getAging(app, owner, 'supplier', { today: '2026-11-15' })).total;
+      for (const bucket of ['current', 'd1_30', 'd31_60', 'd61_90', 'd90plus', 'unknown'] as const)
+        expect(s[bucket], bucket).toBeGreaterThan(0);
+    });
+  });
+});
+
+describe('invariants of the twin (T20)', () => {
+  it('has ledger totals equal to the sum of their parts', async () => {
+    // an invoice: TTC = HT + VAT, HT = the sum of its lines
+    expect(
+      await count(
+        `select count(*) as n from invoice where total_ttc_centimes <> total_ht_centimes + total_vat_centimes`,
+      ),
+    ).toBe(0);
+    expect(
+      await count(
+        `select count(*) as n from invoice i where i.total_ht_centimes <> (select coalesce(sum(l.line_ht_centimes), 0) from invoice_line l where l.invoice_id = i.id)`,
+      ),
+    ).toBe(0);
+    // an order: the payment plan adds up to its total, TTC = HT + VAT
+    expect(
+      await count(
+        `select count(*) as n from sales_order where total_ttc_centimes <> total_ht_centimes + total_vat_centimes`,
+      ),
+    ).toBe(0);
+    expect(
+      await count(
+        `select count(*) as n from sales_order o where o.reverses_id is null and o.total_ttc_centimes <> (select coalesce(sum(i.amount_centimes), 0) from payment_plan_item i where i.order_id = o.id and i.reverses_id is null)`,
+      ),
+    ).toBe(0);
+    // a purchase: the lines add up, the plan adds up
+    expect(
+      await count(
+        `select count(*) as n from purchase p where p.reverses_id is null and p.total_ht_centimes <> (select coalesce(sum(l.line_ht_centimes), 0) from purchase_line l where l.purchase_id = p.id)`,
+      ),
+    ).toBe(0);
+    expect(
+      await count(
+        `select count(*) as n from purchase p where p.reverses_id is null and p.total_ttc_centimes <> (select coalesce(sum(i.amount_centimes), 0) from purchase_plan_item i where i.purchase_id = p.id and i.reverses_id is null)`,
+      ),
+    ).toBe(0);
+  });
+
+  it('never allocates more than an instrument holds or a plan item asks', async () => {
+    expect(
+      await count(
+        `select count(*) as n from payment_instrument i where (select coalesce(sum(a.amount_centimes), 0) from allocation a where a.instrument_id = i.id) > i.amount_centimes`,
+      ),
+    ).toBe(0);
+    expect(
+      await count(
+        `select count(*) as n from payment_plan_item i where i.reverses_id is null and (select coalesce(sum(a.amount_centimes), 0) from allocation a where a.payment_plan_item_id = i.id) > i.amount_centimes`,
+      ),
+    ).toBe(0);
+    expect(
+      await count(
+        `select count(*) as n from purchase_plan_item i where i.reverses_id is null and (select coalesce(sum(a.amount_centimes), 0) from allocation a where a.purchase_plan_item_id = i.id) > i.amount_centimes`,
+      ),
+    ).toBe(0);
+  });
+
+  it('holds no real-looking identifier: every ICE is in the reserved fake range, every name says fictitious, every account is on the reserved domain', async () => {
+    const ices = await migrator.query<{ ice: string }>(
+      `select ice from client where ice is not null union all select ice from supplier where ice is not null`,
+    );
+    expect(ices.rows.length).toBeGreaterThan(20);
+    for (const r of ices.rows) expect(r.ice).toMatch(FAKE_ICE);
+    expect(await count(`select count(*) as n from client where name !~* 'fictif'`)).toBe(0);
+    expect(await count(`select count(*) as n from supplier where name !~* 'fictif'`)).toBe(0);
+    expect(
+      await count(`select count(*) as n from "user" where email not like '%@formation.kayas.invalid'`),
+    ).toBe(0);
+    // nothing that looks like a birth date or an ID number was written into a free-text column
+    expect(
+      await count(
+        `select count(*) as n from client where name ~ '[0-9]{8,}' or coalesce(notes, '') ~ '[0-9]{8,}'`,
+      ),
+    ).toBe(0);
+  });
+
+  it('keeps the audit chain intact over everything the seed wrote', async () => {
+    const client = await migrator.connect();
+    try {
+      const verdict = await verifyAuditChain(client);
+      expect(verdict.ok).toBe(true);
+      if (verdict.ok) expect(verdict.checked).toBeGreaterThan(5000);
+    } finally {
+      client.release();
+    }
   });
 });
