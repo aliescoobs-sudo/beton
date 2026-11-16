@@ -45,3 +45,7 @@ generated_images
 .rehearsal
 staging
 release
+# T20: the twin seed's developer helper imports test sources; its end-to-end config and setup are test sources too
+scripts/seed/twin/dev-base.ts
+e2e-twin
+playwright.twin.config.ts
