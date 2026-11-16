@@ -134,3 +134,129 @@ describe('item 1: the structure', () => {
     ).toBe(5);
   });
 });
+
+describe('item 2: the sales history', () => {
+  it('has the orders of 1 Sep to 15 Nov in both plants, cancellations as reversing rows, pump jobs and PO numbers', async () => {
+    expect(await count(`select count(*) as n from sales_order where reverses_id is null`)).toBeGreaterThan(
+      380,
+    );
+    expect(
+      await count(`select count(*) as n from sales_order where reverses_id is not null`),
+    ).toBeGreaterThanOrEqual(3);
+    expect(
+      await count(
+        `select count(*) as n from sales_order where reverses_id is null and order_date < '2026-09-01'`,
+      ),
+    ).toBe(0);
+    expect(
+      await count(
+        `select count(*) as n from sales_order where reverses_id is null and order_date > '2026-11-15'`,
+      ),
+    ).toBe(0);
+    for (const code of ['TETOUAN', 'CHEFCHN'])
+      expect(
+        await count(
+          `select count(*) as n from sales_order o join plant p on p.id = o.plant_id where p.code = $1 and o.reverses_id is null`,
+          [code],
+        ),
+      ).toBeGreaterThan(100);
+    expect(await count(`select count(*) as n from pump_job`)).toBeGreaterThan(30);
+    expect(
+      await count(
+        `select count(*) as n from sales_order where discharge_method = 'GOULOTTE' and reverses_id is null`,
+      ),
+    ).toBeGreaterThan(200);
+    expect(
+      await count(
+        `select count(*) as n from sales_order where discharge_method = 'POMPE' and reverses_id is null`,
+      ),
+    ).toBeGreaterThan(30);
+    // every order of a client that requires a PO number carries one
+    expect(
+      await count(
+        `select count(*) as n from sales_order o join client c on c.id = o.client_id left join order_extra x on x.order_id = o.id
+          where c.po_required and o.reverses_id is null and x.client_po is null`,
+      ),
+    ).toBe(0);
+  });
+
+  it('numbers the BLs in one run, losing about 12 numbers per plant-month and nothing else', async () => {
+    const { rows } = await migrator.query<{ n: number; plant: string; month: string }>(
+      `select substr(d.bl_no, 9)::int as n, p.code as plant, to_char(d.load_date, 'YYYY-MM') as month
+         from delivery d join sales_order o on o.id = d.order_id join plant p on p.id = o.plant_id
+        where d.reverses_id is null order by 1`,
+    );
+    expect(rows.length).toBeGreaterThan(1200);
+    expect(rows[0]!.n).toBe(1);
+    const missing = new Map<string, number>();
+    for (const [i, r] of rows.entries()) {
+      if (i === 0) continue;
+      // every missing number is charged to the plant-month of the BL that follows it
+      for (let m = rows[i - 1]!.n + 1; m < r.n; m++)
+        missing.set(`${r.plant}|${r.month}`, (missing.get(`${r.plant}|${r.month}`) ?? 0) + 1);
+    }
+    for (const plant of ['TETOUAN', 'CHEFCHN']) {
+      expect(missing.get(`${plant}|2026-09`)).toBe(12);
+      expect(missing.get(`${plant}|2026-10`)).toBe(12);
+      expect(missing.get(`${plant}|2026-11`)).toBe(6);
+    }
+    expect([...missing.values()].reduce((a, b) => a + b, 0)).toBe(60);
+    // the loads are in business-date order: a later number never has an earlier load date
+    const dates = (
+      await migrator.query<{ d: string }>(
+        `select to_char(load_date, 'YYYY-MM-DD') as d from delivery where reverses_id is null order by bl_no`,
+      )
+    ).rows.map((r) => r.d);
+    expect(dates).toEqual([...dates].sort());
+  });
+
+  it("has the plants' paper books with 4 duplicated numbers, the missing numbers and one date typed as text", async () => {
+    const { rows } = await migrator.query<{
+      plant: string;
+      month: string;
+      n: number;
+      text: boolean;
+      mode: string;
+    }>(
+      `select p.code as plant, to_char(d.delivery_date, 'YYYY-MM') as month, d.bl_raw::int as n, (d.legacy->>'date_cell' = 'text') as text, d.pump_mode as mode
+         from history.delivery d join plant p on p.id = d.plant_id order by p.code, d.src_file, d.src_row`,
+    );
+    let duplicates = 0;
+    const missing = new Map<string, number>();
+    for (const [i, r] of rows.entries()) {
+      const prev = rows[i - 1];
+      if (!prev || prev.plant !== r.plant) continue;
+      if (r.n === prev.n) duplicates += 1;
+      else {
+        expect(r.n - prev.n).toBeGreaterThanOrEqual(1);
+        expect(r.n - prev.n).toBeLessThanOrEqual(2);
+        if (r.n - prev.n === 2)
+          missing.set(`${r.plant}|${r.month}`, (missing.get(`${r.plant}|${r.month}`) ?? 0) + 1);
+      }
+    }
+    expect(duplicates).toBe(4);
+    expect(rows.filter((r) => r.text)).toHaveLength(1);
+    expect(new Set(rows.map((r) => r.mode))).toEqual(new Set(['pump', 'chute', 'unknown']));
+    for (const plant of ['TETOUAN', 'CHEFCHN']) {
+      expect(missing.get(`${plant}|2026-09`)).toBeGreaterThanOrEqual(9);
+      expect(missing.get(`${plant}|2026-09`)).toBeLessThanOrEqual(13);
+    }
+    expect(await count(`select count(*) as n from history.batch where status = 'applied'`)).toBe(2);
+  });
+
+  it('has invoices and an uninvoiced queue, complete cost snapshots, signed BLs back for most loads', async () => {
+    expect(await count(`select count(*) as n from invoice where credit_note_of is null`)).toBeGreaterThan(
+      300,
+    );
+    expect(
+      await count(`select count(*) as n from invoice where credit_note_of is not null`),
+    ).toBeGreaterThanOrEqual(2);
+    expect(await count(`select count(*) as n from bl_cost_snapshot where incomplete`)).toBe(0);
+    expect(await count(`select count(*) as n from delivery_return`)).toBeGreaterThan(900);
+    expect(
+      await count(
+        `select count(*) as n from delivery d where d.reverses_id is null and not exists (select 1 from delivery_delivered g where g.delivery_id = d.id)`,
+      ),
+    ).toBeGreaterThan(0);
+  });
+});

@@ -4,6 +4,9 @@ import type pg from 'pg';
 import {
   createClient,
   createListPrice,
+  createPurchasePrice,
+  listPurchasePrices,
+  replacePurchaseTransport,
   createRecetteVersion,
   createSupplier,
   createTruck,
@@ -116,6 +119,39 @@ export async function buildStructure(ctx: TwinContext): Promise<World> {
         effectiveFrom: from,
       }),
     );
+
+  // Purchase prices: the cement price rises by 3 % on 1 Oct (a second version, the first stays); the transport that makes each price a delivered price is an
+  // assumption of set A1 (invented, in centimes per purchase unit). Without it every BL cost snapshot would be listed as incomplete (D241).
+  const cement = (await listPurchasePrices(app, owner, comp('Ciment')))[0]!;
+  must(
+    'cement price Oct',
+    await createPurchasePrice(app, owner, {
+      componentId: cement.componentId,
+      supplierId: cement.supplierId,
+      purchaseUnitId: cement.purchaseUnitId,
+      priceHtCentimes: Math.round(cement.priceHtCentimes * 1.03),
+      effectiveFrom: '2026-10-01',
+    }),
+  );
+  const TRANSPORT: Record<string, number> = {
+    Ciment: 3_500,
+    Sable: 2_500,
+    'Gravette 8/15': 2_500,
+    'Gravette 15/25': 2_500,
+    Eau: 0,
+    Adjuvant: 0,
+  };
+  for (const [name, centimes] of Object.entries(TRANSPORT))
+    for (const price of await listPurchasePrices(app, owner, comp(name)))
+      must(
+        `transport ${name}`,
+        await replacePurchaseTransport(app, owner, {
+          priceId: price.id,
+          transportCentimes: centimes,
+          sourceNote: 'assumption A1: invented delivery cost to the plant',
+          reason: 'twin seed (D251), assumption set A1',
+        }),
+      );
 
   // Vehicles: the four pilot mixers go to Tétouan (16 m³ as in the training base), Chefchaouen gets five smaller ones; three pump trucks (one per plant plus one shared).
   const pilotTrucks = (await listTrucks(app, owner)).filter((t) => t.kind === 'mixer');
