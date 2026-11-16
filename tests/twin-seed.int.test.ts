@@ -7,6 +7,8 @@ import { TRAINING_TEST_DATABASE, ensureRoles, recreateDatabase } from '../script
 import { runMigrations } from '../scripts/db-migrate';
 import { seedTraining } from '../scripts/seed-training';
 import { seedTwin } from '../scripts/seed/twin/index';
+import { getFuelTankLevels, loadFuelCheck } from '../src/modules/operations';
+import { realSessionUser } from './helpers/actors';
 import { testEnv } from './db-env';
 
 // T20 (D251): the fictitious twin seed, run once on a scratch database that the training seed (profile twin-base) prepared. Fictitious data only.
@@ -258,5 +260,77 @@ describe('item 2: the sales history', () => {
         `select count(*) as n from delivery d where d.reverses_id is null and not exists (select 1 from delivery_delivered g where g.delivery_id = d.id)`,
       ),
     ).toBeGreaterThan(0);
+  });
+});
+
+describe('item 4: stock, receipts, fuel and counts', () => {
+  it('never lets a component of a plant go below zero on any day, from the opening stock on', async () => {
+    const lows = await migrator.query<{
+      plant_id: string;
+      component_id: string;
+      movement_date: string;
+      lvl: string;
+    }>(
+      `select plant_id, component_id, movement_date, lvl from (
+         select plant_id, component_id, movement_date, sum(sum(qty_base)) over (partition by plant_id, component_id order by movement_date) lvl
+           from stock_movement group by plant_id, component_id, movement_date) x where lvl < 0`,
+    );
+    expect(lows.rows).toEqual([]);
+    expect(await count(`select count(*) as n from stock_movement where source = 'opening'`)).toBe(12);
+    // consumption comes from the BLs (the stock engine), not from the seed
+    expect(
+      await count(`select count(*) as n from stock_movement where source = 'delivery' and qty_base < 0`),
+    ).toBeGreaterThan(8000);
+  });
+
+  it('has purchases received, some still on their way, three arrivals counted short, and thresholds', async () => {
+    expect(await count(`select count(*) as n from purchase where reverses_id is null`)).toBeGreaterThan(90);
+    expect(await count(`select count(*) as n from purchase_receipt`)).toBeGreaterThan(80);
+    expect(
+      await count(
+        `select count(*) as n from purchase p where p.reverses_id is null and not exists (select 1 from purchase_receipt r where r.purchase_id = p.id)`,
+      ),
+    ).toBeGreaterThan(10);
+    expect(await count(`select count(*) as n from stock_threshold`)).toBe(12);
+    expect(await count(`select count(*) as n from receipt_variance`)).toBeGreaterThanOrEqual(1);
+  });
+
+  it('has a count round with small variances posted and two outside the tolerance waiting for a decision', async () => {
+    expect(await count(`select count(*) as n from stock_count`)).toBe(12);
+    expect(await count(`select count(*) as n from stock_count where status = 'pending_decision'`)).toBe(2);
+    expect(
+      await count(
+        `select count(*) as n from stock_count where status = 'in_tolerance_posted' and variance_qty <> 0`,
+      ),
+    ).toBeGreaterThanOrEqual(5);
+    expect(
+      await count(
+        `select count(*) as n from stock_count where abs(coalesce(variance_bp, 0)) > 300 and status = 'in_tolerance_posted'`,
+      ),
+    ).toBe(0);
+  });
+
+  it('has fuel: tank openings, purchases and fills, and ONE truck-month the fuel check flags', async () => {
+    const owner = await realSessionUser(env.DATABASE_URL_MIGRATOR, 'owner');
+    const app = new pg.Pool({ connectionString: env.DATABASE_URL_APP, max: 2 });
+    try {
+      const check = await loadFuelCheck(app, owner, { from: '2026-09-01', to: '2026-11-30', plantId: null });
+      expect(check.ok).toBe(true);
+      const rows = check.ok ? check.value : [];
+      const mixers = rows.filter((r) => r.truckKind === 'mixer');
+      expect(mixers.length).toBeGreaterThanOrEqual(24);
+      const flagged = mixers.filter((r) => r.flagged);
+      expect(flagged).toHaveLength(1);
+      expect(flagged[0]).toMatchObject({ truckCode: 'T2', month: '2026-10' });
+      // everything else is within a few per cent of the norm
+      for (const r of mixers.filter((x) => !x.flagged && x.varianceBp !== null))
+        expect(Math.abs(r.varianceBp as number)).toBeLessThan(1000);
+      const tanks = await getFuelTankLevels(app, owner);
+      expect(tanks).toHaveLength(2);
+      for (const t of tanks) expect(t.purchasedL).toBeGreaterThan(5000);
+    } finally {
+      await app.end();
+    }
+    expect(await count(`select count(*) as n from fuel_fill`)).toBeGreaterThan(150);
   });
 });
