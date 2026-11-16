@@ -229,6 +229,10 @@ const BLIND: [RegExp, string][] = [
     / \/api\/field\//,
     'a phone-token door: an office session is not its caller (the phone-token matrices are in role-negatives.spec.ts)',
   ],
+  [
+    /^GET \/fr\/aging\/export$/,
+    'the aging CSV needs ?kind=client or supplier: the sweep sends none, so the control gets 404 too; the known-target check with each office role is in role-negatives.spec.ts (T19c)',
+  ],
   [/ \/api\/finance(-configuration)?$/, 'needs a fresh TOTP of its own (a step-up the sweep does not hold)'],
   [/ \/api\/assistant\/proposals\/[^/]+\/(confirm|reject)$/, 'needs an existing proposal of the caller'],
   [
