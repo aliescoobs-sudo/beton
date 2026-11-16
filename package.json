@@ -42,6 +42,7 @@
     "user:reset-owner-2fa": "node --import ./scripts/register-ts-paths.mjs scripts/reset-owner-2fa.ts",
     "user:reset-owner-password": "node --import ./scripts/register-ts-paths.mjs scripts/reset-owner-password.ts",
     "seed:training": "node --import ./scripts/register-ts-paths.mjs scripts/seed-training.ts",
+    "seed:twin": "node --import ./scripts/register-ts-paths.mjs scripts/seed/twin/run.ts",
     "training:screens": "node --import ./scripts/register-ts-paths.mjs scripts/training-screens.ts",
     "rearm:training": "node --import ./scripts/register-ts-paths.mjs scripts/rearm-training.ts",
     "reset:training": "node --import ./scripts/register-ts-paths.mjs scripts/reset-training.ts"

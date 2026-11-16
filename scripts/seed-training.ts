@@ -79,6 +79,11 @@ export interface SeedTrainingOptions {
    * 'unverified-test-database' skips it, and is honoured ONLY for the throwaway databases of the test runners.
    */
   provenance?: 'stock-volume' | 'unverified-test-database';
+  /**
+   * T20 (D251): 'twin-base' seeds only what the fictitious twin builds on (master data, both plants, one account per role, the finance switch, the
+   * marker) and none of the pilot's activity: the twin seed (scripts/seed/twin) then writes the whole history. Default 'pilot' (T1, unchanged).
+   */
+  profile?: 'pilot' | 'twin-base';
 }
 export interface SeedTrainingResult {
   applied: boolean;
@@ -189,6 +194,7 @@ const pgFormatIdent = (name: string): string => `"${name.replaceAll('"', '""')}"
 
 export async function seedTraining(opts: SeedTrainingOptions): Promise<SeedTrainingResult> {
   const { env, today } = opts;
+  const twinBase = opts.profile === 'twin-base';
   if (!env.TRAINING_MODE) throw new SeedError('training seed refused: TRAINING_MODE is not "true"');
   if (env.APP_ENV === 'production') throw new SeedError('training seed refused: APP_ENV is "production"');
   if (env.REAL_DATA) throw new SeedError('training seed refused: REAL_DATA is "true"');
@@ -269,328 +275,330 @@ export async function seedTraining(opts: SeedTrainingOptions): Promise<SeedTrain
         await updateTruck(app, owner, t.id, { plate: t.plate, capacityL: 16_000, plantId: tet.id }),
       );
 
-    // 4. The pilot scenario (orders, cheques, LCN, instalments, loads, rotations, invoices, supplier invoices) dated from today.
-    await seedPilotScenario(seed, env, today);
-    await seedOperationsScenario(seed, env, today);
-    await seedOperationsWave2(seed, env, today);
-    await seedIntegrationScenario(seed, env, today);
-
+    if (!twinBase) {
+      // 4. The pilot scenario (orders, cheques, LCN, instalments, loads, rotations, invoices, supplier invoices) dated from today.
+      await seedPilotScenario(seed, env, today);
+      await seedOperationsScenario(seed, env, today);
+      await seedOperationsWave2(seed, env, today);
+      await seedIntegrationScenario(seed, env, today);
+    }
     // 5. Plant Chefchaouen, with its own trucks, pumps, recipes, reference prices, stock and activity.
     const chf = must(
       'plant Chefchaouen',
       await createPlant(app, owner, { code: 'CHEFCHN', name: 'Centrale de Chefchaouen' }),
     );
-    const inChf = { ...owner, plantId: chf.id } as SessionUser;
-    const inTet = { ...owner, plantId: tet.id } as SessionUser;
-    for (let i = 0; i < 4; i++)
-      must(
-        `truck T${5 + i}`,
-        await createTruck(app, owner, {
-          code: `T${5 + i}`,
-          plate: `20${i + 1}01-D-6`,
-          capacityL: 11_000,
-          plantId: chf.id,
-        }),
-      );
-    must(
-      'truck T9',
-      await createTruck(app, owner, { code: 'T9', plate: '20109-D-6', capacityL: 10_000, plantId: chf.id }),
-    );
-    const pumpIds: string[] = [];
-    for (let i = 1; i <= 3; i++)
-      pumpIds.push(
-        must(
-          `pump P${i}`,
-          await createTruck(app, owner, { code: `P${i}`, plate: `POMPE-DEMO-${i}`, kind: 'pump' }),
-        ).id,
-      );
-
-    const types = await listConcreteTypes(app, owner);
-    const typeId = (code: string) => types.find((t) => t.code === code)!.id;
-    const components = await listComponents(app, owner);
-    const comp = (nameFr: string) => components.find((c) => c.nameFr === nameFr)!;
-
-    // Recipes per plant (different mixes) and the reference prices per plant.
-    const mix = (c: number, s: number, g1: number, g2: number, w: number, a: number) => [
-      { componentId: comp('Ciment').id, qtyPerM3: c },
-      { componentId: comp('Sable').id, qtyPerM3: s },
-      { componentId: comp('Gravette 8/15').id, qtyPerM3: g1 },
-      { componentId: comp('Gravette 15/25').id, qtyPerM3: g2 },
-      { componentId: comp('Eau').id, qtyPerM3: w },
-      { componentId: comp('Adjuvant').id, qtyPerM3: a },
-    ];
-    must(
-      'recipe B25 Chefchaouen',
-      await createRecetteVersion(app, owner, typeId('B25'), {
-        plantId: chf.id,
-        effectiveFrom: '2026-01-02',
-        lines: mix(335_000, 830_000, 380_000, 610_000, 182, 3_200),
-      }),
-    );
-    must(
-      'recipe B30 Tétouan',
-      await createRecetteVersion(app, owner, typeId('B30'), {
-        plantId: tet.id,
-        effectiveFrom: '2026-01-02',
-        lines: mix(415_000, 770_000, 380_000, 570_000, 172, 4_200),
-      }),
-    );
-    for (const [code, centimes] of [
-      ['B20', 80_000],
-      ['B25', 87_000],
-      ['B30', 95_000],
-    ] as const)
-      must(
-        `price ${code} Chefchaouen`,
-        await createListPrice(app, owner, {
-          concreteTypeId: typeId(code),
-          plantId: chf.id,
-          priceHtPerM3Centimes: centimes,
-          effectiveFrom: '2026-01-02',
-        }),
-      );
-    must(
-      'price B25 Tétouan',
-      await createListPrice(app, owner, {
-        concreteTypeId: typeId('B25'),
-        plantId: tet.id,
-        priceHtPerM3Centimes: 86_000,
-        effectiveFrom: '2026-01-02',
-      }),
-    );
-
-    // Obviously fictitious parties: fake ICE, fake phones that cannot be dialled (0000 00 xxxx: 00 is the international prefix and no country code starts with 0).
-    const supplierCement = must(
-      'supplier Ciment Démo',
-      await createSupplier(app, owner, {
-        name: 'Ciment Démo',
-        category: 'cement',
-        ice: '000000000000101',
-        phone: '0000 00 0101',
-        paymentTermsDays: 30,
-        leadTimeDays: 3,
-      }),
-    );
-    must(
-      'supplier Carburant Démo',
-      await createSupplier(app, owner, {
-        name: 'Carburant Démo',
-        category: 'fuel',
-        ice: '000000000000102',
-        phone: '0000 00 0102',
-        paymentTermsDays: 15,
-        leadTimeDays: 1,
-      }),
-    );
-    const clients = [];
-    for (let i = 1; i <= 4; i++) {
-      const r = must(
-        `client ${i}`,
-        await createClient(app, owner, {
-          name: `Client Démo ${i}`,
-          kind: 'company',
-          ice: `00000000000020${i}`,
-          phone: `0000 00 000${i}`,
-          paymentTermsDays: 30,
-        }),
-      );
-      clients.push(r.client);
-    }
-
-    // Stock and fuel of Chefchaouen, a purchase received in two states, a transfer between the plants.
-    const opening = addDays(today, -30);
-    for (const [name, qty] of [
-      ['Ciment', 60_000_000],
-      ['Sable', 150_000_000],
-      ['Gravette 8/15', 90_000_000],
-      ['Gravette 15/25', 90_000_000],
-      ['Eau', 40_000],
-      ['Adjuvant', 400_000],
-    ] as const)
-      must(
-        `opening ${name}`,
-        await setOpeningStock(app, owner, {
-          componentId: comp(name).id,
-          date: opening,
-          qtyBase: qty,
-          plantId: chf.id,
-        }),
-      );
-    must(
-      'fuel Chefchaouen',
-      await setFuelTankOpening(app, owner, { plantId: chf.id, litres: 3_000, asOf: opening }),
-    );
-    must(
-      'fuel Tétouan',
-      await setFuelTankOpening(app, owner, { plantId: tet.id, litres: 5_000, asOf: opening }),
-    );
-
-    const purchase = must(
-      'purchase Chefchaouen',
-      await createPurchase(
-        app,
-        inChf,
-        {
-          supplierId: supplierCement.id,
-          plantId: chf.id,
-          lines: [
-            {
-              componentId: comp('Ciment').id,
-              purchaseUnitId: await unitOf(app, owner, comp('Ciment').id, 't'),
-              qtyMilli: 20_000,
-              unitPriceHtCentimes: 145_000,
-            },
-          ],
-        },
-        { today },
-      ),
-    );
-
     // 6. The remaining accounts (the plant managers need both plants).
     for (const a of PASSWORD_ACCOUNTS.slice(1))
       await makeAccount(a, a.plant === 'TET' ? tet.id : a.plant === 'CHF' ? chf.id : null);
 
-    // 7. Phone accounts: three drivers of the pilot's rotations and a pump operator, each with a code and a PIN.
-    const deps = { appPool: app, authPool, auth, secret: env.AUTH_SECRET };
-    const driverRows = await listDrivers(app, owner);
-    for (const d of driverRows.filter((x) => x.kind === 'driver').slice(0, 3)) {
-      must(`field account ${d.code}`, await createFieldAccount(deps, owner, d.id));
-      const pin = generatePin();
-      must(`pin ${d.code}`, await setDriverPin(deps, owner, { driverId: d.id, pin }));
+    if (!twinBase) {
+      const inChf = { ...owner, plantId: chf.id } as SessionUser;
+      const inTet = { ...owner, plantId: tet.id } as SessionUser;
+      for (let i = 0; i < 4; i++)
+        must(
+          `truck T${5 + i}`,
+          await createTruck(app, owner, {
+            code: `T${5 + i}`,
+            plate: `20${i + 1}01-D-6`,
+            capacityL: 11_000,
+            plantId: chf.id,
+          }),
+        );
+      must(
+        'truck T9',
+        await createTruck(app, owner, { code: 'T9', plate: '20109-D-6', capacityL: 10_000, plantId: chf.id }),
+      );
+      const pumpIds: string[] = [];
+      for (let i = 1; i <= 3; i++)
+        pumpIds.push(
+          must(
+            `pump P${i}`,
+            await createTruck(app, owner, { code: `P${i}`, plate: `POMPE-DEMO-${i}`, kind: 'pump' }),
+          ).id,
+        );
+
+      const types = await listConcreteTypes(app, owner);
+      const typeId = (code: string) => types.find((t) => t.code === code)!.id;
+      const components = await listComponents(app, owner);
+      const comp = (nameFr: string) => components.find((c) => c.nameFr === nameFr)!;
+
+      // Recipes per plant (different mixes) and the reference prices per plant.
+      const mix = (c: number, s: number, g1: number, g2: number, w: number, a: number) => [
+        { componentId: comp('Ciment').id, qtyPerM3: c },
+        { componentId: comp('Sable').id, qtyPerM3: s },
+        { componentId: comp('Gravette 8/15').id, qtyPerM3: g1 },
+        { componentId: comp('Gravette 15/25').id, qtyPerM3: g2 },
+        { componentId: comp('Eau').id, qtyPerM3: w },
+        { componentId: comp('Adjuvant').id, qtyPerM3: a },
+      ];
+      must(
+        'recipe B25 Chefchaouen',
+        await createRecetteVersion(app, owner, typeId('B25'), {
+          plantId: chf.id,
+          effectiveFrom: '2026-01-02',
+          lines: mix(335_000, 830_000, 380_000, 610_000, 182, 3_200),
+        }),
+      );
+      must(
+        'recipe B30 Tétouan',
+        await createRecetteVersion(app, owner, typeId('B30'), {
+          plantId: tet.id,
+          effectiveFrom: '2026-01-02',
+          lines: mix(415_000, 770_000, 380_000, 570_000, 172, 4_200),
+        }),
+      );
+      for (const [code, centimes] of [
+        ['B20', 80_000],
+        ['B25', 87_000],
+        ['B30', 95_000],
+      ] as const)
+        must(
+          `price ${code} Chefchaouen`,
+          await createListPrice(app, owner, {
+            concreteTypeId: typeId(code),
+            plantId: chf.id,
+            priceHtPerM3Centimes: centimes,
+            effectiveFrom: '2026-01-02',
+          }),
+        );
+      must(
+        'price B25 Tétouan',
+        await createListPrice(app, owner, {
+          concreteTypeId: typeId('B25'),
+          plantId: tet.id,
+          priceHtPerM3Centimes: 86_000,
+          effectiveFrom: '2026-01-02',
+        }),
+      );
+
+      // Obviously fictitious parties: fake ICE, fake phones that cannot be dialled (0000 00 xxxx: 00 is the international prefix and no country code starts with 0).
+      const supplierCement = must(
+        'supplier Ciment Démo',
+        await createSupplier(app, owner, {
+          name: 'Ciment Démo',
+          category: 'cement',
+          ice: '000000000000101',
+          phone: '0000 00 0101',
+          paymentTermsDays: 30,
+          leadTimeDays: 3,
+        }),
+      );
+      must(
+        'supplier Carburant Démo',
+        await createSupplier(app, owner, {
+          name: 'Carburant Démo',
+          category: 'fuel',
+          ice: '000000000000102',
+          phone: '0000 00 0102',
+          paymentTermsDays: 15,
+          leadTimeDays: 1,
+        }),
+      );
+      const clients = [];
+      for (let i = 1; i <= 4; i++) {
+        const r = must(
+          `client ${i}`,
+          await createClient(app, owner, {
+            name: `Client Démo ${i}`,
+            kind: 'company',
+            ice: `00000000000020${i}`,
+            phone: `0000 00 000${i}`,
+            paymentTermsDays: 30,
+          }),
+        );
+        clients.push(r.client);
+      }
+
+      // Stock and fuel of Chefchaouen, a purchase received in two states, a transfer between the plants.
+      const opening = addDays(today, -30);
+      for (const [name, qty] of [
+        ['Ciment', 60_000_000],
+        ['Sable', 150_000_000],
+        ['Gravette 8/15', 90_000_000],
+        ['Gravette 15/25', 90_000_000],
+        ['Eau', 40_000],
+        ['Adjuvant', 400_000],
+      ] as const)
+        must(
+          `opening ${name}`,
+          await setOpeningStock(app, owner, {
+            componentId: comp(name).id,
+            date: opening,
+            qtyBase: qty,
+            plantId: chf.id,
+          }),
+        );
+      must(
+        'fuel Chefchaouen',
+        await setFuelTankOpening(app, owner, { plantId: chf.id, litres: 3_000, asOf: opening }),
+      );
+      must(
+        'fuel Tétouan',
+        await setFuelTankOpening(app, owner, { plantId: tet.id, litres: 5_000, asOf: opening }),
+      );
+
+      const purchase = must(
+        'purchase Chefchaouen',
+        await createPurchase(
+          app,
+          inChf,
+          {
+            supplierId: supplierCement.id,
+            plantId: chf.id,
+            lines: [
+              {
+                componentId: comp('Ciment').id,
+                purchaseUnitId: await unitOf(app, owner, comp('Ciment').id, 't'),
+                qtyMilli: 20_000,
+                unitPriceHtCentimes: 145_000,
+              },
+            ],
+          },
+          { today },
+        ),
+      );
+
+      // 7. Phone accounts: three drivers of the pilot's rotations and a pump operator, each with a code and a PIN.
+      const deps = { appPool: app, authPool, auth, secret: env.AUTH_SECRET };
+      const driverRows = await listDrivers(app, owner);
+      for (const d of driverRows.filter((x) => x.kind === 'driver').slice(0, 3)) {
+        must(`field account ${d.code}`, await createFieldAccount(deps, owner, d.id));
+        const pin = generatePin();
+        must(`pin ${d.code}`, await setDriverPin(deps, owner, { driverId: d.id, pin }));
+        issued.push({
+          label: `Chauffeur ${d.name}`,
+          role: 'driver',
+          login: d.code,
+          secret: pin,
+          secretKind: 'pin',
+        });
+      }
+      const operator = await addPumpOperator(app, owner, 'Pompiste Démo');
+      must('field account pump operator', await createFieldAccount(deps, owner, operator.id));
+      const operatorPin = generatePin();
+      must('pin pump operator', await setDriverPin(deps, owner, { driverId: operator.id, pin: operatorPin }));
       issued.push({
-        label: `Chauffeur ${d.name}`,
-        role: 'driver',
-        login: d.code,
-        secret: pin,
+        label: 'Pompiste Démo',
+        role: 'pump_operator',
+        login: operator.code,
+        secret: operatorPin,
         secretKind: 'pin',
       });
-    }
-    const operator = await addPumpOperator(app, owner, 'Pompiste Démo');
-    must('field account pump operator', await createFieldAccount(deps, owner, operator.id));
-    const operatorPin = generatePin();
-    must('pin pump operator', await setDriverPin(deps, owner, { driverId: operator.id, pin: operatorPin }));
-    issued.push({
-      label: 'Pompiste Démo',
-      role: 'pump_operator',
-      login: operator.code,
-      secret: operatorPin,
-      secretKind: 'pin',
-    });
 
-    // 8. Activity at Chefchaouen: orders (one pumped with a pump on site, one waiting for a price), a counted arrival with a refused part,
-    //    a material and a fuel transfer from Tétouan.
-    const c1 = clients[0]!;
-    const c2 = clients[1]!;
-    const tomorrow = addDays(today, 1);
-    must(
-      'order Chefchaouen A',
-      await createOrder(
-        app,
-        inChf,
-        {
-          clientId: c1.id,
-          plantId: chf.id,
-          concreteTypeId: typeId('B25'),
-          dischargeMethod: 'POMPE',
-          volumeL: 22_000,
-          deliveryDate: tomorrow,
-          plan: { preset: 'advance50' },
-        },
-        { today },
-      ),
-    );
-    const orderB = must(
-      'order Chefchaouen B',
-      await createOrder(
-        app,
-        inChf,
-        {
-          clientId: c2.id,
-          plantId: chf.id,
-          concreteTypeId: typeId('B30'),
-          dischargeMethod: 'GOULOTTE',
-          volumeL: 11_000,
-          deliveryDate: today,
-          plan: { preset: 'cash' },
-        },
-        { today },
-      ),
-    );
-    must(
-      'order Tétouan C',
-      await createOrder(
-        app,
-        inTet,
-        {
-          clientId: c1.id,
-          plantId: tet.id,
-          concreteTypeId: typeId('B20'),
-          dischargeMethod: 'GOULOTTE',
-          volumeL: 32_000,
-          deliveryDate: tomorrow,
-          plan: { preset: 'cheque30' },
-        },
-        { today },
-      ),
-    );
-    const orderBId = orderB.id;
-    must('order B pumped', await setOrderPumped(app, owner, { orderId: orderBId, pumped: true }));
-    must(
-      'pump on site',
-      await schedulePumpJob(
-        app,
-        owner,
-        {
-          date: today,
-          pumpId: pumpIds[0]!,
-          operatorId: operator.id,
-          orderId: orderBId,
-          onSiteMin: 420,
-          siteLabel: 'Chantier Démo Chefchaouen',
-          plannedM3: 11,
-        },
-        cipher,
-      ),
-    );
-    const manager = created.get('centrale-chefchaouen')!.session;
-    must(
-      'arrival counted',
-      await confirmArrivalAtPlant(app, manager, {
-        purchaseId: purchase.id,
-        note: 'camion démo',
-        lines: [
+      // 8. Activity at Chefchaouen: orders (one pumped with a pump on site, one waiting for a price), a counted arrival with a refused part,
+      //    a material and a fuel transfer from Tétouan.
+      const c1 = clients[0]!;
+      const c2 = clients[1]!;
+      const tomorrow = addDays(today, 1);
+      must(
+        'order Chefchaouen A',
+        await createOrder(
+          app,
+          inChf,
           {
-            lineId: await purchaseLineOf(app, owner, purchase.id),
-            arrivedMilli: 12_000,
-            rejectedMilli: 1_000,
-            available: true,
+            clientId: c1.id,
+            plantId: chf.id,
+            concreteTypeId: typeId('B25'),
+            dischargeMethod: 'POMPE',
+            volumeL: 22_000,
+            deliveryDate: tomorrow,
+            plan: { preset: 'advance50' },
           },
-        ],
-      }),
-    );
-    const sent = must(
-      'material transfer',
-      await sendTransfer(app, owner, {
-        kind: 'material',
-        fromPlant: tet.id,
-        toPlant: chf.id,
-        componentId: comp('Ciment').id,
-        qty: 5_000_000,
-        date: today,
-      }),
-    );
-    must('transfer picked up', await pickUpTransfer(app, owner, sent.id));
-    must(
-      'fuel transfer',
-      await sendTransfer(app, owner, {
-        kind: 'fuel',
-        fromPlant: tet.id,
-        toPlant: chf.id,
-        qty: 500,
-        date: today,
-      }),
-    );
-
+          { today },
+        ),
+      );
+      const orderB = must(
+        'order Chefchaouen B',
+        await createOrder(
+          app,
+          inChf,
+          {
+            clientId: c2.id,
+            plantId: chf.id,
+            concreteTypeId: typeId('B30'),
+            dischargeMethod: 'GOULOTTE',
+            volumeL: 11_000,
+            deliveryDate: today,
+            plan: { preset: 'cash' },
+          },
+          { today },
+        ),
+      );
+      must(
+        'order Tétouan C',
+        await createOrder(
+          app,
+          inTet,
+          {
+            clientId: c1.id,
+            plantId: tet.id,
+            concreteTypeId: typeId('B20'),
+            dischargeMethod: 'GOULOTTE',
+            volumeL: 32_000,
+            deliveryDate: tomorrow,
+            plan: { preset: 'cheque30' },
+          },
+          { today },
+        ),
+      );
+      const orderBId = orderB.id;
+      must('order B pumped', await setOrderPumped(app, owner, { orderId: orderBId, pumped: true }));
+      must(
+        'pump on site',
+        await schedulePumpJob(
+          app,
+          owner,
+          {
+            date: today,
+            pumpId: pumpIds[0]!,
+            operatorId: operator.id,
+            orderId: orderBId,
+            onSiteMin: 420,
+            siteLabel: 'Chantier Démo Chefchaouen',
+            plannedM3: 11,
+          },
+          cipher,
+        ),
+      );
+      const manager = created.get('centrale-chefchaouen')!.session;
+      must(
+        'arrival counted',
+        await confirmArrivalAtPlant(app, manager, {
+          purchaseId: purchase.id,
+          note: 'camion démo',
+          lines: [
+            {
+              lineId: await purchaseLineOf(app, owner, purchase.id),
+              arrivedMilli: 12_000,
+              rejectedMilli: 1_000,
+              available: true,
+            },
+          ],
+        }),
+      );
+      const sent = must(
+        'material transfer',
+        await sendTransfer(app, owner, {
+          kind: 'material',
+          fromPlant: tet.id,
+          toPlant: chf.id,
+          componentId: comp('Ciment').id,
+          qty: 5_000_000,
+          date: today,
+        }),
+      );
+      must('transfer picked up', await pickUpTransfer(app, owner, sent.id));
+      must(
+        'fuel transfer',
+        await sendTransfer(app, owner, {
+          kind: 'fuel',
+          fromPlant: tet.id,
+          toPlant: chf.id,
+          qty: 500,
+          date: today,
+        }),
+      );
+    }
     // 8b. R11-08: the finance module's database switch is turned on for the training instance (it defaults to off). This is provisioning by
     //     the seed, like the step-up flag of its other doors, not a runtime path: the application still asks every finance request for the
     //     user's REAL authenticator (a password-only training sign-in is refused by finance), which a training account may enrol on its own.
@@ -602,9 +610,10 @@ export async function seedTraining(opts: SeedTrainingOptions): Promise<SeedTrain
 
     // 8c. T5: the working day of the training instance (rotations for the three drivers, orders to dispatch and to cancel, quotes,
     //     a delivery to receive, a low-stock alert), dated from today. `rearm:training` does the same on any later morning.
-    lock.assertHeld('the training day');
-    await armTrainingDay(env, today, { requireMarker: false });
-
+    if (!twinBase) {
+      lock.assertHeld('the training day');
+      await armTrainingDay(env, today, { requireMarker: false });
+    }
     // 9. Credentials first, marker last (R11-04, R11-02). The file is staged privately and exclusively; if it cannot be written the seed
     //    stops here, with no marker, saying so. Only then is it put in place, and only then is the database marked: the marker means
     //    "completed seed, credentials in the hands of the operator". If the marker cannot be written the file is taken away again.
@@ -708,6 +717,8 @@ if (import.meta.main) {
       env,
       today: businessDateOf(realClock.now()),
       credentialsFile: requireOutputPath(),
+      // T20: `TRAINING_SEED_PROFILE=twin-base` seeds the structure and the accounts only, for the twin seed to build on.
+      ...(process.env.TRAINING_SEED_PROFILE === 'twin-base' ? { profile: 'twin-base' as const } : {}),
     });
     console.log(
       result.applied
