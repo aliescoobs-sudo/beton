@@ -197,6 +197,11 @@ export const TABLE_ACCESS = {
     exception:
       'T1: the marker of a database seeded with the training data. Written by seed:training through the maintenance login only; no runtime login reads the table, they ask public.training_seeded().',
   },
+  twin_seed_marker: {
+    kind: 'auth_only',
+    reason:
+      'T20 (D251): the one-row marker left by the fictitious twin seed (idempotency). Written and read only by the seed script through the maintenance login (belgobeton_migrator policy); RLS forced, no grant to any runtime login (app, system, auth).',
+  },
   plant: {
     kind: 'rls',
     read: {
